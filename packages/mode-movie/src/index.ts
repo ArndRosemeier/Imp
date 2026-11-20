@@ -21,6 +21,7 @@ export {
   createMovieMode,
   filmEditor,
   productionDesigner,
+  soundEditor,
   screenwriter,
   soundDesigner,
 } from './mode.js';
@@ -43,6 +44,7 @@ export {
   VoiceSample,
 } from './schema.js';
 export { createEditCommands } from './edit.js';
+export { LibrarySound, soundLibrary } from './library.js';
 export {
   clipPrompt,
   createShotCommands,
@@ -58,3 +60,5 @@ export {
   soundPrompt,
 } from './sounds.js';
 export { createCharacterVoiceCommands, SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
+export { movieCopier, movieProjectSupport, summarizeMovie } from './project.js';
+export { movieTemplates } from './templates.js';

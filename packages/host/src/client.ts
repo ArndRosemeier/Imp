@@ -28,12 +28,22 @@ export interface ImpClient {
   run(commandId: string, input: unknown): Promise<ExecutionResult<unknown>>;
   /** Calls `listener` after each change to the store under `prefix`. */
   subscribe(prefix: string, listener: () => void): () => void;
-  blob(key: string): Promise<StoredFile | undefined>;
+  /** Reads a stored file. `take` removes an export once it is read. */
+  blob(key: string, take?: boolean): Promise<StoredFile | undefined>;
+  /** Stores a file the person picked and returns its key, for project.import and the like. */
+  upload(bytes: Uint8Array, mediaType: string): Promise<string>;
   listModels(): Promise<readonly ModelInfo[]>;
   /** Resolves when the stored key is accepted. */
   verifyCredentials(): Promise<void>;
   /** The key is kept on this side and handed to the core. */
   readonly secrets: SecretStore;
+}
+
+/** Bytes per upload part: base64 makes 4 MiB about 5.3 MB, under the local server's 8 MB. */
+const UPLOAD_PART = 4 * 1024 * 1024;
+
+function newUploadId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export function connectImp(
@@ -93,7 +103,18 @@ export function connectImp(
       return described.modes;
     },
     run: (commandId, input) => ask('run', commandId, input),
-    blob: (key) => ask('blob', key),
+    blob: (key, take) => ask('blob', key, take),
+    upload: async (bytes, mediaType) => {
+      const uploadId = newUploadId();
+      // Parts stay well under what the local server takes in one message.
+      for (let at = 0; at + UPLOAD_PART < bytes.length; at += UPLOAD_PART) {
+        await ask('upload', uploadId, bytes.slice(at, at + UPLOAD_PART), null);
+      }
+      const lastStart = Math.max(0, Math.floor((bytes.length - 1) / UPLOAD_PART) * UPLOAD_PART);
+      const done = await ask('upload', uploadId, bytes.slice(lastStart), { mediaType });
+      if (done === null) throw new Error('The file did not arrive.');
+      return done.key;
+    },
     listModels: () => ask('models'),
     verifyCredentials: async () => {
       await ask('verify');

@@ -697,6 +697,19 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                 }
               />
             ))}
+            <label className="row">
+              <input
+                type="checkbox"
+                checked={character.voiceOnly}
+                onChange={(event) => {
+                  void act('movie.character.update', {
+                    characterId: character.id,
+                    voiceOnly: event.target.checked,
+                  });
+                }}
+              />
+              Voice only (a narrator: heard, never seen)
+            </label>
             <CharacterVoice character={character} model={speech.model} act={act} />
             <div className="row">
               <ConfirmButton

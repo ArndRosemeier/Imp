@@ -72,12 +72,20 @@ describe('the movie mode', () => {
       'shots',
       'sound',
       'edit',
+      'audio',
     ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
       isInScope(command, screenwriter.scope),
     );
-    expect(outside.map((command) => command.id)).toEqual(['project.list']);
+    expect(outside.map((command) => command.id).sort()).toEqual([
+      'project.list',
+      'project.resources.copy',
+      'project.resources.list',
+      'project.resources.request.get',
+      'project.resources.request.list',
+      'project.resources.request.resolve',
+    ]);
     expect(movieMode.commands.every((command) => isInScope(command, castingDirector.scope))).toBe(
       true,
     );
@@ -212,8 +220,8 @@ describe('characters', () => {
     await run('movie.character.update', { characterId: mara.id, voice: 'Low and dry.' });
     expect(await run('movie.character.list', {})).toEqual({
       characters: [
-        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null },
-        { id: tomas.id, name: 'Tomas', part: '', portraitId: null },
+        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
+        { id: tomas.id, name: 'Tomas', part: '', portraitId: null, voiceOnly: false },
       ],
     });
     expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
@@ -233,6 +241,7 @@ describe('characters', () => {
         images: [],
         portraitId: null,
         voiceSample: null,
+        voiceOnly: false,
       },
       expect.objectContaining({ name: 'Tomas' }),
     ]);
@@ -316,6 +325,7 @@ describe('character images', () => {
           name: 'Mara',
           part: 'protagonist',
           portraitId: first.image.id,
+          voiceOnly: false,
         },
       ],
     });
@@ -445,6 +455,11 @@ describe('character voice samples', () => {
   it('records an introduction in the written voice and keeps it with the character', async () => {
     const { run, runtime, provider, mara, record } = await withMara();
     const first = await record();
+    expect(await run('movie.sound.library', {})).toMatchObject({
+      sounds: [
+        { kind: 'voice', label: expect.stringContaining('voice sample') as string, sceneId: null },
+      ],
+    });
     expect(provider.speechRequests[0]).toEqual({
       model: 'vendor/speaker',
       text: 'Hello. My name is Mara.',
@@ -459,7 +474,9 @@ describe('character voice samples', () => {
     });
     // The outline of the cast does not carry it.
     expect(await run('movie.character.list', {})).toEqual({
-      characters: [{ id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null }],
+      characters: [
+        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
+      ],
     });
   });
 
@@ -654,6 +671,33 @@ describe('shots and clips', () => {
     expect(clipPrompt(offscreen, [], '')).toBe('Dark stairs.\nA voice says "Hello?"');
   });
 
+  it('keeps a voice-only narrator out of the prompt and the picture', async () => {
+    const { run, mara, add } = await withScene();
+    const narrator = Character.parse(
+      await run('movie.character.create', {
+        name: 'Narrator',
+        appearance: 'An old man in a chair.',
+        voice: 'Warm, slow.',
+        voiceOnly: true,
+      }),
+    );
+    expect(narrator.voiceOnly).toBe(true);
+    expect(
+      Character.parse(await run('movie.character.get', { characterId: narrator.id })).voiceOnly,
+    ).toBe(true);
+    const shot = Shot.parse(
+      await add({ description: 'The lamp turns.', line: 'It had burned for a century.' }),
+    );
+    const narrated = { ...shot, speakerId: narrator.id };
+    expect(clipPrompt(narrated, [Character.parse(mara), narrator], '')).toBe(
+      'The lamp turns.\nMara: Seventy, grey braid.\nNobody in the picture speaks; a voice-over is added later.',
+    );
+    const unset = Character.parse(
+      await run('movie.character.update', { characterId: narrator.id, voiceOnly: false }),
+    );
+    expect(unset.voiceOnly).toBe(false);
+  });
+
   it('starts a clip with the portraits as guides, then stores it when it is done', async () => {
     const { run, runtime, registry, provider, mara, at, storm } = await withScene();
     await registry.executeById(
@@ -753,6 +797,15 @@ describe('shots and clips', () => {
       instructions: expect.stringContaining('Delivery: Screaming over the wind.') as string,
     });
     expect(spoken.dialogue).toMatchObject({ line: 'Tomas! Get away from the rail!' });
+    expect(await run('movie.sound.library', {})).toMatchObject({
+      sounds: [
+        {
+          key: spoken.dialogue.blobKey,
+          kind: 'dialogue',
+          label: 'Shot 1: Tomas! Get away from the rail!',
+        },
+      ],
+    });
     expect(await run('movie.shot.list', { sceneId: shot['sceneId'] })).toMatchObject({
       shots: [{ dialogue: true }],
     });
@@ -1199,6 +1252,13 @@ describe('sounds', () => {
       { model: 'vendor/composer', kind: 'music', prompt: 'Low strings.\nInstrumental, no vocals.' },
     ]);
     expect(await takes()).toBe(2);
+    const library = (await run('movie.sound.library', {})) as unknown as {
+      sounds: { label: string; kind: string }[];
+    };
+    expect(library.sounds.map((sound) => [sound.kind, sound.label])).toEqual([
+      ['effect', 'Sound effect'],
+      ['music', 'Music'],
+    ]);
   });
 
   it('removes the files with the sound and with the scene', async () => {

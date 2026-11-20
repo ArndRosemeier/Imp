@@ -601,13 +601,13 @@ export function DesignView({ project }: { project: Project }): ReactElement {
         </span>
       </div>
       <div className="row wrap model-pickers">
-        <div className="segmented" role="tablist" aria-label="Kind">
+        <div className="kind-switch" role="tablist" aria-label="Kind">
           {(['location', 'object'] as const).map((candidate) => (
             <button
               key={candidate}
               role="tab"
               aria-selected={kind === candidate}
-              className="segment"
+              className="kind-segment"
               onClick={() => {
                 setKind(candidate);
               }}

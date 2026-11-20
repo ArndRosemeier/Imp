@@ -394,6 +394,7 @@ export const characterCreate = defineCommand({
     description: Character.shape.description.default(''),
     appearance: Character.shape.appearance.default(''),
     voice: Character.shape.voice.default(''),
+    voiceOnly: Character.shape.voiceOnly,
   }),
   output: Character,
   handler: async ({ runtime }, { projectId, ...fields }) => {
@@ -438,6 +439,7 @@ export const characterUpdate = defineCommand({
       description: changes.description ?? current.description,
       appearance: changes.appearance ?? current.appearance,
       voice: changes.voice ?? current.voice,
+      voiceOnly: changes.voiceOnly ?? current.voiceOnly,
       images: current.images,
       portraitId: current.portraitId,
       voiceSample: current.voiceSample,

@@ -56,7 +56,7 @@ async function completeSetup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /Continue/ }));
   await user.type(await screen.findByLabelText(/Model/), 'vendor/writer');
   await user.click(screen.getByRole('button', { name: /Hire the coordinator/ }));
-  await screen.findByRole('heading', { name: 'Crew' });
+  await screen.findByRole('heading', { name: 'Projects' });
 }
 
 beforeAll(() => {
@@ -407,6 +407,7 @@ describe('App', () => {
     expect(screen.getByText('Delete it.')).toBeTruthy();
 
     // Hiring a specialist and handing it work goes through an approval and then continues.
+    await user.click(await screen.findByRole('button', { name: 'Crew' }));
     await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));
     await screen.findByLabelText('Talking to');
     const crew = await imp.store.list('crew/');
@@ -603,6 +604,11 @@ describe('App', () => {
     const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
+    // jsdom cannot record video, so export says so instead of offering a broken button.
+    expect(screen.getByText(/cannot record video/)).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Export film/ }).disabled).toBe(
+      true,
+    );
 
     await user.click(first);
     expect(await screen.findByText(/Shot 1/, { selector: 'h3' })).toBeTruthy();
@@ -625,6 +631,144 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /Delete/ }));
     await vi.waitFor(() => {
       expect(screen.queryByRole('button', { name: /Title 2: Title/ })).toBeNull();
+    });
+  });
+
+  it('manages projects from the start screen: templates, duplicates, export, import, delete', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    const call = async (id: string, input: unknown) => {
+      const result = await imp.registry.executeById(id, input, {
+        actor: { kind: 'user', id: 'local' },
+      });
+      return (result as { output: Record<string, unknown> }).output;
+    };
+
+    await user.click(screen.getByRole('button', { name: 'New project' }));
+    await user.type(await screen.findByLabelText('Working title'), 'Storm');
+    await user.click(screen.getByRole('radio', { name: 'Short film' }));
+    await user.click(screen.getByRole('button', { name: /Create project/ }));
+    await screen.findByRole('heading', { name: 'Development' });
+    await user.click(screen.getByRole('button', { name: 'Projects' }));
+    expect(await screen.findByRole('heading', { name: 'Storm' })).toBeTruthy();
+    expect(screen.getByText('Open')).toBeTruthy();
+    expect(screen.getAllByText('0/5').length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate: Storm' }));
+    expect(await screen.findByRole('heading', { name: 'Storm (2)' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Rename: Storm (2)' }));
+    const field = screen.getByLabelText('Project name');
+    await user.clear(field);
+    await user.type(field, 'Squall{Enter}');
+    expect(await screen.findByRole('heading', { name: 'Squall' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Save as template: Squall' }));
+    await user.click(await screen.findByRole('button', { name: /Save template/ }));
+    expect(await screen.findByText(/Saved the template “Squall template”/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Your templates' })).toBeTruthy();
+
+    // Export hands the file over and removes it from the store.
+    let saved = 0;
+    HTMLAnchorElement.prototype.click = () => {
+      saved += 1;
+    };
+    await user.click(screen.getByRole('button', { name: 'Export to a file: Squall' }));
+    expect(await screen.findByText(/Saved Squall\.imp\.zip/)).toBeTruthy();
+    expect(saved).toBe(1);
+    expect(await imp.blobs.list('exports/')).toEqual([]);
+
+    // Import a file made by export.
+    const projects = (await call('project.list', {}))['projects'] as { id: string; name: string }[];
+    const squall = projects.find((p) => p.name === 'Squall');
+    const exported = await call('project.export', { projectId: squall?.id });
+    const file = await imp.blobs.get(String(exported['fileKey']));
+    const picked = new File([file?.bytes.slice() ?? new Uint8Array()], 'Squall.imp.zip', {
+      type: 'application/zip',
+    });
+    await user.upload(screen.getByLabelText('Project file to import'), picked);
+    expect(await screen.findByRole('heading', { name: 'Squall (2)' })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Delete: Squall (2)' }));
+    await user.click(await screen.findByRole('button', { name: /Delete for good/ }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Squall (2)' })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Delete template Squall template' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Your templates' })).toBeNull();
+    });
+  });
+
+  it('copies between projects and puts collisions to the person, also when an agent copies', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    const call = async (
+      id: string,
+      input: unknown,
+      actor: Record<string, string> = { kind: 'user', id: 'local' },
+    ) => {
+      const result = await imp.registry.executeById(id, input, { actor: actor as never });
+      return (result as { output: Record<string, unknown> }).output;
+    };
+    const a = await call('project.create', { name: 'Keeper', mode: 'movie' });
+    const b = await call('project.create', { name: 'Tide', mode: 'movie' });
+    await call('movie.character.create', { projectId: a['id'], name: 'Mara' });
+    await call('movie.character.create', { projectId: a['id'], name: 'Tomas' });
+    await call('movie.character.create', { projectId: b['id'], name: 'Mara' });
+
+    await user.click(await screen.findByRole('button', { name: 'Copy between projects' }));
+    await user.selectOptions(screen.getByLabelText('From', { exact: true }), 'Keeper');
+    await user.selectOptions(screen.getByLabelText('Into', { exact: true }), 'Tide');
+    await user.click(await screen.findByRole('checkbox', { name: /^Tomas/ }));
+    await user.click(screen.getByRole('button', { name: /^Copy 1/ }));
+    expect(await screen.findByText(/Copied 1 into “Tide”/)).toBeTruthy();
+
+    // An agent asks; the question comes to the person.
+    const cast = (await call('movie.character.list', { projectId: a['id'] }))['characters'] as {
+      id: string;
+      name: string;
+    }[];
+    const maraId = cast.find((c) => c.name === 'Mara')?.id;
+    const asked = await call(
+      'project.resources.copy',
+      {
+        fromProjectId: a['id'],
+        toProjectId: b['id'],
+        items: [{ kind: 'character', id: maraId }],
+        note: 'Mara appears in the sequel.',
+      },
+      { kind: 'agent', id: 'c', role: 'casting-director' },
+    );
+    expect(asked['status']).toBe('waiting-for-person');
+    const dialog = await screen.findByRole('dialog', { name: 'Already in the target' });
+    expect(within(dialog).getByText(/Casting director wants to copy/)).toBeTruthy();
+    expect(within(dialog).getByText('Mara appears in the sequel.')).toBeTruthy();
+    expect(within(dialog).getByRole('radio', { name: 'Keep both' })).toHaveProperty(
+      'checked',
+      true,
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Skip' }));
+    await user.click(within(dialog).getByRole('radio', { name: 'Overwrite' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Copy' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Already in the target' })).toBeNull();
+    });
+    const request = await call('project.resources.request.get', { requestId: asked['requestId'] });
+    expect(request['status']).toBe('done');
+    expect((request['outcomes'] as { outcome: string }[])[0]?.outcome).toBe('overwritten');
+
+    // Cancelling also answers it.
+    const again = await call('project.resources.copy', {
+      fromProjectId: a['id'],
+      toProjectId: b['id'],
+      items: [{ kind: 'character', id: maraId }],
+    });
+    await user.click(await screen.findByRole('button', { name: 'Cancel the copy' }));
+    await vi.waitFor(async () => {
+      expect(
+        (await call('project.resources.request.get', { requestId: again['requestId'] }))['status'],
+      ).toBe('cancelled');
     });
   });
 
@@ -688,6 +832,41 @@ describe('App', () => {
     expect(await imp.blobs.list('')).toEqual([]);
   });
 
+  it('opens an audio document and edits its tracks with undo', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+
+    await user.click(screen.getByRole('button', { name: 'Audio' }));
+    expect(await screen.findByText(/No sounds are recorded yet/)).toBeTruthy();
+    await user.type(screen.getByLabelText('Name'), 'Lamp room');
+    await user.click(screen.getByRole('button', { name: /Start empty/ }));
+    expect(await screen.findByRole('tab', { name: 'Lamp room' })).toBeTruthy();
+    expect(await screen.findByText('1 track')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /Add track/ }));
+    expect(await screen.findByText('2 tracks')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Mute Track 2' }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mute Track 2' })).toHaveProperty(
+        'ariaPressed',
+        'true',
+      );
+    });
+    expect(await screen.findByRole('heading', { name: 'Audio' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mute Track 2' })).toHaveProperty(
+        'ariaPressed',
+        'false',
+      );
+    });
+    expect(screen.getByRole('button', { name: 'Play' })).toHaveProperty('disabled', true);
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);
@@ -716,6 +895,7 @@ describe('App', () => {
   it('switches web search on for a crew member', async () => {
     const { imp, user } = start();
     await completeSetup(user);
+    await user.click(await screen.findByRole('button', { name: 'Crew' }));
     const box = await screen.findByRole('checkbox', { name: 'Coordinator can search the web' });
     expect(box).toHaveProperty('checked', false);
     await user.click(box);
@@ -731,6 +911,7 @@ describe('App', () => {
   it('defines a custom role, hires for it and deletes it again', async () => {
     const { imp, user } = start();
     await completeSetup(user);
+    await user.click(await screen.findByRole('button', { name: 'Crew' }));
     await user.click(screen.getByRole('button', { name: /New role/ }));
     const form = screen.getByRole('form', { name: 'New role' });
     await user.type(within(form).getByLabelText('Name'), 'Dialogue Polisher');
@@ -758,5 +939,15 @@ describe('App', () => {
     await vi.waitFor(async () => {
       expect(await imp.store.get('roles/dialogue-polisher')).toBeUndefined();
     });
+  });
+});
+
+describe('title cards in an exported video', () => {
+  it('wraps words into lines that fit', async () => {
+    const { wrapLines } = await import('../src/app/export.js');
+    const fits = (line: string): boolean => line.length <= 10;
+    expect(wrapLines('One two three four', fits)).toEqual(['One two', 'three four']);
+    expect(wrapLines('A\nB', fits)).toEqual(['A', 'B']);
+    expect(wrapLines('', fits)).toEqual(['']);
   });
 });

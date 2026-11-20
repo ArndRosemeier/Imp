@@ -308,6 +308,8 @@ export function createEditCommands(): readonly Command[] {
           });
           continue;
         }
+        // Stored files are the audio editor's own sources; a scene's lane does not hold them.
+        if (placement.source === 'file') continue;
         const shot = await loadShot(runtime.store, projectId, placement.sceneId, placement.shotId);
         if (shot === undefined) continue;
         lane.push({

@@ -13,7 +13,7 @@ import {
   CommandRegistry,
   mediaCommands,
   MemoryBlobStore,
-  projectCommands,
+  createProjectCommands,
   readProject,
   settingsCommands,
   type BlobStore,
@@ -87,7 +87,7 @@ export function createImp(options: ImpOptions): Imp {
   registry.register(
     ...settingsCommands,
     ...activityCommands,
-    ...projectCommands,
+    ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createAudioCommands({ codec: createDefaultAudioCodec() }),
     ...createWorldCommands({

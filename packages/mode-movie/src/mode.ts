@@ -5,10 +5,14 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import { libraryCommands } from './library.js';
 import { createSoundCommands } from './sounds.js';
+import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
-const SCOPE = { prefixes: ['movie.', 'world.', 'project.list', 'media.'] } as const;
+const SCOPE = {
+  prefixes: ['movie.', 'world.', 'project.list', 'project.resources.', 'media.'],
+} as const;
 
 export const screenwriter: Role = {
   id: 'screenwriter',
@@ -41,7 +45,9 @@ export const castingDirector: Role = {
     'entry per character. Write the appearance so precisely that an image model would draw',
     'the same person every time: age, build, face, hair, clothing, distinguishing marks.',
     'Describe the voice the same way: pitch, pace, accent, manner. Keep each character',
-    'consistent with what the script says and does not say about them. When asked for',
+    'consistent with what the script says and does not say about them. A narrator or other voice',
+    'that is never seen gets voiceOnly set to true: it needs a voice but no appearance, and it is',
+    'kept out of every clip. When asked for',
     'pictures, generate them with movie.character.image.generate; the appearance you wrote',
     'is the prompt, so improve the appearance first if it is thin. Look at what',
     'was made with media.view and judge it against the character: say what works, generate',
@@ -159,6 +165,25 @@ export const filmEditor: Role = {
   scope: SCOPE,
 };
 
+export const soundEditor: Role = {
+  id: 'sound-editor',
+  name: 'Sound Editor',
+  summary: 'Edits and mixes sound in the audio editor: cleans, trims, levels.',
+  brief: [
+    'You are a sound editor. You work in the audio editor with the same tools the person has',
+    'there. A document holds tracks of regions, and each region plays a stretch of a recorded',
+    'sound; movie.sound.library lists every recorded sound of the film with its key. Open',
+    'sounds with audio.doc.create or audio.region.insert. You cannot hear while you work, so',
+    'measure: audio.inspect gives levels (dialogue around -20 dB average, peaks below -1 dB)',
+    'and audio.waveform shows where sound and pauses are. Cut with audio.region.split,',
+    'audio.region.update (move, trim, fades, gain) and the range edits audio.edit.*; level with',
+    'audio.normalize and track gain. Listen with audio.listen to check a short stretch if you',
+    'can. Each change is a step the person can undo, and they can take back your whole pass at',
+    'once, so work in clear steps and say what you changed and why, by time.',
+  ].join(' '),
+  scope: { prefixes: ['movie.', 'project.list', 'media.', 'audio.'] },
+};
+
 /**
  * Movie creation: the first working mode. It needs the provider for what it
  * generates. The edit comes later.
@@ -177,6 +202,7 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       { id: 'shots', name: 'Shots' },
       { id: 'sound', name: 'Sound' },
       { id: 'edit', name: 'Edit' },
+      { id: 'audio', name: 'Audio' },
     ],
     commands: [
       ...movieCommands,
@@ -185,6 +211,7 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...createShotCommands(options.provider),
       ...createSoundCommands(options.provider),
       ...createEditCommands(),
+      ...libraryCommands,
     ],
     roles: [
       screenwriter,
@@ -193,7 +220,9 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       clipDesigner,
       soundDesigner,
       filmEditor,
+      soundEditor,
     ],
+    project: movieProjectSupport,
     // The pictures of the world are drawn in the film's tone.
     visualStyle: async (store, projectId) => {
       const stored = await store.get(movieDevelopmentKey(projectId));

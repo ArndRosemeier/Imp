@@ -16,9 +16,15 @@ export const SoundPlacement = z.object({
   id: z.string(),
   /**
    * What plays: a sound of the scene, the own sound of a shot's clip (taken apart
-   * from its picture), or the recorded dialogue of a shot.
+   * from its picture), the recorded dialogue of a shot, or any stored file by
+   * its key (`blobKey`), which is how the audio editor's own documents refer
+   * to sound.
    */
-  source: z.enum(['sound', 'clip', 'dialogue']).default('sound'),
+  source: z.enum(['sound', 'clip', 'dialogue', 'file']).default('sound'),
+  /** The stored file, for the source "file". */
+  blobKey: z.string().default(''),
+  /** A name to show, for example "Mara, line 3". Empty shows the source's own name. */
+  label: z.string().max(120).default(''),
   soundId: z.string(),
   /** Where the shot is, for the sources "clip" and "dialogue". */
   sceneId: z.string().default(''),
@@ -35,6 +41,8 @@ export const SoundPlacement = z.object({
   loop: z.boolean(),
   /** How long it plays, in seconds. Null plays the source to its end (or, looping, to the scene's end). */
   durationSeconds: z.number().positive().nullable().default(null),
+  /** Extra gain in decibels on top of the volume, so a quiet take can be raised. */
+  gainDb: z.number().min(-60).max(24).default(0),
   /** Left -1 to right 1; 0 is the middle. */
   pan: z.number().min(-1).max(1).default(0),
   /** The shape of both fades. */
