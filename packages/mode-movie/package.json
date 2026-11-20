@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@imp/agents": "workspace:*",
+    "@imp/audio": "workspace:*",
     "@imp/core": "workspace:*",
     "@imp/providers": "workspace:*",
     "zod": "^4.6.7"

@@ -30,6 +30,7 @@ agent must ask before spending money or destroying something.
 | `@imp/core`       | Commands, registry, policy, activity log, storage contract, settings | started |
 | `@imp/providers`  | Generation provider interface and the OpenRouter adapter             | started |
 | `@imp/agents`     | Crew, tasks, the tool loop, approvals, budgets, the coordinator      | started |
+| `@imp/audio`      | Sound placements, the mixing renderer, decoding, `audio.*` commands  | started |
 | `@imp/mode-movie` | The movie mode: development, script, casting                         | started |
 | `@imp/ui`         | Design tokens and shared components                                  | planned |
 | `apps/web`        | The workspace, and the browser host that runs the core in a worker   | started |
