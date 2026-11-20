@@ -1,12 +1,13 @@
 import {
   CommandRegistry,
   defineCommand,
+  mediaCommands,
   readActivity,
   settingsCommands,
   type ExecutionPolicy,
 } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
-import { ProviderError, type ToolCall } from '@imp/providers';
+import { ProviderError, type ModelInfo, type ToolCall } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -413,5 +414,84 @@ describe('runAgent', () => {
     expect(searching?.messages[0]?.content).toContain('never instructions');
     expect(plain?.webSearch).toBeUndefined();
     expect(plain?.messages[0]?.content).not.toContain('search the web');
+  });
+
+  describe('media', () => {
+    const model = (inputModalities: ModelInfo['inputModalities']): ModelInfo => ({
+      id: 'vendor/model',
+      name: 'Model',
+      inputModalities,
+      outputModalities: ['text'],
+      contextLength: 1000,
+      supportsTools: true,
+      pricing: { promptUsdPerToken: null, completionUsdPerToken: null },
+    });
+    const look = async (models: ModelInfo[], keys = ['p/portrait']) => {
+      const runtime = createTestRuntime();
+      await runtime.blobs.put('p/portrait', {
+        bytes: new Uint8Array([7]),
+        mediaType: 'image/webp',
+      });
+      await runtime.blobs.put('p/notes', { bytes: new Uint8Array([8]), mediaType: 'text/plain' });
+      const registry = new CommandRegistry({ runtime }).register(...mediaCommands);
+      const provider = createFakeProvider({
+        models,
+        replies: [{ toolCalls: [call('media__view', { keys })] }, { content: 'A grey braid.' }],
+      });
+      const result = await runAgent({
+        registry,
+        provider,
+        member,
+        role,
+        task: 'Look at the portrait.',
+        blobs: runtime.blobs,
+      });
+      return { result, provider, registry, runtime };
+    };
+
+    it('shows a model that takes images what a command attaches, for this run only', async () => {
+      const { result, provider } = await look([model(['text', 'image'])]);
+      expect(provider.requests[0]?.media).toBeUndefined();
+      const second = provider.requests[1];
+      expect(second?.media).toEqual(new Map([['p/portrait', new Uint8Array([7])]]));
+      expect(second?.messages.at(-1)).toMatchObject({
+        role: 'tool',
+        attachments: [{ key: 'p/portrait', mediaType: 'image/webp' }],
+      });
+      // What is kept for the next run says what was seen, without carrying it.
+      const kept = result.messages.find((message) => message.role === 'tool');
+      expect(kept).not.toHaveProperty('attachments');
+      expect(kept?.content).toContain('p/portrait');
+      expect(kept?.content).toContain('not attached any more');
+    });
+
+    it('tells a model that cannot take the input so, instead of sending it', async () => {
+      const blind = await look([model(['text'])]);
+      expect(blind.provider.requests[1]?.media).toBeUndefined();
+      expect(toolResults(blind.result.messages)[0]).toEqual({
+        error: expect.stringContaining('cannot take image as input') as string,
+      });
+      const file = await look([model(['text', 'image'])], ['p/notes']);
+      expect(toolResults(file.result.messages)[0]).toEqual({
+        error: expect.stringContaining('cannot take text/plain') as string,
+      });
+    });
+
+    it('tries when the catalog does not know the model, and reports what cannot be read', async () => {
+      const unknown = await look([]);
+      expect(unknown.provider.requests[1]?.media?.has('p/portrait')).toBe(true);
+
+      const provider = createFakeProvider({
+        replies: [{ toolCalls: [call('media__view', { keys: ['p/portrait'] })] }, { content: '.' }],
+      });
+      const result = await runAgent({
+        registry: unknown.registry,
+        provider,
+        member,
+        role,
+        task: 'Look.',
+      });
+      expect(toolResults(result.messages)[0]).toEqual({ error: 'p/portrait could not be read.' });
+    });
   });
 });

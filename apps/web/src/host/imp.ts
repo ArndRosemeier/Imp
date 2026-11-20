@@ -10,6 +10,7 @@ import {
 import {
   activityCommands,
   CommandRegistry,
+  mediaCommands,
   MemoryBlobStore,
   projectCommands,
   settingsCommands,
@@ -76,6 +77,7 @@ export function createImp(options: ImpOptions): Imp {
     ...settingsCommands,
     ...activityCommands,
     ...projectCommands,
+    ...mediaCommands,
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider),
     ...createCrewCommands(roles, {

@@ -28,7 +28,12 @@ export const ChatMessageSchema = z.discriminatedUnion('role', [
     content: z.string().nullable(),
     toolCalls: z.array(ToolCallSchema).optional(),
   }),
-  z.object({ role: z.literal('tool'), toolCallId: z.string(), content: z.string() }),
+  z.object({
+    role: z.literal('tool'),
+    toolCallId: z.string(),
+    content: z.string(),
+    attachments: z.array(z.object({ key: z.string(), mediaType: z.string() })).optional(),
+  }),
 ]);
 
 const UsageSchema = z.object({
@@ -118,6 +123,10 @@ function toChatMessages(messages: Conversation['messages']): ChatMessage[] {
         content: message.content,
         ...(message.context === undefined ? {} : { context: message.context }),
       };
+    }
+    if (message.role === 'tool') {
+      const { attachments, ...rest } = message;
+      return attachments === undefined ? rest : { ...rest, attachments };
     }
     if (message.role !== 'assistant') {
       return message;
@@ -242,6 +251,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           provider,
           member,
           role,
+          blobs: runtime.blobs,
           history: toChatMessages(before.messages),
           maxSteps: input.maxSteps,
           ...(input.task === undefined ? {} : { task: input.task }),

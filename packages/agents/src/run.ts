@@ -4,10 +4,13 @@ import {
   isInScope,
   toToolDefinitions,
   type Actor,
+  type BlobStore,
   type CommandRegistry,
 } from '@imp/core';
 import {
+  modalityOf,
   ProviderError,
+  type Attachment,
   type CancelSignal,
   type ChatMessage,
   type GenerationProvider,
@@ -80,6 +83,8 @@ export interface AgentRunOptions {
   readonly signal?: CancelSignal;
   /** Called with the conversation so far whenever it has grown, so it can be shown or stored. */
   readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
+  /** Where the media that commands show the agent is read from. Without it, nothing is shown. */
+  readonly blobs?: BlobStore;
 }
 
 const DEFAULT_MAX_STEPS = 20;
@@ -124,12 +129,40 @@ function withCacheMark(messages: readonly ChatMessage[]): ChatMessage[] {
   );
 }
 
+/** What a run leaves for the next one: no long results, and no media, which costs most of all. */
 function withoutLongResults(messages: readonly ChatMessage[]): ChatMessage[] {
-  return messages.map((message) =>
-    message.role === 'tool' && message.content.length > KEPT_RESULT_CHARS
+  return messages.map((message) => {
+    if (message.role !== 'tool') return message;
+    if (message.attachments !== undefined) {
+      const { attachments, ...rest } = message;
+      return {
+        ...rest,
+        content: JSON.stringify({
+          status: 'ok',
+          trimmed: true,
+          note: `You were shown ${attachments.map(({ key }) => key).join(', ')}. It is not attached any more. Look at it again if you need it.`,
+        }),
+      };
+    }
+    return message.content.length > KEPT_RESULT_CHARS
       ? { ...message, content: TRIMMED_RESULT }
-      : message,
-  );
+      : message;
+  });
+}
+
+interface ToolOutcome {
+  readonly content: string;
+  readonly attachments?: readonly Attachment[];
+}
+
+/** The media a command result asks to be shown, by the convention of `media.view`. */
+function attachmentsOf(output: unknown): Attachment[] {
+  const listed = (output as { attachments?: unknown } | null)?.attachments;
+  if (!Array.isArray(listed)) return [];
+  return listed.flatMap((entry: unknown) => {
+    const { key, mediaType } = (entry ?? {}) as { key?: unknown; mediaType?: unknown };
+    return typeof key === 'string' && typeof mediaType === 'string' ? [{ key, mediaType }] : [];
+  });
 }
 
 /**
@@ -179,7 +212,39 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     error,
   });
 
-  async function run(commandId: string, input: unknown): Promise<string> {
+  const media = new Map<string, Uint8Array>();
+  let accepted: ReadonlySet<string> | null | undefined;
+
+  /** What the agent's model takes as input, or null when the catalog does not know the model. */
+  async function inputKinds(): Promise<ReadonlySet<string> | null> {
+    if (accepted === undefined) {
+      const model = (await provider.listModels()).find(({ id }) => id === member.model);
+      accepted = model === undefined ? null : new Set<string>(model.inputModalities);
+    }
+    return accepted;
+  }
+
+  /** Loads what a result shows, or says why the agent cannot be shown it. */
+  async function attach(attachments: readonly Attachment[]): Promise<string | null> {
+    const kinds = await inputKinds();
+    for (const { key, mediaType } of attachments) {
+      const kind = modalityOf(mediaType);
+      if (kind === undefined || (kinds !== null && !kinds.has(kind))) {
+        return `Your model (${member.model}) cannot take ${kind ?? mediaType} as input, so ${key} cannot be shown to you. Say so instead of guessing what it contains.`;
+      }
+      const blob = media.has(key) ? undefined : await options.blobs?.get(key);
+      if (blob !== undefined) media.set(key, blob.bytes);
+      if (!media.has(key)) return `${key} could not be read.`;
+    }
+    return null;
+  }
+
+  async function run(commandId: string, input: unknown): Promise<ToolOutcome> {
+    const outcome = await runText(commandId, input);
+    return typeof outcome === 'string' ? { content: outcome } : outcome;
+  }
+
+  async function runText(commandId: string, input: unknown): Promise<string | ToolOutcome> {
     if (!registry.has(commandId) || !isInScope(registry.get(commandId), role.scope)) {
       return JSON.stringify({ error: `"${commandId}" is not a command you can run.` });
     }
@@ -192,7 +257,11 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
           note: 'The user must approve this before it runs. It has been put in front of them.',
         });
       }
-      return JSON.stringify({ status: 'ok', output: result.output });
+      const content = JSON.stringify({ status: 'ok', output: result.output });
+      const attachments = attachmentsOf(result.output);
+      if (attachments.length === 0) return content;
+      const refused = await attach(attachments);
+      return refused === null ? { content, attachments } : JSON.stringify({ error: refused });
     } catch (error) {
       if (error instanceof CommandError) {
         return JSON.stringify({ error: error.message, details: error.details });
@@ -201,15 +270,19 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     }
   }
 
-  async function execute(call: ToolCall): Promise<string> {
+  async function execute(call: ToolCall): Promise<ToolOutcome> {
     if (call.arguments === undefined) {
-      return JSON.stringify({ error: 'The arguments were not valid JSON. Call the tool again.' });
+      return {
+        content: JSON.stringify({
+          error: 'The arguments were not valid JSON. Call the tool again.',
+        }),
+      };
     }
     if (hidden.length > 0 && (call.name === FIND_TOOL || call.name === RUN_TOOL)) {
       const given = call.arguments as { query?: unknown; id?: unknown; input?: unknown } | null;
       const text = (value: unknown): string => (typeof value === 'string' ? value : '');
       if (call.name === FIND_TOOL) {
-        return JSON.stringify(findCommands(hidden, text(given?.query)));
+        return { content: JSON.stringify(findCommands(hidden, text(given?.query))) };
       }
       return run(text(given?.id), given?.input ?? {});
     }
@@ -233,6 +306,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
           messages: [system, ...withCacheMark(messages)],
           tools,
           ...(member.webSearch ? { webSearch: true } : {}),
+          ...(media.size > 0 ? { media } : {}),
         },
         options.signal === undefined ? {} : { signal: options.signal },
       );
@@ -258,7 +332,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       return finish(pendingApprovals.length > 0 ? 'awaiting-approval' : 'completed');
     }
     for (const call of response.toolCalls) {
-      messages.push({ role: 'tool', toolCallId: call.id, content: await execute(call) });
+      messages.push({ role: 'tool', toolCallId: call.id, ...(await execute(call)) });
     }
     await options.onProgress?.(messages);
   }

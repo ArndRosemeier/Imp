@@ -64,7 +64,30 @@ export type ChatMessage =
       readonly content: string | null;
       readonly toolCalls?: readonly ToolCall[];
     }
-  | ({ readonly role: 'tool'; readonly toolCallId: string; readonly content: string } & Cacheable);
+  | ({
+      readonly role: 'tool';
+      readonly toolCallId: string;
+      readonly content: string;
+      /** Media the tool hands the model to look at or listen to, beside its text result. */
+      readonly attachments?: readonly Attachment[];
+    } & Cacheable);
+
+/**
+ * A stored image, sound or video shown to a model. Conversations hold only
+ * this reference, so they stay small; the bytes travel in `ChatRequest.media`.
+ */
+export interface Attachment {
+  /** The key of the blob. */
+  readonly key: string;
+  /** For example `image/webp`, `audio/mpeg`, `video/mp4`. */
+  readonly mediaType: string;
+}
+
+/** Which kind of input a media type is to a model, or undefined when no model takes it. */
+export function modalityOf(mediaType: string): 'image' | 'audio' | 'video' | undefined {
+  const kind = mediaType.split('/')[0];
+  return kind === 'image' || kind === 'audio' || kind === 'video' ? kind : undefined;
+}
 
 export interface ChatRequest {
   readonly model: string;
@@ -75,6 +98,11 @@ export interface ChatRequest {
    * runs the searches; they are part of the cost of the call.
    */
   readonly webSearch?: boolean;
+  /**
+   * The bytes of the attachments the messages refer to, by key. An attachment
+   * without an entry here is described to the model as no longer available.
+   */
+  readonly media?: ReadonlyMap<string, Uint8Array>;
   readonly temperature?: number;
   readonly maxOutputTokens?: number;
 }
