@@ -11,7 +11,14 @@ import { ProviderError } from '@imp/providers';
 import { createTestRuntime } from '@imp/core/testing';
 import { describe, expect, it } from 'vitest';
 import { createFakeProvider } from '@imp/providers/testing';
-import { castingDirector, createMovieMode, screenwriter } from '../src/index.js';
+import {
+  castingDirector,
+  Character,
+  clipPrompt,
+  createMovieMode,
+  screenwriter,
+  Shot,
+} from '../src/index.js';
 
 const user = { kind: 'user', id: 'arnd' } as const;
 const writer = { kind: 'agent', id: 'w', role: 'screenwriter' } as const;
@@ -52,7 +59,12 @@ const headings = (listed: unknown): string[] =>
 describe('the movie mode', () => {
   it('is a consistent mode with its roles limited to its own commands', () => {
     const movieMode = createMovieMode({ provider: createFakeProvider({}) });
-    expect(movieMode.stages.map((stage) => stage.id)).toEqual(['development', 'script', 'casting']);
+    expect(movieMode.stages.map((stage) => stage.id)).toEqual([
+      'development',
+      'script',
+      'casting',
+      'shots',
+    ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
       isInScope(command, screenwriter.scope),
@@ -511,5 +523,241 @@ describe('character voice samples', () => {
     await expect(
       failing.registry.executeById('movie.character.voice.generate', failingInput, { actor: user }),
     ).rejects.toMatchObject({ message: 'No voice was recorded: Slow down.' });
+  });
+});
+
+describe('shots and clips', () => {
+  interface WithClip {
+    clip: {
+      status: string;
+      jobId: string;
+      blobKey: string | null;
+      prompt: string;
+      costUsd: number | null;
+      error: string | null;
+    };
+  }
+  const withScene = async (options: Parameters<typeof setup>[0] = {}) => {
+    const context = await setup(options);
+    const { run } = context;
+    const scene = await run('movie.scene.create', { heading: 'INT. LAMP ROOM - NIGHT' });
+    const mara = await run('movie.character.create', {
+      name: 'Mara',
+      appearance: 'Seventy, grey braid.',
+    });
+    const tomas = await run('movie.character.create', { name: 'Tomas' });
+    await context.registry.executeById(
+      'settings.set',
+      { key: 'video.model', value: 'vendor/clips' },
+      { actor: user },
+    );
+    const at = (shotId: string) => ({ sceneId: scene.id, shotId });
+    const add = (fields: Record<string, unknown> = {}) =>
+      run('movie.shot.create', { sceneId: scene.id, ...fields });
+    const storm = () =>
+      add({
+        description: 'Wide on the gallery door, rain blowing in.',
+        characterIds: [mara.id, tomas.id],
+        performance: 'Mara lunges and drags Tomas back by the collar.',
+        speakerId: mara.id,
+        line: 'Tomas! Get away from the rail!',
+        delivery: 'Screaming over the wind.',
+      });
+    return { ...context, scene, mara, tomas, at, add, storm };
+  };
+
+  it('adds shots in order, lists an outline, changes and deletes them', async () => {
+    const { run, scene, mara, at, add } = await withScene();
+    const first = await add({ description: 'The lamp turns.' });
+    const second = await add({ description: 'Mara at the stairs.', line: 'Who is there?' });
+    expect(first).toEqual({
+      id: first.id,
+      sceneId: scene.id,
+      position: 1,
+      description: 'The lamp turns.',
+      characterIds: [],
+      performance: '',
+      speakerId: null,
+      line: '',
+      delivery: '',
+      clip: null,
+    });
+    expect(await run('movie.shot.list', { sceneId: scene.id })).toEqual({
+      shots: [
+        { id: first.id, position: 1, description: 'The lamp turns.', line: '', clip: null },
+        {
+          id: second.id,
+          position: 2,
+          description: 'Mara at the stairs.',
+          line: 'Who is there?',
+          clip: null,
+        },
+      ],
+    });
+    expect(
+      await run('movie.shot.update', { ...at(second.id), speakerId: mara.id, delivery: 'Sharp.' }),
+    ).toMatchObject({ speakerId: mara.id, delivery: 'Sharp.', line: 'Who is there?' });
+    expect(await run('movie.shot.update', { ...at(second.id), speakerId: null })).toMatchObject({
+      speakerId: null,
+      delivery: 'Sharp.',
+    });
+    expect(await run('movie.shot.get', at(second.id))).toMatchObject({ position: 2 });
+    expect(await run('movie.shot.delete', at(first.id))).toEqual({
+      shotId: first.id,
+      remaining: 1,
+    });
+    expect(await run('movie.shot.list', { sceneId: scene.id, full: true })).toMatchObject({
+      shots: [{ id: second.id, position: 1, delivery: 'Sharp.' }],
+    });
+  });
+
+  it('builds the prompt from the shot, the cast and the tone', async () => {
+    const { run, mara, tomas, storm, add } = await withScene();
+    await run('movie.development.update', { tone: 'Cold sea light.' });
+    const shot = Shot.parse(await storm());
+    const cast = [mara, tomas].map((entry) => Character.parse(entry));
+    expect(clipPrompt(shot, cast, 'Cold sea light.')).toBe(
+      [
+        'Wide on the gallery door, rain blowing in.',
+        'Mara: Seventy, grey braid.',
+        'Performance: Mara lunges and drags Tomas back by the collar.',
+        'Mara says, Screaming over the wind, "Tomas! Get away from the rail!"',
+        'Visual style: Cold sea light.',
+      ].join('\n'),
+    );
+    const silent = Shot.parse(await add({ description: 'The lamp turns.' }));
+    expect(clipPrompt(silent, [], '')).toBe('The lamp turns.\nNobody speaks.');
+    const offscreen = Shot.parse(await add({ description: 'Dark stairs.', line: 'Hello?' }));
+    expect(clipPrompt(offscreen, [], '')).toBe('Dark stairs.\nA voice says "Hello?"');
+  });
+
+  it('starts a clip with the portraits as guides, then stores it when it is done', async () => {
+    const { run, runtime, registry, provider, mara, at, storm } = await withScene();
+    await registry.executeById(
+      'settings.set',
+      { key: 'images.model', value: 'vendor/painter' },
+      { actor: user },
+    );
+    await run('movie.character.image.generate', { characterId: mara.id });
+    const shot = await storm();
+    const started = (await run('movie.shot.clip.generate', at(shot.id))) as unknown as WithClip;
+    expect(started.clip).toMatchObject({
+      status: 'pending',
+      jobId: 'job-1',
+      blobKey: null,
+      portraits: 1,
+    });
+    expect(provider.videoRequests[0]).toMatchObject({
+      model: 'vendor/clips',
+      durationSeconds: 4,
+      resolution: '720p',
+      aspectRatio: '16:9',
+      audio: true,
+      references: [{ mediaType: 'image/webp' }],
+      prompt: expect.stringContaining('"Tomas! Get away from the rail!"') as string,
+    });
+    expect(await run('movie.shot.list', { sceneId: shot['sceneId'] })).toMatchObject({
+      shots: [{ clip: 'pending' }],
+    });
+
+    const waiting = (await run('movie.shot.clip.check', at(shot.id))) as unknown as WithClip;
+    expect(waiting.clip.status).toBe('pending');
+    const done = (await run('movie.shot.clip.check', at(shot.id))) as unknown as WithClip;
+    expect(done.clip).toMatchObject({ status: 'ready', costUsd: 0.2 });
+    expect((await runtime.blobs.get(done.clip.blobKey ?? ''))?.mediaType).toBe('video/mp4');
+    // Checking a finished clip asks nobody and changes nothing.
+    expect(await run('movie.shot.clip.check', at(shot.id))).toEqual(done);
+
+    // A new clip replaces the file of the old one.
+    await run('movie.shot.clip.generate', { ...at(shot.id), portraits: false, audio: false });
+    expect(provider.videoRequests[1]).toMatchObject({ audio: false });
+    expect(provider.videoRequests[1]).not.toHaveProperty('references');
+    expect(await runtime.blobs.list('')).not.toContain(done.clip.blobKey);
+  });
+
+  it('makes the clip from the words alone when the model takes no portraits', async () => {
+    const { run, registry, provider, mara, at, storm } = await withScene({
+      videoRefusesReferences: true,
+    });
+    await registry.executeById(
+      'settings.set',
+      { key: 'images.model', value: 'vendor/painter' },
+      { actor: user },
+    );
+    await run('movie.character.image.generate', { characterId: mara.id });
+    const shot = await storm();
+    expect(await run('movie.shot.clip.generate', at(shot.id))).toMatchObject({
+      clip: { status: 'pending', portraits: 0 },
+    });
+    expect(provider.videoRequests).toHaveLength(2);
+    expect(provider.videoRequests[1]).not.toHaveProperty('references');
+  });
+
+  it('deletes clips with what they belong to', async () => {
+    const { run, runtime, scene, at, add } = await withScene();
+    const make = async () => {
+      const shot = await add({ description: 'The lamp turns.' });
+      await run('movie.shot.clip.generate', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+      return shot;
+    };
+    const clips = async () =>
+      (await runtime.blobs.list('')).filter((key) => key.includes('/clip/')).length;
+    const [a, b] = [await make(), await make(), await make()];
+    expect(await clips()).toBe(3);
+    expect(await run('movie.shot.clip.delete', at(a.id))).toEqual({ shotId: a.id, deleted: true });
+    expect(await run('movie.shot.clip.delete', at(a.id))).toEqual({ shotId: a.id, deleted: false });
+    expect(await run('movie.shot.get', at(a.id))).toMatchObject({ clip: null });
+    await run('movie.shot.delete', at(b.id));
+    expect(await clips()).toBe(1);
+    await run('movie.scene.delete', { sceneId: scene.id });
+    expect(await clips()).toBe(0);
+    expect(await runtime.store.list('projects/')).not.toContainEqual(
+      expect.objectContaining({ key: expect.stringContaining('/shots/') as string }),
+    );
+  });
+
+  it('reports failed clips, and refuses what cannot work', async () => {
+    const failing = await withScene({ videoFailure: 'Blocked by the content filter.' });
+    const shot = await failing.add({ description: 'The lamp turns.' });
+    await failing.run('movie.shot.clip.generate', failing.at(shot.id));
+    await failing.run('movie.shot.clip.check', failing.at(shot.id));
+    expect(await failing.run('movie.shot.clip.check', failing.at(shot.id))).toMatchObject({
+      clip: { status: 'failed', error: 'Blocked by the content filter.', blobKey: null },
+    });
+
+    const refused = await withScene({
+      videoError: new ProviderError('bad_request', 'fake', 'duration must be one of 4, 6, 8'),
+    });
+    const { registry, projectId, scene, at, add } = refused;
+    const described = await add({ description: 'The lamp turns.' });
+    const empty = await add();
+    const input = (shotId: string) => ({ projectId, ...at(shotId) });
+    const generate = (shotId: string, extra: Record<string, unknown> = {}, actor = user) =>
+      registry.executeById('movie.shot.clip.generate', { ...input(shotId), ...extra }, { actor });
+    await expect(generate(described.id)).rejects.toMatchObject({
+      message: 'No clip was started: duration must be one of 4, 6, 8',
+    });
+    await expect(generate(empty.id)).rejects.toThrow(/Describe what the shot shows/);
+    await expect(generate('nobody')).rejects.toThrow(/No shot "nobody"/);
+    await registry.executeById('settings.set', { key: 'video.model', value: '' }, { actor: user });
+    await expect(generate(described.id)).rejects.toThrow(/No video model is chosen/);
+    await expect(
+      registry.executeById('movie.shot.clip.check', input(described.id), { actor: user }),
+    ).rejects.toThrow(/has no clip/);
+    await expect(
+      registry.executeById('movie.shot.create', { projectId, sceneId: 'nowhere' }, { actor: user }),
+    ).rejects.toThrow(/No scene "nowhere"/);
+    expect(
+      (
+        await registry.executeById(
+          'movie.shot.clip.generate',
+          { ...input(described.id), model: 'vendor/clips' },
+          { actor: { kind: 'agent', id: 'c', role: 'clip-designer' } },
+        )
+      ).status,
+    ).toBe('needs-approval');
+    expect(scene.id).toBeTruthy();
   });
 });

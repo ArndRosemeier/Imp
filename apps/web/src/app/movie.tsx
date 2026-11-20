@@ -23,10 +23,10 @@ import { ConfirmButton, EditableField } from './Field.js';
 const SceneList = z.object({ scenes: z.array(Scene) });
 const CharacterList = z.object({ characters: z.array(Character) });
 
-const moviePrefix = (project: Project): string => `projects/${project.id}/movie/`;
+export const moviePrefix = (project: Project): string => `projects/${project.id}/movie/`;
 
 /** Runs a movie command on the project and reports failures in the view. */
-function useAct(project: Project): {
+export function useAct(project: Project): {
   act: (id: string, input: Record<string, unknown>) => Promise<unknown>;
   error: string | null;
 } {
@@ -46,7 +46,7 @@ function useAct(project: Project): {
   };
 }
 
-function Problem({ text }: { text: string | null }): ReactElement | null {
+export function Problem({ text }: { text: string | null }): ReactElement | null {
   return text === null ? null : (
     <p className="error" role="alert">
       {text}
@@ -299,9 +299,9 @@ const ImageModels = z.object({ models: z.array(z.object({ id: z.string(), name: 
 const StringSetting = z.object({ value: z.json() });
 
 /** Reads a setting that names a generation model, and the models it can be set to. */
-function useModelSetting(
+export function useModelSetting(
   key: string,
-  output: 'image' | 'speech',
+  output: 'image' | 'speech' | 'video',
 ): {
   model: string | null;
   models: readonly { id: string; name: string }[];
@@ -339,7 +339,7 @@ function useModelSetting(
 }
 
 /** Turns a stored image into something an `img` can show, and frees it again afterwards. */
-function useBlobUrl(blobKey: string | undefined): string | null {
+export function useBlobUrl(blobKey: string | undefined): string | null {
   const imp = useImp();
   const [shown, setShown] = useState<{ key: string; url: string } | null>(null);
   useEffect(() => {
@@ -464,9 +464,9 @@ function CharacterImages({
   );
 }
 
-type Act = (id: string, input: Record<string, unknown>) => Promise<unknown>;
+export type Act = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
-function ModelPicker({
+export function ModelPicker({
   id,
   label,
   empty,

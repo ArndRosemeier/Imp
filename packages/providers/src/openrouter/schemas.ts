@@ -66,3 +66,12 @@ export const ImageGenerationResponse = z.object({
 export const ErrorResponse = z.object({
   error: z.object({ message: z.string() }),
 });
+
+/** A video job, as returned when it is started and each time it is looked at. */
+export const VideoJobResponse = z.object({
+  id: z.string().min(1),
+  status: z.string(),
+  progress: z.number().nullish(),
+  error: z.union([z.string(), z.object({ message: z.string() })]).nullish(),
+  usage: z.object({ cost: z.number().nullish() }).nullish(),
+});

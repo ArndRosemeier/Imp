@@ -22,6 +22,11 @@ const ProjectId = z.string().describe('The id of a movie project from project.li
 const base = (projectId: string): string => `${projectPrefix(projectId)}movie/`;
 const developmentKey = (projectId: string): string => `${base(projectId)}development`;
 const scenePrefix = (projectId: string): string => `${base(projectId)}scenes/`;
+/** Shots are kept under their scene, so removing a scene removes them and their clips. */
+export const shotPrefix = (projectId: string, sceneId?: string): string =>
+  `${base(projectId)}shots/${sceneId === undefined ? '' : `${sceneId}/`}`;
+export const movieSceneKey = (projectId: string, sceneId: string): string =>
+  `${scenePrefix(projectId)}${sceneId}`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
@@ -202,7 +207,8 @@ export const sceneUpdate = defineCommand({
 export const sceneDelete = defineCommand({
   id: 'movie.scene.delete',
   title: 'Delete scene',
-  description: 'Removes a scene from the script. Its text is lost. Later scenes move up.',
+  description:
+    'Removes a scene from the script. Its text, its shots and their clips are lost. Later scenes move up.',
   effect: 'destructive',
   input: z.object({ projectId: ProjectId, sceneId: z.string() }),
   output: z.object({ sceneId: z.string(), remaining: z.number() }),
@@ -215,8 +221,15 @@ export const sceneDelete = defineCommand({
     }
     await runtime.store.batch([
       { type: 'delete', key: `${scenePrefix(projectId)}${sceneId}` },
+      ...(await runtime.store.list(shotPrefix(projectId, sceneId))).map((entry) => ({
+        type: 'delete' as const,
+        key: entry.key,
+      })),
       ...renumbered(projectId, remaining),
     ]);
+    for (const blobKey of await runtime.blobs.list(shotPrefix(projectId, sceneId))) {
+      await runtime.blobs.delete(blobKey);
+    }
     return { sceneId, remaining: remaining.length };
   },
 });

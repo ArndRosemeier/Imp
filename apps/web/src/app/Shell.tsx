@@ -1,3 +1,4 @@
+import { ShotsView } from './shots.js';
 import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
@@ -49,6 +50,7 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
   if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
   if (stage === 'casting') return <CastingView key={project.id} project={project} />;
+  if (stage === 'shots') return <ShotsView key={project.id} project={project} />;
   return null;
 }
 

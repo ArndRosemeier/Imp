@@ -165,6 +165,45 @@ export interface SpeechResponse {
   readonly costUsd: number | null;
 }
 
+/** A stored file handed to a generation as a guide: a portrait, a first frame. */
+export interface MediaInput {
+  readonly bytes: Uint8Array;
+  readonly mediaType: string;
+}
+
+export interface VideoRequest {
+  /** An id from the catalog whose output modalities include `video`. */
+  readonly model: string;
+  readonly prompt: string;
+  /** Models take only certain lengths; a refusal names the ones they take. */
+  readonly durationSeconds?: number;
+  /** For example `480p` or `720p`. */
+  readonly resolution?: string;
+  /** Width to height, for example `16:9`. */
+  readonly aspectRatio?: string;
+  /** Whether the clip gets sound. Always say, because models differ in what they do unasked. */
+  readonly audio: boolean;
+  /** Images that guide who and what is in the clip, without fixing a frame. */
+  readonly references?: readonly MediaInput[];
+  /** An image the clip starts on exactly. */
+  readonly firstFrame?: MediaInput;
+}
+
+/**
+ * A video being made. Clips take minutes, so a job is started, looked at
+ * again later, and downloaded once it is done.
+ */
+export interface VideoJob {
+  readonly id: string;
+  readonly status: 'pending' | 'completed' | 'failed';
+  /** Percent done, where the model reports it. */
+  readonly progress: number | null;
+  /** Why it failed, in the provider's words. */
+  readonly error: string | null;
+  /** What it cost in US dollars, known once it is done, or null when the provider did not say. */
+  readonly costUsd: number | null;
+}
+
 /** Lets a caller cancel a request. Structurally matches the platform `AbortSignal`. */
 export interface CancelSignal {
   readonly aborted: boolean;
@@ -186,6 +225,11 @@ export interface GenerationProvider {
   chat(request: ChatRequest, options?: CallOptions): Promise<ChatResponse>;
   generateImage(request: ImageRequest, options?: CallOptions): Promise<ImageResponse>;
   generateSpeech(request: SpeechRequest, options?: CallOptions): Promise<SpeechResponse>;
+  /** Starts a clip and returns at once. Money is spent from here on. */
+  startVideo(request: VideoRequest, options?: CallOptions): Promise<VideoJob>;
+  checkVideo(jobId: string, options?: CallOptions): Promise<VideoJob>;
+  /** The finished clip. Fails while the job is not completed. */
+  downloadVideo(jobId: string, options?: CallOptions): Promise<MediaInput>;
   /** Resolves when the stored credentials are accepted, and throws a `ProviderError` otherwise. */
   verifyCredentials(options?: CallOptions): Promise<void>;
 }
