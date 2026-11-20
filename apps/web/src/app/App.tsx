@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import type { ImpClient } from '../host/client.js';
+import type { ImpClient } from '@imp/host';
 import { ImpContext, messageOf, runCommand } from './context.js';
 import { Setup } from './Setup.js';
 import { Shell } from './Shell.js';

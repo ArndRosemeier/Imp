@@ -22,7 +22,7 @@ import { createMovieMode } from '@imp/mode-movie';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
-/** Everything the UI needs from the running core. The UI talks to nothing else. */
+/** The assembled core of one host. The interface reaches it through `serveImp`. */
 export interface Imp {
   readonly registry: CommandRegistry;
   readonly provider: GenerationProvider;
@@ -93,6 +93,7 @@ export function createImp(options: ImpOptions): Imp {
     }),
     ...createAgentCommands({ registry, provider, roles }),
   );
+  let started: Promise<void> | undefined;
   return {
     registry,
     provider,
@@ -101,6 +102,7 @@ export function createImp(options: ImpOptions): Imp {
     store: options.store,
     blobs,
     secrets: options.secrets,
-    start: () => releaseInterruptedRuns(options.store),
+    // Once per core: a second interface that connects must not release runs the first one started.
+    start: () => (started ??= releaseInterruptedRuns(options.store)),
   };
 }

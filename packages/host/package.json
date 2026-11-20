@@ -1,0 +1,19 @@
+{
+  "name": "@imp/host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@imp/agents": "workspace:*",
+    "@imp/core": "workspace:*",
+    "@imp/mode-movie": "workspace:*",
+    "@imp/providers": "workspace:*"
+  }
+}

@@ -2,12 +2,16 @@ import { MemoryBlobStore, MemoryKeyValueStore } from '@imp/core';
 import { ProviderError } from '@imp/providers';
 import { createFakeProvider } from '@imp/providers/testing';
 import { describe, expect, it, vi } from 'vitest';
-import { connectImp } from '../src/host/client.js';
-import { createImp } from '../src/host/imp.js';
-import { createLocalPorts } from '../src/host/port.js';
-import { fromWireError, toWireError } from '../src/host/protocol.js';
-import { createMemorySecretStore, serveImp } from '../src/host/serve.js';
-import type { SecretStore } from '../src/host/secrets.js';
+import {
+  connectImp,
+  createImp,
+  createLocalPorts,
+  createMemorySecretStore,
+  fromWireError,
+  serveImp,
+  toWireError,
+  type SecretStore,
+} from '../src/index.js';
 
 function setup(options: Parameters<typeof createFakeProvider>[0] = {}) {
   const [page, core] = createLocalPorts();

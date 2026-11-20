@@ -1,3 +1,4 @@
+export { decodeBase64, encodeBase64 } from './base64.js';
 export { ProviderError, type ProviderErrorKind } from './errors.js';
 export type { HttpFetch, HttpRequest, HttpResponse } from './http.js';
 export {

@@ -1,7 +1,5 @@
-import { createImp } from './imp.js';
+import { createImp, serveImp, type Port } from '@imp/host';
 import { IndexedDbBlobStore, IndexedDbKeyValueStore } from './indexeddb-store.js';
-import type { Port } from './port.js';
-import { serveImp } from './serve.js';
 
 // The core of the browser host: storage, providers, commands and agent runs,
 // off the thread that draws the interface.

@@ -1,15 +1,8 @@
+import type { SecretStore } from '@imp/host';
+
 const KEY_NAME = 'imp.openrouter-key';
 
-/**
- * Where the browser host keeps the OpenRouter key. It is deliberately outside
- * the key-value store, so no command and therefore no agent can read it.
- */
-export interface SecretStore {
-  getKey(): string | null;
-  setKey(key: string): void;
-  clearKey(): void;
-}
-
+/** Keeps the key in the browser, on the page's side of the channel. */
 export function createLocalSecretStore(storage: Storage = localStorage): SecretStore {
   return {
     getKey: () => storage.getItem(KEY_NAME),

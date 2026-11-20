@@ -1,0 +1,19 @@
+{
+  "name": "@imp/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && node scripts/package.mjs",
+    "start": "node dist/imp-server/imp.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@imp/core": "workspace:*",
+    "@imp/host": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8",
+    "@imp/providers": "workspace:*"
+  }
+}

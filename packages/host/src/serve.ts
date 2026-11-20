@@ -2,21 +2,7 @@ import { inputSchemaOf } from '@imp/core';
 import type { Imp } from './imp.js';
 import type { Port } from './port.js';
 import { toWireError, type Calls, type Reply, type Request } from './protocol.js';
-import type { SecretStore } from './secrets.js';
-
-/** Secrets for a core that has no storage of its own for them: it is told the key. */
-export function createMemorySecretStore(): SecretStore {
-  let held: string | null = null;
-  return {
-    getKey: () => held,
-    setKey: (key) => {
-      held = key;
-    },
-    clearKey: () => {
-      held = null;
-    },
-  };
-}
+import { createMemorySecretStore, type SecretStore } from './secrets.js';
 
 const USER = { kind: 'user', id: 'local' } as const;
 
@@ -25,8 +11,12 @@ const USER = { kind: 'user', id: 'local' } as const;
  * it is given; it runs once, on the first request, so that listening starts at
  * once and nothing sent early is lost.
  */
-export function serveImp(open: (secrets: SecretStore) => Promise<Imp> | Imp, port: Port): void {
-  const secrets = createMemorySecretStore();
+export function serveImp(
+  open: (secrets: SecretStore) => Promise<Imp> | Imp,
+  port: Port,
+  /** Shared when several interfaces reach one core, as with the local server. */
+  secrets: SecretStore = createMemorySecretStore(),
+): () => void {
   let opened: Promise<Imp> | undefined;
   const core = (): Promise<Imp> => (opened ??= Promise.resolve(open(secrets)));
   const subscriptions = new Map<number, () => void>();
@@ -104,5 +94,12 @@ export function serveImp(open: (secrets: SecretStore) => Promise<Imp> | Imp, por
         },
       );
     }
+  };
+
+  // For when the other end goes away: stop telling it of changes.
+  return () => {
+    port.onmessage = null;
+    for (const stop of subscriptions.values()) stop();
+    subscriptions.clear();
   };
 }
