@@ -3,6 +3,7 @@ import type { GenerationProvider } from '@imp/providers';
 import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
+import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = { prefixes: ['movie.', 'project.list', 'media.'] } as const;
 
@@ -39,7 +40,10 @@ export const castingDirector: Role = {
     'is the prompt, so improve the appearance first if it is thin. Look at what',
     'was made with media.view and judge it against the character: say what works, generate',
     'again with a direction where it does not, and select the best one as the portrait. If',
-    'you cannot be shown images, say so and leave the choice to the user.',
+    'you cannot be shown images, say so and leave the choice to the user. When asked how a',
+    'character sounds, record a line with movie.character.voice.generate; the voice you wrote',
+    'directs the speaker. Listen to it with media.view if you can, and rewrite the voice and',
+    'record again when it does not fit.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -58,7 +62,11 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       { id: 'script', name: 'Script' },
       { id: 'casting', name: 'Casting' },
     ],
-    commands: [...movieCommands, ...createCharacterImageCommands(options.provider)],
+    commands: [
+      ...movieCommands,
+      ...createCharacterImageCommands(options.provider),
+      ...createCharacterVoiceCommands(options.provider),
+    ],
     roles: [screenwriter, castingDirector],
   });
 }

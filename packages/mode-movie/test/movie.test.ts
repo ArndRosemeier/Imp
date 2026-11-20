@@ -210,6 +210,7 @@ describe('characters', () => {
         voice: 'Low and dry.',
         images: [],
         portraitId: null,
+        voiceSample: null,
       },
       expect.objectContaining({ name: 'Tomas' }),
     ]);
@@ -390,5 +391,125 @@ describe('character images', () => {
         ),
       ).rejects.toThrow(/No image "x"/);
     }
+  });
+});
+
+describe('character voice samples', () => {
+  interface Recorded {
+    voiceSample: { blobKey: string; line: string; direction: string; model: string };
+    costUsd: number | null;
+  }
+  const withMara = async (options: Parameters<typeof setup>[0] = {}) => {
+    const context = await setup(options);
+    const mara = await context.run('movie.character.create', {
+      name: 'Mara',
+      part: 'protagonist',
+      description: 'Keeps the light.',
+      voice: 'Low and dry.',
+    });
+    await context.registry.executeById(
+      'settings.set',
+      { key: 'speech.model', value: 'vendor/speaker' },
+      { actor: user },
+    );
+    const record = async (input: Record<string, unknown> = {}) =>
+      (await context.run('movie.character.voice.generate', {
+        characterId: mara.id,
+        ...input,
+      })) as unknown as Recorded;
+    return { ...context, mara, record };
+  };
+
+  it('records an introduction in the written voice and keeps it with the character', async () => {
+    const { run, runtime, provider, mara, record } = await withMara();
+    const first = await record();
+    expect(provider.speechRequests[0]).toEqual({
+      model: 'vendor/speaker',
+      text: 'Hello. My name is Mara.',
+      instructions: 'Mara, protagonist. Low and dry.',
+    });
+    expect(first.voiceSample).toMatchObject({ model: 'vendor/speaker', mediaType: 'audio/mpeg' });
+    expect((await runtime.blobs.get(first.voiceSample.blobKey))?.bytes).toEqual(
+      new Uint8Array([1]),
+    );
+    expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
+      voiceSample: { blobKey: first.voiceSample.blobKey, line: 'Hello. My name is Mara.' },
+    });
+    // The outline of the cast does not carry it.
+    expect(await run('movie.character.list', {})).toEqual({
+      characters: [{ id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null }],
+    });
+  });
+
+  it('takes a line, a delivery and a model, and replaces the earlier recording', async () => {
+    const { runtime, provider, record } = await withMara();
+    const first = await record();
+    const second = await record({
+      line: 'Get away from the rail!',
+      delivery: 'Shouting over a storm.',
+      model: 'other/speaker',
+    });
+    expect(provider.speechRequests[1]).toEqual({
+      model: 'other/speaker',
+      text: 'Get away from the rail!',
+      instructions: 'Mara, protagonist. Low and dry. Delivery: Shouting over a storm.',
+    });
+    expect(second.voiceSample.direction).toContain('Delivery: Shouting over a storm.');
+    expect(await runtime.blobs.list('')).toEqual([second.voiceSample.blobKey]);
+    expect(second.voiceSample.blobKey).not.toBe(first.voiceSample.blobKey);
+  });
+
+  it('deletes the recording alone, and with the character', async () => {
+    const { run, runtime, mara, record } = await withMara();
+    const at = { characterId: mara.id };
+    expect(await run('movie.character.voice.delete', at)).toEqual({ ...at, deleted: false });
+    await record();
+    expect(await run('movie.character.voice.delete', at)).toEqual({ ...at, deleted: true });
+    expect(await runtime.blobs.list('')).toEqual([]);
+    expect(await run('movie.character.get', at)).toMatchObject({
+      voiceSample: null,
+      voice: 'Low and dry.',
+    });
+    await record();
+    await run('movie.character.delete', at);
+    expect(await runtime.blobs.list('')).toEqual([]);
+  });
+
+  it('falls back to the description, needs a model, and reports failures in words', async () => {
+    const { run, registry, provider, projectId } = await setup();
+    const bare = await run('movie.character.create', {
+      name: 'Tomas',
+      description: 'A quiet clerk.',
+    });
+    const input = { projectId, characterId: bare.id };
+    await expect(
+      registry.executeById('movie.character.voice.generate', input, { actor: user }),
+    ).rejects.toThrow(/No speech model is chosen/);
+    await run('movie.character.voice.generate', { characterId: bare.id, model: 'vendor/speaker' });
+    expect(provider.speechRequests[0]?.instructions).toBe('Tomas. A quiet clerk.');
+    for (const id of ['generate', 'delete']) {
+      await expect(
+        registry.executeById(
+          `movie.character.voice.${id}`,
+          { projectId, characterId: 'nobody' },
+          { actor: user },
+        ),
+      ).rejects.toThrow(/No character/);
+    }
+
+    const failing = await withMara({
+      speechError: new ProviderError('rate_limit', 'fake', 'Slow down.'),
+    });
+    const failingInput = { projectId: failing.projectId, characterId: failing.mara.id };
+    expect(
+      (
+        await failing.registry.executeById('movie.character.voice.generate', failingInput, {
+          actor: { kind: 'agent', id: 'c', role: 'casting-director' },
+        })
+      ).status,
+    ).toBe('needs-approval');
+    await expect(
+      failing.registry.executeById('movie.character.voice.generate', failingInput, { actor: user }),
+    ).rejects.toMatchObject({ message: 'No voice was recorded: Slow down.' });
   });
 });

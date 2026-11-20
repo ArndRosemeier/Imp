@@ -6,6 +6,7 @@ import type {
   GenerationProvider,
   ImageRequest,
   ModelInfo,
+  SpeechRequest,
 } from './types.js';
 
 export interface RecordedHttpCall {
@@ -15,7 +16,11 @@ export interface RecordedHttpCall {
 
 /** A `fetch` that answers from a queue and records what it was asked. */
 export function createScriptedFetch(
-  replies: readonly ({ status: number; body: unknown } | Error)[],
+  replies: readonly (
+    | { status: number; body: unknown; contentType?: string }
+    | { status: number; bytes: Uint8Array; contentType: string }
+    | Error
+  )[],
 ): { fetch: HttpFetch; calls: RecordedHttpCall[] } {
   const queue = [...replies];
   const calls: RecordedHttpCall[] = [];
@@ -28,11 +33,18 @@ export function createScriptedFetch(
     if (reply instanceof Error) {
       return Promise.reject(reply);
     }
-    const text = typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body);
+    const body = 'bytes' in reply ? reply.bytes : reply.body;
+    const text =
+      body instanceof Uint8Array ? '' : typeof body === 'string' ? body : JSON.stringify(body);
     return Promise.resolve({
       ok: reply.status >= 200 && reply.status < 300,
       status: reply.status,
+      contentType: reply.contentType ?? 'application/json',
       text: () => Promise.resolve(text),
+      bytes: () =>
+        Promise.resolve(
+          body instanceof Uint8Array ? body : Uint8Array.from(text, (c) => c.charCodeAt(0)),
+        ),
     });
   };
   return { fetch, calls };
@@ -51,19 +63,35 @@ export function createFakeProvider(script: {
   readonly credentialsError?: ProviderError;
   /** When set, `generateImage` rejects with it. */
   readonly imageError?: ProviderError;
+  /** When set, `generateSpeech` rejects with it. */
+  readonly speechError?: ProviderError;
 }): GenerationProvider & {
   readonly requests: ChatRequest[];
   readonly imageRequests: ImageRequest[];
+  readonly speechRequests: SpeechRequest[];
   /** Adds replies to the end of the script, for ones that depend on what happened first. */
   script(...replies: ScriptedChatReply[]): void;
 } {
   const queue = [...(script.replies ?? [])];
   const requests: ChatRequest[] = [];
   const imageRequests: ImageRequest[] = [];
+  const speechRequests: SpeechRequest[] = [];
   return {
     id: 'fake',
     requests,
     imageRequests,
+    speechRequests,
+    generateSpeech: (request) => {
+      speechRequests.push(request);
+      if (script.speechError !== undefined) {
+        return Promise.reject(script.speechError);
+      }
+      return Promise.resolve({
+        model: request.model,
+        audio: { bytes: new Uint8Array([speechRequests.length]), mediaType: 'audio/mpeg' },
+        costUsd: null,
+      });
+    },
     generateImage: (request) => {
       imageRequests.push(request);
       if (script.imageError !== undefined) {

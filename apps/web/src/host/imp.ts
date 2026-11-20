@@ -36,13 +36,21 @@ export interface Imp {
   start(): Promise<void>;
 }
 
-const browserFetch: HttpFetch = (url, request) =>
-  fetch(url, {
+const browserFetch: HttpFetch = async (url, request) => {
+  const response = await fetch(url, {
     method: request.method,
     headers: request.headers,
     ...(request.body === undefined ? {} : { body: request.body }),
     ...(request.signal instanceof AbortSignal ? { signal: request.signal } : {}),
   });
+  return {
+    ok: response.ok,
+    status: response.status,
+    contentType: response.headers.get('content-type'),
+    text: () => response.text(),
+    bytes: async () => new Uint8Array(await response.arrayBuffer()),
+  };
+};
 
 export interface ImpOptions {
   readonly store: KeyValueStore;
