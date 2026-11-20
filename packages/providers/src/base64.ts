@@ -1,4 +1,19 @@
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+/** Encodes bytes as standard base64, with padding. */
+export function encodeBase64(bytes: Uint8Array): string {
+  let text = '';
+  for (let at = 0; at < bytes.length; at += 3) {
+    const [a = 0, b = 0, c = 0] = [bytes[at], bytes[at + 1], bytes[at + 2]];
+    const triple = (a << 16) | (b << 8) | c;
+    text +=
+      (ALPHABET[(triple >> 18) & 63] ?? '') +
+      (ALPHABET[(triple >> 12) & 63] ?? '') +
+      (at + 1 < bytes.length ? (ALPHABET[(triple >> 6) & 63] ?? '') : '=') +
+      (at + 2 < bytes.length ? (ALPHABET[triple & 63] ?? '') : '=');
+  }
+  return text;
+}
+
 const VALUES = new Map(Array.from(ALPHABET, (character, index) => [character, index]));
 
 /**

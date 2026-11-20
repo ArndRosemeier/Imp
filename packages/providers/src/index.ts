@@ -7,6 +7,8 @@ export {
 } from './openrouter/provider.js';
 export {
   MODALITIES,
+  modalityOf,
+  type Attachment,
   type CallOptions,
   type CancelSignal,
   type ChatMessage,

@@ -1,10 +1,12 @@
 import type { JsonValue } from '@imp/core';
 import type { z } from 'zod';
-import { decodeBase64 } from '../base64.js';
+import { decodeBase64, encodeBase64 } from '../base64.js';
 import { ProviderError, type ProviderErrorKind } from '../errors.js';
 import type { HttpFetch, HttpResponse } from '../http.js';
 import {
   MODALITIES,
+  modalityOf,
+  type Attachment,
   type CallOptions,
   type ChatMessage,
   type ChatRequest,
@@ -78,6 +80,69 @@ function parseArguments(text: string): JsonValue | undefined {
 /** Text content, as a marked part when the prefix ending here should be cached. */
 function toWireContent(text: string, cache: boolean | undefined): unknown {
   return cache === true ? [{ type: 'text', text, cache_control: { type: 'ephemeral' } }] : text;
+}
+
+/** The audio format names the API knows, by the second half of the media type. */
+const AUDIO_FORMATS: Readonly<Record<string, string>> = { mpeg: 'mp3', 'x-wav': 'wav', mp4: 'm4a' };
+
+/** One attachment as a content part, or as a line of text when it cannot be sent. */
+function toMediaPart(
+  attachment: Attachment,
+  media: ReadonlyMap<string, Uint8Array> | undefined,
+): Record<string, unknown> {
+  const bytes = media?.get(attachment.key);
+  const kind = modalityOf(attachment.mediaType);
+  if (bytes === undefined || kind === undefined) {
+    return { type: 'text', text: `[${attachment.key} is not available any more.]` };
+  }
+  const data = encodeBase64(bytes);
+  const url = `data:${attachment.mediaType};base64,${data}`;
+  switch (kind) {
+    case 'image':
+      return { type: 'image_url', image_url: { url } };
+    case 'video':
+      return { type: 'video_url', video_url: { url } };
+    case 'audio': {
+      const subtype = attachment.mediaType.split('/')[1] ?? '';
+      return {
+        type: 'input_audio',
+        input_audio: { data, format: AUDIO_FORMATS[subtype] ?? subtype },
+      };
+    }
+  }
+}
+
+/**
+ * Tool results carry text only on this API, so what a tool attached follows
+ * the results of its turn in a user message of its own.
+ */
+function toWireMessages(
+  messages: readonly ChatMessage[],
+  media: ReadonlyMap<string, Uint8Array> | undefined,
+): Record<string, unknown>[] {
+  const wire: Record<string, unknown>[] = [];
+  let shown: Attachment[] = [];
+  const flush = (): void => {
+    if (shown.length === 0) return;
+    wire.push({
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: `Attached, as the tools returned: ${shown.map(({ key }) => key).join(', ')}`,
+        },
+        ...shown.map((attachment) => toMediaPart(attachment, media)),
+      ],
+    });
+    shown = [];
+  };
+  for (const message of messages) {
+    if (message.role !== 'tool') flush();
+    wire.push(toWireMessage(message));
+    if (message.role === 'tool') shown.push(...(message.attachments ?? []));
+  }
+  flush();
+  return wire;
 }
 
 function toWireMessage(message: ChatMessage): Record<string, unknown> {
@@ -233,7 +298,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
       ];
       const body = {
         model: request.model,
-        messages: request.messages.map(toWireMessage),
+        messages: toWireMessages(request.messages, request.media),
         usage: { include: true },
         ...(tools.length > 0 ? { tools } : {}),
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),

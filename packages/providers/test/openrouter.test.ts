@@ -234,6 +234,69 @@ describe('OpenRouter provider: chat', () => {
     ]);
   });
 
+  it('sends what a tool attached after the results of its turn, by kind', async () => {
+    const { provider, calls } = setup(completion({ content: 'ok' }));
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    await provider.chat({
+      model: 'vendor/model-a',
+      media: new Map([
+        ['p/a', bytes],
+        ['p/b', bytes],
+        ['p/c', bytes],
+        ['p/d', bytes],
+        ['p/f', bytes],
+      ]),
+      messages: [
+        { role: 'user', content: 'Look.' },
+        { role: 'assistant', content: null },
+        {
+          role: 'tool',
+          toolCallId: '1',
+          content: '{}',
+          attachments: [
+            { key: 'p/a', mediaType: 'image/webp' },
+            { key: 'p/b', mediaType: 'audio/mpeg' },
+          ],
+        },
+        {
+          role: 'tool',
+          toolCallId: '2',
+          content: '{}',
+          attachments: [
+            { key: 'p/c', mediaType: 'video/mp4' },
+            { key: 'p/d', mediaType: 'audio/flac' },
+            { key: 'p/e', mediaType: 'image/png' },
+            { key: 'p/f', mediaType: 'application/pdf' },
+          ],
+        },
+        { role: 'assistant', content: 'Seen.' },
+        { role: 'tool', toolCallId: '3', content: '{}' },
+      ],
+    });
+    const sent = (JSON.parse(calls[0]?.request.body ?? '') as { messages: unknown[] }).messages;
+    expect(sent.map((message) => (message as { role: string }).role)).toEqual([
+      'user',
+      'assistant',
+      'tool',
+      'tool',
+      'user',
+      'assistant',
+      'tool',
+    ]);
+    expect(sent[4]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Attached, as the tools returned: p/a, p/b, p/c, p/d, p/e, p/f' },
+        { type: 'image_url', image_url: { url: 'data:image/webp;base64,AQIDBA==' } },
+        { type: 'input_audio', input_audio: { data: 'AQIDBA==', format: 'mp3' } },
+        { type: 'video_url', video_url: { url: 'data:video/mp4;base64,AQIDBA==' } },
+        { type: 'input_audio', input_audio: { data: 'AQIDBA==', format: 'flac' } },
+        { type: 'text', text: '[p/e is not available any more.]' },
+        { type: 'text', text: '[p/f is not available any more.]' },
+      ],
+    });
+  });
+
   it('returns text with usage and cost', async () => {
     const { provider } = setup(
       completion(

@@ -27,6 +27,7 @@ export {
   readProject,
   requireProject,
 } from './commands/projects.js';
+export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
 export type { JsonValue } from './json.js';

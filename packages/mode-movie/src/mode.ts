@@ -4,7 +4,7 @@ import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
 
-const SCOPE = { prefixes: ['movie.', 'project.list'] } as const;
+const SCOPE = { prefixes: ['movie.', 'project.list', 'media.'] } as const;
 
 export const screenwriter: Role = {
   id: 'screenwriter',
@@ -36,8 +36,10 @@ export const castingDirector: Role = {
     'Describe the voice the same way: pitch, pace, accent, manner. Keep each character',
     'consistent with what the script says and does not say about them. When asked for',
     'pictures, generate them with movie.character.image.generate; the appearance you wrote',
-    'is the prompt, so improve the appearance first if it is thin. You cannot see the',
-    'images, so leave the choice of portrait to the user.',
+    'is the prompt, so improve the appearance first if it is thin. Look at what',
+    'was made with media.view and judge it against the character: say what works, generate',
+    'again with a direction where it does not, and select the best one as the portrait. If',
+    'you cannot be shown images, say so and leave the choice to the user.',
   ].join(' '),
   scope: SCOPE,
 };
