@@ -1710,3 +1710,40 @@ input.input.script {
     min-height: 44px;
   }
 }
+.picture-head {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.picture-head .eyebrow {
+  margin: 0;
+}
+.picture-strip {
+  position: relative;
+  height: 34px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+}
+.picture-item {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  overflow: hidden;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  font-size: 11px;
+  line-height: 24px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-soft);
+}
+.picture-item[data-kind='title'] {
+  font-style: italic;
+}
+.linked-note {
+  margin: 0;
+}

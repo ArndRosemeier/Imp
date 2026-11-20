@@ -68,9 +68,25 @@ const Doc = z.object({
   name: z.string(),
   durationSeconds: z.number(),
   markers: z.array(z.object({ id: z.string(), atSeconds: z.number(), label: z.string() })),
+  link: z.object({ kind: z.string(), target: z.string() }).nullable().default(null),
   tracks: z.array(Track),
 });
 type Doc = z.infer<typeof Doc>;
+/** The picture of a scene, for the strip above the tracks. */
+const Picture = z.object({
+  items: z.array(
+    z
+      .object({
+        itemId: z.string(),
+        kind: z.string(),
+        index: z.number(),
+        label: z.string(),
+        startsAtSeconds: z.number(),
+        durationSeconds: z.number(),
+      })
+      .loose(),
+  ),
+});
 const Documents = z.object({
   documents: z.array(
     z.object({ id: z.string(), name: z.string(), durationSeconds: z.number(), tracks: z.number() }),
@@ -79,8 +95,8 @@ const Documents = z.object({
 const WithDoc = z.object({ document: Doc });
 const Step = z.object({
   label: z.string(),
-  actor: z.object({ kind: z.string(), role: z.string().optional() }).loose(),
-  at: z.string(),
+  actor: z.object({ kind: z.string(), role: z.string().optional() }).loose().nullable(),
+  at: z.string().nullable(),
 });
 const History = z.object({ undo: z.array(Step), redo: z.array(Step) });
 type History = z.infer<typeof History>;
@@ -426,6 +442,8 @@ function NumberInput({
 
 /** Who made a step, in words. */
 function byWhom(step: z.infer<typeof Step>): string {
+  // The cut of a scene keeps its steps without saying who made them.
+  if (step.actor === null) return 'Scene';
   if (step.actor.kind !== 'agent') return 'You';
   const role = step.actor.role ?? 'agent';
   return role
@@ -564,7 +582,13 @@ function Inspector({
         <section className="stack">
           <p className="eyebrow">Track</p>
           <p className="inspector-title">{track.name}</p>
-          <div className="knobs">
+          {doc.link !== null && (
+            <p className="muted small">
+              The tracks of a scene are its kinds of sound. Set levels on the regions, or normalize
+              them all here.
+            </p>
+          )}
+          <div className="knobs" hidden={doc.link !== null}>
             <NumberInput
               label="Gain"
               unit="dB"
@@ -598,15 +622,17 @@ function Inspector({
             >
               <EqualizerIcon aria-hidden="true" /> Normalize regions
             </button>
-            <ConfirmButton
-              label="Remove track"
-              question="Remove this track and its regions?"
-              onConfirm={() => {
-                void edit('audio.track.remove', { trackId: track.id });
-              }}
-            >
-              <TrashIcon aria-hidden="true" />
-            </ConfirmButton>
+            {doc.link === null && (
+              <ConfirmButton
+                label="Remove track"
+                question="Remove this track and its regions?"
+                onConfirm={() => {
+                  void edit('audio.track.remove', { trackId: track.id });
+                }}
+              >
+                <TrashIcon aria-hidden="true" />
+              </ConfirmButton>
+            )}
           </div>
         </section>
       ) : (
@@ -625,7 +651,10 @@ function Inspector({
         ) : (
           <ol className="steps-list">
             {steps.map((step, index) => (
-              <li key={`${step.at}-${String(index)}`} data-agent={step.actor.kind === 'agent'}>
+              <li
+                key={`${step.at ?? 'step'}-${String(index)}`}
+                data-agent={step.actor?.kind === 'agent'}
+              >
                 <span>{step.label}</span>
                 <span className="muted small">{byWhom(step)}</span>
               </li>
@@ -654,16 +683,33 @@ function AudioEditor({
 }): ReactElement {
   const imp = useImp();
   const prefix = audioPrefix(project);
-  const live = useLive([`${prefix}docs/${docId}`, `${prefix}history/${docId}`], async (current) => {
+  // A document opened onto a scene changes whenever the scene's cut does.
+  const watched = [
+    `${prefix}docs/${docId}`,
+    `${prefix}history/${docId}`,
+    `projects/${project.id}/movie/`,
+  ];
+  const live = useLive(watched, async (current) => {
     const input = { projectId: project.id, docId };
     const [got, past] = await Promise.all([
       runCommand(current, 'audio.doc.get', input),
       runCommand(current, 'audio.history.list', input),
     ]);
-    return { doc: WithDoc.parse(got).document, history: History.parse(past) };
+    const loaded = WithDoc.parse(got).document;
+    const picture =
+      loaded.link?.kind === 'scene'
+        ? Picture.parse(
+            await runCommand(current, 'movie.edit.get', {
+              projectId: project.id,
+              sceneId: loaded.link.target,
+            }),
+          ).items.filter((item) => item.durationSeconds > 0)
+        : null;
+    return { doc: loaded, history: History.parse(past), picture };
   });
   const doc = live.data?.doc;
   const history = live.data?.history;
+  const picture = live.data?.picture ?? null;
   const { edit, error, setError } = useEdit(imp, project, docId);
   const player = usePlayer(imp, project, docId);
   const [zoom, setZoom] = useState(80);
@@ -722,7 +768,7 @@ function AudioEditor({
   const width = Math.max(length + 10, 30) * zoom;
   const at = player.at;
   const lastStep = history?.undo.at(-1);
-  const agentLast = lastStep?.actor.kind === 'agent';
+  const agentLast = lastStep?.actor?.kind === 'agent';
 
   /** The time under a pointer on the lanes, snapped to region edges and the playhead nearby. */
   const timeAt = (clientX: number, snap = true): number => {
@@ -1172,6 +1218,12 @@ function AudioEditor({
           </button>
         </div>
       </div>
+      {doc.link?.kind === 'scene' && (
+        <p className="linked-note muted small">
+          This is the sound of the scene&apos;s cut. Changes here change the Edit stage, and undo
+          there as well. Moving or trimming a shot&apos;s line takes it apart from its picture.
+        </p>
+      )}
       {agentLast && (
         <div className="agent-pass" role="status">
           <RobotIcon aria-hidden="true" size={16} />
@@ -1198,6 +1250,11 @@ function AudioEditor({
                 {tracks.length === 1 ? '1 track' : `${String(tracks.length)} tracks`}
               </span>
             </div>
+            {picture !== null && (
+              <div className="picture-head">
+                <span className="eyebrow">Picture</span>
+              </div>
+            )}
             {tracks.map((track, index) => (
               <div
                 key={track.id}
@@ -1249,9 +1306,11 @@ function AudioEditor({
                 </div>
               </div>
             ))}
-            <button type="button" className="add-track" onClick={actions.addTrack}>
-              <PlusIcon aria-hidden="true" /> Add track
-            </button>
+            {doc.link === null && (
+              <button type="button" className="add-track" onClick={actions.addTrack}>
+                <PlusIcon aria-hidden="true" /> Add track
+              </button>
+            )}
           </div>
           <div className="lanes-scroll" ref={scroll}>
             <div className="lanes-inner" style={{ width }}>
@@ -1287,6 +1346,27 @@ function AudioEditor({
                   </span>
                 ))}
               </div>
+              {picture !== null && (
+                <div className="picture-strip" aria-label="Picture of the scene" role="group">
+                  {picture.map((item) => (
+                    <span
+                      key={item.itemId}
+                      className="picture-item"
+                      data-kind={item.kind}
+                      style={{
+                        left: item.startsAtSeconds * zoom,
+                        width: item.durationSeconds * zoom,
+                      }}
+                      title={item.label}
+                    >
+                      <strong>
+                        {item.kind === 'title' ? 'Title' : `Shot ${String(item.index)}`}
+                      </strong>{' '}
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div
                 ref={lanes}
                 className="lanes"
@@ -1543,6 +1623,57 @@ function NewDocument({
         )}
       </div>
     </section>
+  );
+}
+
+/** The window event that sends the person to another view; its detail is the view's id. */
+export const OPEN_VIEW = 'imp:open-view';
+
+/** Opens a scene's sound in the audio editor, on the Edit stage. */
+export function OpenInAudioEditor({
+  project,
+  sceneId,
+}: {
+  project: Project;
+  sceneId: string;
+}): ReactElement {
+  const imp = useImp();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        className="button quiet"
+        title="Edit this scene's sound in the audio editor: waveforms, trims, fades, levels"
+        onClick={() => {
+          setError(null);
+          runCommand(imp, 'audio.doc.open', {
+            projectId: project.id,
+            kind: 'scene',
+            target: sceneId,
+          }).then(
+            (output) => {
+              try {
+                localStorage.setItem(DOC_SETTING(project), WithDoc.parse(output).document.id);
+              } catch {
+                // The editor then opens its newest document, which this is.
+              }
+              window.dispatchEvent(new CustomEvent(OPEN_VIEW, { detail: 'audio' }));
+            },
+            (reason: unknown) => {
+              setError(messageOf(reason));
+            },
+          );
+        }}
+      >
+        <WaveformIcon aria-hidden="true" /> Audio editor
+      </button>
+      {error !== null && (
+        <span className="error" role="alert">
+          {error}
+        </span>
+      )}
+    </>
   );
 }
 

@@ -1,4 +1,4 @@
-import { AudioView } from './audio.js';
+import { AudioView, OPEN_VIEW } from './audio.js';
 import { EditView } from './edit.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
@@ -100,6 +100,21 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       console.error(messageOf(error));
     });
   };
+
+  // Views can send the person to another view, such as the Edit stage to the audio editor.
+  useEffect(() => {
+    const onOpen = (event: Event): void => {
+      const next = (event as CustomEvent<unknown>).detail;
+      if (typeof next === 'string') {
+        setViewState(next);
+        localStorage.setItem('imp.view', next);
+      }
+    };
+    window.addEventListener(OPEN_VIEW, onOpen);
+    return () => {
+      window.removeEventListener(OPEN_VIEW, onOpen);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

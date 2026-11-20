@@ -73,7 +73,7 @@ async function loadShot(store: KeyValueStore, projectId: string, sceneId: string
   return stored === undefined ? undefined : Shot.parse(stored);
 }
 
-async function requireScene(
+export async function requireScene(
   store: KeyValueStore,
   commandId: string,
   projectId: string,
@@ -104,12 +104,20 @@ const wholeShot = (shot: Shot): CutItem => ({
 });
 
 /** The items of a cut: as stored, or the scene's shots in order, whole. */
-async function itemsOf(store: KeyValueStore, projectId: string, cut: SceneCut) {
+export async function itemsOf(
+  store: KeyValueStore,
+  projectId: string,
+  cut: SceneCut,
+): Promise<CutItem[]> {
   if (cut.items !== null) return cut.items;
   return (await readShots(store, projectId, cut.sceneId)).map(wholeShot);
 }
 
-async function readCut(store: KeyValueStore, projectId: string, sceneId: string) {
+export async function readCut(
+  store: KeyValueStore,
+  projectId: string,
+  sceneId: string,
+): Promise<SceneCut> {
   const stored = await store.get(editKey(projectId, sceneId));
   return stored === undefined ? SceneCut.parse({ sceneId }) : SceneCut.parse(stored);
 }
@@ -161,8 +169,20 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
   return { items: laid, totalSeconds: round(at) };
 }
 
+/** Where each item starts and how long it plays, for the audio editor. */
+export async function itemTimes(
+  store: KeyValueStore,
+  projectId: string,
+  items: readonly CutItem[],
+): Promise<{
+  items: { startsAtSeconds: number; durationSeconds: number }[];
+  totalSeconds: number;
+}> {
+  return layOut(store, projectId, items);
+}
+
 /** Writes a cut, and keeps what it was so that the change can be undone. */
-async function save(
+export async function save(
   runtime: CoreRuntime,
   projectId: string,
   before: SceneCut,

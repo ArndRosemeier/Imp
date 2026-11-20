@@ -28,7 +28,8 @@ import {
 import type { StereoPcm } from './pcm.js';
 import { toDecibels } from './pcm.js';
 import { FadeCurve, SoundPlacement } from './placement.js';
-import type { AudioSources } from './sources.js';
+import { UnsupportedAudioError } from './codec.js';
+import { MissingSourceError, type AudioSources } from './sources.js';
 import { SAMPLE_RATE, snapSeconds, toFrames } from './time.js';
 import { encodeWav } from './wav.js';
 
@@ -71,6 +72,7 @@ function outline(doc: AudioDoc) {
     name: doc.name,
     durationSeconds: round3(docDuration(doc)),
     markers: doc.markers,
+    link: doc.link,
     tracks: doc.tracks.map((track) => ({
       id: track.id,
       name: track.name,
@@ -115,6 +117,10 @@ const DocOutline = z.object({
   name: z.string(),
   durationSeconds: z.number(),
   markers: z.array(Marker),
+  link: z
+    .object({ kind: z.string(), target: z.string() })
+    .nullable()
+    .describe("Where the tracks are kept when they are not the document's own."),
   tracks: z.array(
     z.object({
       id: z.string(),
@@ -128,20 +134,108 @@ const DocOutline = z.object({
   ),
 });
 
+/** How long a stored sound is in seconds, or undefined when it cannot be decoded here. */
+export type LengthOf = (key: string) => Promise<number | undefined>;
+
+/**
+ * Sound kept elsewhere that the audio editor can open as a document, such as
+ * a scene's sound lanes. The owner of that sound provides the link, so the
+ * audio engine needs to know nothing about it: the link turns it into tracks
+ * of regions and takes edited tracks back, keeping its own undo history so
+ * that both places undo the same steps.
+ */
+export interface AudioLink {
+  /** The kind named in audio.doc.open, for example "scene". */
+  readonly kind: string;
+  /** What the target is, for the command description: "a scene id from movie.scene.list". */
+  readonly target: string;
+  /** The tracks as they are now, and a name for the document. Throws a CommandError when the target is gone. */
+  read(
+    runtime: CoreRuntime,
+    projectId: string,
+    target: string,
+    lengthOf: LengthOf,
+  ): Promise<{ name: string; tracks: Track[] }>;
+  /** Takes edited tracks back as one undoable step. Throws a CommandError for what the target cannot hold. */
+  write(
+    runtime: CoreRuntime,
+    projectId: string,
+    target: string,
+    tracks: readonly Track[],
+    lengthOf: LengthOf,
+  ): Promise<void>;
+  /** Moves one step in the target's history; false when there is none. */
+  travel(
+    runtime: CoreRuntime,
+    projectId: string,
+    target: string,
+    direction: 'undo' | 'redo',
+  ): Promise<boolean>;
+  /** How many steps can be undone and redone. */
+  steps(
+    runtime: CoreRuntime,
+    projectId: string,
+    target: string,
+  ): Promise<{ undo: number; redo: number }>;
+}
+
 export interface AudioDocCommandOptions {
   /** The decoded-sound cache of a store. */
   readonly sources: (runtime: CoreRuntime) => AudioSources;
+  /** Sound kept elsewhere that documents can be opened onto. */
+  readonly links?: readonly AudioLink[];
 }
+
+/** What tracks play, apart from listening switches, to tell whether an edit changed it. */
+const playing = (tracks: readonly Track[]): string =>
+  JSON.stringify(tracks.map((track) => [track.id, track.gainDb, track.pan, track.regions]));
 
 /** The commands that make and edit audio documents: the audio editor's whole ability. */
 export function createAudioDocCommands(options: AudioDocCommandOptions): readonly Command[] {
+  const links = options.links ?? [];
+  const lengthFor =
+    (runtime: CoreRuntime): LengthOf =>
+    (key) =>
+      options
+        .sources(runtime)
+        .describe(key)
+        .then(
+          ({ info }) => info.durationSeconds,
+          () => undefined,
+        );
+  const linkOf = (id: string, kind: string): AudioLink => {
+    const link = links.find((candidate) => candidate.kind === kind);
+    if (link === undefined) {
+      throw new CommandError('invalid_input', id, `Audio documents cannot open "${kind}" here.`);
+    }
+    return link;
+  };
+
+  /** A document as it plays now. A linked one reads its tracks from where they are kept. */
   async function load(runtime: CoreRuntime, id: string, projectId: string, docId: string) {
     await requireProject(runtime.store, id, projectId);
     const stored = await runtime.store.get(docKey(projectId, docId));
     if (stored === undefined) {
       throw new CommandError('invalid_input', id, `No audio document "${docId}".`);
     }
-    return AudioDoc.parse(stored);
+    const doc = AudioDoc.parse(stored);
+    if (doc.link === null) return doc;
+    const live = await linkOf(id, doc.link.kind).read(
+      runtime,
+      projectId,
+      doc.link.target,
+      lengthFor(runtime),
+    );
+    // Mute and solo are for listening only, so the document keeps them itself.
+    const kept = new Map(doc.tracks.map((track) => [track.id, track]));
+    return {
+      ...doc,
+      tracks: live.tracks.map((track) => ({
+        ...track,
+        mute: kept.get(track.id)?.mute ?? track.mute,
+        solo: kept.get(track.id)?.solo ?? track.solo,
+      })),
+    };
   }
 
   async function history(runtime: CoreRuntime, projectId: string, docId: string) {
@@ -166,6 +260,22 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
       ...(await edit(AudioDoc.parse(before))),
       updatedAt: runtime.now().toISOString(),
     });
+    if (before.link !== null) {
+      // The linked sound keeps the history, so both places undo the same steps.
+      if (playing(after.tracks) !== playing(before.tracks)) {
+        await linkOf(id, before.link.kind).write(
+          runtime,
+          projectId,
+          before.link.target,
+          after.tracks,
+          lengthFor(runtime),
+        );
+      }
+      await runtime.store.batch([
+        { type: 'put', key: docKey(projectId, docId), value: after as unknown as JsonValue },
+      ]);
+      return load(runtime, id, projectId, docId);
+    }
     const past = await history(runtime, projectId, docId);
     const entry = {
       label,
@@ -214,27 +324,41 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     }
   };
 
-  /** Decodes every file the document plays, so rendering can read samples synchronously. */
+  /**
+   * Decodes every file the document plays, so rendering can read samples
+   * synchronously. A file that cannot be decoded here (such as the sound of a
+   * video clip) plays as silence and is named in `unheard`.
+   */
   async function decodeAll(runtime: CoreRuntime, doc: AudioDoc) {
     const decoded = new Map<string, StereoPcm>();
+    const unheard = new Set<string>();
     for (const region of doc.tracks.flatMap((track) => track.regions)) {
-      if (region.source === 'file' && region.blobKey !== '' && !decoded.has(region.blobKey)) {
-        decoded.set(region.blobKey, await options.sources(runtime).pcm(region.blobKey));
+      const key = region.blobKey;
+      if (key === '' || decoded.has(key) || unheard.has(key)) continue;
+      try {
+        decoded.set(key, await options.sources(runtime).pcm(key));
+      } catch (error) {
+        if (!(error instanceof MissingSourceError || error instanceof UnsupportedAudioError)) {
+          throw error;
+        }
+        unheard.add(key);
       }
     }
-    return (region: SoundPlacement) => decoded.get(region.blobKey);
+    const labels = doc.tracks
+      .flatMap((track) => track.regions)
+      .filter((region) => unheard.has(region.blobKey))
+      .map((region) => (region.label === '' ? region.id : region.label));
+    return {
+      source: (region: SoundPlacement) => decoded.get(region.blobKey),
+      unheard: [...new Set(labels)],
+    };
   }
 
-  async function renderRange(
-    runtime: CoreRuntime,
-    doc: AudioDoc,
-    from: number,
-    to: number,
-  ): Promise<Uint8Array> {
-    const source = await decodeAll(runtime, doc);
+  async function renderRange(runtime: CoreRuntime, doc: AudioDoc, from: number, to: number) {
+    const { source, unheard } = await decodeAll(runtime, doc);
     const frames = Math.max(1, toFrames(to) - toFrames(from));
     const channels = renderDoc(doc, source, toFrames(from), frames);
-    return encodeWav({ sampleRate: SAMPLE_RATE, channels });
+    return { bytes: encodeWav({ sampleRate: SAMPLE_RATE, channels }), unheard };
   }
 
   const ok = z.object({ document: DocOutline });
@@ -337,6 +461,47 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
         name,
         tracks,
         markers: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      await runtime.store.batch([
+        { type: 'put', key: docKey(projectId, doc.id), value: doc as unknown as JsonValue },
+      ]);
+      return done(doc);
+    },
+  });
+
+  const open = defineCommand({
+    id: 'audio.doc.open',
+    title: 'Open linked sound',
+    description: `Opens sound kept elsewhere as an audio document, so it can be edited with every audio command, and returns it. Edits are written back to where the sound is kept and undo there too; the same document is returned when it was opened before. Kinds: ${
+      links.length === 0
+        ? 'none in this setup.'
+        : links.map((link) => `"${link.kind}" with ${link.target}`).join('; ')
+    }.`,
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      kind: z.string().min(1).describe('What is opened, for example "scene".'),
+      target: z.string().min(1).describe('Which one, for example a scene id.'),
+    }),
+    output: ok,
+    handler: async ({ runtime }, { projectId, kind, target }) => {
+      const id = 'audio.doc.open';
+      await requireProject(runtime.store, id, projectId);
+      const link = linkOf(id, kind);
+      const existing = (await runtime.store.list(docPrefix(projectId)))
+        .map((entry) => AudioDoc.parse(entry.value))
+        .find((doc) => doc.link?.kind === kind && doc.link.target === target);
+      if (existing !== undefined) return done(await load(runtime, id, projectId, existing.id));
+      const live = await link.read(runtime, projectId, target, lengthFor(runtime));
+      const now = runtime.now().toISOString();
+      const doc = AudioDoc.parse({
+        id: runtime.newId(),
+        name: live.name.slice(0, 120) || kind,
+        tracks: live.tracks,
+        markers: [],
+        link: { kind, target },
         createdAt: now,
         updatedAt: now,
       });
@@ -539,8 +704,17 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
       const doc = await load(context.runtime, 'audio.region.update', projectId, docId);
       const { region } = regionOf(doc, 'audio.region.update', regionId);
       const trim = fields.trimStartSeconds ?? region.trimStartSeconds;
-      if (region.source === 'file' && region.blobKey !== '') {
-        const length = await sourceLength(context.runtime, 'audio.region.update', region.blobKey);
+      const length =
+        region.blobKey === ''
+          ? undefined
+          : await options
+              .sources(context.runtime)
+              .describe(region.blobKey)
+              .then(
+                ({ info }) => info.durationSeconds,
+                () => undefined,
+              );
+      if (length !== undefined) {
         const duration = fields.durationSeconds ?? regionDuration(region);
         if (trim + duration > length + 1 / SAMPLE_RATE) {
           throw new CommandError(
@@ -1016,10 +1190,14 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     },
   });
 
-  const HistoryOut = z.object({
-    undo: z.array(z.object({ label: z.string(), actor: Actor, at: z.string() })),
-    redo: z.array(z.object({ label: z.string(), actor: Actor, at: z.string() })),
+  const Step = z.object({
+    label: z.string(),
+    actor: Actor.nullable().describe(
+      'Who made it; null where the linked sound does not record it.',
+    ),
+    at: z.string().nullable(),
   });
+  const HistoryOut = z.object({ undo: z.array(Step), redo: z.array(Step) });
 
   const historyList = defineCommand({
     id: 'audio.history.list',
@@ -1030,7 +1208,19 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     input: z.object({ projectId: ProjectId, docId: DocId }),
     output: HistoryOut,
     handler: async ({ runtime }, { projectId, docId }) => {
-      await load(runtime, 'audio.history.list', projectId, docId);
+      const doc = await load(runtime, 'audio.history.list', projectId, docId);
+      if (doc.link !== null) {
+        const steps = await linkOf('audio.history.list', doc.link.kind).steps(
+          runtime,
+          projectId,
+          doc.link.target,
+        );
+        const step = { label: 'Change', actor: null, at: null };
+        return {
+          undo: Array.from({ length: steps.undo }, () => step),
+          redo: Array.from({ length: steps.redo }, () => step),
+        };
+      }
       const past = await history(runtime, projectId, docId);
       const strip = ({ label, actor, at }: z.infer<typeof HistoryEntry>) => ({ label, actor, at });
       return { undo: past.undo.map(strip), redo: past.redo.map(strip) };
@@ -1047,6 +1237,15 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     wholeRun: boolean,
   ) {
     let doc = await load(runtime, id, projectId, docId);
+    if (doc.link !== null) {
+      // A linked document undoes in its target's history, one step at a time.
+      if (
+        !(await linkOf(id, doc.link.kind).travel(runtime, projectId, doc.link.target, direction))
+      ) {
+        throw new CommandError('invalid_input', id, `There is nothing to ${direction}.`);
+      }
+      return { steps: 1, document: outline(await load(runtime, id, projectId, docId)) };
+    }
     const past = await history(runtime, projectId, docId);
     const from = direction === 'undo' ? [...past.undo] : [...past.redo];
     const to = direction === 'undo' ? [...past.redo] : [...past.undo];
@@ -1102,6 +1301,9 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     key: z.string(),
     durationSeconds: z.number(),
     sizeBytes: z.number(),
+    unheard: z
+      .array(z.string())
+      .describe('Regions whose sound cannot be decoded here and played as silence.'),
   });
 
   const renderInput = z.object({
@@ -1120,7 +1322,7 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     const doc = await load(runtime, id, input.projectId, input.docId);
     const end = Math.min(input.toSeconds ?? docDuration(doc), input.fromSeconds + limitSeconds);
     checkRange(id, input.fromSeconds, end);
-    return { doc, end, bytes: await renderRange(runtime, doc, input.fromSeconds, end) };
+    return { doc, end, ...(await renderRange(runtime, doc, input.fromSeconds, end)) };
   }
 
   const listen = defineCommand({
@@ -1137,13 +1339,14 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     }),
     handler: async ({ runtime, actor }, input) => {
       const limit = actor.kind === 'agent' ? 30 : 600;
-      const { end, bytes } = await renderFor(runtime, 'audio.listen', input, limit);
+      const { end, bytes, unheard } = await renderFor(runtime, 'audio.listen', input, limit);
       const key = audioRenderKey(input.projectId, input.docId, `listen-${actor.kind}.wav`);
       await runtime.blobs.put(key, { bytes, mediaType: 'audio/wav' });
       const result = {
         key,
         durationSeconds: round3(end - input.fromSeconds),
         sizeBytes: bytes.length,
+        unheard,
       };
       return { ...result, attachments: [{ key, mediaType: 'audio/wav', sizeBytes: bytes.length }] };
     },
@@ -1158,10 +1361,15 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     input: renderInput,
     output: RenderOut,
     handler: async ({ runtime }, input) => {
-      const { end, bytes } = await renderFor(runtime, 'audio.export', input, 4 * 3600);
+      const { end, bytes, unheard } = await renderFor(runtime, 'audio.export', input, 4 * 3600);
       const key = audioRenderKey(input.projectId, input.docId, `export-${runtime.newId()}.wav`);
       await runtime.blobs.put(key, { bytes, mediaType: 'audio/wav' });
-      return { key, durationSeconds: round3(end - input.fromSeconds), sizeBytes: bytes.length };
+      return {
+        key,
+        durationSeconds: round3(end - input.fromSeconds),
+        sizeBytes: bytes.length,
+        unheard,
+      };
     },
   });
 
@@ -1169,6 +1377,7 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     list,
     get,
     create,
+    open,
     rename,
     remove,
     trackAdd,

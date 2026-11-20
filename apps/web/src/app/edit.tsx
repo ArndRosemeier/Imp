@@ -34,6 +34,7 @@ import {
   type Placement,
   type Source,
 } from './cut-player.js';
+import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
@@ -830,6 +831,7 @@ function SceneEditor({
       </div>
 
       <div className="row wrap toolbar" role="toolbar" aria-label="Editing">
+        <OpenInAudioEditor project={project} sceneId={sceneId} />
         <button
           className="button"
           onClick={playback.playing ? playback.pause : playback.play}

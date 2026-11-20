@@ -19,7 +19,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { createMovieMode } from '@imp/mode-movie';
+import { createMovieMode, createSceneAudioLink } from '@imp/mode-movie';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -87,7 +87,10 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...projectCommands,
     ...mediaCommands,
-    ...createAudioCommands({ codec: createDefaultAudioCodec() }),
+    ...createAudioCommands({
+      codec: createDefaultAudioCodec(),
+      links: [createSceneAudioLink()],
+    }),
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider),
     ...createCrewCommands(roles, {
