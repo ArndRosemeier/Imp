@@ -153,6 +153,11 @@ export interface ImageRequest {
   readonly aspectRatio?: string;
   /** The same seed, prompt and model give the same image, where the model supports it. */
   readonly seed?: number;
+  /**
+   * Images the new one has to agree with: the same place from another side, the
+   * same person, the same object. Models that take no images refuse the request.
+   */
+  readonly references?: readonly MediaInput[];
 }
 
 export interface GeneratedImage {

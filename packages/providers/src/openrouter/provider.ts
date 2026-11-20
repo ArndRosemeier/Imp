@@ -494,6 +494,9 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         prompt: request.prompt,
         ...(request.aspectRatio === undefined ? {} : { aspect_ratio: request.aspectRatio }),
         ...(request.seed === undefined ? {} : { seed: request.seed }),
+        ...(request.references === undefined || request.references.length === 0
+          ? {}
+          : { input_references: request.references.map(toImagePart) }),
       };
       const json = await sendJson('/images', 'POST', body, call, true);
       const generation = parse(ImageGenerationResponse, json, 'an image');

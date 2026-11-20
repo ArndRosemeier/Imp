@@ -4,8 +4,10 @@ import { z } from 'zod';
 import { characterPrefix, movieDevelopmentKey } from './commands.js';
 import { Character, CharacterImage, Development, MODE_ID } from './schema.js';
 
-/** The setting that names the model images are made with when a call does not say. */
-export const IMAGE_MODEL_SETTING = 'images.model';
+import { IMAGE_MODEL_SETTING } from '@imp/world';
+
+/** The setting that names the model images are made with; the world draws with the same one. */
+export { IMAGE_MODEL_SETTING };
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 

@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
+import { ShotPlace, useWorld } from './place.js';
 import {
   ModelPicker,
   moviePrefix,
@@ -16,7 +17,7 @@ import {
 } from './movie.js';
 
 const Scenes = z.object({
-  scenes: z.array(Scene.pick({ id: true, position: true, heading: true })),
+  scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
 });
 const Cast = z.object({ characters: z.array(Character.pick({ id: true, name: true })) });
 const Shots = z.object({ shots: z.array(Shot) });
@@ -239,12 +240,16 @@ function Dialogue({
 function ShotCard({
   shot,
   cast,
+  world,
+  sceneLocationId,
   model,
   speechModel,
   act,
 }: {
   shot: Shot;
   cast: readonly { id: string; name: string }[];
+  world: ReturnType<typeof useWorld>;
+  sceneLocationId: string | null;
   model: string | null;
   speechModel: string | null;
   act: Act;
@@ -284,6 +289,13 @@ function ShotCard({
         value={shot.performance}
         placeholder="Who moves how, how far, how fast, and how the others react. Models underplay bodies unless told."
         onCommit={(performance) => change({ performance })}
+      />
+      <ShotPlace
+        shot={shot}
+        sceneLocationId={sceneLocationId}
+        locations={world.locations}
+        objects={world.objects}
+        change={change}
       />
       {cast.length > 0 && (
         <fieldset className="choices">
@@ -383,6 +395,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
       .characters,
   }));
   const { act, error } = useAct(project);
+  const world = useWorld(project);
   const video = useModelSetting(VIDEO_MODEL_SETTING, 'video');
   const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -470,6 +483,8 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
                 key={shot.id}
                 shot={shot}
                 cast={outline.data?.cast ?? []}
+                world={world}
+                sceneLocationId={scene?.locationId ?? null}
                 model={video.model}
                 speechModel={speech.model}
                 act={act}
