@@ -26,6 +26,27 @@ describe('models.list', () => {
       model('a/plain', { supportsTools: false }),
       model('~a/latest'),
       model('meta/muse-image', { outputModalities: ['image'] }),
+      model('v/clips', {
+        outputModalities: ['video'],
+        video: {
+          durationsSeconds: [4, 6, 8],
+          resolutions: ['720p'],
+          aspectRatios: ['16:9'],
+          frameImages: [],
+          nativeAudio: true,
+        },
+      }),
+      model('v/avatar', {
+        outputModalities: ['video'],
+        video: {
+          durationsSeconds: [],
+          resolutions: ['1080p'],
+          aspectRatios: [],
+          frameImages: [],
+          nativeAudio: false,
+        },
+      }),
+      model('v/unknown', { outputModalities: ['video'] }),
       ...Array.from({ length: 30 }, (_, index) => model(`bulk/m${String(index).padStart(2, '0')}`)),
     ],
   });
@@ -74,6 +95,20 @@ describe('models.list', () => {
       { id: 'b/writer', name: 'B/WRITER', inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
       { id: '~a/latest', name: '~A/LATEST', inputUsdPerMillion: null, outputUsdPerMillion: null },
     ]);
-    expect(await list({ output: 'video' })).toEqual({ models: [], total: 0 });
+  });
+
+  it('lists the video models that can make clips, with what they can do, and the rest on request', async () => {
+    const clips = await list({ output: 'video' });
+    expect(clips.total).toBe(2);
+    expect(clips.models.map((entry) => entry['id'])).toEqual(['v/clips', 'v/unknown']);
+    expect(clips.models[0]).toMatchObject({ abilities: ['4, 6, 8 s', 'own sound'] });
+    expect(clips.models[0]).not.toHaveProperty('unsuitable');
+    expect(clips.models[1]).not.toHaveProperty('abilities');
+    const all = await list({ output: 'video', all: true });
+    expect(all.total).toBe(3);
+    expect(all.models.find((entry) => entry['id'] === 'v/avatar')).toMatchObject({
+      abilities: ['silent'],
+      unsuitable: expect.stringContaining('photo or an existing video') as string,
+    });
   });
 });

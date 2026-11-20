@@ -295,7 +295,11 @@ const CHARACTER_FIELDS: readonly {
   { key: 'voice', label: 'Voice', rows: 4, placeholder: 'Pitch, pace, accent, manner.' },
 ];
 
-const ImageModels = z.object({ models: z.array(z.object({ id: z.string(), name: z.string() })) });
+const ImageModels = z.object({
+  models: z.array(
+    z.object({ id: z.string(), name: z.string(), abilities: z.array(z.string()).optional() }),
+  ),
+});
 const StringSetting = z.object({ value: z.json() });
 
 /** Reads a setting that names a generation model, and the models it can be set to. */
@@ -304,7 +308,7 @@ export function useModelSetting(
   output: 'image' | 'speech' | 'audio' | 'video',
 ): {
   model: string | null;
-  models: readonly { id: string; name: string }[];
+  models: readonly { id: string; name: string; abilities?: string[] | undefined }[];
   error: string | null;
 } {
   const setting = useLive([`settings/${key}`], async (imp) => {
@@ -494,11 +498,17 @@ export function ModelPicker({
       >
         {choice.model === null && <option value="">{empty}</option>}
         {choice.model !== null && !choice.models.some((model) => model.id === choice.model) && (
-          <option value={choice.model}>{choice.model}</option>
+          <option value={choice.model}>
+            {choice.model}
+            {choice.models.length > 0 ? ' (not offered: unsuitable or unknown)' : ''}
+          </option>
         )}
         {choice.models.map((model) => (
           <option key={model.id} value={model.id}>
             {model.name}
+            {model.abilities === undefined || model.abilities.length === 0
+              ? ''
+              : ` · ${model.abilities.join(' · ')}`}
           </option>
         ))}
       </select>

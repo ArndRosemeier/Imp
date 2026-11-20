@@ -582,16 +582,25 @@ describe('shots and clips', () => {
       speakerId: null,
       line: '',
       delivery: '',
+      dialogue: null,
       clip: null,
     });
     expect(await run('movie.shot.list', { sceneId: scene.id })).toEqual({
       shots: [
-        { id: first.id, position: 1, description: 'The lamp turns.', line: '', clip: null },
+        {
+          id: first.id,
+          position: 1,
+          description: 'The lamp turns.',
+          line: '',
+          dialogue: false,
+          clip: null,
+        },
         {
           id: second.id,
           position: 2,
           description: 'Mara at the stairs.',
           line: 'Who is there?',
+          dialogue: false,
           clip: null,
         },
       ],
@@ -693,6 +702,123 @@ describe('shots and clips', () => {
     });
     expect(provider.videoRequests).toHaveLength(2);
     expect(provider.videoRequests[1]).not.toHaveProperty('references');
+  });
+
+  it('records the line in the voice of the speaker and makes the clip silent and long enough', async () => {
+    const video = {
+      durationsSeconds: [4, 6, 8],
+      resolutions: ['480p', '720p'],
+      aspectRatios: ['16:9'],
+      frameImages: [],
+      nativeAudio: true,
+    };
+    const { run, runtime, registry, provider, at, storm } = await withScene({
+      models: [
+        {
+          id: 'vendor/clips',
+          name: 'Clips',
+          inputModalities: ['text'],
+          outputModalities: ['video'],
+          video,
+          contextLength: null,
+          supportsTools: false,
+          pricing: { promptUsdPerToken: null, completionUsdPerToken: null },
+        },
+      ],
+    });
+    await registry.executeById(
+      'settings.set',
+      { key: 'speech.model', value: 'vendor/speaker' },
+      { actor: user },
+    );
+    const shot = await storm();
+    const spoken = (await run('movie.shot.dialogue.generate', at(shot.id))) as unknown as {
+      dialogue: { blobKey: string; durationSeconds: number; line: string };
+    };
+    expect(provider.speechRequests[0]).toMatchObject({
+      model: 'vendor/speaker',
+      text: 'Tomas! Get away from the rail!',
+      instructions: expect.stringContaining('Delivery: Screaming over the wind.') as string,
+    });
+    expect(spoken.dialogue).toMatchObject({ line: 'Tomas! Get away from the rail!' });
+    expect(await run('movie.shot.list', { sceneId: shot['sceneId'] })).toMatchObject({
+      shots: [{ dialogue: true }],
+    });
+
+    const started = (await run('movie.shot.clip.generate', {
+      ...at(shot.id),
+      resolution: '1080p',
+    })) as unknown as WithClip;
+    expect(started.clip).toMatchObject({ silent: true, durationSeconds: 4 });
+    expect(provider.videoRequests[0]).toMatchObject({
+      durationSeconds: 4,
+      resolution: '720p',
+      audio: false,
+      prompt: expect.stringContaining('no sound is heard') as string,
+    });
+    expect(provider.videoRequests[0]?.prompt).not.toContain('"Tomas! Get away');
+
+    // A new recording replaces the file of the old one; deleting it leaves the line.
+    await run('movie.shot.dialogue.generate', at(shot.id));
+    expect((await runtime.blobs.list('')).filter((key) => key.includes('/dialogue/'))).toHaveLength(
+      1,
+    );
+    expect(await run('movie.shot.dialogue.delete', at(shot.id))).toEqual({
+      shotId: shot.id,
+      deleted: true,
+    });
+    expect(await run('movie.shot.dialogue.delete', at(shot.id))).toEqual({
+      shotId: shot.id,
+      deleted: false,
+    });
+    expect(await runtime.blobs.list('')).not.toContainEqual(
+      expect.stringContaining('/dialogue/') as string,
+    );
+    await run('movie.shot.dialogue.generate', at(shot.id));
+    await run('movie.shot.delete', at(shot.id));
+    expect((await runtime.blobs.list('')).filter((key) => key.includes('/dialogue/'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('asks for a speaker, a line and a speech model before recording', async () => {
+    const { run, at, add, mara } = await withScene();
+    const mute = await add({ description: 'A door.' });
+    await expect(run('movie.shot.dialogue.generate', at(mute.id))).rejects.toThrow(
+      /speaker and the line/,
+    );
+    const talker = await add({ description: 'Mara.', speakerId: mara.id, line: 'Hello.' });
+    await expect(run('movie.shot.dialogue.generate', at(talker.id))).rejects.toThrow(
+      /No speech model/,
+    );
+  });
+
+  it('refuses a video model that cannot make a film before spending anything', async () => {
+    const { run, provider, at, add } = await withScene({
+      models: [
+        {
+          id: 'vendor/clips',
+          name: 'Clips',
+          inputModalities: ['text', 'image'],
+          outputModalities: ['video'],
+          video: {
+            durationsSeconds: [],
+            resolutions: ['720p'],
+            aspectRatios: ['16:9'],
+            frameImages: ['first_frame'],
+            nativeAudio: null,
+          },
+          contextLength: null,
+          supportsTools: false,
+          pricing: { promptUsdPerToken: null, completionUsdPerToken: null },
+        },
+      ],
+    });
+    const shot = await add({ description: 'The lamp turns.' });
+    await expect(run('movie.shot.clip.generate', at(shot.id))).rejects.toThrow(
+      /cannot be used for clips/,
+    );
+    expect(provider.videoRequests).toHaveLength(0);
   });
 
   it('deletes clips with what they belong to', async () => {

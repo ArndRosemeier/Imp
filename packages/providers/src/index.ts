@@ -1,3 +1,4 @@
+export { mp3DurationSeconds } from './audio.js';
 export { decodeBase64, encodeBase64 } from './base64.js';
 export { ProviderError, type ProviderErrorKind } from './errors.js';
 export type { HttpFetch, HttpRequest, HttpResponse } from './http.js';
@@ -23,6 +24,7 @@ export {
   type Modality,
   type MediaInput,
   type ModelInfo,
+  type VideoAbilities,
   type VideoJob,
   type VideoRequest,
   type SoundRequest,
@@ -32,3 +34,9 @@ export {
   type ToolCall,
   type Usage,
 } from './types.js';
+export {
+  describeVideoModel,
+  fitDuration,
+  fitResolution,
+  type VideoModelNotes,
+} from './video-models.js';
