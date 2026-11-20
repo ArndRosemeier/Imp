@@ -15,6 +15,7 @@
     "@imp/audio": "workspace:*",
     "@imp/core": "workspace:*",
     "@imp/providers": "workspace:*",
+    "@imp/world": "workspace:*",
     "zod": "^4.6.7"
   }
 }

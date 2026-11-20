@@ -14,12 +14,14 @@ import {
   mediaCommands,
   MemoryBlobStore,
   createProjectCommands,
+  readProject,
   settingsCommands,
   type BlobStore,
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
 import { createMovieMode } from '@imp/mode-movie';
+import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -88,6 +90,15 @@ export function createImp(options: ImpOptions): Imp {
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createAudioCommands({ codec: createDefaultAudioCodec() }),
+    ...createWorldCommands({
+      provider,
+      // The world is drawn in the style the project's mode keeps.
+      style: async (store, projectId) => {
+        const project = await readProject(store, projectId);
+        const mode = modes.find((candidate) => candidate.id === project?.mode);
+        return (await mode?.visualStyle?.(store, projectId)) ?? '';
+      },
+    }),
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider),
     ...createCrewCommands(roles, {

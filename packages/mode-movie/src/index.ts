@@ -7,6 +7,7 @@ export {
   developmentGet,
   developmentUpdate,
   movieCommands,
+  requireLocationState,
   sceneCreate,
   sceneDelete,
   sceneGet,
@@ -19,6 +20,7 @@ export {
   clipDesigner,
   createMovieMode,
   filmEditor,
+  productionDesigner,
   soundEditor,
   screenwriter,
   soundDesigner,
@@ -43,7 +45,14 @@ export {
 } from './schema.js';
 export { createEditCommands } from './edit.js';
 export { LibrarySound, soundLibrary } from './library.js';
-export { clipPrompt, createShotCommands, VIDEO_MODEL_SETTING } from './shots.js';
+export {
+  clipPrompt,
+  createShotCommands,
+  MAX_CLIP_GUIDES,
+  readSetting,
+  type ShotSetting,
+  VIDEO_MODEL_SETTING,
+} from './shots.js';
 export {
   createSoundCommands,
   EFFECT_MODEL_SETTING,

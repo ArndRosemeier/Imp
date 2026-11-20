@@ -25,7 +25,15 @@ function build(draft: Draft) {
     };
     records.push({ key: DEVELOPMENT, value: development });
     draft.scenes.forEach(([heading, summary], index) => {
-      const value: Scene = { id: newId(), position: index + 1, heading, summary, body: '' };
+      const value: Scene = {
+        id: newId(),
+        position: index + 1,
+        heading,
+        summary,
+        body: '',
+        locationId: null,
+        locationStateId: null,
+      };
       records.push({ key: scene(value.id), value });
     });
     for (const [name, part, description] of draft.characters ?? []) {

@@ -11,11 +11,14 @@ import { ProviderError } from '@imp/providers';
 import { createTestRuntime } from '@imp/core/testing';
 import { describe, expect, it } from 'vitest';
 import { createFakeProvider } from '@imp/providers/testing';
+import { createWorldCommands } from '@imp/world';
 import {
   castingDirector,
   Character,
   clipPrompt,
   createMovieMode,
+  MAX_CLIP_GUIDES,
+  readSetting,
   screenwriter,
   Shot,
   soundPrompt,
@@ -31,6 +34,7 @@ async function setup(providerOptions: Parameters<typeof createFakeProvider>[0] =
     ...projectCommands,
     ...settingsCommands,
     ...createMovieMode({ provider }).commands,
+    ...createWorldCommands({ provider }),
   );
   const created = await registry.execute(
     projectCreate,
@@ -64,6 +68,7 @@ describe('the movie mode', () => {
       'development',
       'script',
       'casting',
+      'design',
       'shots',
       'sound',
       'edit',
@@ -156,6 +161,8 @@ describe('scenes', () => {
       position: 1,
       heading: 'A',
       summary: '',
+      locationId: null,
+      locationStateId: null,
       words: 2,
     });
     expect(await run('movie.scene.get', { sceneId: a.id })).toMatchObject({ body: 'Mara climbs.' });
@@ -620,6 +627,10 @@ describe('shots and clips', () => {
       description: 'The lamp turns.',
       characterIds: [],
       performance: '',
+      locationId: null,
+      locationStateId: null,
+      viewId: null,
+      objects: [],
       speakerId: null,
       line: '',
       delivery: '',
@@ -1434,5 +1445,174 @@ describe('sounds', () => {
       ),
     ).rejects.toThrow(/deleted while it was made/);
     expect(await runtime.blobs.list('')).toEqual([]);
+  });
+});
+
+describe('locations and objects in scenes and shots', () => {
+  const withWorld = async (options: Parameters<typeof setup>[0] = {}) => {
+    const context = await setup(options);
+    const { run, registry } = context;
+    for (const [key, value] of [
+      ['video.model', 'vendor/clips'],
+      ['images.model', 'vendor/painter'],
+    ]) {
+      await registry.executeById('settings.set', { key, value }, { actor: user });
+    }
+    const lamp = await run('world.location.create', {
+      name: 'Lamp room',
+      look: 'Round iron room under a glass dome.',
+    });
+    const night = await run('world.location.state.add', {
+      locationId: lamp.id,
+      name: 'Night',
+      description: 'Only the lamp lights the room.',
+    });
+    const stairs = await run('world.location.view.add', {
+      locationId: lamp.id,
+      name: 'From the stairs',
+      description: 'Low, looking up at the lamp.',
+    });
+    const watch = await run('world.object.create', { name: 'Pocket watch', look: 'Brass.' });
+    const cracked = await run('world.object.state.add', { objectId: watch.id, name: 'Cracked' });
+    const scene = await run('movie.scene.create', {
+      heading: 'INT. LAMP ROOM - NIGHT',
+      locationId: lamp.id,
+      locationStateId: night.id,
+    });
+    return { ...context, lamp, night, stairs, watch, cracked, scene };
+  };
+
+  it('links a scene to a location and a state, and refuses ones that do not exist', async () => {
+    const { run, lamp, night, scene } = await withWorld();
+    expect(scene).toMatchObject({ locationId: lamp.id, locationStateId: night.id });
+    await expect(
+      run('movie.scene.create', { heading: 'X', locationId: 'nowhere' }),
+    ).rejects.toThrow(/No location "nowhere"/);
+    await expect(
+      run('movie.scene.update', { sceneId: scene.id, locationStateId: 'gone' }),
+    ).rejects.toThrow(/no state "gone"/);
+    await expect(
+      run('movie.scene.create', { heading: 'X', locationStateId: night.id }),
+    ).rejects.toThrow(/A state needs a location/);
+    // A new location resets the state; keeping the location keeps it.
+    const cove = await run('world.location.create', { name: 'Cove' });
+    expect(await run('movie.scene.update', { sceneId: scene.id, summary: 'S' })).toMatchObject({
+      locationStateId: night.id,
+    });
+    expect(
+      await run('movie.scene.update', { sceneId: scene.id, locationId: cove.id }),
+    ).toMatchObject({ locationId: cove.id, locationStateId: null });
+    expect(await run('movie.scene.update', { sceneId: scene.id, locationId: null })).toMatchObject({
+      locationId: null,
+    });
+  });
+
+  it('films a shot from a view of the location with objects, and checks them', async () => {
+    const { run, scene, stairs, watch, cracked, lamp } = await withWorld();
+    const shot = await run('movie.shot.create', {
+      sceneId: scene.id,
+      description: 'Mara climbs into the light.',
+      viewId: stairs.id,
+      objects: [{ objectId: watch.id, stateId: cracked.id }],
+    });
+    expect(shot).toMatchObject({ viewId: stairs.id, objects: [{ objectId: watch.id }] });
+    const at = { sceneId: scene.id, shotId: shot.id };
+    await expect(run('movie.shot.update', { ...at, viewId: 'gone' })).rejects.toThrow(
+      /no view "gone"/,
+    );
+    await expect(
+      run('movie.shot.update', { ...at, objects: [{ objectId: 'gone' }] }),
+    ).rejects.toThrow(/No object "gone"/);
+    await expect(
+      run('movie.shot.update', { ...at, objects: [{ objectId: watch.id, stateId: 'gone' }] }),
+    ).rejects.toThrow(/no state "gone"/);
+    const elsewhere = await run('movie.scene.create', { heading: 'EXT. SEA' });
+    await expect(
+      run('movie.shot.create', { sceneId: elsewhere.id, viewId: stairs.id }),
+    ).rejects.toThrow(/A view needs a location/);
+    const cove = await run('world.location.create', { name: 'Cove' });
+    // The shot may name a place of its own; then the scene's state does not apply.
+    const moved = Shot.parse(
+      await run('movie.shot.update', { ...at, locationId: cove.id, viewId: null }),
+    );
+    expect(moved.locationId).toBe(cove.id);
+    expect(
+      await run('movie.shot.update', { ...at, locationId: lamp.id, viewId: stairs.id }),
+    ).toMatchObject({ locationId: lamp.id });
+  });
+
+  it('describes the place, the view, the state and the objects to the video model', async () => {
+    const { run, runtime, projectId, scene, stairs, watch, cracked } = await withWorld();
+    const shot = Shot.parse(
+      await run('movie.shot.create', {
+        sceneId: scene.id,
+        description: 'Mara climbs into the light.',
+        viewId: stairs.id,
+        objects: [{ objectId: watch.id, stateId: cracked.id }],
+      }),
+    );
+    const setting = await readSetting(runtime.store, projectId, shot);
+    expect(clipPrompt(shot, [], '', false, setting)).toBe(
+      [
+        'Mara climbs into the light.',
+        'Location: Lamp room, seen from "From the stairs": Low, looking up at the lamp. Round iron room under a glass dome. Night: Only the lamp lights the room.',
+        'Pocket watch: Brass (Cracked)',
+        'Nobody speaks.',
+      ].join('\n'),
+    );
+    // What was deleted from the world is left out.
+    await run('world.object.delete', { objectId: watch.id });
+    expect((await readSetting(runtime.store, projectId, shot)).objects).toEqual([]);
+  });
+
+  it('guides the clip with the portraits, the view of the place and the objects', async () => {
+    const { run, provider, scene, stairs, watch, lamp } = await withWorld();
+    const mara = await run('movie.character.create', { name: 'Mara' });
+    await run('movie.character.image.generate', { characterId: mara.id });
+    await run('world.location.image.generate', { locationId: lamp.id });
+    await run('world.location.image.generate', { locationId: lamp.id, viewId: stairs.id });
+    await run('world.object.image.generate', { objectId: watch.id });
+    const shot = await run('movie.shot.create', {
+      sceneId: scene.id,
+      description: 'Mara climbs into the light.',
+      characterIds: [mara.id],
+      viewId: stairs.id,
+      objects: [{ objectId: watch.id }],
+    });
+    const started = (await run('movie.shot.clip.generate', {
+      sceneId: scene.id,
+      shotId: shot.id,
+    })) as unknown as { clip: { portraits: number; guides: string[] } };
+    expect(started.clip).toMatchObject({
+      portraits: 1,
+      guides: ['Mara', 'Lamp room · From the stairs', 'Pocket watch'],
+    });
+    expect(provider.videoRequests[0]?.references).toHaveLength(3);
+    expect(MAX_CLIP_GUIDES).toBe(4);
+  });
+
+  it('says no guides were used when the model refuses them', async () => {
+    const { run, scene, lamp } = await withWorld({ videoRefusesReferences: true });
+    await run('world.location.image.generate', { locationId: lamp.id });
+    const shot = await run('movie.shot.create', { sceneId: scene.id, description: 'The lamp.' });
+    const started = (await run('movie.shot.clip.generate', {
+      sceneId: scene.id,
+      shotId: shot.id,
+    })) as unknown as { clip: { portraits: number; guides: string[] } };
+    expect(started.clip).toMatchObject({ portraits: 0, guides: [] });
+  });
+
+  it('draws the world in the tone of the film', async () => {
+    const { runtime, projectId } = await setup();
+    const mode = createMovieMode({ provider: createFakeProvider({}) });
+    expect(await mode.visualStyle?.(runtime.store, projectId)).toBe('');
+    await runtime.store.batch([
+      {
+        type: 'put',
+        key: `projects/${projectId}/movie/development`,
+        value: { logline: '', premise: '', tone: 'Cold sea light.', treatment: '' },
+      },
+    ]);
+    expect(await mode.visualStyle?.(runtime.store, projectId)).toBe('Cold sea light.');
   });
 });

@@ -16,6 +16,7 @@ import {
   type ResourceItem,
   type WriteOperation,
 } from '@imp/core';
+import { keyImageOf, readWorld, worldPrefix, type WorldElement, type WorldKind } from '@imp/world';
 import {
   characterPrefix,
   editKey,
@@ -40,6 +41,8 @@ interface Movie {
   readonly development: Development;
   readonly scenes: Scene[];
   readonly characters: Character[];
+  readonly locations: WorldElement[];
+  readonly objects: WorldElement[];
   /** By scene id. */
   readonly shots: Map<string, Shot[]>;
   readonly sounds: Map<string, Sound[]>;
@@ -75,6 +78,8 @@ async function readMovie(store: KeyValueStore, projectId: string): Promise<Movie
     development: stored === undefined ? EMPTY_DEVELOPMENT : Development.parse(stored),
     scenes,
     characters,
+    locations: await readWorld(store, projectId, 'location'),
+    objects: await readWorld(store, projectId, 'object'),
     shots: grouped(shots),
     sounds: grouped(sounds),
     cuts,
@@ -101,6 +106,8 @@ export async function summarizeMovie(
     character.voiceOnly ? character.voiceSample !== null : character.portraitId !== null,
   ).length;
   const voiced = characters.filter((character) => character.voiceSample !== null).length;
+  const world = [...movie.locations, ...movie.objects];
+  const drawn = world.filter((element) => keyImageOf(element) !== undefined).length;
   const ready = shots.filter((shot) => shot.clip?.status === 'ready').length;
   const made = sounds.filter((sound) => sound.take !== null).length;
   const cut = scenes.filter((scene) => {
@@ -142,6 +149,16 @@ export async function summarizeMovie(
           characters.length === 0
             ? 'No characters'
             : `${plural(characters.length, 'character')}, ${String(portrayed)} with a portrait, ${String(voiced)} with a voice`,
+      },
+      {
+        id: 'design',
+        name: 'Design',
+        done: drawn,
+        total: world.length,
+        note:
+          world.length === 0
+            ? 'No locations or objects'
+            : `${plural(movie.locations.length, 'location')}, ${plural(movie.objects.length, 'object')}, ${String(drawn)} drawn`,
       },
       {
         id: 'shots',
@@ -204,6 +221,23 @@ function scenesUsedBy(cut: SceneCut | undefined, sceneId: string): string[] {
   return [...new Set(used)].filter((id) => id !== '' && id !== sceneId);
 }
 
+const KIND_OF: Readonly<Record<string, WorldKind>> = { location: 'location', object: 'object' };
+const elementsOf = (movie: Movie, kind: WorldKind): WorldElement[] =>
+  kind === 'location' ? movie.locations : movie.objects;
+const elementKey = (projectId: string, kind: WorldKind, id: string): string =>
+  `${worldPrefix(projectId, kind)}${id}`;
+
+/** The places and objects a scene or a shot needs, as copy kinds and ids. */
+function worldOf(scene: Scene | undefined, shots: readonly Shot[]): [WorldKind, string][] {
+  const needs: [WorldKind, string][] = [];
+  if (scene !== undefined && scene.locationId !== null) needs.push(['location', scene.locationId]);
+  for (const shot of shots) {
+    if (shot.locationId !== null) needs.push(['location', shot.locationId]);
+    for (const seen of shot.objects) needs.push(['object', seen.objectId]);
+  }
+  return needs;
+}
+
 function findShot(movie: Movie, shotId: string): Shot | undefined {
   return [...movie.shots.values()].flat().find((shot) => shot.id === shotId);
 }
@@ -242,6 +276,14 @@ export const movieCopier: ResourceCopier = {
       needsParent: false,
       parentKind: null,
     },
+    {
+      id: 'location',
+      label: 'Location',
+      plural: 'Locations',
+      needsParent: false,
+      parentKind: null,
+    },
+    { id: 'object', label: 'Object', plural: 'Objects', needsParent: false, parentKind: null },
     { id: 'scene', label: 'Scene', plural: 'Scenes', needsParent: false, parentKind: null },
     { id: 'shot', label: 'Shot', plural: 'Shots', needsParent: true, parentKind: 'scene' },
     { id: 'sound', label: 'Sound', plural: 'Sounds', needsParent: true, parentKind: 'scene' },
@@ -271,6 +313,21 @@ export const movieCopier: ResourceCopier = {
         id: character.id,
         name: character.name,
         detail: has.join(' · '),
+        parentId: null,
+      });
+    }
+    for (const element of [...movie.locations, ...movie.objects]) {
+      items.push({
+        kind: element.kind,
+        id: element.id,
+        name: element.name,
+        detail: [
+          plural(element.views.length, 'view'),
+          element.states.length === 0 ? '' : plural(element.states.length, 'state'),
+          plural(element.images.length, 'picture'),
+        ]
+          .filter((part) => part !== '')
+          .join(' · '),
         parentId: null,
       });
     }
@@ -377,6 +434,33 @@ export const movieCopier: ResourceCopier = {
                   choices: ALL,
                 },
         });
+      } else if (KIND_OF[next.kind] !== undefined) {
+        const kind = KIND_OF[next.kind] ?? 'location';
+        const element = elementsOf(source, kind).find((e) => e.id === next.id);
+        if (element === undefined) {
+          if (next.reason === 'needed') continue;
+          return fail(`No ${kind} "${next.id}" in the source project.`);
+        }
+        const byId = elementsOf(target, kind).find((e) => e.id === element.id);
+        const byName = elementsOf(target, kind).find((e) => same(e.name, element.name));
+        const match = byId ?? byName;
+        planned.push({
+          ...next,
+          name: element.name,
+          collision:
+            match === undefined
+              ? null
+              : {
+                  targetId: match.id,
+                  targetName: match.name,
+                  match: byId === undefined ? 'name' : 'id',
+                  choices: ALL,
+                },
+        });
+        // A place inside a larger place brings the larger one along.
+        if (element.kind === 'location' && element.parentId !== null) {
+          need('location', element.parentId, element.name);
+        }
       } else if (next.kind === 'scene') {
         const scene = source.scenes.find((s) => s.id === next.id);
         if (scene === undefined) {
@@ -394,6 +478,9 @@ export const movieCopier: ResourceCopier = {
         });
         for (const shot of source.shots.get(scene.id) ?? []) {
           for (const id of castOf(shot)) need('character', id, sceneName(scene));
+        }
+        for (const [kind, id] of worldOf(scene, source.shots.get(scene.id) ?? [])) {
+          need(kind, id, sceneName(scene));
         }
         for (const id of scenesUsedBy(source.cuts.get(scene.id), scene.id))
           need('scene', id, sceneName(scene));
@@ -419,6 +506,7 @@ export const movieCopier: ResourceCopier = {
                 },
         });
         for (const id of castOf(shot)) need('character', id, name);
+        for (const [kind, id] of worldOf(undefined, [shot])) need(kind, id, name);
       } else if (next.kind === 'sound') {
         const sound = findSound(source, next.id);
         if (sound === undefined) return fail(`No sound "${next.id}" in the source project.`);
@@ -483,6 +571,10 @@ export const movieCopier: ResourceCopier = {
     let nextScenePosition = Math.max(0, ...target.scenes.map((s) => s.position)) + 1;
     const nextShotPosition = new Map<string, number>();
     const takenCharacterNames = target.characters.map((c) => c.name);
+    const takenWorldNames: Record<WorldKind, string[]> = {
+      location: target.locations.map((e) => e.name),
+      object: target.objects.map((e) => e.name),
+    };
     const takenSoundNames = (target.sounds.get(spec.parentId ?? '') ?? []).map((s) => s.name);
 
     for (const { item, choice, targetId } of decided) {
@@ -502,6 +594,24 @@ export const movieCopier: ResourceCopier = {
           choice === 'keepBoth' ? freeName(character.name, takenCharacterNames) : character.name;
         takenCharacterNames.push(name);
         put(key(spec.toProjectId, targetId), { ...value, id: targetId, name });
+      } else if (KIND_OF[item.kind] !== undefined) {
+        const kind = KIND_OF[item.kind] ?? 'location';
+        const element = elementsOf(source, kind).find((e) => e.id === item.id);
+        if (element === undefined) continue;
+        if (choice === 'overwrite') {
+          await removeFiles(runtime, `${elementKey(spec.toProjectId, kind, targetId)}/`);
+        }
+        const rewrite = rewriter();
+        await moveFiles(
+          runtime,
+          `${elementKey(spec.fromProjectId, kind, element.id)}/`,
+          rewrite.key,
+        );
+        const value = rewrite.value(element) as WorldElement;
+        const name =
+          choice === 'keepBoth' ? freeName(element.name, takenWorldNames[kind]) : element.name;
+        takenWorldNames[kind].push(name);
+        put(elementKey(spec.toProjectId, kind, targetId), { ...value, id: targetId, name });
       } else if (item.kind === 'scene') {
         const scene = source.scenes.find((s) => s.id === item.id);
         if (scene === undefined) continue;
