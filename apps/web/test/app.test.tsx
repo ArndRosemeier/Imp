@@ -95,6 +95,7 @@ describe('helpers', () => {
       { name: 'model', kind: 'string', required: true },
       { name: 'name', kind: 'string', required: false },
       { name: 'budgetUsdPerRun', kind: 'number', required: false },
+      { name: 'webSearch', kind: 'boolean', required: false },
     ]);
     expect(
       toInput(fields, { roleId: 'coordinator', model: 'm', name: ' ', budgetUsdPerRun: '0.5' }),
@@ -396,6 +397,21 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /Start over/ }));
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
+  });
+
+  it('switches web search on for a crew member', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    const box = await screen.findByRole('checkbox', { name: 'Coordinator can search the web' });
+    expect(box).toHaveProperty('checked', false);
+    await user.click(box);
+    await vi.waitFor(async () => {
+      const [member] = await imp.store.list('crew/');
+      expect(member?.value).toMatchObject({ webSearch: true });
+    });
+    await vi.waitFor(() => {
+      expect(box).toHaveProperty('checked', true);
+    });
   });
 
   it('defines a custom role, hires for it and deletes it again', async () => {

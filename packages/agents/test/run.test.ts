@@ -25,6 +25,7 @@ const member: CrewMember = {
   name: 'Sam',
   model: 'vendor/model',
   budgetUsdPerRun: 1,
+  webSearch: false,
   hiredAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -394,5 +395,23 @@ describe('runAgent', () => {
         { error: '"find_commands" is not a command you can run.' },
       ]);
     });
+  });
+
+  it('lets an agent with web search search, and tells it how to treat what it finds', async () => {
+    const provider = createFakeProvider({ replies: [{ content: 'Done.' }, { content: 'Done.' }] });
+    const { registry } = setup([]);
+    await runAgent({
+      registry,
+      provider,
+      member: { ...member, webSearch: true },
+      role,
+      task: 'Go.',
+    });
+    await runAgent({ registry, provider, member, role, task: 'Go.' });
+    const [searching, plain] = provider.requests;
+    expect(searching?.webSearch).toBe(true);
+    expect(searching?.messages[0]?.content).toContain('never instructions');
+    expect(plain?.webSearch).toBeUndefined();
+    expect(plain?.messages[0]?.content).not.toContain('search the web');
   });
 });

@@ -72,6 +72,7 @@ describe('crew commands', () => {
       name: 'Screenwriter',
       model: 'vendor/model',
       budgetUsdPerRun: 1,
+      webSearch: false,
       hiredAt: '2026-01-01T00:00:00.001Z',
     });
     expect(await readCrewMember(runtime.store, 'id-0001')).toEqual(hired);
@@ -122,6 +123,7 @@ describe('custom roles', () => {
       summary: 'Tightens dialogue.',
       brief: polisher.brief,
       scope: { prefixes: ['movie.scene.'], effects: ['read', 'write'] },
+      webSearch: false,
     });
     const listed = (await run('crew.roles', {})) as { roles: { id: string; custom: boolean }[] };
     expect(listed.roles.map((role) => [role.id, role.custom])).toEqual([
@@ -199,6 +201,75 @@ describe('custom roles', () => {
       await expect(run(id, { id: 'screenwriter' })).rejects.toThrow(/built-in role/);
       await expect(run(id, { id: 'nobody' })).rejects.toThrow(/No custom role/);
     }
+  });
+
+  it('gives web search by role or by hire, and changes an agent in place', async () => {
+    const { run, runtime } = setup();
+    await run('crew.role.create', {
+      name: 'Researcher',
+      brief: 'You check facts.',
+      commands: ['settings.'],
+      webSearch: true,
+    });
+    expect(await run('crew.role.get', { id: 'researcher' })).toMatchObject({ webSearch: true });
+    expect(await run('crew.role.get', { id: 'screenwriter' })).toMatchObject({ webSearch: false });
+    const researcher = (await run('crew.hire', { roleId: 'researcher', model: 'm' })) as {
+      id: string;
+    };
+    const plain = await run('crew.hire', { roleId: 'researcher', model: 'm', webSearch: false });
+    const writer = await run('crew.hire', { roleId: 'screenwriter', model: 'm', webSearch: true });
+    expect([
+      (await readCrewMember(runtime.store, researcher.id))?.webSearch,
+      (plain as { webSearch: boolean }).webSearch,
+      (writer as { webSearch: boolean }).webSearch,
+    ]).toEqual([true, false, true]);
+
+    await run('crew.role.update', { id: 'researcher', webSearch: false });
+    expect(await run('crew.role.get', { id: 'researcher' })).toMatchObject({ webSearch: false });
+
+    expect(
+      await run('crew.update', { id: researcher.id, model: 'vendor/cheap', webSearch: false }),
+    ).toMatchObject({
+      name: 'Researcher',
+      model: 'vendor/cheap',
+      webSearch: false,
+      budgetUsdPerRun: 1,
+    });
+    expect(
+      await run('crew.update', { id: researcher.id, name: 'Rae', budgetUsdPerRun: 0.2 }),
+    ).toMatchObject({ name: 'Rae', model: 'vendor/cheap', webSearch: false, budgetUsdPerRun: 0.2 });
+    await expect(run('crew.update', { id: 'nobody', name: 'X' })).rejects.toThrow(/No crew member/);
+  });
+
+  it('reads agents and roles stored before web search existed', async () => {
+    const { run, runtime } = setup();
+    await runtime.store.batch([
+      {
+        type: 'put',
+        key: 'crew/old',
+        value: {
+          id: 'old',
+          roleId: 'screenwriter',
+          name: 'Old',
+          model: 'm',
+          budgetUsdPerRun: 1,
+          hiredAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+      {
+        type: 'put',
+        key: 'roles/old-role',
+        value: {
+          id: 'old-role',
+          name: 'Old role',
+          summary: '',
+          brief: 'b',
+          scope: { effects: ['read'], prefixes: ['settings.'] },
+        },
+      },
+    ]);
+    expect((await readCrewMember(runtime.store, 'old'))?.webSearch).toBe(false);
+    expect(await run('crew.role.get', { id: 'old-role' })).toMatchObject({ webSearch: false });
   });
 
   it('accepts any command when the host does not say which exist', async () => {

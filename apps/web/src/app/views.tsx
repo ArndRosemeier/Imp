@@ -54,6 +54,22 @@ export function CrewView(): ReactElement {
             </div>
             <div className="row spread muted">
               <span>Up to ${member.budgetUsdPerRun.toFixed(2)} per run</span>
+              <label className="choice">
+                <input
+                  type="checkbox"
+                  checked={member.webSearch}
+                  aria-label={`${member.name} can search the web`}
+                  onChange={() => {
+                    runCommand(imp, 'crew.update', {
+                      id: member.id,
+                      webSearch: !member.webSearch,
+                    }).catch((error: unknown) => {
+                      console.error(messageOf(error));
+                    });
+                  }}
+                />
+                Web search
+              </label>
               {member.id !== coordinator.data?.value && (
                 <button
                   className="button quiet"
@@ -166,6 +182,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
   const [change, setChange] = useState(true);
   const [spend, setSpend] = useState(false);
   const [destroy, setDestroy] = useState(false);
+  const [webSearch, setWebSearch] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (event: SyntheticEvent): void => {
@@ -181,6 +198,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
         ...(spend ? ['spend'] : []),
         ...(destroy ? ['destructive'] : []),
       ],
+      webSearch,
     }).then(onDone, (reason: unknown) => {
       setError(messageOf(reason));
     });
@@ -276,6 +294,16 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
             }}
           />
           ask to delete things
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={webSearch}
+            onChange={() => {
+              setWebSearch(!webSearch);
+            }}
+          />
+          search the web
         </label>
       </fieldset>
       {error !== null && (

@@ -217,6 +217,23 @@ describe('OpenRouter provider: chat', () => {
     ]);
   });
 
+  it("adds the search tool beside the caller's tools when web search is asked for", async () => {
+    const { provider, calls } = setup(completion({ content: 'ok' }), completion({ content: 'ok' }));
+    const tool = {
+      type: 'function' as const,
+      function: { name: 'note', description: 'Notes.', parameters: { type: 'object' } },
+    };
+    await provider.chat({ model: 'vendor/model-a', messages: [], tools: [tool], webSearch: true });
+    await provider.chat({ model: 'vendor/model-a', messages: [], webSearch: true });
+    const sent = calls.map(
+      (call) => (JSON.parse(call.request.body ?? '') as { tools: unknown }).tools,
+    );
+    expect(sent).toEqual([
+      [tool, { type: 'openrouter:web_search' }],
+      [{ type: 'openrouter:web_search' }],
+    ]);
+  });
+
   it('returns text with usage and cost', async () => {
     const { provider } = setup(
       completion(
