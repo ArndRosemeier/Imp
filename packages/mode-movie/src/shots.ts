@@ -94,19 +94,22 @@ export function clipPrompt(
   dialogueApart = false,
 ): string {
   const speaker = cast.find((character) => character.id === shot.speakerId);
+  const onScreen = cast.filter((character) => !character.voiceOnly);
   const said =
     shot.line.trim() === ''
       ? 'Nobody speaks.'
-      : dialogueApart
-        ? `${speaker?.name ?? 'Someone'} speaks${
-            shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
-          } and the lips move, but no sound is heard: the voice is added later.`
-        : `${speaker?.name ?? 'A voice'} says${
-            shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
-          } "${shot.line.trim()}"`;
+      : speaker?.voiceOnly === true
+        ? 'Nobody in the picture speaks; a voice-over is added later.'
+        : dialogueApart
+          ? `${speaker?.name ?? 'Someone'} speaks${
+              shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
+            } and the lips move, but no sound is heard: the voice is added later.`
+          : `${speaker?.name ?? 'A voice'} says${
+              shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
+            } "${shot.line.trim()}"`;
   return [
     shot.description,
-    ...cast.map((character) =>
+    ...onScreen.map((character) =>
       character.appearance === '' ? '' : `${character.name}: ${character.appearance}`,
     ),
     shot.performance === '' ? '' : `Performance: ${shot.performance}`,
@@ -365,7 +368,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
 
       const references: MediaInput[] = [];
       if (input.portraits) {
-        for (const character of cast) {
+        for (const character of cast.filter((candidate) => !candidate.voiceOnly)) {
           const portrait = character.images.find((image) => image.id === character.portraitId);
           const blob =
             portrait === undefined ? undefined : await runtime.blobs.get(portrait.blobKey);
