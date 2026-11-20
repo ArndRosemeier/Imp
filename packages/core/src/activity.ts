@@ -4,7 +4,10 @@ import { EFFECTS } from './command.js';
 import type { JsonValue } from './json.js';
 import type { KeyValueStore } from './storage/kv.js';
 
-/** One record per command execution: who ran what, with which outcome. */
+/**
+ * One record per command execution that changed something or was refused:
+ * who ran what, with which outcome. Successful reads are not recorded.
+ */
 export const ActivityEntry = z.object({
   id: z.string(),
   at: z.iso.datetime(),

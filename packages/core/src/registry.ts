@@ -131,7 +131,11 @@ export class CommandRegistry {
 
     try {
       const output = await run({ actor, runtime: this.#runtime }, rawInput);
-      await record('ok');
+      // A successful read changes nothing, so it is not worth a log entry. This also
+      // lets a view read the log through a command without the read adding to it.
+      if (command.effect !== 'read') {
+        await record('ok');
+      }
       return { status: 'ok', output };
     } catch (error) {
       await record('failed', error instanceof Error ? error.message : String(error));

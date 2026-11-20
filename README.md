@@ -9,9 +9,11 @@ the same typed command layer. See [docs/architecture.md](docs/architecture.md).
 
 ## Status
 
-Early. The command layer, execution policy, activity log, storage contract and
-settings commands exist in `@imp/core`, and `@imp/providers` talks to OpenRouter for
-chat with tools and the model catalog. There is no UI yet.
+Early, and usable in the browser: after connecting an OpenRouter key and
+choosing a coordinator model, you can talk to the coordinator, which acts
+through the same commands as the UI. The movie mode does not exist yet.
+
+The current `main` is published at <https://arndrosemeier.github.io/Imp/>.
 
 ## Development
 
@@ -20,6 +22,7 @@ Requires Node 22 or newer and pnpm 10.
 ```sh
 pnpm install
 pnpm check        # format, lint, type check and tests with coverage
+pnpm --filter @imp/web dev   # the web app at http://localhost:5173
 ```
 
 | Script               | Does                                              |

@@ -93,4 +93,6 @@ export interface GenerationProvider {
   /** The live catalog. Model ids are never hardcoded; they are chosen from this. */
   listModels(options?: CallOptions): Promise<readonly ModelInfo[]>;
   chat(request: ChatRequest, options?: CallOptions): Promise<ChatResponse>;
+  /** Resolves when the stored credentials are accepted, and throws a `ProviderError` otherwise. */
+  verifyCredentials(options?: CallOptions): Promise<void>;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  activityList,
   CommandRegistry,
   defineCommand,
   readActivity,
@@ -130,6 +131,23 @@ describe('CommandRegistry', () => {
     expect(log[0]?.error).toBeNull();
     expect(log[1]?.error).toMatch(/Invalid input/);
     expect(log[0]?.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns the log through a command, newest first and limited, without logging reads', async () => {
+    const { registry } = setup();
+    registry.register(activityList);
+    await registry.execute(settingsSet, { key: 'a', value: 1 }, { actor: user });
+    await registry.execute(settingsSet, { key: 'b', value: 2 }, { actor: agent });
+    await registry.execute(settingsGet, { key: 'a' }, { actor: agent });
+    const all = await registry.execute(activityList, {}, { actor: user });
+    expect(
+      all.status === 'ok' && all.output.entries.map((entry) => [entry.actor.kind, entry.commandId]),
+    ).toEqual([
+      ['agent', 'settings.set'],
+      ['user', 'settings.set'],
+    ]);
+    const one = await registry.execute(activityList, { limit: 1 }, { actor: user });
+    expect(one.status === 'ok' && one.output.entries).toHaveLength(1);
   });
 
   it('records a non-Error failure as text', async () => {

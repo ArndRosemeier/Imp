@@ -192,6 +192,10 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
       }));
     },
 
+    async verifyCredentials(call = {}): Promise<void> {
+      await send('/key', 'GET', undefined, call, true);
+    },
+
     async chat(request: ChatRequest, call = {}): Promise<ChatResponse> {
       const body = {
         model: request.model,

@@ -28,3 +28,4 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test:coverage
+      - run: pnpm --filter @imp/web build

@@ -42,3 +42,22 @@ export class RoleCatalog {
     return [...this.#roles.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
   }
 }
+
+/**
+ * The agent the user talks to. It has no mechanism of its own: it plans and
+ * delegates through the same commands a person uses, within the read and write
+ * effects. Spending and destroying stay behind the user's approval.
+ */
+export const coordinatorRole: Role = {
+  id: 'coordinator',
+  name: 'Coordinator',
+  summary: 'Talks with you, plans the work, hires the crew and keeps things moving.',
+  brief: [
+    'You are the coordinator of this workspace. The user tells you what they want to make.',
+    'Work out what is needed, look at the current state with the read tools, and carry out',
+    'setup and organisation yourself: adjust settings, see which roles exist, and hire crew',
+    'members for the work. Prefer doing over asking, and ask only when a choice is truly the',
+    "user's. Be brief and concrete in what you say.",
+  ].join(' '),
+  scope: { effects: ['read', 'write'] },
+};
