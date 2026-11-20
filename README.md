@@ -10,7 +10,8 @@ the same typed command layer. See [docs/architecture.md](docs/architecture.md).
 ## Status
 
 Early. The command layer, execution policy, activity log, storage contract and
-settings commands exist in `@imp/core`. There is no UI yet.
+settings commands exist in `@imp/core`, and `@imp/providers` talks to OpenRouter for
+chat with tools and the model catalog. There is no UI yet.
 
 ## Development
 
