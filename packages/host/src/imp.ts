@@ -20,11 +20,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import {
-  createMovieMode,
-  createSceneAudioLink,
-  type FrameImageEncoder,
-} from '@imp/mode-movie';
+import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
