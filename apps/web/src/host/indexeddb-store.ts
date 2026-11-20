@@ -1,9 +1,11 @@
 import {
   assertValidKey,
+  type BlobStore,
   type JsonValue,
   type KeyValueEntry,
   type KeyValueListener,
   type KeyValueStore,
+  type StoredBlob,
   type Unsubscribe,
   type WriteOperation,
 } from '@imp/core';
@@ -94,6 +96,57 @@ export class IndexedDbKeyValueStore implements KeyValueStore {
     return () => {
       this.#subscriptions.delete(subscription);
     };
+  }
+
+  close(): void {
+    this.#database.close();
+  }
+}
+
+const BLOBS = 'blobs';
+
+/**
+ * The browser implementation of blob storage. It lives in a database of its
+ * own, so that large files never slow down reads of the key-value data.
+ */
+export class IndexedDbBlobStore implements BlobStore {
+  readonly #database: IDBDatabase;
+
+  private constructor(database: IDBDatabase) {
+    this.#database = database;
+  }
+
+  static async open(name: string, factory: IDBFactory = indexedDB): Promise<IndexedDbBlobStore> {
+    const opening = factory.open(name, 1);
+    opening.onupgradeneeded = () => {
+      opening.result.createObjectStore(BLOBS);
+    };
+    return new IndexedDbBlobStore(await request(opening));
+  }
+
+  async get(key: string): Promise<StoredBlob | undefined> {
+    const store = this.#database.transaction(BLOBS, 'readonly').objectStore(BLOBS);
+    const stored = (await request(store.get(key))) as StoredBlob | undefined;
+    return stored === undefined
+      ? undefined
+      : { bytes: new Uint8Array(stored.bytes), mediaType: stored.mediaType };
+  }
+
+  async put(key: string, blob: StoredBlob): Promise<void> {
+    assertValidKey(key);
+    const store = this.#database.transaction(BLOBS, 'readwrite').objectStore(BLOBS);
+    await request(store.put({ bytes: blob.bytes.slice(), mediaType: blob.mediaType }, key));
+  }
+
+  async delete(key: string): Promise<void> {
+    const store = this.#database.transaction(BLOBS, 'readwrite').objectStore(BLOBS);
+    await request(store.delete(key));
+  }
+
+  async list(prefix: string): Promise<readonly string[]> {
+    const store = this.#database.transaction(BLOBS, 'readonly').objectStore(BLOBS);
+    const keys = await request(store.getAllKeys(IDBKeyRange.bound(prefix, `${prefix}\uffff`)));
+    return keys.map((key) => key as string);
   }
 
   close(): void {

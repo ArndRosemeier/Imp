@@ -1,6 +1,12 @@
 import { ProviderError } from './errors.js';
 import type { HttpFetch, HttpRequest } from './http.js';
-import type { ChatRequest, ChatResponse, GenerationProvider, ModelInfo } from './types.js';
+import type {
+  ChatRequest,
+  ChatResponse,
+  GenerationProvider,
+  ImageRequest,
+  ModelInfo,
+} from './types.js';
 
 export interface RecordedHttpCall {
   readonly url: string;
@@ -43,16 +49,33 @@ export function createFakeProvider(script: {
   readonly replies?: readonly ScriptedChatReply[];
   /** When set, `verifyCredentials` rejects with it. */
   readonly credentialsError?: ProviderError;
+  /** When set, `generateImage` rejects with it. */
+  readonly imageError?: ProviderError;
 }): GenerationProvider & {
   readonly requests: ChatRequest[];
+  readonly imageRequests: ImageRequest[];
   /** Adds replies to the end of the script, for ones that depend on what happened first. */
   script(...replies: ScriptedChatReply[]): void;
 } {
   const queue = [...(script.replies ?? [])];
   const requests: ChatRequest[] = [];
+  const imageRequests: ImageRequest[] = [];
   return {
     id: 'fake',
     requests,
+    imageRequests,
+    generateImage: (request) => {
+      imageRequests.push(request);
+      if (script.imageError !== undefined) {
+        return Promise.reject(script.imageError);
+      }
+      // The bytes differ per call, so tests can tell generated images apart.
+      return Promise.resolve({
+        model: request.model,
+        images: [{ bytes: new Uint8Array([imageRequests.length]), mediaType: 'image/webp' }],
+        costUsd: 0.01,
+      });
+    },
     script: (...replies) => {
       queue.push(...replies);
     },

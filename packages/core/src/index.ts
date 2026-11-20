@@ -48,6 +48,7 @@ export {
   type WriteOperation,
 } from './storage/kv.js';
 export { MemoryKeyValueStore } from './storage/memory.js';
+export { MemoryBlobStore, type BlobStore, type StoredBlob } from './storage/blob.js';
 export {
   fromToolName,
   isInScope,

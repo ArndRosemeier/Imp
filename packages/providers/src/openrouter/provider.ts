@@ -1,5 +1,6 @@
 import type { JsonValue } from '@imp/core';
 import type { z } from 'zod';
+import { decodeBase64 } from '../base64.js';
 import { ProviderError, type ProviderErrorKind } from '../errors.js';
 import type { HttpFetch, HttpResponse } from '../http.js';
 import {
@@ -10,11 +11,18 @@ import {
   type ChatResponse,
   type FinishReason,
   type GenerationProvider,
+  type ImageRequest,
+  type ImageResponse,
   type Modality,
   type ModelInfo,
   type ToolCall,
 } from '../types.js';
-import { ChatCompletionResponse, ErrorResponse, ModelsResponse } from './schemas.js';
+import {
+  ChatCompletionResponse,
+  ErrorResponse,
+  ImageGenerationResponse,
+  ModelsResponse,
+} from './schemas.js';
 
 export const OPENROUTER_ID = 'openrouter';
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -253,6 +261,29 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
           costUsd: completion.usage?.cost ?? null,
         },
       };
+    },
+
+    async generateImage(request: ImageRequest, call = {}): Promise<ImageResponse> {
+      const body = {
+        model: request.model,
+        prompt: request.prompt,
+        ...(request.aspectRatio === undefined ? {} : { aspect_ratio: request.aspectRatio }),
+        ...(request.seed === undefined ? {} : { seed: request.seed }),
+      };
+      const json = await send('/images', 'POST', body, call, true);
+      const generation = parse(ImageGenerationResponse, json, 'an image');
+      const images = generation.data.map((image) => {
+        const bytes = typeof image.b64_json === 'string' ? decodeBase64(image.b64_json) : undefined;
+        if (bytes === undefined || bytes.length === 0) {
+          throw new ProviderError(
+            'invalid_response',
+            OPENROUTER_ID,
+            'OpenRouter returned an image without readable data.',
+          );
+        }
+        return { bytes, mediaType: image.media_type ?? 'image/png' };
+      });
+      return { model: request.model, images, costUsd: generation.usage?.cost ?? null };
     },
   };
 }

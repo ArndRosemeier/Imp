@@ -49,8 +49,12 @@ describe('project commands', () => {
       { type: 'put', key: `${projectPrefix(doomed.id)}movie/scenes/1`, value: 1 },
       { type: 'put', key: `${projectPrefix(kept.id)}movie/scenes/1`, value: 1 },
     ]);
+    const image = { bytes: new Uint8Array([1]), mediaType: 'image/png' };
+    await runtime.blobs.put(`${projectPrefix(doomed.id)}movie/images/1`, image);
+    await runtime.blobs.put(`${projectPrefix(kept.id)}movie/images/1`, image);
     const result = await registry.execute(projectDelete, { projectId: doomed.id }, { actor: user });
-    expect(result).toEqual({ status: 'ok', output: { projectId: doomed.id, removedEntries: 1 } });
+    expect(result).toEqual({ status: 'ok', output: { projectId: doomed.id, removedEntries: 2 } });
+    expect(await runtime.blobs.list('')).toEqual([`${projectPrefix(kept.id)}movie/images/1`]);
     expect(await runtime.store.list(projectPrefix(doomed.id))).toEqual([]);
     expect(await runtime.store.list(projectPrefix(kept.id))).toHaveLength(1);
     const listed = await registry.execute(projectList, {}, { actor: user });

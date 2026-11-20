@@ -105,7 +105,7 @@ export const projectRename = defineCommand({
 export const projectDelete = defineCommand({
   id: 'project.delete',
   title: 'Delete project',
-  description: 'Removes a project and everything in it. This cannot be undone.',
+  description: 'Removes a project and everything in it, files included. This cannot be undone.',
   effect: 'destructive',
   input: z.object({ projectId: z.string() }),
   output: z.object({ projectId: z.string(), removedEntries: z.number() }),
@@ -116,7 +116,11 @@ export const projectDelete = defineCommand({
       ...contents.map((entry) => ({ type: 'delete' as const, key: entry.key })),
       { type: 'delete', key: `${INDEX_PREFIX}${projectId}` },
     ]);
-    return { projectId, removedEntries: contents.length };
+    const files = await runtime.blobs.list(projectPrefix(projectId));
+    for (const key of files) {
+      await runtime.blobs.delete(key);
+    }
+    return { projectId, removedEntries: contents.length + files.length };
   },
 });
 

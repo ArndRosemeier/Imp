@@ -2,6 +2,7 @@ import {
   coordinatorRole,
   createAgentCommands,
   createCrewCommands,
+  createModelCommands,
   releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
@@ -9,12 +10,14 @@ import {
 import {
   activityCommands,
   CommandRegistry,
+  MemoryBlobStore,
   projectCommands,
   settingsCommands,
+  type BlobStore,
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { movieMode } from '@imp/mode-movie';
+import { createMovieMode } from '@imp/mode-movie';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -26,6 +29,7 @@ export interface Imp {
   /** The working modes this build ships with. */
   readonly modes: readonly Mode[];
   readonly store: KeyValueStore;
+  readonly blobs: BlobStore;
   readonly secrets: SecretStore;
   /** Puts the stored state in order after a restart. Called once before the UI reads anything. */
   start(): Promise<void>;
@@ -41,22 +45,22 @@ const browserFetch: HttpFetch = (url, request) =>
 
 export interface ImpOptions {
   readonly store: KeyValueStore;
+  /** Where images and other files go. Defaults to memory, which a reload empties. */
+  readonly blobs?: BlobStore;
   readonly secrets: SecretStore;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
 
-/** Adding a working mode to the app is adding it to this list. */
-const MODES: readonly Mode[] = [movieMode];
-
 /** Assembles the core for the browser host. */
 export function createImp(options: ImpOptions): Imp {
+  const blobs = options.blobs ?? new MemoryBlobStore();
   const runtime: CoreRuntime = {
     store: options.store,
+    blobs,
     now: () => new Date(),
     newId: () => crypto.randomUUID(),
   };
-  const roles = new RoleCatalog([coordinatorRole, ...MODES.flatMap((mode) => mode.roles)]);
   const provider =
     options.provider ??
     createOpenRouterProvider({
@@ -64,12 +68,16 @@ export function createImp(options: ImpOptions): Imp {
       appName: 'Imp',
       apiKey: () => options.secrets.getKey() ?? '',
     });
+  // Adding a working mode to the app is adding it to this list.
+  const modes: readonly Mode[] = [createMovieMode({ provider })];
+  const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
   const registry = new CommandRegistry({ runtime });
   registry.register(
     ...settingsCommands,
     ...activityCommands,
     ...projectCommands,
-    ...MODES.flatMap((mode) => mode.commands),
+    ...modes.flatMap((mode) => mode.commands),
+    ...createModelCommands(provider),
     ...createCrewCommands(roles, {
       commandIds: () => registry.list().map((command) => command.id),
     }),
@@ -79,8 +87,9 @@ export function createImp(options: ImpOptions): Imp {
     registry,
     provider,
     roles,
-    modes: MODES,
+    modes,
     store: options.store,
+    blobs,
     secrets: options.secrets,
     start: () => releaseInterruptedRuns(options.store),
   };

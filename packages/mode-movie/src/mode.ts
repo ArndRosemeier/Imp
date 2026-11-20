@@ -1,5 +1,7 @@
-import { defineMode, type Role } from '@imp/agents';
+import { defineMode, type Mode, type Role } from '@imp/agents';
+import type { GenerationProvider } from '@imp/providers';
 import { movieCommands } from './commands.js';
+import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
 
 const SCOPE = { prefixes: ['movie.', 'project.list'] } as const;
@@ -32,21 +34,29 @@ export const castingDirector: Role = {
     'entry per character. Write the appearance so precisely that an image model would draw',
     'the same person every time: age, build, face, hair, clothing, distinguishing marks.',
     'Describe the voice the same way: pitch, pace, accent, manner. Keep each character',
-    'consistent with what the script says and does not say about them.',
+    'consistent with what the script says and does not say about them. When asked for',
+    'pictures, generate them with movie.character.image.generate; the appearance you wrote',
+    'is the prompt, so improve the appearance first if it is thin. You cannot see the',
+    'images, so leave the choice of portrait to the user.',
   ].join(' '),
   scope: SCOPE,
 };
 
-/** Movie creation: the first working mode. Storyboard, shots, sound and edit come later. */
-export const movieMode = defineMode({
-  id: MODE_ID,
-  name: 'Movie',
-  summary: 'Develop an idea, write the script and cast the characters.',
-  stages: [
-    { id: 'development', name: 'Development' },
-    { id: 'script', name: 'Script' },
-    { id: 'casting', name: 'Casting' },
-  ],
-  commands: movieCommands,
-  roles: [screenwriter, castingDirector],
-});
+/**
+ * Movie creation: the first working mode. It needs the provider for what it
+ * generates. Storyboard, shots, sound and edit come later.
+ */
+export function createMovieMode(options: { readonly provider: GenerationProvider }): Mode {
+  return defineMode({
+    id: MODE_ID,
+    name: 'Movie',
+    summary: 'Develop an idea, write the script and cast the characters.',
+    stages: [
+      { id: 'development', name: 'Development' },
+      { id: 'script', name: 'Script' },
+      { id: 'casting', name: 'Casting' },
+    ],
+    commands: [...movieCommands, ...createCharacterImageCommands(options.provider)],
+    roles: [screenwriter, castingDirector],
+  });
+}

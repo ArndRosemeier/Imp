@@ -5,7 +5,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.js';
 import { createImp } from './host/imp.js';
-import { IndexedDbKeyValueStore } from './host/indexeddb-store.js';
+import { IndexedDbBlobStore, IndexedDbKeyValueStore } from './host/indexeddb-store.js';
 import { createLocalSecretStore } from './host/secrets.js';
 import './styles/tokens.css';
 import './styles/app.css';
@@ -19,7 +19,8 @@ document.documentElement.dataset['theme'] = localStorage.getItem('imp.theme') ??
 const store = await IndexedDbKeyValueStore.open('imp');
 // Ask the browser not to evict the data under storage pressure.
 void navigator.storage.persist();
-const imp = createImp({ store, secrets: createLocalSecretStore() });
+const blobs = await IndexedDbBlobStore.open('imp-blobs');
+const imp = createImp({ store, blobs, secrets: createLocalSecretStore() });
 
 createRoot(root).render(
   <StrictMode>
