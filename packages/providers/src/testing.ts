@@ -41,6 +41,8 @@ export type ScriptedChatReply = Partial<ChatResponse> | ProviderError;
 export function createFakeProvider(script: {
   readonly models?: readonly ModelInfo[];
   readonly replies?: readonly ScriptedChatReply[];
+  /** When set, `verifyCredentials` rejects with it. */
+  readonly credentialsError?: ProviderError;
 }): GenerationProvider & { readonly requests: ChatRequest[] } {
   const queue = [...(script.replies ?? [])];
   const requests: ChatRequest[] = [];
@@ -48,6 +50,10 @@ export function createFakeProvider(script: {
     id: 'fake',
     requests,
     listModels: () => Promise.resolve(script.models ?? []),
+    verifyCredentials: () =>
+      script.credentialsError === undefined
+        ? Promise.resolve()
+        : Promise.reject(script.credentialsError),
     chat: (request) => {
       requests.push(request);
       const reply = queue.shift();

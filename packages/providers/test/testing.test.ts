@@ -22,6 +22,13 @@ describe('createFakeProvider', () => {
     await expect(provider.chat(request)).rejects.toThrow(/ran out of replies/);
     expect(provider.requests).toHaveLength(4);
     expect(await provider.listModels()).toEqual([]);
+    await expect(provider.verifyCredentials()).resolves.toBeUndefined();
+  });
+
+  it('can be scripted to refuse credentials', async () => {
+    const refusal = new ProviderError('auth', 'fake', 'bad key');
+    const provider = createFakeProvider({ credentialsError: refusal });
+    await expect(provider.verifyCredentials()).rejects.toBe(refusal);
   });
 });
 

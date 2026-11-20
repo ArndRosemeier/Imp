@@ -32,7 +32,7 @@ agent must ask before spending money or destroying something.
 | `@imp/agents`     | Crew, tasks, the tool loop, approvals, budgets, the coordinator      | planned |
 | `@imp/mode-movie` | The movie mode: development, script, casting                         | planned |
 | `@imp/ui`         | Design tokens and shared components                                  | planned |
-| `apps/web`        | The workspace, and the browser host that runs the core in a worker   | planned |
+| `apps/web`        | The workspace, and the browser host that runs the core in a worker   | started |
 | `apps/server`     | The optional local server that runs the same core on Node            | planned |
 
 ## Two hosts, one core
@@ -60,3 +60,14 @@ a separate blob store. Every implementation must pass the shared suite
 A working mode (movie first) is a package that contributes commands, agent
 roles, stages and views. The core knows nothing about scripts or shots, so a
 new mode is a new package and not a change to the core.
+
+## The web app today
+
+`apps/web` assembles the core in `src/host/imp.ts` and renders the workspace
+from it. Views read through commands with `useLive`, which reads again when the
+store changes, so the screen stays current whoever made the change. The
+OpenRouter key is held in `localStorage`, outside the key-value store, so no
+command can return it.
+
+The core currently runs on the page's main thread behind the same registry
+interface. Moving it into a worker is planned and does not change any view.

@@ -1,0 +1,56 @@
+/*
+ * Design tokens. Components use only these variables, so a theme is a
+ * different set of values and never a different stylesheet.
+ */
+:root {
+  color-scheme: dark;
+
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Inter Variable', Inter, system-ui, sans-serif;
+  --font-script: 'Courier Prime', 'Courier New', monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --ground: #0e0d0b;
+  --surface: #171512;
+  --surface-raised: #1f1c18;
+  --line: #2a2622;
+  --line-strong: #3d3731;
+  --ink: #ede6da;
+  --ink-soft: #c9bfaf;
+  --ink-muted: #a39a8b;
+  --accent: #e8a33d;
+  --accent-ink: #0e0d0b;
+  --accent-wash: rgb(232 163 61 / 0.1);
+  --danger: #f08a6c;
+  --ok: #9ccf8f;
+
+  --radius-s: 8px;
+  --radius-m: 12px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 36px;
+  --control-height: 44px;
+  --shadow-overlay: 0 24px 80px rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --ground: #f6f2ea;
+  --surface: #fffdf8;
+  --surface-raised: #ffffff;
+  --line: #e2dacb;
+  --line-strong: #cbc1ae;
+  --ink: #1b1814;
+  --ink-soft: #453e35;
+  --ink-muted: #6b6257;
+  --accent: #9a5b00;
+  --accent-ink: #fffdf8;
+  --accent-wash: rgb(154 91 0 / 0.08);
+  --danger: #b3261e;
+  --ok: #2e6b2a;
+  --shadow-overlay: 0 24px 80px rgb(60 40 10 / 0.2);
+}

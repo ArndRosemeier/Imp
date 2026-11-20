@@ -102,6 +102,20 @@ describe('OpenRouter provider: models', () => {
   });
 });
 
+describe('OpenRouter provider: credentials', () => {
+  it('accepts a key the service accepts', async () => {
+    const { provider, calls } = setup({ status: 200, body: { data: { label: 'k' } } });
+    await expect(provider.verifyCredentials()).resolves.toBeUndefined();
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/key');
+    expect(calls[0]?.request.headers).toMatchObject({ Authorization: 'Bearer test-key' });
+  });
+
+  it('rejects a key the service refuses', async () => {
+    const { provider } = setup({ status: 401, body: { error: { message: 'No auth' } } });
+    expect(await kindOf(provider.verifyCredentials())).toBe('auth');
+  });
+});
+
 describe('OpenRouter provider: chat', () => {
   it('sends the conversation and tools in wire format with the key', async () => {
     const { provider, calls } = setup(completion({ content: 'done' }));

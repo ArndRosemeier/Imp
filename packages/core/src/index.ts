@@ -15,6 +15,7 @@ export {
   type Effect,
   type TypedCommand,
 } from './command.js';
+export { activityCommands, activityList } from './commands/activity.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
 export type { JsonValue } from './json.js';
