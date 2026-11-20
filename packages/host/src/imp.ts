@@ -12,7 +12,7 @@ import {
   CommandRegistry,
   mediaCommands,
   MemoryBlobStore,
-  projectCommands,
+  createProjectCommands,
   settingsCommands,
   type BlobStore,
   type CoreRuntime,
@@ -84,7 +84,7 @@ export function createImp(options: ImpOptions): Imp {
   registry.register(
     ...settingsCommands,
     ...activityCommands,
-    ...projectCommands,
+    ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider),

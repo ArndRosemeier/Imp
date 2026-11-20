@@ -6,9 +6,12 @@ import { MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
 import { createSoundCommands } from './sounds.js';
+import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
-const SCOPE = { prefixes: ['movie.', 'project.list', 'media.'] } as const;
+const SCOPE = {
+  prefixes: ['movie.', 'project.list', 'project.resources.', 'media.'],
+} as const;
 
 export const screenwriter: Role = {
   id: 'screenwriter',
@@ -151,5 +154,6 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...createEditCommands(),
     ],
     roles: [screenwriter, castingDirector, clipDesigner, soundDesigner, filmEditor],
+    project: movieProjectSupport,
   });
 }

@@ -9,6 +9,7 @@ import {
   MagnifyingGlassIcon,
   MoonIcon,
   PlusIcon,
+  SquaresFourIcon,
   SunIcon,
   UsersThreeIcon,
   type Icon,
@@ -21,12 +22,13 @@ import { CrewPanel } from './CrewPanel.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
+import { CopyQuestions, ProjectsView } from './projects.js';
 
 const WORKSPACE: readonly { id: string; label: string; icon: Icon }[] = [
+  { id: 'projects', label: 'Projects', icon: SquaresFourIcon },
   { id: 'crew', label: 'Crew', icon: UsersThreeIcon },
   { id: 'settings', label: 'Settings', icon: GearSixIcon },
 ];
-const NEW_PROJECT = 'new-project';
 /** The setting that says which project is open. Agents can read and change it too. */
 const CURRENT_PROJECT = 'project.current';
 
@@ -60,12 +62,13 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
 
 export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
   const imp = useImp();
-  const [view, setViewState] = useState(() => localStorage.getItem('imp.view') ?? 'crew');
+  const [view, setViewState] = useState(() => localStorage.getItem('imp.view') ?? 'projects');
   const setView = (next: string): void => {
     setViewState(next);
     localStorage.setItem('imp.view', next);
   };
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
   const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
@@ -94,7 +97,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     crew.find((member) => member.id === talkingTo) ?? state.data?.coordinator ?? crew[0];
 
   const openProject = (id: string): void => {
-    runCommand(imp, 'settings.set', { key: CURRENT_PROJECT, value: id }).catch((error: unknown) => {
+    runCommand(imp, 'project.open', { projectId: id }).catch((error: unknown) => {
       console.error(messageOf(error));
     });
   };
@@ -115,10 +118,10 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const viewLabel =
     [...WORKSPACE, ...stages.map((stage) => ({ id: stage.id, label: stage.name }))].find(
       (candidate) => candidate.id === view,
-    )?.label ?? 'New project';
+    )?.label ?? 'Projects';
   const context =
     project === null
-      ? `No project is open. A new one is made with project.create; the setting "${CURRENT_PROJECT}" holds the id of the open project.`
+      ? `No project is open. A new one is made with project.create and opened with project.open; the setting "${CURRENT_PROJECT}" holds the id of the open project.`
       : `Open project: "${project.name}" (projectId "${project.id}", mode ${project.mode}). The user is looking at: ${viewLabel}.`;
 
   const isStage = stages.some((stage) => stage.id === view);
@@ -126,7 +129,6 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     <StartMovie
       onCreated={(created) => {
         openProject(created.id);
-        if (view === NEW_PROJECT) setView(stages[0]?.id ?? 'crew');
       }}
     />
   );
@@ -167,7 +169,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               aria-label="New project"
               title="New project"
               onClick={() => {
-                setView(NEW_PROJECT);
+                setView('projects');
+                setCreating(true);
               }}
             >
               <PlusIcon aria-hidden="true" />
@@ -226,7 +229,19 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       <main className="main">
         {view === 'crew' && <CrewView />}
         {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
-        {view === NEW_PROJECT && startMovie}
+        {view === 'projects' && (
+          <ProjectsView
+            creating={creating}
+            onCreatingChange={setCreating}
+            onOpen={(id) => {
+              openProject(id);
+              const opened = projects.find((candidate) => candidate.id === id);
+              const firstStage = imp.modes.find((m) => m.id === (opened?.mode ?? 'movie'))
+                ?.stages[0];
+              setView(firstStage?.id ?? 'crew');
+            }}
+          />
+        )}
         {isStage &&
           state.data !== undefined &&
           (project === null ? startMovie : <StageView stage={view} project={project} />)}
@@ -270,6 +285,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           </div>
         )}
       </div>
+      <CopyQuestions />
       <CommandPalette
         open={paletteOpen}
         onClose={() => {

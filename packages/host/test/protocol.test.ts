@@ -113,6 +113,30 @@ describe('the channel between the interface and the core', () => {
     expect(await client.blob('a/none')).toBeUndefined();
   });
 
+  it('takes in a picked file in parts and imports it; an export is removed once saved', async () => {
+    const { page, blobs, stored } = setup();
+    const client = connectImp(page, stored);
+    await client.start();
+    const created = await client.run('project.create', { name: 'Keeper', mode: 'movie' });
+    const project = (created as { output: { id: string } }).output;
+    await blobs.put(`projects/${project.id}/movie/characters/c/images/i`, {
+      bytes: new Uint8Array(5 * 1024 * 1024).fill(7),
+      mediaType: 'image/png',
+    });
+    const exported = (await client.run('project.export', { projectId: project.id })) as {
+      output: { fileKey: string };
+    };
+    const file = await client.blob(exported.output.fileKey, true);
+    expect(await blobs.get(exported.output.fileKey)).toBeUndefined();
+    // Larger than one part, so it crosses in two.
+    const key = await client.upload(file?.bytes ?? new Uint8Array(), 'application/zip');
+    expect(key).toMatch(/^uploads\//);
+    expect((await blobs.get(key))?.bytes.length).toBe(file?.bytes.length);
+    const imported = await client.run('project.import', { fileKey: key });
+    expect(imported).toMatchObject({ status: 'ok', output: { name: 'Keeper (2)', files: 1 } });
+    expect(await client.upload(new Uint8Array(), 'text/plain')).toMatch(/^uploads\//);
+  });
+
   it('fails the start when the other end is lost', async () => {
     const [page] = createLocalPorts();
     const client = connectImp(
