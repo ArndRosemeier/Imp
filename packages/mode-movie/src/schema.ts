@@ -1,3 +1,4 @@
+import { SoundPlacement } from '@imp/audio';
 import { z } from 'zod';
 
 export const MODE_ID = 'movie';
@@ -175,30 +176,11 @@ export const Shot = z.object({
 });
 export type Shot = z.infer<typeof Shot>;
 
-/** A sound laid on the timeline of a scene. */
-export const SoundPlacement = z.object({
-  id: z.string(),
-  /**
-   * What plays: a sound of the scene, the own sound of a shot's clip (taken apart
-   * from its picture), or the recorded dialogue of a shot.
-   */
-  source: z.enum(['sound', 'clip', 'dialogue']).default('sound'),
-  soundId: z.string(),
-  /** Where the shot is, for the sources "clip" and "dialogue". */
-  sceneId: z.string().default(''),
-  shotId: z.string().default(''),
-  /** Seconds skipped at the start of the source. */
-  trimStartSeconds: z.number().min(0).default(0),
-  /** Seconds from the start of the scene. */
-  startSeconds: z.number().min(0),
-  /** 0 to 1. Music under dialogue is quieter than effects. */
-  volume: z.number().min(0).max(1),
-  fadeInSeconds: z.number().min(0),
-  fadeOutSeconds: z.number().min(0),
-  /** Repeats until the scene ends, for ambience and score that must outlast the shots. */
-  loop: z.boolean(),
-});
-export type SoundPlacement = z.infer<typeof SoundPlacement>;
+/**
+ * A sound laid on the timeline of a scene. The type lives in the audio engine,
+ * which the audio editor shares, so the Edit stage and the editor edit the same data.
+ */
+export { SoundPlacement } from '@imp/audio';
 
 /**
  * One piece of a scene's cut: a stretch of a shot's clip, or a title card. The

@@ -633,7 +633,7 @@ export function createEditCommands(): readonly Command[] {
           'This item has no sound of its own to take apart: it is a title, has no ready clip, or its clip was made silent.',
         );
       }
-      const placement: SoundPlacement = {
+      const placement = SoundPlacement.parse({
         id: runtime.newId(),
         source: 'clip',
         soundId: '',
@@ -645,7 +645,7 @@ export function createEditCommands(): readonly Command[] {
         fadeInSeconds: item.fadeInSeconds,
         fadeOutSeconds: item.fadeOutSeconds,
         loop: false,
-      };
+      });
       await save(runtime, projectId, cut, {
         ...cut,
         items: items.map((candidate, at) =>
@@ -710,7 +710,7 @@ export function createEditCommands(): readonly Command[] {
         }
         return { soundId: '', sceneId: from, shotId: shot.id };
       })();
-      const placement: SoundPlacement = { id: runtime.newId(), ...fields, ...source };
+      const placement = SoundPlacement.parse({ id: runtime.newId(), ...fields, ...source });
       await save(runtime, projectId, cut, { ...cut, sounds: [...cut.sounds, placement] });
       return placement;
     },
