@@ -195,7 +195,7 @@ textarea.input {
   height: 100%;
   display: grid;
   grid-template-rows: 60px minmax(0, 1fr) auto;
-  grid-template-columns: 220px minmax(0, 1fr) 360px;
+  grid-template-columns: var(--nav-width, 220px) minmax(0, 1fr) var(--crew-width, 360px);
   grid-template-areas: 'top top top' 'nav main crew' 'nav strip crew';
 }
 .topbar {
@@ -468,7 +468,45 @@ dialog.palette::backdrop {
   overflow-y: auto;
 }
 
+/* Panel edges */
+.resizer {
+  grid-row: 2 / 4;
+  width: 11px;
+  z-index: 1;
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+}
+.resizer[data-side='left'] {
+  grid-column: 2;
+  justify-self: start;
+  margin-left: -6px;
+}
+.resizer[data-side='right'] {
+  grid-column: 3;
+  justify-self: start;
+  margin-left: -6px;
+}
+.resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 4px;
+  border-radius: 2px;
+  background: transparent;
+}
+.resizer:hover::after,
+.resizer:focus-visible::after,
+.resizer[data-dragging='true']::after {
+  background: var(--accent);
+}
+.resizer:focus-visible {
+  outline: none;
+}
+
 @media (max-width: 1080px) {
+  .resizer[data-side='left'] {
+    display: none;
+  }
   .shell {
     grid-template-columns: 72px minmax(0, 1fr) 320px;
   }
@@ -485,6 +523,9 @@ dialog.palette::backdrop {
   }
 }
 @media (max-width: 760px) {
+  .resizer {
+    display: none;
+  }
   .shell {
     height: auto;
     min-height: 100%;
@@ -512,6 +553,9 @@ dialog.palette::backdrop {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .resizer::after {
+    transition: background-color 120ms;
+  }
   .button,
   .nav-item,
   .palette-option {

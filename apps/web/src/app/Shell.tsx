@@ -10,11 +10,12 @@ import {
   UsersThreeIcon,
   type Icon,
 } from '@phosphor-icons/react';
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { CrewPanel } from './CrewPanel.js';
+import { Resizer, usePanelWidth } from './Resizer.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 
@@ -57,6 +58,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
+  const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
+  const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
   const state = useLive(['crew/', 'settings/', 'project-index/'], async (current) => {
     const setting = async (key: string): Promise<unknown> =>
@@ -119,7 +122,15 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   );
 
   return (
-    <div className="shell">
+    <div
+      className="shell"
+      style={
+        {
+          '--nav-width': `${String(navWidth.value)}px`,
+          '--crew-width': `${String(crewWidth.value)}px`,
+        } as CSSProperties
+      }
+    >
       <header className="topbar">
         <div className="wordmark">Imp</div>
         {projects.length > 0 && (
@@ -211,6 +222,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           (project === null ? startMovie : <StageView stage={view} project={project} />)}
       </main>
       <ActivityStrip />
+      <Resizer label="Resize the navigation" side="left" width={navWidth} />
+      <Resizer label="Resize the crew panel" side="right" width={crewWidth} />
       <div className="crew">
         {crew.length > 1 && (
           <div className="field crew-switch">
