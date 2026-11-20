@@ -76,16 +76,49 @@ export const developmentUpdate = defineCommand({
 
 // Script
 
+const Full = z
+  .boolean()
+  .default(false)
+  .describe('Also return the long fields of every item. Costly; prefer fetching single items.');
+
+const countWords = (text: string): number => text.split(/\s+/).filter(Boolean).length;
+
 export const sceneList = defineCommand({
   id: 'movie.scene.list',
   title: 'List scenes',
-  description: 'Returns every scene of the script in order, with heading, summary and full text.',
+  description:
+    'Returns the outline of the script: every scene in order with id, heading, summary and length. The text of a scene comes from movie.scene.get.',
   effect: 'read',
-  input: z.object({ projectId: ProjectId }),
-  output: z.object({ scenes: z.array(Scene) }),
-  handler: async ({ runtime }, { projectId }) => {
+  input: z.object({ projectId: ProjectId, full: Full }),
+  output: z.object({
+    scenes: z.array(Scene.partial({ body: true }).extend({ words: z.number() })),
+  }),
+  handler: async ({ runtime }, { projectId, full }) => {
     await requireProject(runtime.store, 'movie.scene.list', projectId, MODE_ID);
-    return { scenes: await readScenes(runtime.store, projectId) };
+    return {
+      scenes: (await readScenes(runtime.store, projectId)).map(({ body, ...outline }) => ({
+        ...outline,
+        words: countWords(body),
+        ...(full ? { body } : {}),
+      })),
+    };
+  },
+});
+
+export const sceneGet = defineCommand({
+  id: 'movie.scene.get',
+  title: 'Read scene',
+  description: 'Returns one scene with its full text.',
+  effect: 'read',
+  input: z.object({ projectId: ProjectId, sceneId: z.string() }),
+  output: Scene,
+  handler: async ({ runtime }, { projectId, sceneId }) => {
+    await requireProject(runtime.store, 'movie.scene.get', projectId, MODE_ID);
+    const stored = await runtime.store.get(`${scenePrefix(projectId)}${sceneId}`);
+    if (stored === undefined) {
+      throw new CommandError('invalid_input', 'movie.scene.get', `No scene "${sceneId}".`);
+    }
+    return Scene.parse(stored);
   },
 });
 
@@ -186,17 +219,44 @@ const CharacterFields = Character.omit({ id: true });
 export const characterList = defineCommand({
   id: 'movie.character.list',
   title: 'List characters',
-  description: 'Returns the cast of a movie project with every detail of each character.',
+  description:
+    'Returns the cast of a movie project: id, name and part of each character. The details of a character come from movie.character.get.',
   effect: 'read',
-  input: z.object({ projectId: ProjectId }),
-  output: z.object({ characters: z.array(Character) }),
-  handler: async ({ runtime }, { projectId }) => {
+  input: z.object({ projectId: ProjectId, full: Full }),
+  output: z.object({
+    characters: z.array(Character.partial({ description: true, appearance: true, voice: true })),
+  }),
+  handler: async ({ runtime }, { projectId, full }) => {
     await requireProject(runtime.store, 'movie.character.list', projectId, MODE_ID);
     return {
       characters: (await runtime.store.list(characterPrefix(projectId)))
         .map((entry) => Character.parse(entry.value))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((character) =>
+          full ? character : { id: character.id, name: character.name, part: character.part },
+        ),
     };
+  },
+});
+
+export const characterGet = defineCommand({
+  id: 'movie.character.get',
+  title: 'Read character',
+  description: 'Returns one character with description, appearance and voice.',
+  effect: 'read',
+  input: z.object({ projectId: ProjectId, characterId: z.string() }),
+  output: Character,
+  handler: async ({ runtime }, { projectId, characterId }) => {
+    await requireProject(runtime.store, 'movie.character.get', projectId, MODE_ID);
+    const stored = await runtime.store.get(`${characterPrefix(projectId)}${characterId}`);
+    if (stored === undefined) {
+      throw new CommandError(
+        'invalid_input',
+        'movie.character.get',
+        `No character "${characterId}".`,
+      );
+    }
+    return Character.parse(stored);
   },
 });
 
@@ -282,10 +342,12 @@ export const movieCommands: readonly Command[] = [
   developmentGet,
   developmentUpdate,
   sceneList,
+  sceneGet,
   sceneCreate,
   sceneUpdate,
   sceneDelete,
   characterList,
+  characterGet,
   characterCreate,
   characterUpdate,
   characterDelete,

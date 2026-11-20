@@ -83,7 +83,8 @@ describe('crew.ask', () => {
     );
     expect(first).toMatchObject({ status: 'completed', finalText: 'Theme set.', steps: 2 });
     expect(await runtime.store.get('settings/theme')).toBe('dark');
-    expect(provider.requests[0]?.messages[0]?.content).toContain('Project: p-1');
+    expect(provider.requests[0]?.messages[1]).toMatchObject({ context: 'Project: p-1' });
+    expect(first).toMatchObject({ usage: { promptTokens: 0, cachedPromptTokens: 0 } });
 
     const second = AgentRunSchema.parse(
       await run('crew.ask', {

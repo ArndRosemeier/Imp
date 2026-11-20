@@ -45,6 +45,7 @@ export const ChatCompletionResponse = z.object({
     .object({
       prompt_tokens: z.number().nullish(),
       completion_tokens: z.number().nullish(),
+      prompt_tokens_details: z.object({ cached_tokens: z.number().nullish() }).nullish(),
       cost: z.number().nullish(),
     })
     .nullish(),

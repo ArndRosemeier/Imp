@@ -82,11 +82,11 @@ describe('runAgent', () => {
     const { run, runtime, provider } = setup([
       {
         toolCalls: [call('settings__set', { key: 'theme', value: 'dark' })],
-        usage: { promptTokens: 10, completionTokens: 5, costUsd: 0.01 },
+        usage: { cachedPromptTokens: 0, promptTokens: 10, completionTokens: 5, costUsd: 0.01 },
       },
       {
         content: 'The theme is dark now.',
-        usage: { promptTokens: 20, completionTokens: 5, costUsd: 0.02 },
+        usage: { cachedPromptTokens: 0, promptTokens: 20, completionTokens: 5, costUsd: 0.02 },
       },
     ]);
     const result = await run();
@@ -116,7 +116,14 @@ describe('runAgent', () => {
     expect(first?.model).toBe('vendor/model');
     expect(first?.messages[0]).toMatchObject({ role: 'system' });
     expect(first?.messages[0]?.content).toContain('You write screenplays.');
-    expect(first?.messages[1]).toEqual({ role: 'user', content: 'Set the theme to dark.' });
+    // The instructions and the newest message end the two prefixes worth caching.
+    expect(first?.messages[0]).toMatchObject({ cache: true });
+    expect(first?.messages[1]).toEqual({
+      role: 'user',
+      content: 'Set the theme to dark.',
+      cache: true,
+    });
+    expect(result.messages[0]).toEqual({ role: 'user', content: 'Set the theme to dark.' });
     expect(first?.tools?.map((tool) => tool.function.name)).toEqual([
       'media__generate',
       'settings__get',
@@ -127,10 +134,56 @@ describe('runAgent', () => {
     expect(provider.requests[1]?.messages.at(-1)).toMatchObject({ role: 'tool' });
   });
 
-  it('adds the context of the run to the instructions', async () => {
-    const { run, provider } = setup([{ content: 'ok' }]);
-    await run({ context: 'Current project id: p-1' });
-    expect(provider.requests[0]?.messages[0]?.content).toContain('Current project id: p-1');
+  it('sends the context with the task and keeps the instructions unchanged', async () => {
+    const { run, provider } = setup([{ content: 'ok' }, { content: 'ok' }]);
+    const first = await run({ context: 'Current project id: p-1' });
+    expect(provider.requests[0]?.messages[1]).toMatchObject({
+      content: 'Set the theme to dark.',
+      context: 'Current project id: p-1',
+    });
+    await run({ context: 'Current project id: p-2', history: first.messages });
+    // A changed context must not invalidate the cached instructions or the earlier turn.
+    expect(provider.requests[1]?.messages[0]).toEqual(provider.requests[0]?.messages[0]);
+    expect(provider.requests[1]?.messages[1]).toMatchObject({ context: 'Current project id: p-1' });
+    expect(provider.requests[1]?.messages.at(-1)).toMatchObject({
+      context: 'Current project id: p-2',
+      cache: true,
+    });
+  });
+
+  it('adds up token usage over the steps', async () => {
+    const usage = { promptTokens: 100, cachedPromptTokens: 80, completionTokens: 5, costUsd: 0 };
+    const { run } = setup([
+      { toolCalls: [call('settings__list', {})], usage },
+      { content: 'ok', usage },
+    ]);
+    expect((await run()).usage).toEqual({
+      promptTokens: 200,
+      cachedPromptTokens: 160,
+      completionTokens: 10,
+    });
+  });
+
+  it('drops long tool results from the conversation it hands back', async () => {
+    const { run, runtime } = setup([
+      {
+        toolCalls: [call('settings__get', { key: 'big' }), call('settings__get', { key: 'small' })],
+      },
+      { content: 'Read both.' },
+    ]);
+    await runtime.store.batch([
+      { type: 'put', key: 'settings/big', value: 'x'.repeat(5000) },
+      { type: 'put', key: 'settings/small', value: 'y' },
+    ]);
+    const result = await run();
+    expect(toolResults(result.messages)).toEqual([
+      {
+        status: 'ok',
+        trimmed: true,
+        note: expect.stringContaining('Call the tool again') as string,
+      },
+      { status: 'ok', output: { key: 'small', value: 'y' } },
+    ]);
   });
 
   it('continues from earlier messages', async () => {
@@ -156,8 +209,8 @@ describe('runAgent', () => {
     ]);
     const result = await run();
     expect(toolResults(result.messages)).toEqual([
-      { error: '"vault__read" is not a tool you have.' },
-      { error: '"made__up" is not a tool you have.' },
+      { error: '"vault.read" is not a command you can run.' },
+      { error: '"made.up" is not a command you can run.' },
     ]);
     expect(await readActivity(runtime.store)).toEqual([]);
   });
@@ -216,7 +269,7 @@ describe('runAgent', () => {
   });
 
   it('stops when the run budget is used up', async () => {
-    const usage = { promptTokens: 1, completionTokens: 1, costUsd: 0.6 };
+    const usage = { cachedPromptTokens: 0, promptTokens: 1, completionTokens: 1, costUsd: 0.6 };
     const { run, provider } = setup([
       { toolCalls: [call('settings__list', {})], usage },
       { toolCalls: [call('settings__list', {})], usage },
@@ -230,7 +283,10 @@ describe('runAgent', () => {
 
   it('counts a reply without a reported cost as free', async () => {
     const { run } = setup([
-      { content: 'Hi.', usage: { promptTokens: 1, completionTokens: 1, costUsd: null } },
+      {
+        content: 'Hi.',
+        usage: { cachedPromptTokens: 0, promptTokens: 1, completionTokens: 1, costUsd: null },
+      },
     ]);
     expect((await run()).costUsd).toBe(0);
   });
@@ -263,5 +319,80 @@ describe('runAgent', () => {
       throw policyBug;
     });
     await expect(broken.run()).rejects.toBe(policyBug);
+  });
+
+  describe('with a role that looks commands up instead of carrying them all', () => {
+    const wide: Role = { ...role, scope: { effects: ['read', 'write'] }, direct: ['settings.get'] };
+
+    it('offers the direct tools and the two lookup tools, and names the groups', async () => {
+      const { run, provider } = setup([{ content: 'ok' }]);
+      await run({ role: wide });
+      expect(provider.requests[0]?.tools?.map((tool) => tool.function.name)).toEqual([
+        'settings__get',
+        'find_commands',
+        'run_command',
+      ]);
+      expect(provider.requests[0]?.messages[0]?.content).toContain('settings (2), vault (1)');
+    });
+
+    it('finds a command with its input and runs it through the same checks', async () => {
+      const { run, runtime } = setup([
+        {
+          toolCalls: [
+            call('find_commands', { query: 'settings.set' }),
+            call('find_commands', { query: 'change a setting' }),
+            call('find_commands', { query: 'zzz' }),
+          ],
+        },
+        {
+          toolCalls: [
+            call('run_command', { id: 'settings.set', input: { key: 'theme', value: 'dark' } }),
+            call('run_command', { id: 'media.generate', input: { prompt: 'x' } }),
+            call('run_command', { id: 'settings.set', input: { key: 'Bad Key' } }),
+            call('run_command', {}),
+            call('find_commands', 'not json'),
+          ],
+        },
+        { content: 'Done.' },
+      ]);
+      const result = await run({ role: wide });
+      const results = toolResults(result.messages);
+
+      const exact = results[0] as { matches: { id: string; input: { properties: object } }[] };
+      expect(exact.matches[0]?.id).toBe('settings.set');
+      expect(Object.keys(exact.matches[0]?.input.properties ?? {})).toEqual(['key', 'value']);
+      expect((results[1] as typeof exact).matches.map((match) => match.id)).toContain(
+        'settings.set',
+      );
+      expect(results[2]).toEqual({
+        matches: [],
+        note: expect.stringContaining('settings (2), vault (1)') as string,
+      });
+
+      expect(results[3]).toMatchObject({ status: 'ok' });
+      expect(await runtime.store.get('settings/theme')).toBe('dark');
+      // Outside the role's effects: looking a command up does not widen what may run.
+      expect(results[4]).toEqual({ error: '"media.generate" is not a command you can run.' });
+      expect(results[5]).toMatchObject({
+        error: expect.stringContaining('settings.set') as string,
+      });
+      expect(results[6]).toEqual({ error: '"" is not a command you can run.' });
+      expect(results[7]).toMatchObject({
+        error: expect.stringContaining('not valid JSON') as string,
+      });
+      expect((await readActivity(runtime.store)).map((entry) => entry.commandId)).toContain(
+        'settings.set',
+      );
+    });
+
+    it('treats the lookup names as unknown tools for a role that has every tool', async () => {
+      const { run } = setup([
+        { toolCalls: [call('find_commands', { query: 'x' })] },
+        { content: 'ok' },
+      ]);
+      expect(toolResults((await run()).messages)).toEqual([
+        { error: '"find_commands" is not a command you can run.' },
+      ]);
+    });
   });
 });

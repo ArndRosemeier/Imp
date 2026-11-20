@@ -71,7 +71,7 @@ export function createFakeProvider(script: {
         toolCalls: [],
         finishReason:
           reply.toolCalls !== undefined && reply.toolCalls.length > 0 ? 'tool_calls' : 'stop',
-        usage: { promptTokens: 0, completionTokens: 0, costUsd: 0 },
+        usage: { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0, costUsd: 0 },
         ...reply,
       });
     },

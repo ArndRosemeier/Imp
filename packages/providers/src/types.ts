@@ -39,15 +39,32 @@ export interface ToolCall {
   readonly argumentsText: string;
 }
 
+/**
+ * Marks the end of a stable prefix: the request up to and including this
+ * message is expected to be sent again unchanged, so a provider that can
+ * cache prompts should cache it. Providers that cannot ignore the mark.
+ */
+interface Cacheable {
+  readonly cache?: boolean;
+}
+
 export type ChatMessage =
-  | { readonly role: 'system'; readonly content: string }
-  | { readonly role: 'user'; readonly content: string }
+  | ({ readonly role: 'system'; readonly content: string } & Cacheable)
+  | ({
+      readonly role: 'user';
+      readonly content: string;
+      /**
+       * Background for the model that the person did not write, sent ahead of
+       * the content. Kept apart so that a conversation view shows only their words.
+       */
+      readonly context?: string;
+    } & Cacheable)
   | {
       readonly role: 'assistant';
       readonly content: string | null;
       readonly toolCalls?: readonly ToolCall[];
     }
-  | { readonly role: 'tool'; readonly toolCallId: string; readonly content: string };
+  | ({ readonly role: 'tool'; readonly toolCallId: string; readonly content: string } & Cacheable);
 
 export interface ChatRequest {
   readonly model: string;
@@ -61,6 +78,8 @@ export type FinishReason = 'stop' | 'tool_calls' | 'length' | 'content_filter' |
 
 export interface Usage {
   readonly promptTokens: number;
+  /** How many of the prompt tokens were read from the provider's cache, at a fraction of the price. */
+  readonly cachedPromptTokens: number;
   readonly completionTokens: number;
   /** What the call cost in US dollars, or null when the provider did not say. */
   readonly costUsd: number | null;

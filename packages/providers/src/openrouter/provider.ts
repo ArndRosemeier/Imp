@@ -67,13 +67,31 @@ function parseArguments(text: string): JsonValue | undefined {
   }
 }
 
+/** Text content, as a marked part when the prefix ending here should be cached. */
+function toWireContent(text: string, cache: boolean | undefined): unknown {
+  return cache === true ? [{ type: 'text', text, cache_control: { type: 'ephemeral' } }] : text;
+}
+
 function toWireMessage(message: ChatMessage): Record<string, unknown> {
   switch (message.role) {
     case 'system':
+      return { role: 'system', content: toWireContent(message.content, message.cache) };
     case 'user':
-      return { role: message.role, content: message.content };
+      return {
+        role: 'user',
+        content: toWireContent(
+          message.context === undefined
+            ? message.content
+            : `<context>\n${message.context}\n</context>\n\n${message.content}`,
+          message.cache,
+        ),
+      };
     case 'tool':
-      return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
+      return {
+        role: 'tool',
+        tool_call_id: message.toolCallId,
+        content: toWireContent(message.content, message.cache),
+      };
     case 'assistant':
       return {
         role: 'assistant',
@@ -230,6 +248,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         finishReason: toFinishReason(choice.finish_reason),
         usage: {
           promptTokens: completion.usage?.prompt_tokens ?? 0,
+          cachedPromptTokens: completion.usage?.prompt_tokens_details?.cached_tokens ?? 0,
           completionTokens: completion.usage?.completion_tokens ?? 0,
           costUsd: completion.usage?.cost ?? null,
         },
