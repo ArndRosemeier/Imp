@@ -54,7 +54,11 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
 
 export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
   const imp = useImp();
-  const [view, setView] = useState('crew');
+  const [view, setViewState] = useState(() => localStorage.getItem('imp.view') ?? 'crew');
+  const setView = (next: string): void => {
+    setViewState(next);
+    localStorage.setItem('imp.view', next);
+  };
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();

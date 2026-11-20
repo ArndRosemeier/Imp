@@ -2,6 +2,7 @@ import {
   coordinatorRole,
   createAgentCommands,
   createCrewCommands,
+  releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
@@ -26,6 +27,8 @@ export interface Imp {
   readonly modes: readonly Mode[];
   readonly store: KeyValueStore;
   readonly secrets: SecretStore;
+  /** Puts the stored state in order after a restart. Called once before the UI reads anything. */
+  start(): Promise<void>;
 }
 
 const browserFetch: HttpFetch = (url, request) =>
@@ -77,5 +80,6 @@ export function createImp(options: ImpOptions): Imp {
     modes: MODES,
     store: options.store,
     secrets: options.secrets,
+    start: () => releaseInterruptedRuns(options.store),
   };
 }

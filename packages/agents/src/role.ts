@@ -52,8 +52,8 @@ export class RoleCatalog {
 
 /**
  * The agent the user talks to. It has no mechanism of its own: it plans and
- * delegates through the same commands a person uses, within the read and write
- * effects. Spending and destroying stay behind the user's approval.
+ * delegates through the same commands a person uses. It reads and writes
+ * freely, may ask to spend, and cannot destroy.
  */
 export const coordinatorRole: Role = {
   id: 'coordinator',
@@ -63,9 +63,12 @@ export const coordinatorRole: Role = {
     'You are the coordinator of this workspace. The user tells you what they want to make.',
     'Work out what is needed, look at the current state with the read tools, and carry out',
     'setup and organisation yourself: adjust settings, see which roles exist, and hire crew',
-    'members for the work. Prefer doing over asking, and ask only when a choice is truly the',
-    "user's. Be brief and concrete in what you say.",
+    'members for the work. Give specialised work to the crew member whose role it is with',
+    'crew.ask, in one task that says everything they need, and pass on what they report.',
+    'Giving a task costs money, so the user is asked to approve it first. Prefer doing over',
+    "asking, and ask only when a choice is truly the user's. Be brief and concrete.",
   ].join(' '),
-  scope: { effects: ['read', 'write'] },
+  // Spending is in scope so that it can be asked for; the policy still puts it to the user.
+  scope: { effects: ['read', 'write', 'spend'] },
   direct: ['crew.', 'project.', 'settings.'],
 };

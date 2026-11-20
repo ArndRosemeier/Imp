@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { RoleCatalog } from './role.js';
 
 const CREW_PREFIX = 'crew/';
+/** Where the conversation with each crew member is kept, by member id. */
+export const CONVERSATION_PREFIX = 'conversations/';
 
 export const CrewMember = z.object({
   id: z.string(),
@@ -100,13 +102,17 @@ export function createCrewCommands(roles: RoleCatalog): readonly Command[] {
   const dismiss = defineCommand({
     id: 'crew.dismiss',
     title: 'Dismiss agent',
-    description: 'Removes an agent from the crew. Work the agent already produced is kept.',
+    description:
+      'Removes an agent from the crew, with the conversation held with it. Work the agent produced is kept.',
     effect: 'write',
     input: z.object({ id: z.string() }),
     output: z.object({ id: z.string(), dismissed: z.boolean() }),
     handler: async ({ runtime }, { id }) => {
       const existed = (await readCrewMember(runtime.store, id)) !== undefined;
-      await runtime.store.batch([{ type: 'delete', key: `${CREW_PREFIX}${id}` }]);
+      await runtime.store.batch([
+        { type: 'delete', key: `${CREW_PREFIX}${id}` },
+        { type: 'delete', key: `${CONVERSATION_PREFIX}${id}` },
+      ]);
       return { id, dismissed: existed };
     },
   });
