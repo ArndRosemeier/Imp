@@ -23,6 +23,7 @@ import {
 import { runCommand, useImp, useLive } from './context.js';
 import {
   clock,
+  blobKeys,
   CutPlayer,
   Film,
   ITEM_STATE_TEXT,
@@ -36,6 +37,8 @@ import {
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
+import { CharacterLanes, LineInspector } from './lines.js';
+import { NumberField } from './NumberField.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { SceneTabs } from './shots.js';
@@ -142,45 +145,6 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
   };
 }
 
-function NumberField({
-  label,
-  value,
-  step,
-  max,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  step: number;
-  max: number;
-  onCommit: (value: number) => void;
-}): ReactElement {
-  // What is typed stays until the field is left; then the stored value shows again.
-  const [typed, setTyped] = useState<string | null>(null);
-  const text = typed ?? String(value);
-  return (
-    <label className="field compact">
-      <span>{label}</span>
-      <input
-        className="input"
-        type="number"
-        min={0}
-        max={max}
-        step={step}
-        value={text}
-        onChange={(event) => {
-          setTyped(event.target.value);
-        }}
-        onBlur={() => {
-          const next = Number(text);
-          setTyped(null);
-          if (Number.isFinite(next) && next >= 0 && next <= max && next !== value) onCommit(next);
-        }}
-      />
-    </label>
-  );
-}
-
 const EMPTY_CUT: Cut = {
   totalSeconds: 0,
   canUndo: false,
@@ -188,6 +152,8 @@ const EMPTY_CUT: Cut = {
   items: [],
   unplaced: [],
   sounds: [],
+  lanes: [],
+  lines: [],
 };
 
 /** How many pixels wide a second is on the timeline. */
@@ -196,7 +162,11 @@ const MAX_SCALE = 160;
 /** A piece without length still gets a handle to grab. */
 const MIN_BLOCK_PX = 18;
 
-type Selection = { kind: 'item'; id: string } | { kind: 'sound'; id: string } | null;
+type Selection =
+  | { kind: 'item'; id: string }
+  | { kind: 'sound'; id: string }
+  | { kind: 'line'; id: string }
+  | null;
 
 /** Follows a pointer across the page while a button is held, and reports the distance in the end. */
 function useDrag(onEnd: (distance: number) => void) {
@@ -264,6 +234,7 @@ function Timeline({
   const widest = Math.max(
     cut.totalSeconds,
     ...cut.sounds.map((placement) => placement.startSeconds + audioLength(placement)),
+    ...cut.lines.map((line) => line.startSeconds + Math.max(line.durationSeconds, 0.5)),
     10,
   );
   const width = Math.ceil((widest + 2) * scale);
@@ -459,6 +430,17 @@ function Timeline({
               );
             })}
           </div>
+          <CharacterLanes
+            cut={cut}
+            scale={scale}
+            at={at}
+            sceneId={sceneId}
+            selectedId={selection?.kind === 'line' ? selection.id : null}
+            onSelect={(id) => {
+              onSelect({ kind: 'line', id });
+            }}
+            act={act}
+          />
           <div className="playhead" style={{ left: at * scale }} aria-hidden="true" />
         </div>
       </div>
@@ -492,12 +474,7 @@ function SceneEditor({
     [shots, sounds],
   );
   const cut = data?.cut ?? EMPTY_CUT;
-  const urls = useBlobUrls(
-    [
-      ...source.shots.flatMap((shot) => [shot.clip?.blobKey, shot.dialogue?.blobKey]),
-      ...source.sounds.map((sound) => sound.take?.blobKey),
-    ].filter((key): key is string => typeof key === 'string'),
-  );
+  const urls = useBlobUrls(blobKeys(source, cut));
   const lengths = useAudioLengths(urls);
   const { attachVideo, attachVoice, ...playback } = usePlayback(cut, source, urls);
   if (data === undefined) return <Problem text={live.error} />;
@@ -509,6 +486,10 @@ function SceneEditor({
   const placement =
     selection?.kind === 'sound'
       ? cut.sounds.find((candidate) => candidate.id === selection.id)
+      : undefined;
+  const line =
+    selection?.kind === 'line'
+      ? cut.lines.find((candidate) => candidate.id === selection.id)
       : undefined;
   const run = (id: string, input: Record<string, unknown>): Promise<unknown> =>
     act(id, { sceneId, ...input });
@@ -619,7 +600,7 @@ function SceneEditor({
           <audio ref={attachVoice} aria-label="Dialogue of the preview" />
         </figure>
         <div className="stack inspector" aria-label="Selected piece">
-          {item === undefined && placement === undefined && (
+          {item === undefined && placement === undefined && line === undefined && (
             <p className="muted">
               Select a piece on the timeline to change it. Drag a picture onto another to reorder,
               drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the
@@ -741,6 +722,18 @@ function SceneEditor({
                 </button>
               )}
             </>
+          )}
+          {line !== undefined && (
+            <LineInspector
+              line={line}
+              who={cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? 'Line'}
+              url={urls.get(line.take?.blobKey ?? '')}
+              sceneId={sceneId}
+              act={act}
+              onGone={() => {
+                setSelection(null);
+              }}
+            />
           )}
           {placement !== undefined && (
             <>

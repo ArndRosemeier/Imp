@@ -17,16 +17,49 @@ export {
 } from './command.js';
 export { activityCommands, activityList } from './commands/activity.js';
 export {
-  Project,
+  createProjectCommands,
+  createProjectCommandSet,
   projectCommands,
   projectCreate,
   projectDelete,
+  projectDuplicate,
   projectList,
-  projectPrefix,
+  projectOpen,
   projectRename,
+} from './commands/projects.js';
+export {
+  addProject,
+  CURRENT_PROJECT_SETTING,
+  freeName,
+  listProjects,
+  Project,
+  PROJECT_INDEX_PREFIX,
+  projectIndexKey,
+  projectPrefix,
   readProject,
   requireProject,
-} from './commands/projects.js';
+} from './projects/model.js';
+export {
+  Collision,
+  CollisionChoice,
+  CopyOutcome,
+  itemKey,
+  PlannedItem,
+  ProjectSummary,
+  ResourceItem,
+  ResourceKindInfo,
+  StageProgress,
+  type CopySpec,
+  type ModeProjectSupport,
+  type ProjectSupport,
+  type ProjectTemplate,
+  type ResourceCopier,
+} from './projects/support.js';
+export { copyTree, createRewriter, removeTree } from './projects/tree.js';
+export { COPY_REQUEST_PREFIX, CopyRequest } from './commands/project-copy.js';
+export { EXPORT_PREFIX, fileNameFor, UPLOAD_PREFIX } from './commands/project-files.js';
+export { Template, templatePrefix } from './commands/project-templates.js';
+export { ArchiveError, crc32, readArchive, writeArchive, type ArchiveEntry } from './archive.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';

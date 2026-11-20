@@ -35,6 +35,9 @@ export const editHistoryKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}edit-history/${sceneId}`;
 export const movieSceneKey = (projectId: string, sceneId: string): string =>
   `${scenePrefix(projectId)}${sceneId}`;
+/** The recorded lines of a scene's own-lane characters. */
+export const linePrefix = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}lines/${sceneId}/`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
@@ -237,7 +240,11 @@ export const sceneDelete = defineCommand({
       ].map((entry) => ({ type: 'delete' as const, key: entry.key })),
       ...renumbered(projectId, remaining),
     ]);
-    for (const prefix of [shotPrefix(projectId, sceneId), soundPrefix(projectId, sceneId)]) {
+    for (const prefix of [
+      shotPrefix(projectId, sceneId),
+      soundPrefix(projectId, sceneId),
+      linePrefix(projectId, sceneId),
+    ]) {
       for (const blobKey of await runtime.blobs.list(prefix)) {
         await runtime.blobs.delete(blobKey);
       }
@@ -327,6 +334,7 @@ export const characterCreate = defineCommand({
     appearance: Character.shape.appearance.default(''),
     voice: Character.shape.voice.default(''),
     voiceOnly: Character.shape.voiceOnly,
+    ownLane: Character.shape.ownLane,
   }),
   output: Character,
   handler: async ({ runtime }, { projectId, ...fields }) => {
@@ -372,6 +380,7 @@ export const characterUpdate = defineCommand({
       appearance: changes.appearance ?? current.appearance,
       voice: changes.voice ?? current.voice,
       voiceOnly: changes.voiceOnly ?? current.voiceOnly,
+      ownLane: changes.ownLane ?? current.ownLane,
       images: current.images,
       portraitId: current.portraitId,
       voiceSample: current.voiceSample,
