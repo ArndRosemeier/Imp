@@ -23,7 +23,7 @@ export default tseslint.config(
   {
     // The core and the providers must run unchanged in a browser worker and in the local server,
     // so they may not reach for either host.
-    files: ['packages/{core,providers,agents,mode-movie}/src/**/*.ts'],
+    files: ['packages/{core,providers,agents,audio,mode-movie}/src/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

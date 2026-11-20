@@ -7,6 +7,7 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
+import { createAudioCommands, createDefaultAudioCodec } from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
@@ -86,6 +87,7 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
+    ...createAudioCommands({ codec: createDefaultAudioCodec() }),
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider),
     ...createCrewCommands(roles, {

@@ -212,8 +212,8 @@ describe('characters', () => {
     await run('movie.character.update', { characterId: mara.id, voice: 'Low and dry.' });
     expect(await run('movie.character.list', {})).toEqual({
       characters: [
-        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null },
-        { id: tomas.id, name: 'Tomas', part: '', portraitId: null },
+        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
+        { id: tomas.id, name: 'Tomas', part: '', portraitId: null, voiceOnly: false },
       ],
     });
     expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
@@ -233,6 +233,7 @@ describe('characters', () => {
         images: [],
         portraitId: null,
         voiceSample: null,
+        voiceOnly: false,
       },
       expect.objectContaining({ name: 'Tomas' }),
     ]);
@@ -316,6 +317,7 @@ describe('character images', () => {
           name: 'Mara',
           part: 'protagonist',
           portraitId: first.image.id,
+          voiceOnly: false,
         },
       ],
     });
@@ -459,7 +461,9 @@ describe('character voice samples', () => {
     });
     // The outline of the cast does not carry it.
     expect(await run('movie.character.list', {})).toEqual({
-      characters: [{ id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null }],
+      characters: [
+        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
+      ],
     });
   });
 
@@ -648,6 +652,33 @@ describe('shots and clips', () => {
     expect(clipPrompt(silent, [], '')).toBe('The lamp turns.\nNobody speaks.');
     const offscreen = Shot.parse(await add({ description: 'Dark stairs.', line: 'Hello?' }));
     expect(clipPrompt(offscreen, [], '')).toBe('Dark stairs.\nA voice says "Hello?"');
+  });
+
+  it('keeps a voice-only narrator out of the prompt and the picture', async () => {
+    const { run, mara, add } = await withScene();
+    const narrator = Character.parse(
+      await run('movie.character.create', {
+        name: 'Narrator',
+        appearance: 'An old man in a chair.',
+        voice: 'Warm, slow.',
+        voiceOnly: true,
+      }),
+    );
+    expect(narrator.voiceOnly).toBe(true);
+    expect(
+      Character.parse(await run('movie.character.get', { characterId: narrator.id })).voiceOnly,
+    ).toBe(true);
+    const shot = Shot.parse(
+      await add({ description: 'The lamp turns.', line: 'It had burned for a century.' }),
+    );
+    const narrated = { ...shot, speakerId: narrator.id };
+    expect(clipPrompt(narrated, [Character.parse(mara), narrator], '')).toBe(
+      'The lamp turns.\nMara: Seventy, grey braid.\nNobody in the picture speaks; a voice-over is added later.',
+    );
+    const unset = Character.parse(
+      await run('movie.character.update', { characterId: narrator.id, voiceOnly: false }),
+    );
+    expect(unset.voiceOnly).toBe(false);
   });
 
   it('starts a clip with the portraits as guides, then stores it when it is done', async () => {
