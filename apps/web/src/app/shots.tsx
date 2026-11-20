@@ -1,7 +1,20 @@
 import type { Project } from '@imp/core';
-import { Character, Scene, Shot, SPEECH_MODEL_SETTING, VIDEO_MODEL_SETTING } from '@imp/mode-movie';
-import { FilmStripIcon, MicrophoneIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import {
+  Character,
+  IMAGE_MODEL_SETTING,
+  Scene,
+  Shot,
+  SPEECH_MODEL_SETTING,
+  VIDEO_MODEL_SETTING,
+} from '@imp/mode-movie';
+import {
+  FilmStripIcon,
+  MicrophoneIcon,
+  PlusIcon,
+  SparkleIcon,
+  TrashIcon,
+} from '@phosphor-icons/react';
+import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
@@ -72,10 +85,142 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
         {clip.model}
         {clip.durationSeconds === null ? '' : ` · ${String(clip.durationSeconds)} s`}
         {clip.costUsd === null ? '' : ` · $${clip.costUsd.toFixed(2)}`}
-        {clip.portraits === 0 ? ' · made from the words alone, without portraits' : ''}
+        {clip.startFrameId !== null
+          ? ' · starts on the key frame'
+          : clip.guides.length === 0
+            ? ' · made from the words alone, without pictures'
+            : ` · guided by ${clip.guides.join(', ')}`}
         {overlaid ? ' · silent, the recorded dialogue plays over it' : ''}
       </figcaption>
     </figure>
+  );
+}
+
+function FrameImage({ blobKey, alt }: { blobKey: string; alt: string }): ReactElement | null {
+  const url = useBlobUrl(blobKey);
+  return url === null ? null : <img src={url} alt={alt} />;
+}
+
+/**
+ * The key frame of a shot: a still of its first instant, painted from the
+ * pictures of its place, people and objects. The clip starts exactly on it.
+ */
+function KeyFrames({
+  shot,
+  imageModel,
+  act,
+}: {
+  shot: Shot;
+  imageModel: string | null;
+  act: Act;
+}): ReactElement {
+  const directionId = useId();
+  const [direction, setDirection] = useState('');
+  const [busy, setBusy] = useState(false);
+  const at = { sceneId: shot.sceneId, shotId: shot.id };
+  const chosen = shot.frames.find((frame) => frame.id === shot.frameId);
+  const paint = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    setBusy(true);
+    void act('movie.shot.frame.generate', {
+      ...at,
+      ...(direction.trim() === '' ? {} : { direction: direction.trim() }),
+    }).finally(() => {
+      setBusy(false);
+    });
+  };
+  return (
+    <section className="stack key-frames" aria-label={`Key frame of shot ${String(shot.position)}`}>
+      <div className="row spread wrap">
+        <h4>Key frame</h4>
+        <span className="muted small">
+          {chosen === undefined
+            ? shot.frames.length === 0
+              ? 'The clip starts from words and pictures alone.'
+              : 'None chosen: the clip starts from words and pictures.'
+            : 'The clip starts exactly on this frame.'}
+        </span>
+      </div>
+      {(chosen !== undefined || busy) && (
+        <div className="plate" aria-busy={busy}>
+          {chosen !== undefined && (
+            <FrameImage
+              blobKey={chosen.blobKey}
+              alt={`Key frame of shot ${String(shot.position)}`}
+            />
+          )}
+          {busy && (
+            <span className="portrait-busy" role="status">
+              Painting…
+            </span>
+          )}
+        </div>
+      )}
+      {chosen !== undefined && (
+        <span className="muted small">
+          {chosen.guides.length === 0
+            ? 'Painted from the words alone.'
+            : `Painted from ${chosen.guides.join(', ')}.`}
+        </span>
+      )}
+      {shot.frames.length > 0 && (
+        <div className="thumbs wide" role="group" aria-label="Key frames to choose from">
+          {shot.frames.map((frame, index) => (
+            <button
+              key={frame.id}
+              className="thumb"
+              aria-pressed={frame.id === shot.frameId}
+              aria-label={`Start the clip on frame ${String(index + 1)}`}
+              title={frame.prompt}
+              onClick={() => {
+                void act('movie.shot.frame.select', {
+                  ...at,
+                  frameId: frame.id === shot.frameId ? null : frame.id,
+                });
+              }}
+            >
+              <FrameImage blobKey={frame.blobKey} alt="" />
+            </button>
+          ))}
+        </div>
+      )}
+      <form className="row portrait-make" onSubmit={paint}>
+        <label className="sr-only" htmlFor={directionId}>
+          Direction for the next key frame
+        </label>
+        <input
+          id={directionId}
+          type="text"
+          className="input"
+          value={direction}
+          placeholder="Direction, e.g. closer, Mara on the left"
+          onChange={(event) => {
+            setDirection(event.target.value);
+          }}
+        />
+        <button
+          type="submit"
+          className="button"
+          disabled={busy || imageModel === null || shot.description.trim() === ''}
+          title={imageModel === null ? 'Choose an image model first.' : `Painted by ${imageModel}`}
+        >
+          <SparkleIcon aria-hidden="true" /> {shot.frames.length === 0 ? 'Paint frame' : 'Another'}
+        </button>
+      </form>
+      {chosen !== undefined && (
+        <div className="row">
+          <ConfirmButton
+            label="Delete frame"
+            question="Delete this key frame for good?"
+            onConfirm={() => {
+              void act('movie.shot.frame.delete', { ...at, frameId: chosen.id });
+            }}
+          >
+            <TrashIcon aria-hidden="true" />
+          </ConfirmButton>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -244,6 +389,7 @@ function ShotCard({
   sceneLocationId,
   model,
   speechModel,
+  imageModel,
   act,
 }: {
   shot: Shot;
@@ -252,6 +398,7 @@ function ShotCard({
   sceneLocationId: string | null;
   model: string | null;
   speechModel: string | null;
+  imageModel: string | null;
   act: Act;
 }): ReactElement {
   const speakerId = useId();
@@ -352,6 +499,7 @@ function ShotCard({
         />
       </div>
       <Dialogue shot={shot} speechModel={speechModel} act={act} />
+      <KeyFrames shot={shot} imageModel={imageModel} act={act} />
       <div className="row wrap">
         <button
           className="button"
@@ -398,6 +546,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
   const world = useWorld(project);
   const video = useModelSetting(VIDEO_MODEL_SETTING, 'video');
   const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
+  const images = useModelSetting(IMAGE_MODEL_SETTING, 'image');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const scenes = outline.data?.scenes ?? [];
   const scene = scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0];
@@ -456,12 +605,22 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
           choice={speech}
           act={act}
         />
+        <ModelPicker
+          id="shots-image-model"
+          label="Image model"
+          empty="Choose a model to paint key frames"
+          setting={IMAGE_MODEL_SETTING}
+          choice={images}
+          act={act}
+        />
       </div>
       <p className="muted">
         Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the
         character and played over a silent clip; it is not lip-synced.
       </p>
-      <Problem text={outline.error ?? listed.error ?? error ?? video.error ?? speech.error} />
+      <Problem
+        text={outline.error ?? listed.error ?? error ?? video.error ?? speech.error ?? images.error}
+      />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         outline.data !== undefined && (
@@ -487,6 +646,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
                 sceneLocationId={scene?.locationId ?? null}
                 model={video.model}
                 speechModel={speech.model}
+                imageModel={images.model}
                 act={act}
               />
             ))}

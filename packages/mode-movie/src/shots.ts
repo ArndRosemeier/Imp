@@ -15,6 +15,7 @@ import {
   type GenerationProvider,
   type MediaInput,
   type ModelInfo,
+  type VideoRequest,
 } from '@imp/providers';
 import {
   keyImageOf,
@@ -33,6 +34,7 @@ import {
   requireLocationState,
   shotPrefix,
 } from './commands.js';
+import { asStartFrame, type FrameImageEncoder } from './frames.js';
 import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
 import { Character, Clip, Development, DialogueTake, MODE_ID, Scene, Shot } from './schema.js';
 
@@ -60,6 +62,8 @@ const ShotFields = Shot.omit({
   position: true,
   clip: true,
   dialogue: true,
+  frames: true,
+  frameId: true,
 });
 
 const shotKey = (projectId: string, sceneId: string, shotId: string): string =>
@@ -83,11 +87,11 @@ async function requireScene(
   }
 }
 
-async function loadShot(
+export async function loadShot(
   store: KeyValueStore,
   commandId: string,
   at: { projectId: string; sceneId: string; shotId: string },
-) {
+): Promise<{ key: string; shot: Shot }> {
   await requireProject(store, commandId, at.projectId, MODE_ID);
   const key = shotKey(at.projectId, at.sceneId, at.shotId);
   const stored = await store.get(key);
@@ -139,23 +143,31 @@ export async function readSetting(
 }
 
 /** The pictures of the world that guide a clip, closest first, with what each shows. */
-function settingGuides(setting: ShotSetting): { image: WorldImage; name: string }[] {
-  const guides: { image: WorldImage; name: string }[] = [];
+export function settingGuides(
+  setting: ShotSetting,
+): { image: WorldImage; name: string; kind: 'location' | 'object' }[] {
+  const guides: { image: WorldImage; name: string; kind: 'location' | 'object' }[] = [];
   if (setting.location !== undefined) {
     const { element, view, state } = setting.location;
     const image = keyImageOf(element, view.id, state?.id ?? null);
-    if (image !== undefined) guides.push({ image, name: `${element.name} · ${view.name}` });
+    if (image !== undefined) {
+      guides.push({ image, name: `${element.name} · ${view.name}`, kind: 'location' });
+    }
   }
   for (const { element, state } of setting.objects) {
     const image = keyImageOf(element, null, state?.id ?? null);
-    if (image !== undefined) guides.push({ image, name: element.name });
+    if (image !== undefined) guides.push({ image, name: element.name, kind: 'object' });
   }
   return guides;
 }
 
 const clause = (text: string): string => text.trim().replace(/[.!?]+$/, '');
 
-async function readCast(store: KeyValueStore, projectId: string, shot: Shot) {
+export async function readCast(
+  store: KeyValueStore,
+  projectId: string,
+  shot: Shot,
+): Promise<Character[]> {
   const cast: Character[] = [];
   for (const id of new Set([
     ...shot.characterIds,
@@ -167,20 +179,8 @@ async function readCast(store: KeyValueStore, projectId: string, shot: Shot) {
   return cast;
 }
 
-/**
- * What is sent to the video model. The line goes in as written and is framed
- * by who says it and how, because models take the emotion from the words and
- * not from the situation; the bodies are directed in a sentence of their own.
- */
-export function clipPrompt(
-  shot: Shot,
-  cast: readonly Character[],
-  tone: string,
-  /** The line is recorded apart and laid over the clip, so the clip must not voice it. */
-  dialogueApart = false,
-  /** Where it happens and which objects are seen. */
-  setting: ShotSetting = { objects: [] },
-): string {
+/** The place, the view, its state and the objects of a shot, in words for a model. */
+export function describeSetting(setting: ShotSetting): { where: string; things: string[] } {
   const place = setting.location;
   const where =
     place === undefined
@@ -209,6 +209,24 @@ export function clipPrompt(
       .filter((part) => part !== '')
       .join(' '),
   );
+  return { where, things };
+}
+
+/**
+ * What is sent to the video model. The line goes in as written and is framed
+ * by who says it and how, because models take the emotion from the words and
+ * not from the situation; the bodies are directed in a sentence of their own.
+ */
+export function clipPrompt(
+  shot: Shot,
+  cast: readonly Character[],
+  tone: string,
+  /** The line is recorded apart and laid over the clip, so the clip must not voice it. */
+  dialogueApart = false,
+  /** Where it happens and which objects are seen. */
+  setting: ShotSetting = { objects: [] },
+): string {
+  const { where, things } = describeSetting(setting);
   const speaker = cast.find((character) => character.id === shot.speakerId);
   const onScreen = cast.filter((character) => !character.voiceOnly);
   const said =
@@ -312,7 +330,10 @@ async function findModel(provider: GenerationProvider, id: string): Promise<Mode
 }
 
 /** The commands for the shots of a scene and their clips. They need a provider to generate. */
-export function createShotCommands(provider: GenerationProvider): readonly Command[] {
+export function createShotCommands(
+  provider: GenerationProvider,
+  frameImage?: FrameImageEncoder,
+): readonly Command[] {
   const list = defineCommand({
     id: 'movie.shot.list',
     title: 'List shots',
@@ -389,6 +410,8 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         line: fields.line ?? '',
         delivery: fields.delivery ?? '',
         dialogue: null,
+        frames: [],
+        frameId: null,
         clip: null,
       };
       await requireShotSetting(runtime.store, 'movie.shot.create', projectId, shot);
@@ -497,6 +520,12 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         .describe(
           'Send the portraits of the characters as guides. Switch off for models that refuse them.',
         ),
+      startFrame: z
+        .boolean()
+        .default(true)
+        .describe(
+          'Start the clip exactly on the chosen key frame of the shot (movie.shot.frame.generate), where there is one and the model takes a start picture. This keeps places and faces the same from shot to shot.',
+        ),
     }),
     output: z.object({ clip: Clip }),
     handler: async ({ runtime }, input) => {
@@ -570,27 +599,41 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         aspectRatio: input.aspectRatio,
         audio,
       };
+      // The surest way first: start on the key frame. Then guiding images, then words alone.
+      // A model that cannot take one refuses before anything is spent, and the next is tried.
+      const frame = shot.frames.find((candidate) => candidate.id === shot.frameId);
+      const stored =
+        input.startFrame &&
+        frame !== undefined &&
+        (info?.video === undefined || info.video.frameImages.includes('first_frame'))
+          ? await runtime.blobs.get(frame.blobKey)
+          : undefined;
+      const startBlob = stored === undefined ? undefined : await asStartFrame(stored, frameImage);
+      const attempts: { extra: Partial<VideoRequest>; frameId: string | null; guides: string[] }[] =
+        [];
+      if (startBlob !== undefined && frame !== undefined) {
+        attempts.push({
+          extra: { firstFrame: startBlob },
+          frameId: frame.id,
+          guides: frame.guides,
+        });
+      }
+      if (references.length > 0) attempts.push({ extra: { references }, frameId: null, guides });
+      attempts.push({ extra: {}, frameId: null, guides: [] });
       let job;
-      let portraits = portraitCount;
-      let guided = guides;
+      let used = attempts[attempts.length - 1] ?? { extra: {}, frameId: null, guides: [] };
       try {
-        try {
-          job = await provider.startVideo(
-            references.length === 0 ? request : { ...request, references },
-          );
-        } catch (error) {
-          // Many models take no guiding images and refuse the request, which costs nothing.
-          // The clip is then made from the words alone, and says so.
-          if (
-            !(error instanceof ProviderError) ||
-            error.kind !== 'bad_request' ||
-            references.length === 0
-          ) {
-            throw error;
+        for (const [index, attempt] of attempts.entries()) {
+          try {
+            job = await provider.startVideo({ ...request, ...attempt.extra });
+            used = attempt;
+            break;
+          } catch (error) {
+            const last = index === attempts.length - 1;
+            if (last || !(error instanceof ProviderError) || error.kind !== 'bad_request') {
+              throw error;
+            }
           }
-          portraits = 0;
-          guided = [];
-          job = await provider.startVideo(request);
         }
       } catch (error) {
         if (!(error instanceof ProviderError)) throw error;
@@ -598,6 +641,11 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
           cause: error,
         });
       }
+      if (job === undefined) {
+        throw new CommandError('handler_failed', id, 'No clip was started.');
+      }
+      const portraits = used.extra.references === undefined ? 0 : portraitCount;
+      const guided = used.guides;
       const clip: Clip = {
         status: job.status === 'failed' ? 'failed' : 'pending',
         jobId: job.id,
@@ -611,6 +659,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         error: job.error,
         durationSeconds,
         silent: !audio,
+        startFrameId: used.frameId,
         costUsd: job.costUsd,
         createdAt: runtime.now().toISOString(),
       };

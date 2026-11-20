@@ -5,6 +5,7 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands } from './library.js';
 import { createSoundCommands } from './sounds.js';
 import { movieProjectSupport } from './project.js';
@@ -87,6 +88,11 @@ export const clipDesigner: Role = {
     'from (viewId, from world.location.get), so that shots from different sides show one place,',
     'and list the objects seen with their state. Ask the Production Designer for a view that is',
     'missing rather than describing the room anew in the shot.',
+    'Before a clip, paint its key frame with movie.shot.frame.generate: a still of the first',
+    'instant, drawn from the pictures of the place, the people and the objects. Look at it with',
+    'media.view, judge the framing, the faces and the room against the other shots of the scene,',
+    'and paint again with a direction until it is right; it costs a cent, a clip far more. The',
+    'clip then starts exactly on the chosen frame, which is what keeps a long film coherent.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -188,7 +194,11 @@ export const soundEditor: Role = {
  * Movie creation: the first working mode. It needs the provider for what it
  * generates. The edit comes later.
  */
-export function createMovieMode(options: { readonly provider: GenerationProvider }): Mode {
+export function createMovieMode(options: {
+  readonly provider: GenerationProvider;
+  /** Re-encodes key frames as JPEG for video models that take nothing else as a start frame. */
+  readonly frameImage?: FrameImageEncoder;
+}): Mode {
   return defineMode({
     id: MODE_ID,
     name: 'Movie',
@@ -208,7 +218,8 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...movieCommands,
       ...createCharacterImageCommands(options.provider),
       ...createCharacterVoiceCommands(options.provider),
-      ...createShotCommands(options.provider),
+      ...createShotCommands(options.provider, options.frameImage),
+      ...createFrameCommands(options.provider, options.frameImage),
       ...createSoundCommands(options.provider),
       ...createEditCommands(options.provider),
       ...libraryCommands,

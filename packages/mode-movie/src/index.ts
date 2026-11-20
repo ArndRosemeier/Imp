@@ -29,6 +29,7 @@ export {
   Character,
   CharacterImage,
   Clip,
+  KeyFrame,
   DialogueTake,
   Development,
   EMPTY_DEVELOPMENT,
@@ -44,11 +45,19 @@ export {
   VoiceSample,
 } from './schema.js';
 export { createEditCommands } from './edit.js';
+export {
+  asStartFrame,
+  createFrameCommands,
+  framePrompt,
+  MAX_FRAME_REFERENCES,
+  type FrameImageEncoder,
+} from './frames.js';
 export { LibrarySound, soundLibrary } from './library.js';
 export { createSceneAudioLink } from './scene-audio.js';
 export {
   clipPrompt,
   createShotCommands,
+  describeSetting,
   MAX_CLIP_GUIDES,
   readSetting,
   type ShotSetting,
