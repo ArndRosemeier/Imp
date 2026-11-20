@@ -301,7 +301,7 @@ const StringSetting = z.object({ value: z.json() });
 /** Reads a setting that names a generation model, and the models it can be set to. */
 export function useModelSetting(
   key: string,
-  output: 'image' | 'speech' | 'video',
+  output: 'image' | 'speech' | 'audio' | 'video',
 ): {
   model: string | null;
   models: readonly { id: string; name: string }[];

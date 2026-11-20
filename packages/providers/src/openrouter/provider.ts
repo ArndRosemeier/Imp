@@ -20,11 +20,14 @@ import {
   type ModelInfo,
   type VideoJob,
   type VideoRequest,
+  type SoundRequest,
+  type SoundResponse,
   type SpeechRequest,
   type SpeechResponse,
   type ToolCall,
 } from '../types.js';
 import {
+  AudioStreamChunk,
   ChatCompletionResponse,
   ErrorResponse,
   ImageGenerationResponse,
@@ -205,6 +208,18 @@ function kindForStatus(status: number): ProviderErrorKind {
 /** OpenRouter's own search tool. It replaced the `web` plugin and the `:online` suffix. */
 const WEB_SEARCH_TOOL = 'openrouter:web_search';
 
+/** What an audio file is, read from its first bytes. The stream does not say. */
+function audioTypeOf(bytes: Uint8Array): string | undefined {
+  const starts = (...values: number[]): boolean =>
+    values.every((value, index) => bytes[index] === value);
+  if (starts(0x49, 0x44, 0x33)) return 'audio/mpeg';
+  if (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0) return 'audio/mpeg';
+  if (starts(0x52, 0x49, 0x46, 0x46)) return 'audio/wav';
+  if (starts(0x4f, 0x67, 0x67, 0x53)) return 'audio/ogg';
+  if (starts(0x66, 0x4c, 0x61, 0x43)) return 'audio/flac';
+  return undefined;
+}
+
 export function createOpenRouterProvider(options: OpenRouterOptions): GenerationProvider {
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 
@@ -215,7 +230,12 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
     call: CallOptions,
     authenticated: boolean,
     binary = false,
-  ): Promise<{ json: unknown; bytes: Uint8Array | null; contentType: string | null }> {
+  ): Promise<{
+    json: unknown;
+    text: string;
+    bytes: Uint8Array | null;
+    contentType: string | null;
+  }> {
     const headers: Record<string, string> = { Accept: binary ? '*/*' : 'application/json' };
     if (authenticated) {
       headers['Authorization'] = `Bearer ${await options.apiKey()}`;
@@ -265,11 +285,75 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         { status: response.status },
       );
     }
-    return { json, bytes, contentType: response.contentType };
+    return { json, text, bytes, contentType: response.contentType };
   }
 
   const sendJson = async (...args: Parameters<typeof send>): Promise<unknown> =>
     (await send(...args)).json;
+
+  /** Speech models answer with the audio itself. */
+  async function speak(body: unknown, call: CallOptions, what: string) {
+    const { bytes, contentType } = await send('/audio/speech', 'POST', body, call, true, true);
+    const mediaType = contentType?.split(';')[0]?.trim() ?? '';
+    if (bytes === null || bytes.length === 0 || !mediaType.startsWith('audio/')) {
+      throw new ProviderError(
+        'invalid_response',
+        OPENROUTER_ID,
+        `OpenRouter returned ${what} without readable audio.`,
+      );
+    }
+    return { bytes, mediaType };
+  }
+
+  /**
+   * Music models are chat models whose audio comes only as a stream of events.
+   * The stream is read whole: a piece arrives in one event at the end anyway.
+   */
+  async function compose(request: SoundRequest, call: CallOptions): Promise<SoundResponse> {
+    const body = {
+      model: request.model,
+      messages: [{ role: 'user', content: request.prompt }],
+      modalities: ['text', 'audio'],
+      stream: true,
+      usage: { include: true },
+    };
+    const { text } = await send('/chat/completions', 'POST', body, call, true);
+    let encoded = '';
+    let costUsd: number | null = null;
+    for (const line of text.split('\n')) {
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '' || data === '[DONE]') continue;
+      let json: unknown;
+      try {
+        json = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      const failure = ErrorResponse.safeParse(json);
+      if (failure.success) {
+        throw new ProviderError(
+          'unavailable',
+          OPENROUTER_ID,
+          `OpenRouter reported an error: ${failure.data.error.message}`,
+        );
+      }
+      const chunk = AudioStreamChunk.safeParse(json);
+      if (!chunk.success) continue;
+      encoded += chunk.data.choices?.[0]?.delta?.audio?.data ?? '';
+      costUsd = chunk.data.usage?.cost ?? costUsd;
+    }
+    const bytes = decodeBase64(encoded);
+    const mediaType = bytes === undefined ? undefined : audioTypeOf(bytes);
+    if (bytes === undefined || mediaType === undefined) {
+      throw new ProviderError(
+        'invalid_response',
+        OPENROUTER_ID,
+        'OpenRouter returned music without readable audio.',
+      );
+    }
+    return { model: request.model, audio: { bytes, mediaType }, costUsd };
+  }
 
   function toVideoJob(json: unknown): VideoJob {
     const job = parse(VideoJobResponse, json, 'a video job');
@@ -402,17 +486,20 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         response_format: 'mp3',
         ...(request.instructions === undefined ? {} : { instructions: request.instructions }),
       };
-      const { bytes, contentType } = await send('/audio/speech', 'POST', body, call, true, true);
-      const mediaType = contentType?.split(';')[0]?.trim() ?? '';
-      if (bytes === null || bytes.length === 0 || !mediaType.startsWith('audio/')) {
-        throw new ProviderError(
-          'invalid_response',
-          OPENROUTER_ID,
-          'OpenRouter returned speech without readable audio.',
-        );
-      }
       // The price of speech is not part of the answer.
-      return { model: request.model, audio: { bytes, mediaType }, costUsd: null };
+      return { model: request.model, audio: await speak(body, call, 'speech'), costUsd: null };
+    },
+
+    async generateSound(request: SoundRequest, call = {}): Promise<SoundResponse> {
+      if (request.kind === 'music') return compose(request, call);
+      const prompt = request.prompt.trim();
+      const body = {
+        model: request.model,
+        // A speech model reads its text aloud unless the text opens like this.
+        input: /^the sounds? of\b/i.test(prompt) ? prompt : `The sound of ${prompt}`,
+        response_format: 'mp3',
+      };
+      return { model: request.model, audio: await speak(body, call, 'a sound'), costUsd: null };
     },
 
     async startVideo(request: VideoRequest, call = {}): Promise<VideoJob> {

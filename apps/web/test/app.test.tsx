@@ -31,6 +31,7 @@ function start(replies: readonly ScriptedChatReply[] = []) {
       model('vendor/painter', { outputModalities: ['image'] }),
       model('vendor/speaker', { outputModalities: ['speech'] }),
       model('vendor/clips', { outputModalities: ['video'] }),
+      model('vendor/composer', { outputModalities: ['text', 'audio'] }),
       model('vendor/no-tools', { supportsTools: false }),
     ],
   });
@@ -485,6 +486,66 @@ describe('App', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('gives a scene sound effects and music', async () => {
+    const { imp, provider, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+
+    await user.click(screen.getByRole('button', { name: 'Sound' }));
+    expect(await screen.findByText(/there are no scenes yet/)).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    await user.click(await screen.findByRole('button', { name: /Add scene/ }));
+    await screen.findByLabelText('Scene heading');
+    await user.click(screen.getByRole('button', { name: 'Sound' }));
+    expect(await screen.findByText(/This scene is silent so far/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /Add sound effect/ }));
+    const effect = await screen.findByRole('article', { name: 'Sound effect' });
+    const generate = within(effect).getByRole('button', { name: /Generate/ });
+    expect(generate).toHaveProperty('disabled', true);
+    await user.selectOptions(await screen.findByLabelText('Sound effects model'), 'vendor/speaker');
+    await user.type(within(effect).getByLabelText('What is heard'), 'A gale at sea.');
+    await user.tab();
+    await vi.waitFor(() => {
+      expect(generate).toHaveProperty('disabled', false);
+    });
+    await user.type(within(effect).getByLabelText('Name'), 'Wind');
+    await user.tab();
+    const wind = await screen.findByRole('article', { name: 'Wind' });
+    await user.click(within(wind).getByRole('button', { name: /Generate/ }));
+    expect(await within(wind).findByLabelText('Recording of Wind')).toBeTruthy();
+    expect(within(wind).getByRole('button', { name: /Generate again/ })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /Add music/ }));
+    const music = await screen.findByRole('article', { name: 'Music' });
+    await user.selectOptions(await screen.findByLabelText('Music model'), 'vendor/composer');
+    await user.type(within(music).getByLabelText('What is heard'), 'Low strings.');
+    await user.tab();
+    await vi.waitFor(() => {
+      expect(within(music).getByRole('button', { name: /Generate/ })).toHaveProperty(
+        'disabled',
+        false,
+      );
+    });
+    await user.click(within(music).getByRole('button', { name: /Generate/ }));
+    expect(await within(music).findByText(/vendor\/composer · \$0\.04/)).toBeTruthy();
+    expect(provider.soundRequests).toEqual([
+      { model: 'vendor/speaker', kind: 'effect', prompt: 'A gale at sea.' },
+      { model: 'vendor/composer', kind: 'music', prompt: 'Low strings.\nInstrumental, no vocals.' },
+    ]);
+    expect(screen.getByText('2 sounds in this scene')).toBeTruthy();
+
+    for (const card of [wind, music]) {
+      await user.click(within(card).getByRole('button', { name: /Delete sound/ }));
+      await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    }
+    expect(await screen.findByText(/This scene is silent so far/)).toBeTruthy();
+    expect(await imp.blobs.list('')).toEqual([]);
   });
 
   it('switches web search on for a crew member', async () => {

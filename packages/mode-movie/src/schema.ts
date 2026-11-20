@@ -65,6 +65,39 @@ export const Character = z.object({
 });
 export type Character = z.infer<typeof Character>;
 
+/** What was made of a sound: the file, and what it was made with. */
+export const SoundTake = z.object({
+  blobKey: z.string(),
+  mediaType: z.string(),
+  /** The prompt and model it was made with, so it can be made again or varied. */
+  prompt: z.string(),
+  model: z.string(),
+  costUsd: z.number().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type SoundTake = z.infer<typeof SoundTake>;
+
+/** A sound effect or a piece of music that belongs to a scene. */
+export const Sound = z.object({
+  id: z.string(),
+  sceneId: z.string(),
+  kind: z
+    .enum(['effect', 'music'])
+    .describe(
+      '"effect" for a noise or an ambience, "music" for score. It cannot be changed later.',
+    ),
+  name: z.string().max(80).describe('A short label, for example "Storm wind" or "Mara\'s theme".'),
+  description: z
+    .string()
+    .max(1000)
+    .describe(
+      'What is heard. For an effect: the source, its character, how it starts and ends, for example "a heavy wooden door slamming shut in a stone hall, long echo". For music: instruments, tempo, mood and how it develops.',
+    ),
+  take: SoundTake.nullable().default(null),
+  createdAt: z.iso.datetime(),
+});
+export type Sound = z.infer<typeof Sound>;
+
 /** A generated clip of a shot. Clips take minutes, so one starts as a job and becomes a file. */
 export const Clip = z.object({
   status: z.enum(['pending', 'ready', 'failed']),

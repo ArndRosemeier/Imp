@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { encodeBase64 } from '../src/base64.js';
 import { createOpenRouterProvider, ProviderError, type ProviderErrorKind } from '../src/index.js';
 import { createScriptedFetch } from '../src/testing.js';
 
@@ -533,6 +534,107 @@ describe('OpenRouter provider: images', () => {
       kind: 'insufficient_credit',
       message: 'OpenRouter refused the request: No credit',
     });
+  });
+
+  it('makes an effect with a speech model, opened so that it is not read aloud', async () => {
+    const audio = new Uint8Array([73, 68, 51, 1]);
+    const reply = { status: 200, bytes: audio, contentType: 'audio/mpeg' };
+    const { provider, calls } = setup(reply, reply);
+    expect(
+      await provider.generateSound({ model: 'v/speaker', kind: 'effect', prompt: ' a door ' }),
+    ).toEqual({
+      model: 'v/speaker',
+      audio: { bytes: audio, mediaType: 'audio/mpeg' },
+      costUsd: null,
+    });
+    await provider.generateSound({
+      model: 'v/speaker',
+      kind: 'effect',
+      prompt: 'The sounds of rain',
+    });
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/audio/speech');
+    expect(calls.map((call) => JSON.parse(call.request.body ?? '') as unknown)).toEqual([
+      { model: 'v/speaker', input: 'The sound of a door', response_format: 'mp3' },
+      { model: 'v/speaker', input: 'The sounds of rain', response_format: 'mp3' },
+    ]);
+  });
+
+  it('collects music from the stream of a chat model', async () => {
+    const event = (value: unknown) => `data: ${JSON.stringify(value)}`;
+    const stream = [
+      ': OPENROUTER PROCESSING',
+      event({ choices: [{ delta: { content: '<instrumental>' } }] }),
+      'data: not json',
+      event({ choices: [{ delta: { audio: { data: 'SUQz' } } }] }),
+      event({ choices: [{ delta: { audio: { data: 'AQID' } } }] }),
+      event({ choices: [{ delta: {} }], usage: { cost: 0.04 } }),
+      'data: [DONE]',
+    ].join('\n');
+    const { provider, calls } = setup({
+      status: 200,
+      body: stream,
+      contentType: 'text/event-stream',
+    });
+    expect(
+      await provider.generateSound({ model: 'v/composer', kind: 'music', prompt: 'Low strings' }),
+    ).toEqual({
+      model: 'v/composer',
+      audio: { bytes: new Uint8Array([73, 68, 51, 1, 2, 3]), mediaType: 'audio/mpeg' },
+      costUsd: 0.04,
+    });
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/chat/completions');
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
+      model: 'v/composer',
+      messages: [{ role: 'user', content: 'Low strings' }],
+      modalities: ['text', 'audio'],
+      stream: true,
+      usage: { include: true },
+    });
+  });
+
+  it('tells apart the audio formats music can come in', async () => {
+    const formats: [number[], string][] = [
+      [[0xff, 0xfb, 0x90], 'audio/mpeg'],
+      [[0x52, 0x49, 0x46, 0x46], 'audio/wav'],
+      [[0x4f, 0x67, 0x67, 0x53], 'audio/ogg'],
+      [[0x66, 0x4c, 0x61, 0x43], 'audio/flac'],
+    ];
+    for (const [start, mediaType] of formats) {
+      const data = encodeBase64(new Uint8Array(start));
+      const { provider } = setup({
+        status: 200,
+        body: `data: ${JSON.stringify({ choices: [{ delta: { audio: { data } } }] })}`,
+      });
+      const made = await provider.generateSound({ model: 'm', kind: 'music', prompt: 'x' });
+      expect(made.audio.mediaType).toBe(mediaType);
+      expect(made.costUsd).toBeNull();
+    }
+  });
+
+  it('refuses music without audio, and passes on an error inside the stream', async () => {
+    const music = { model: 'm', kind: 'music', prompt: 'x' } as const;
+    for (const body of [
+      '',
+      `data: ${JSON.stringify({ choices: [{ delta: { audio: { data: 'AAAA' } } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { audio: { data: '!' } } }] })}`,
+    ]) {
+      const { provider } = setup({ status: 200, body });
+      expect(await kindOf(provider.generateSound(music))).toBe('invalid_response');
+    }
+    const { provider } = setup({
+      status: 200,
+      body: `data: ${JSON.stringify({ error: { message: 'Upstream failed' } })}`,
+    });
+    await expect(provider.generateSound(music)).rejects.toMatchObject({
+      kind: 'unavailable',
+      message: 'OpenRouter reported an error: Upstream failed',
+    });
+    const refused = setup({ status: 400, body: { error: { message: 'No such model' } } });
+    expect(await kindOf(refused.provider.generateSound(music))).toBe('bad_request');
+    const silent = setup({ status: 200, bytes: new Uint8Array(), contentType: 'audio/mpeg' });
+    expect(
+      await kindOf(silent.provider.generateSound({ model: 'm', kind: 'effect', prompt: 'x' })),
+    ).toBe('invalid_response');
   });
 
   it('starts a clip with its guides, looks at it again and downloads it', async () => {

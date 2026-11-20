@@ -6,6 +6,7 @@ import type {
   GenerationProvider,
   ImageRequest,
   ModelInfo,
+  SoundRequest,
   SpeechRequest,
   VideoJob,
   VideoRequest,
@@ -67,6 +68,8 @@ export function createFakeProvider(script: {
   readonly imageError?: ProviderError;
   /** When set, `generateSpeech` rejects with it. */
   readonly speechError?: ProviderError;
+  /** When set, `generateSound` rejects with it. */
+  readonly soundError?: ProviderError;
   /** When set, `startVideo` rejects with it. */
   readonly videoError?: ProviderError;
   /** When true, `startVideo` refuses requests that carry guiding images, as many models do. */
@@ -79,6 +82,7 @@ export function createFakeProvider(script: {
   readonly requests: ChatRequest[];
   readonly imageRequests: ImageRequest[];
   readonly speechRequests: SpeechRequest[];
+  readonly soundRequests: SoundRequest[];
   readonly videoRequests: VideoRequest[];
   /** Adds replies to the end of the script, for ones that depend on what happened first. */
   script(...replies: ScriptedChatReply[]): void;
@@ -88,6 +92,7 @@ export function createFakeProvider(script: {
   const imageRequests: ImageRequest[] = [];
   const speechRequests: SpeechRequest[] = [];
   const videoRequests: VideoRequest[] = [];
+  const soundRequests: SoundRequest[] = [];
   const checks = new Map<string, number>();
   const job = (id: string, status: VideoJob['status']): VideoJob => ({
     id,
@@ -101,7 +106,19 @@ export function createFakeProvider(script: {
     requests,
     imageRequests,
     speechRequests,
+    soundRequests,
     videoRequests,
+    generateSound: (request) => {
+      soundRequests.push(request);
+      if (script.soundError !== undefined) {
+        return Promise.reject(script.soundError);
+      }
+      return Promise.resolve({
+        model: request.model,
+        audio: { bytes: new Uint8Array([soundRequests.length]), mediaType: 'audio/mpeg' },
+        costUsd: request.kind === 'music' ? 0.04 : null,
+      });
+    },
     startVideo: (request) => {
       videoRequests.push(request);
       if (script.videoError !== undefined) {
