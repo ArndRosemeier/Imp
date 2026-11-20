@@ -15,6 +15,7 @@
     "@fontsource/instrument-serif": "^5.3.0",
     "@imp/agents": "workspace:*",
     "@imp/core": "workspace:*",
+    "@imp/mode-movie": "workspace:*",
     "@imp/providers": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "react": "^19.3.1",

@@ -14,3 +14,4 @@ export {
   type AgentRunStatus,
   type PendingApproval,
 } from './run.js';
+export { defineMode, type Mode, type Stage } from './mode.js';

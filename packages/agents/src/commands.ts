@@ -115,6 +115,10 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         .array(ChatMessageSchema)
         .default([])
         .describe('The messages of an earlier run with this agent, to continue it.'),
+      context: z
+        .string()
+        .optional()
+        .describe('Facts the agent should know for this run, such as the current project id.'),
       maxSteps: z.number().int().positive().max(50).default(20),
     }),
     output: AgentRunSchema,
@@ -128,6 +132,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         task: input.task,
         history: toChatMessages(input.history),
         maxSteps: input.maxSteps,
+        ...(input.context === undefined ? {} : { context: input.context }),
       });
       return AgentRunSchema.parse(JSON.parse(JSON.stringify(result)));
     },

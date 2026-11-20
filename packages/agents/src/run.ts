@@ -51,6 +51,8 @@ export interface AgentRunOptions {
   readonly role: Role;
   /** What the agent is asked to do in this run. */
   readonly task: string;
+  /** Facts for this run, such as the current project, added to the agent's instructions. */
+  readonly context?: string;
   /** Earlier messages to continue from, without the system message. */
   readonly history?: readonly ChatMessage[];
   /** The most model calls this run may make. */
@@ -60,10 +62,11 @@ export interface AgentRunOptions {
 
 const DEFAULT_MAX_STEPS = 20;
 
-function systemPrompt(member: CrewMember, role: Role): string {
+function systemPrompt(member: CrewMember, role: Role, context: string | undefined): string {
   return [
     `You are ${member.name}, working as ${role.name} in Imp, a content creation toolbox.`,
     role.brief,
+    ...(context === undefined ? [] : [`Context for this run:\n${context}`]),
     'You act only by calling the tools you are given. Read the current state before changing it.',
     'If a tool reports that it needs approval, do not call it again; finish and say what is waiting.',
     'When the task is done, reply with a short summary of what you did.',
@@ -140,7 +143,10 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       response = await provider.chat(
         {
           model: member.model,
-          messages: [{ role: 'system', content: systemPrompt(member, role) }, ...messages],
+          messages: [
+            { role: 'system', content: systemPrompt(member, role, options.context) },
+            ...messages,
+          ],
           tools,
         },
         options.signal === undefined ? {} : { signal: options.signal },

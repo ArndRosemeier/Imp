@@ -11,7 +11,9 @@ the same typed command layer. See [docs/architecture.md](docs/architecture.md).
 
 Early, and usable in the browser: after connecting an OpenRouter key and
 choosing a coordinator model, you can talk to the coordinator, which acts
-through the same commands as the UI. The movie mode does not exist yet.
+through the same commands as the UI. The movie mode covers development, script
+and casting as text: you can hire a Screenwriter and a Casting Director, or
+write everything yourself. Images, voices, storyboard and shots come next.
 
 The current `main` is published at <https://arndrosemeier.github.io/Imp/>.
 
