@@ -66,6 +66,7 @@ describe('the movie mode', () => {
       'casting',
       'shots',
       'sound',
+      'edit',
     ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
@@ -819,6 +820,225 @@ describe('shots and clips', () => {
       /cannot be used for clips/,
     );
     expect(provider.videoRequests).toHaveLength(0);
+  });
+
+  const withCuts = async () => {
+    const context = await withScene();
+    const { run, at, add } = context;
+    const ready = async (fields: Record<string, unknown>) => {
+      const shot = await add(fields);
+      await run('movie.shot.clip.generate', { ...at(shot.id), durationSeconds: 4 });
+      await run('movie.shot.clip.check', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+      return shot;
+    };
+    interface CutView {
+      totalSeconds: number;
+      canUndo: boolean;
+      canRedo: boolean;
+      items: {
+        itemId: string;
+        state: string;
+        startsAtSeconds: number;
+        durationSeconds: number;
+        label: string;
+        clipAudioVolume: number;
+      }[];
+      unplaced: { shotId: string }[];
+      sounds: { id: string; name: string; kind: string; recorded: boolean; source: string }[];
+    }
+    const cutOf = async () =>
+      (await run('movie.edit.get', { sceneId: context.scene.id })) as unknown as CutView;
+    const edit = (command: string, fields: Record<string, unknown>) =>
+      run(`movie.edit.${command}`, { sceneId: context.scene.id, ...fields });
+    return { ...context, ready, cutOf, edit };
+  };
+
+  it('lays out a scene on a timeline and says what is missing', async () => {
+    const { run, add, ready, cutOf, edit, scene, mara } = await withCuts();
+    const a = await ready({ description: 'The lamp turns.' });
+    const b = await ready({ description: 'Mara at the stairs.' });
+    const c = await add({ description: 'Nothing yet.' });
+    await add({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hello.' });
+
+    const first = await cutOf();
+    expect(first.totalSeconds).toBe(8);
+    expect(first.canUndo).toBe(false);
+    expect(first.items.map((i) => [i.state, i.startsAtSeconds, i.durationSeconds])).toEqual([
+      ['ready', 0, 4],
+      ['ready', 4, 4],
+      ['no_clip', 8, 0],
+      ['no_clip', 8, 0],
+    ]);
+
+    await edit('item.set', { itemId: a.id, trimEndSeconds: 1.5 });
+    await edit('item.set', { itemId: b.id, trimStartSeconds: 0.5 });
+    const trimmed = await cutOf();
+    expect(trimmed.totalSeconds).toBe(6);
+    expect(trimmed.items[1]).toMatchObject({ startsAtSeconds: 2.5, durationSeconds: 3.5 });
+    await expect(edit('item.set', { itemId: 'nope', trimEndSeconds: 1 })).rejects.toThrow(
+      /No item/,
+    );
+
+    const overview = (await run('movie.edit.film', {})) as unknown as {
+      totalSeconds: number;
+      items: number;
+      readyItems: number;
+      scenes: { missing: { itemId: string; state: string }[] }[];
+    };
+    expect(overview).toMatchObject({ totalSeconds: 6, items: 4, readyItems: 2 });
+    expect(overview.scenes[0]?.missing[0]).toMatchObject({ itemId: c.id, state: 'no_clip' });
+    expect(scene.id).toBeDefined();
+  });
+
+  it('moves, splits, copies and removes pieces, and undoes and redoes them', async () => {
+    const { ready, cutOf, edit } = await withCuts();
+    const a = await ready({ description: 'A' });
+    const b = await ready({ description: 'B' });
+    const labels = async () => (await cutOf()).items.map((i) => i.label).join('');
+
+    await edit('item.move', { itemId: b.id, toIndex: 0 });
+    expect(await labels()).toBe('BA');
+
+    const split = (await edit('item.split', { itemId: a.id, atSeconds: 1.5 })) as unknown as {
+      first: { trimEndSeconds: number };
+      second: { id: string; trimStartSeconds: number };
+    };
+    expect(split.first.trimEndSeconds).toBe(2.5);
+    expect(split.second.trimStartSeconds).toBe(1.5);
+    expect(await labels()).toBe('BAA');
+    expect((await cutOf()).totalSeconds).toBe(8);
+    await expect(edit('item.split', { itemId: a.id, atSeconds: 1.45 })).rejects.toThrow(
+      /Split between/,
+    );
+
+    await edit('item.move', { itemId: split.second.id, toIndex: 0 });
+    expect((await cutOf()).items.map((i) => i.durationSeconds)).toEqual([2.5, 4, 1.5]);
+
+    const copy = (await edit('item.duplicate', { itemId: b.id })) as unknown as {
+      item: { id: string };
+    };
+    expect(await labels()).toBe('ABBA');
+    await edit('item.remove', { itemId: copy.item.id });
+    await edit('item.remove', { itemId: b.id });
+    const afterRemoval = await cutOf();
+    expect(afterRemoval.items).toHaveLength(2);
+    expect(afterRemoval.unplaced).toEqual([expect.objectContaining({ shotId: b.id })]);
+
+    await edit('item.add', { shotId: b.id, toIndex: 1 });
+    expect(await labels()).toBe('ABA');
+    await edit('title.add', { text: 'The Keeper', seconds: 2, toIndex: 0 });
+    const titled = await cutOf();
+    expect(titled.items[0]).toMatchObject({
+      label: 'The Keeper',
+      durationSeconds: 2,
+      state: 'ready',
+    });
+    await expect(
+      edit('item.split', { itemId: titled.items[0]?.itemId, atSeconds: 1 }),
+    ).rejects.toThrow(/title card/);
+
+    // Undo walks back every change; redo walks forward again.
+    const total = titled.totalSeconds;
+    expect((await edit('undo', {}))['done']).toBe(true);
+    expect(await labels()).toBe('ABA');
+    expect((await edit('redo', {}))['done']).toBe(true);
+    expect((await cutOf()).totalSeconds).toBe(total);
+    let steps = 0;
+    while (((await edit('undo', {}))['done'] as boolean) && steps < 60) steps++;
+    expect(steps).toBe(8);
+    expect(await labels()).toBe('AB');
+    expect((await cutOf()).canUndo).toBe(false);
+    // A new change drops what could have been redone.
+    await edit('item.move', { itemId: a.id, toIndex: 1 });
+    expect((await cutOf()).canRedo).toBe(false);
+  });
+
+  it('puts a copy into the cut of another scene', async () => {
+    const { run, ready, edit, scene } = await withCuts();
+    const a = await ready({ description: 'A' });
+    const other = await run('movie.scene.create', { heading: 'INT. STAIRS - DAY' });
+    await edit('item.duplicate', { itemId: a.id, toSceneId: other.id });
+    const there = (await run('movie.edit.get', { sceneId: other.id })) as unknown as {
+      items: { sceneId: string; shotId: string; state: string; durationSeconds: number }[];
+    };
+    expect(there.items).toEqual([
+      expect.objectContaining({
+        sceneId: scene.id,
+        shotId: a.id,
+        state: 'ready',
+        durationSeconds: 4,
+      }),
+    ]);
+  });
+
+  it('places sounds, takes the sound of a clip apart, and drops it all with the scene', async () => {
+    const { run, runtime, scene, at, add, mara, cutOf, edit } = await withCuts();
+    const wind = await run('movie.sound.create', {
+      sceneId: scene.id,
+      kind: 'effect',
+      name: 'Wind',
+      description: 'Wind.',
+    });
+    const placed = await edit('sound.place', { soundId: wind.id, volume: 0.4, loop: true });
+    expect(placed).toMatchObject({ source: 'sound', soundId: wind.id, volume: 0.4, loop: true });
+    expect(
+      await edit('sound.update', { placementId: placed.id, startSeconds: 2, fadeInSeconds: 1 }),
+    ).toMatchObject({ startSeconds: 2, fadeInSeconds: 1, volume: 0.4 });
+    expect((await cutOf()).sounds).toEqual([
+      expect.objectContaining({ id: placed.id, name: 'Wind', kind: 'effect', recorded: false }),
+    ]);
+    await expect(edit('sound.place', { soundId: 'nope' })).rejects.toThrow(/No sound/);
+
+    // A clip made with its own voice has a sound that can be taken apart.
+    const talker = await add({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hello.' });
+    await run('movie.shot.clip.generate', { ...at(talker.id), durationSeconds: 4 });
+    await run('movie.shot.clip.check', at(talker.id));
+    await run('movie.shot.clip.check', at(talker.id));
+    const detached = await edit('audio.detach', { itemId: talker.id });
+    expect(detached).toMatchObject({
+      source: 'clip',
+      shotId: talker.id,
+      startSeconds: 0,
+      trimStartSeconds: 0,
+    });
+    const view = await cutOf();
+    expect(view.items[0]).toMatchObject({ clipAudioVolume: 0 });
+    expect(view.sounds.find((s) => s.source === 'clip')).toMatchObject({
+      name: 'Clip sound of shot 1',
+      kind: 'clip',
+      recorded: true,
+    });
+    await edit('undo', {});
+    expect((await cutOf()).items[0]).toMatchObject({ clipAudioVolume: 1 });
+
+    // Without a sound of its own, or without a clip, there is nothing to take apart.
+    const quiet = await add({ description: 'Silent lamp.' });
+    await run('movie.shot.clip.generate', { ...at(quiet.id), audio: false });
+    await run('movie.shot.clip.check', at(quiet.id));
+    await run('movie.shot.clip.check', at(quiet.id));
+    await expect(edit('audio.detach', { itemId: quiet.id })).rejects.toThrow(/no sound of its own/);
+
+    // Dialogue can be laid anywhere once it is recorded.
+    await expect(edit('sound.place', { source: 'dialogue', shotId: talker.id })).rejects.toThrow(
+      /no recorded dialogue/,
+    );
+
+    await run('movie.sound.delete', { sceneId: scene.id, soundId: wind.id });
+    expect((await cutOf()).sounds.some((s) => s.source === 'sound')).toBe(false);
+    const two = await edit('sound.place', { source: 'clip', shotId: talker.id });
+    expect(await edit('sound.remove', { placementId: two.id })).toEqual({
+      placementId: two.id,
+      removed: true,
+    });
+    expect(await edit('sound.remove', { placementId: two.id })).toEqual({
+      placementId: two.id,
+      removed: false,
+    });
+    await run('movie.scene.delete', { sceneId: scene.id });
+    expect(
+      (await runtime.store.list('projects/')).filter((entry) => entry.key.includes('/edit')),
+    ).toEqual([]);
   });
 
   it('deletes clips with what they belong to', async () => {

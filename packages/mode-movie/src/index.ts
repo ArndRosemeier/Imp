@@ -18,6 +18,7 @@ export {
   castingDirector,
   clipDesigner,
   createMovieMode,
+  filmEditor,
   screenwriter,
   soundDesigner,
 } from './mode.js';
@@ -28,6 +29,10 @@ export {
   DialogueTake,
   Development,
   EMPTY_DEVELOPMENT,
+  CutHistory,
+  CutItem,
+  SceneCut,
+  SoundPlacement,
   MODE_ID,
   Scene,
   Shot,
@@ -35,6 +40,7 @@ export {
   SoundTake,
   VoiceSample,
 } from './schema.js';
+export { createEditCommands } from './edit.js';
 export { clipPrompt, createShotCommands, VIDEO_MODEL_SETTING } from './shots.js';
 export {
   createSoundCommands,

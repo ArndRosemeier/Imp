@@ -174,3 +174,74 @@ export const Shot = z.object({
   clip: Clip.nullable().default(null),
 });
 export type Shot = z.infer<typeof Shot>;
+
+/** A sound laid on the timeline of a scene. */
+export const SoundPlacement = z.object({
+  id: z.string(),
+  /**
+   * What plays: a sound of the scene, the own sound of a shot's clip (taken apart
+   * from its picture), or the recorded dialogue of a shot.
+   */
+  source: z.enum(['sound', 'clip', 'dialogue']).default('sound'),
+  soundId: z.string(),
+  /** Where the shot is, for the sources "clip" and "dialogue". */
+  sceneId: z.string().default(''),
+  shotId: z.string().default(''),
+  /** Seconds skipped at the start of the source. */
+  trimStartSeconds: z.number().min(0).default(0),
+  /** Seconds from the start of the scene. */
+  startSeconds: z.number().min(0),
+  /** 0 to 1. Music under dialogue is quieter than effects. */
+  volume: z.number().min(0).max(1),
+  fadeInSeconds: z.number().min(0),
+  fadeOutSeconds: z.number().min(0),
+  /** Repeats until the scene ends, for ambience and score that must outlast the shots. */
+  loop: z.boolean(),
+});
+export type SoundPlacement = z.infer<typeof SoundPlacement>;
+
+/**
+ * One piece of a scene's cut: a stretch of a shot's clip, or a title card. The
+ * same shot can be cut into several items (a split) or used twice (a paste),
+ * and an item can come from another scene.
+ */
+export const CutItem = z.object({
+  id: z.string(),
+  kind: z.enum(['shot', 'title']),
+  /** Where the shot is, for kind "shot". */
+  sceneId: z.string(),
+  shotId: z.string(),
+  /** Seconds taken off the start and the end of the clip. */
+  trimStartSeconds: z.number().min(0),
+  trimEndSeconds: z.number().min(0),
+  /** How loud the recorded dialogue plays, 0 to 1. */
+  dialogueVolume: z.number().min(0).max(1),
+  /** How loud the clip's own sound plays, 0 to 1. Zero once it was taken apart or when it is unwanted. */
+  clipAudioVolume: z.number().min(0).max(1).default(1),
+  /** Seconds to fade in from black and out to black at the edges of the item. */
+  fadeInSeconds: z.number().min(0),
+  fadeOutSeconds: z.number().min(0),
+  /** The words and the length of a title card, for kind "title". */
+  text: z.string(),
+  titleSeconds: z.number().min(0.5),
+});
+export type CutItem = z.infer<typeof CutItem>;
+
+/**
+ * The cut of a scene: its items in playing order and the sounds that lie under
+ * them. While items is null the cut is the scene's shots in order, whole;
+ * the first edit makes it explicit.
+ */
+export const SceneCut = z.object({
+  sceneId: z.string(),
+  items: z.array(CutItem).nullable().default(null),
+  sounds: z.array(SoundPlacement).default([]),
+});
+export type SceneCut = z.infer<typeof SceneCut>;
+
+/** The cuts a scene went through, for undo and redo. */
+export const CutHistory = z.object({
+  undo: z.array(SceneCut).default([]),
+  redo: z.array(SceneCut).default([]),
+});
+export type CutHistory = z.infer<typeof CutHistory>;

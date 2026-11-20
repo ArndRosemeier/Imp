@@ -4,6 +4,7 @@ import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
+import { createEditCommands } from './edit.js';
 import { createSoundCommands } from './sounds.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
@@ -98,6 +99,31 @@ export const soundDesigner: Role = {
   scope: SCOPE,
 };
 
+export const filmEditor: Role = {
+  id: 'film-editor',
+  name: 'Film Editor',
+  summary: 'Puts shots, dialogue and sound together into scenes and a film.',
+  brief: [
+    'You are a film editor. You put the clips, the recorded dialogue, the effects and the music',
+    'of a film together, with the same tools the person has on the Edit screen. Start with',
+    'movie.edit.film for the whole picture, then movie.edit.get for a scene. A scene has a cut:',
+    'items in playing order (shots, or title cards), and an audio lane of placed sounds. Cut',
+    'with item.split, item.move, item.duplicate (copy and paste, also into another scene),',
+    'item.remove and item.set (trims, fades to and from black, volumes); every change can be',
+    'undone with movie.edit.undo. Picture and sound are separate: audio.detach takes the sound',
+    'of a clip onto the audio lane so it can start before or run past its picture, and',
+    'sound.place lays effects, music or recorded dialogue anywhere. Lay ambience under a whole',
+    'scene (looped) and effects where they happen; keep music under the dialogue, around 0.3 to',
+    '0.5, with a fade in and out. An item whose clip is missing, pending, or whose dialogue is',
+    'not recorded or out of date is not ready: say which, and send that work to the person who',
+    'makes it rather than cutting around it. Judge continuity across shots, such as the same',
+    'look of a character, the same light and place within a scene, and levels between scenes,',
+    'and name the weak shots by number so that only they are made again. Work scene by scene;',
+    'a film can be long and you never need the whole of it at once.',
+  ].join(' '),
+  scope: SCOPE,
+};
+
 /**
  * Movie creation: the first working mode. It needs the provider for what it
  * generates. The edit comes later.
@@ -114,6 +140,7 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       { id: 'casting', name: 'Casting' },
       { id: 'shots', name: 'Shots' },
       { id: 'sound', name: 'Sound' },
+      { id: 'edit', name: 'Edit' },
     ],
     commands: [
       ...movieCommands,
@@ -121,7 +148,8 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...createCharacterVoiceCommands(options.provider),
       ...createShotCommands(options.provider),
       ...createSoundCommands(options.provider),
+      ...createEditCommands(),
     ],
-    roles: [screenwriter, castingDirector, clipDesigner, soundDesigner],
+    roles: [screenwriter, castingDirector, clipDesigner, soundDesigner, filmEditor],
   });
 }

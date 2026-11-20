@@ -63,6 +63,9 @@ beforeAll(() => {
   // jsdom implements neither scrolling nor the modal dialog methods.
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.setPointerCapture = () => undefined;
+  // Nor does it play media.
+  HTMLMediaElement.prototype.pause = () => undefined;
+  HTMLMediaElement.prototype.play = () => Promise.resolve();
   // jsdom has no object URLs either.
   let urls = 0;
   URL.createObjectURL = () => `blob:test/${String((urls += 1))}`;
@@ -498,6 +501,69 @@ describe('App', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('cuts a film: copy, paste, undo, title cards and an overview', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+
+    const actor = { kind: 'user', id: 'arnd' } as const;
+    const call = async (id: string, input: Record<string, unknown>) => {
+      const result = await imp.registry.executeById(id, input, { actor });
+      if (result.status !== 'ok') throw new Error(id);
+      return result.output as Record<string, string>;
+    };
+    const projects = (await call('project.list', {})) as unknown as { projects: { id: string }[] };
+    const projectId = projects.projects[0]?.id ?? '';
+    await call('settings.set', { key: 'video.model', value: 'vendor/clips' });
+    const scene = await call('movie.scene.create', {
+      projectId,
+      heading: 'INT. LAMP ROOM - NIGHT',
+    });
+    for (const description of ['The lamp turns.', 'Mara at the stairs.']) {
+      const shot = await call('movie.shot.create', {
+        projectId,
+        sceneId: scene['id'],
+        description,
+      });
+      const at = { projectId, sceneId: scene['id'], shotId: shot['id'] };
+      await call('movie.shot.clip.generate', { ...at, durationSeconds: 4 });
+      await call('movie.shot.clip.check', at);
+      await call('movie.shot.clip.check', at);
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByText(/2 of 2 pieces ready/)).toBeTruthy();
+    const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
+    expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
+    expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
+
+    await user.click(first);
+    expect(await screen.findByText(/Shot 1/, { selector: 'h3' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /^Copy/ }));
+    await user.click(screen.getByRole('button', { name: /^Paste/ }));
+    // The copy goes in right after the original.
+    expect(await screen.findByRole('button', { name: /Shot 2: The lamp turns/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Shot 3: Mara at the stairs/ })).toBeTruthy();
+    expect(screen.getAllByText(/0:12/).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: /Undo/ }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Shot 3: Mara/ })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: /Redo/ }));
+    expect(await screen.findByRole('button', { name: /Shot 3: Mara/ })).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /Add title/ }));
+    expect(await screen.findByRole('button', { name: /Title 2: Title/ })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Delete/ }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Title 2: Title/ })).toBeNull();
+    });
   });
 
   it('gives a scene sound effects and music', async () => {
