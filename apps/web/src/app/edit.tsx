@@ -35,6 +35,7 @@ import {
   type Source,
 } from './cut-player.js';
 import { ExportBar } from './ExportBar.js';
+import { usePinchZoom } from './gestures.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { SceneTabs } from './shots.js';
@@ -197,10 +198,20 @@ const MIN_BLOCK_PX = 18;
 
 type Selection = { kind: 'item'; id: string } | { kind: 'sound'; id: string } | null;
 
-/** Follows a pointer across the page while a button is held, and reports the distance in the end. */
-function useDrag(onEnd: (distance: number) => void) {
-  const [dragging, setDragging] = useState<{ id: string; edge: string; dx: number } | null>(null);
+/**
+ * Follows a pointer across the page while a button or finger is held, and
+ * reports the distance in the end. A finger must move further than a mouse
+ * before it counts as a drag rather than a tap.
+ */
+function useDrag() {
+  const [dragging, setDragging] = useState<{
+    id: string;
+    edge: string;
+    dx: number;
+    x: number;
+  } | null>(null);
   const origin = useRef(0);
+  const slop = useRef(2);
   return {
     dragging,
     start: (event: PointerEvent, id: string, edge: string) => {
@@ -208,11 +219,14 @@ function useDrag(onEnd: (distance: number) => void) {
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
       origin.current = event.clientX;
-      setDragging({ id, edge, dx: 0 });
+      slop.current = event.pointerType === 'touch' ? 8 : 2;
+      setDragging({ id, edge, dx: 0, x: event.clientX });
     },
     move: (event: PointerEvent) => {
       setDragging((before) =>
-        before === null ? null : { ...before, dx: event.clientX - origin.current },
+        before === null
+          ? null
+          : { ...before, dx: event.clientX - origin.current, x: event.clientX },
       );
     },
     end: (event: PointerEvent, done: (id: string, edge: string, distance: number) => void) => {
@@ -220,11 +234,18 @@ function useDrag(onEnd: (distance: number) => void) {
       event.currentTarget.releasePointerCapture(event.pointerId);
       const { id, edge, dx } = dragging;
       setDragging(null);
-      if (Math.abs(dx) >= 2) done(id, edge, dx);
-      else onEnd(0);
+      if (Math.abs(dx) >= slop.current) done(id, edge, dx);
+    },
+    /** The browser took the pointer, for example to scroll: nothing changes. */
+    cancel: () => {
+      setDragging(null);
     },
   };
 }
+
+/** A finger on a piece that is not selected scrolls the timeline; it must be selected to move. */
+const grabs = (event: PointerEvent, selected: boolean): boolean =>
+  event.pointerType !== 'touch' || selected;
 
 function Timeline({
   cut,
@@ -235,6 +256,7 @@ function Timeline({
   source,
   onSelect,
   onSeek,
+  onZoom,
   act,
   sceneId,
 }: {
@@ -246,12 +268,38 @@ function Timeline({
   source: Source;
   onSelect: (selection: Selection) => void;
   onSeek: (seconds: number) => void;
+  /** Zooms to a new scale, keeping the given second under the same point of the screen. */
+  onZoom: (scale: number) => void;
   act: Act;
   sceneId: string;
 }): ReactElement {
-  const edges = useDrag(() => undefined);
-  const audioDrag = useDrag(() => undefined);
-  const [over, setOver] = useState<string | null>(null);
+  const edges = useDrag();
+  const audioDrag = useDrag();
+  const moving = useDrag();
+  const scroller = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+  // The second under the fingers stays under them while pinching.
+  const pending = useRef<{ second: number; offset: number } | null>(null);
+  usePinchZoom(scroller, (factor, clientX) => {
+    const box = scroller.current?.getBoundingClientRect();
+    if (box === undefined || scroller.current === null) return;
+    const offset = clientX - box.left;
+    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    pending.current = { second: (scroller.current.scrollLeft + offset) / scale, offset };
+    onZoom(next);
+  });
+  useEffect(() => {
+    const anchor = pending.current;
+    if (anchor === null || scroller.current === null) return;
+    pending.current = null;
+    scroller.current.scrollLeft = anchor.second * scale - anchor.offset;
+  }, [scale]);
+  /** The second of the timeline under a point of the screen. */
+  const secondAt = (clientX: number): number => {
+    const box = inner.current?.getBoundingClientRect();
+    return box === undefined ? 0 : Math.max(0, (clientX - box.left) / scale);
+  };
   const audioLength = (placement: Placement): number => {
     if (placement.loop) return Math.max(cut.totalSeconds - placement.startSeconds, 1);
     const item = cut.items.find((candidate) => candidate.shotId === placement.shotId);
@@ -270,18 +318,41 @@ function Timeline({
   const ticks = Array.from({ length: Math.floor(widest + 2) + 1 }, (_, second) => second);
   const every = scale < 24 ? 10 : scale < 50 ? 5 : 1;
 
-  const seekFrom = (event: React.MouseEvent<HTMLDivElement>): void => {
-    const box = event.currentTarget.getBoundingClientRect();
-    onSeek(Math.max(0, (event.clientX - box.left) / scale));
-  };
+  // Where a picture piece being moved would land: before the piece under the pointer.
+  const movingId = moving.dragging?.id;
+  const target =
+    moving.dragging === null || Math.abs(moving.dragging.dx) < 2
+      ? undefined
+      : playing.find((candidate) => {
+          const second = secondAt(moving.dragging?.x ?? 0);
+          return (
+            candidate.itemId !== movingId &&
+            second >= candidate.startsAtSeconds &&
+            second < candidate.startsAtSeconds + candidate.durationSeconds
+          );
+        });
 
   return (
     <div className="timeline" role="group" aria-label="Timeline">
-      <div className="timeline-scroll">
-        <div className="timeline-inner" style={{ width }}>
+      <div className="timeline-scroll" ref={scroller}>
+        <div className="timeline-inner" style={{ width }} ref={inner}>
           <div
             className="timeline-ruler"
-            onClick={seekFrom}
+            data-scrubbing={scrubbing}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setScrubbing(true);
+              onSeek(secondAt(event.clientX));
+            }}
+            onPointerMove={(event) => {
+              if (scrubbing) onSeek(secondAt(event.clientX));
+            }}
+            onPointerUp={() => {
+              setScrubbing(false);
+            }}
+            onPointerCancel={() => {
+              setScrubbing(false);
+            }}
             role="slider"
             tabIndex={0}
             onKeyDown={(event) => {
@@ -308,7 +379,8 @@ function Timeline({
               const shift = drag === null ? 0 : drag.dx / scale;
               const startShift = drag?.edge === 'start' ? shift : 0;
               const endShift = drag?.edge === 'end' ? shift : 0;
-              const left = (item.startsAtSeconds + startShift) * scale;
+              const lift = moving.dragging?.id === item.itemId ? moving.dragging.dx : 0;
+              const left = (item.startsAtSeconds + startShift) * scale + lift;
               const blockWidth = Math.max(
                 MIN_BLOCK_PX,
                 (item.durationSeconds - startShift + endShift) * scale,
@@ -317,9 +389,8 @@ function Timeline({
               return (
                 <div
                   key={item.itemId}
-                  className={`block block-${item.kind}${selected ? ' selected' : ''}${over === item.itemId ? ' drop' : ''}`}
+                  className={`block block-${item.kind}${selected ? ' selected' : ''}${target?.itemId === item.itemId ? ' drop' : ''}${lift === 0 ? '' : ' lifted'}`}
                   style={{ left, width: blockWidth }}
-                  draggable
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
@@ -331,37 +402,34 @@ function Timeline({
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') onSelect({ kind: 'item', id: item.itemId });
                   }}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', item.itemId);
-                    event.dataTransfer.effectAllowed = 'move';
+                  onPointerDown={(event) => {
+                    if (grabs(event, selected)) moving.start(event, item.itemId, 'move');
                   }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setOver(item.itemId);
-                  }}
-                  onDragLeave={() => {
-                    setOver(null);
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setOver(null);
-                    const moving = event.dataTransfer.getData('text/plain');
-                    if (moving === '' || moving === item.itemId) return;
-                    void act('movie.edit.item.move', {
-                      sceneId,
-                      itemId: moving,
-                      toIndex: cut.items.findIndex((candidate) => candidate.itemId === item.itemId),
+                  onPointerMove={moving.move}
+                  onPointerUp={(event) => {
+                    const landing = target;
+                    moving.end(event, (id) => {
+                      if (landing === undefined) return;
+                      void act('movie.edit.item.move', {
+                        sceneId,
+                        itemId: id,
+                        toIndex: cut.items.findIndex(
+                          (candidate) => candidate.itemId === landing.itemId,
+                        ),
+                      });
                     });
                   }}
+                  onPointerCancel={moving.cancel}
                 >
                   {item.kind === 'shot' && (
                     <span
                       className="handle handle-start"
                       aria-label={`Trim the start of item ${String(item.index)}`}
                       onPointerDown={(event) => {
-                        edges.start(event, item.itemId, 'start');
+                        if (grabs(event, selected)) edges.start(event, item.itemId, 'start');
                       }}
                       onPointerMove={edges.move}
+                      onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
                         edges.end(event, (id, edge, distance) => {
                           void act('movie.edit.item.set', {
@@ -374,7 +442,6 @@ function Timeline({
                           });
                         });
                       }}
-                      draggable={false}
                     />
                   )}
                   <span className="block-label">
@@ -385,9 +452,10 @@ function Timeline({
                       className="handle handle-end"
                       aria-label={`Trim the end of item ${String(item.index)}`}
                       onPointerDown={(event) => {
-                        edges.start(event, item.itemId, 'end');
+                        if (grabs(event, selected)) edges.start(event, item.itemId, 'end');
                       }}
                       onPointerMove={edges.move}
+                      onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
                         edges.end(event, (id, _edge, distance) => {
                           void act('movie.edit.item.set', {
@@ -400,7 +468,6 @@ function Timeline({
                           });
                         });
                       }}
-                      draggable={false}
                     />
                   )}
                 </div>
@@ -436,10 +503,12 @@ function Timeline({
                     if (event.key === 'Enter') onSelect({ kind: 'sound', id: placement.id });
                   }}
                   onPointerDown={(event) => {
+                    if (!grabs(event, selected)) return;
                     audioDrag.start(event, placement.id, 'move');
                     onSelect({ kind: 'sound', id: placement.id });
                   }}
                   onPointerMove={audioDrag.move}
+                  onPointerCancel={audioDrag.cancel}
                   onPointerUp={(event) => {
                     audioDrag.end(event, (id, _edge, distance) => {
                       void act('movie.edit.sound.update', {
@@ -935,6 +1004,7 @@ function SceneEditor({
         source={source}
         onSelect={setSelection}
         onSeek={playback.seek}
+        onZoom={setScale}
         act={act}
         sceneId={sceneId}
       />

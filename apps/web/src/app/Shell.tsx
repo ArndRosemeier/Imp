@@ -4,6 +4,7 @@ import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
+  ChatsCircleIcon,
   FilmSlateIcon,
   GearSixIcon,
   MagnifyingGlassIcon,
@@ -18,6 +19,7 @@ import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { CrewPanel } from './CrewPanel.js';
+import { isCoarsePointer } from './gestures.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
@@ -48,6 +50,25 @@ function useTheme(): [string, () => void] {
   ];
 }
 
+/**
+ * Whether the crew panel is shown. Remembered in this browser; on a tablet
+ * narrower than 1200 pixels it starts closed, so the stage gets the room.
+ */
+function useCrewOpen(): [boolean, () => void] {
+  const [open, setOpen] = useState(() => {
+    const stored = localStorage.getItem('imp.crew.open');
+    if (stored !== null) return stored === 'true';
+    return !(isCoarsePointer() && window.innerWidth < 1200);
+  });
+  return [
+    open,
+    () => {
+      localStorage.setItem('imp.crew.open', String(!open));
+      setOpen(!open);
+    },
+  ];
+}
+
 function StageView({ stage, project }: { stage: string; project: Project }): ReactElement | null {
   if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
@@ -68,6 +89,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
+  const [crewOpen, toggleCrew] = useCrewOpen();
   const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
   const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
@@ -134,6 +156,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   return (
     <div
       className="shell"
+      data-crew={crewOpen ? 'open' : 'closed'}
       style={
         {
           '--nav-width': `${String(navWidth.value)}px`,
@@ -186,6 +209,16 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           <kbd>Ctrl K</kbd>
         </button>
         <button
+          className="button quiet crew-toggle"
+          aria-label="Crew panel"
+          aria-pressed={crewOpen}
+          aria-controls="crew-panel"
+          title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
+          onClick={toggleCrew}
+        >
+          <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
+        </button>
+        <button
           className="button quiet"
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           onClick={toggleTheme}
@@ -233,8 +266,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       </main>
       <ActivityStrip />
       <Resizer label="Resize the navigation" side="left" width={navWidth} />
-      <Resizer label="Resize the crew panel" side="right" width={crewWidth} />
-      <div className="crew">
+      {crewOpen && <Resizer label="Resize the crew panel" side="right" width={crewWidth} />}
+      <div className="crew" id="crew-panel">
         {crew.length > 1 && (
           <div className="field crew-switch">
             <label htmlFor="talking-to">Talking to</label>
