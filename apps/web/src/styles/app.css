@@ -2365,7 +2365,7 @@ dialog.modal::backdrop {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: calc(var(--control-height) - 8px);
+  min-height: calc(var(--hit) - 8px);
   padding: 0 18px;
   border: none;
   border-radius: var(--radius-pill);
@@ -2467,8 +2467,8 @@ dialog.modal::backdrop {
 .sheet-cell {
   display: grid;
   place-items: center;
-  width: 112px;
-  height: 63px;
+  width: max(112px, calc(var(--hit) * 16 / 9));
+  height: max(63px, var(--hit));
   padding: 0;
   border-radius: 6px;
   overflow: hidden;
