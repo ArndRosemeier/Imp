@@ -115,6 +115,18 @@ describe('scenes', () => {
 
     const edited = await run('movie.scene.update', { sceneId: a.id, body: 'Mara climbs.' });
     expect(edited).toMatchObject({ heading: 'A', body: 'Mara climbs.', position: 1 });
+    // The outline leaves the text out and says how long it is; the text is fetched per scene.
+    const outline = (await run('movie.scene.list', {})) as unknown as { scenes: object[] };
+    expect(outline.scenes[0]).toEqual({
+      id: a.id,
+      position: 1,
+      heading: 'A',
+      summary: '',
+      words: 2,
+    });
+    expect(await run('movie.scene.get', { sceneId: a.id })).toMatchObject({ body: 'Mara climbs.' });
+    const full = (await run('movie.scene.list', { full: true })) as unknown as { scenes: object[] };
+    expect(full.scenes[0]).toMatchObject({ body: 'Mara climbs.', words: 2 });
 
     const moved = await run('movie.scene.update', { sceneId: a.id, position: 3, heading: 'A2' });
     expect(moved).toMatchObject({ position: 3, body: 'Mara climbs.' });
@@ -145,7 +157,7 @@ describe('scenes', () => {
 
   it('refuses unknown scenes', async () => {
     const { registry, projectId } = await setup();
-    for (const id of ['movie.scene.update', 'movie.scene.delete']) {
+    for (const id of ['movie.scene.get', 'movie.scene.update', 'movie.scene.delete']) {
       await expect(
         registry.executeById(id, { projectId, sceneId: 'nope' }, { actor: user }),
       ).rejects.toMatchObject({ code: 'invalid_input' });
@@ -165,7 +177,16 @@ describe('characters', () => {
     expect(tomas).toMatchObject({ part: '', description: '', appearance: '', voice: '' });
 
     await run('movie.character.update', { characterId: mara.id, voice: 'Low and dry.' });
-    const listed = (await run('movie.character.list', {})) as unknown as {
+    expect(await run('movie.character.list', {})).toEqual({
+      characters: [
+        { id: mara.id, name: 'Mara', part: 'protagonist' },
+        { id: tomas.id, name: 'Tomas', part: '' },
+      ],
+    });
+    expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
+      voice: 'Low and dry.',
+    });
+    const listed = (await run('movie.character.list', { full: true })) as unknown as {
       characters: Record<string, string>[];
     };
     expect(listed.characters).toEqual([
@@ -183,7 +204,7 @@ describe('characters', () => {
     expect(await run('movie.character.delete', { characterId: tomas.id })).toEqual({
       characterId: tomas.id,
     });
-    for (const id of ['movie.character.update', 'movie.character.delete']) {
+    for (const id of ['movie.character.get', 'movie.character.update', 'movie.character.delete']) {
       await expect(
         registry.executeById(id, { projectId, characterId: tomas.id }, { actor: user }),
       ).rejects.toMatchObject({ code: 'invalid_input' });

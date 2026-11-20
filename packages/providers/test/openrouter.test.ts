@@ -199,11 +199,36 @@ describe('OpenRouter provider: chat', () => {
     });
   });
 
+  it('marks cache points and sends context ahead of what the user wrote', async () => {
+    const { provider, calls } = setup(completion({ content: 'ok' }));
+    await provider.chat({
+      model: 'vendor/model-a',
+      messages: [
+        { role: 'system', content: 'Rules.', cache: true },
+        { role: 'user', content: 'Write it.', context: 'Project p-1' },
+        { role: 'tool', toolCallId: 'c', content: '{}', cache: true },
+      ],
+    });
+    const mark = { cache_control: { type: 'ephemeral' } };
+    expect((JSON.parse(calls[0]?.request.body ?? '') as { messages: unknown }).messages).toEqual([
+      { role: 'system', content: [{ type: 'text', text: 'Rules.', ...mark }] },
+      { role: 'user', content: '<context>\nProject p-1\n</context>\n\nWrite it.' },
+      { role: 'tool', tool_call_id: 'c', content: [{ type: 'text', text: '{}', ...mark }] },
+    ]);
+  });
+
   it('returns text with usage and cost', async () => {
     const { provider } = setup(
       completion(
         { content: 'Hello.' },
-        { usage: { prompt_tokens: 12, completion_tokens: 3, cost: 0.00042 } },
+        {
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 3,
+            cost: 0.00042,
+            prompt_tokens_details: { cached_tokens: 8 },
+          },
+        },
       ),
     );
     expect(await provider.chat({ model: 'vendor/model-a', messages: [] })).toEqual({
@@ -211,7 +236,7 @@ describe('OpenRouter provider: chat', () => {
       content: 'Hello.',
       toolCalls: [],
       finishReason: 'stop',
-      usage: { promptTokens: 12, completionTokens: 3, costUsd: 0.00042 },
+      usage: { promptTokens: 12, cachedPromptTokens: 8, completionTokens: 3, costUsd: 0.00042 },
     });
   });
 
@@ -240,7 +265,12 @@ describe('OpenRouter provider: chat', () => {
     const response = await provider.chat({ model: 'vendor/requested', messages: [], tools: [] });
     expect(response.model).toBe('vendor/requested');
     expect(response.finishReason).toBe('tool_calls');
-    expect(response.usage).toEqual({ promptTokens: 0, completionTokens: 0, costUsd: null });
+    expect(response.usage).toEqual({
+      promptTokens: 0,
+      cachedPromptTokens: 0,
+      completionTokens: 0,
+      costUsd: null,
+    });
     expect(response.toolCalls).toEqual([
       {
         id: 'a',

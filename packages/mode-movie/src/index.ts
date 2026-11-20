@@ -1,6 +1,7 @@
 export {
   characterCreate,
   characterDelete,
+  characterGet,
   characterList,
   characterUpdate,
   developmentGet,
@@ -8,6 +9,7 @@ export {
   movieCommands,
   sceneCreate,
   sceneDelete,
+  sceneGet,
   sceneList,
   sceneUpdate,
 } from './commands.js';

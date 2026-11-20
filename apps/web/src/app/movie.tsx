@@ -148,7 +148,9 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
 
 export function ScriptView({ project }: { project: Project }): ReactElement {
   const listed = useLive([moviePrefix(project)], async (imp) =>
-    SceneList.parse(await runCommand(imp, 'movie.scene.list', { projectId: project.id })),
+    SceneList.parse(
+      await runCommand(imp, 'movie.scene.list', { projectId: project.id, full: true }),
+    ),
   );
   const { act, error } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -287,7 +289,9 @@ const CHARACTER_FIELDS: readonly {
 
 export function CastingView({ project }: { project: Project }): ReactElement {
   const listed = useLive([moviePrefix(project)], async (imp) =>
-    CharacterList.parse(await runCommand(imp, 'movie.character.list', { projectId: project.id })),
+    CharacterList.parse(
+      await runCommand(imp, 'movie.character.list', { projectId: project.id, full: true }),
+    ),
   );
   const { act, error } = useAct(project);
   const characters = listed.data?.characters ?? [];

@@ -238,7 +238,9 @@ describe('App', () => {
 
     const panel = screen.getByRole('complementary', { name: /Conversation with Screenwriter/ });
     expect(await within(panel).findByText('The opening scene is in.')).toBeTruthy();
-    expect(provider.requests[0]?.messages[0]?.content).toContain(`projectId "${projectId}"`);
+    expect(provider.requests[0]?.messages[1]).toMatchObject({
+      context: expect.stringContaining(`projectId "${projectId}"`) as string,
+    });
     await user.click(screen.getByRole('button', { name: 'Script' }));
     expect(await screen.findByRole('tab', { name: /1 · EXT\. HARBOUR - DUSK/ })).toBeTruthy();
   });

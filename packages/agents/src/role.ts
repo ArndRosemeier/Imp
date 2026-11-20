@@ -14,6 +14,13 @@ export interface Role {
   readonly brief: string;
   /** The commands this role may call. An agent cannot act outside it. */
   readonly scope: ToolScope;
+  /**
+   * Prefixes of the commands handed to the model as tools from the start.
+   * Everything else in scope stays reachable, but the agent looks it up when
+   * it needs it, so a wide scope does not cost context on every request.
+   * Left out, every command in scope is a tool.
+   */
+  readonly direct?: readonly string[];
 }
 
 const ROLE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -60,4 +67,5 @@ export const coordinatorRole: Role = {
     "user's. Be brief and concrete in what you say.",
   ].join(' '),
   scope: { effects: ['read', 'write'] },
+  direct: ['crew.', 'project.', 'settings.'],
 };

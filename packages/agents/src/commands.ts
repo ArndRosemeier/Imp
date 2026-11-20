@@ -21,7 +21,7 @@ const ToolCallSchema = z.object({
 /** The conversation of a run, in a form that can be stored and sent back to continue it. */
 export const ChatMessageSchema = z.discriminatedUnion('role', [
   z.object({ role: z.literal('system'), content: z.string() }),
-  z.object({ role: z.literal('user'), content: z.string() }),
+  z.object({ role: z.literal('user'), content: z.string(), context: z.string().optional() }),
   z.object({
     role: z.literal('assistant'),
     content: z.string().nullable(),
@@ -44,6 +44,11 @@ export const AgentRunSchema = z.object({
   finalText: z.string().nullable(),
   steps: z.number(),
   costUsd: z.number(),
+  usage: z.object({
+    promptTokens: z.number(),
+    cachedPromptTokens: z.number(),
+    completionTokens: z.number(),
+  }),
   pendingApprovals: z.array(PendingApprovalSchema),
   messages: z.array(ChatMessageSchema),
   error: z.string().nullable(),
@@ -52,6 +57,13 @@ export type AgentRun = z.infer<typeof AgentRunSchema>;
 
 function toChatMessages(messages: readonly z.infer<typeof ChatMessageSchema>[]): ChatMessage[] {
   return messages.map((message) => {
+    if (message.role === 'user') {
+      return {
+        role: 'user',
+        content: message.content,
+        ...(message.context === undefined ? {} : { context: message.context }),
+      };
+    }
     if (message.role !== 'assistant') {
       return message;
     }
