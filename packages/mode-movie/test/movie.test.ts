@@ -18,6 +18,7 @@ import {
   createMovieMode,
   screenwriter,
   Shot,
+  soundPrompt,
 } from '../src/index.js';
 
 const user = { kind: 'user', id: 'arnd' } as const;
@@ -64,6 +65,7 @@ describe('the movie mode', () => {
       'script',
       'casting',
       'shots',
+      'sound',
     ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
@@ -759,5 +761,171 @@ describe('shots and clips', () => {
       ).status,
     ).toBe('needs-approval');
     expect(scene.id).toBeTruthy();
+  });
+});
+
+describe('sounds', () => {
+  interface Made {
+    sound: { take: { blobKey: string; prompt: string; model: string; mediaType: string } };
+    costUsd: number | null;
+  }
+  const withScene = async (options: Parameters<typeof setup>[0] = {}) => {
+    const context = await setup(options);
+    const scene = await context.run('movie.scene.create', { heading: 'EXT. GALLERY - NIGHT' });
+    for (const [key, value] of [
+      ['sounds.model', 'vendor/noises'],
+      ['music.model', 'vendor/composer'],
+    ]) {
+      await context.registry.executeById('settings.set', { key, value }, { actor: user });
+    }
+    const at = (soundId: string) => ({ sceneId: scene.id, soundId });
+    const add = (fields: Record<string, unknown>) =>
+      context.run('movie.sound.create', { sceneId: scene.id, ...fields });
+    const takes = async () =>
+      (await context.runtime.blobs.list('')).filter((key) => key.includes('/take/')).length;
+    return { ...context, scene, at, add, takes };
+  };
+
+  it('keeps music instrumental unless a voice is asked for', () => {
+    expect(soundPrompt({ kind: 'effect', description: ' A door slams. ' })).toBe('A door slams.');
+    expect(soundPrompt({ kind: 'music', description: 'Low strings.' })).toBe(
+      'Low strings.\nInstrumental, no vocals.',
+    );
+    expect(soundPrompt({ kind: 'music', description: 'A choir, far off.' })).toBe(
+      'A choir, far off.',
+    );
+  });
+
+  it('adds, lists in the order added, changes and deletes', async () => {
+    const { run, scene, at, add } = await withScene();
+    const wind = await add({ kind: 'effect', name: 'Wind', description: 'A gale at sea.' });
+    const theme = await add({ kind: 'music', description: 'Low strings.' });
+    expect(theme).toMatchObject({ kind: 'music', name: '', take: null });
+    expect(await run('movie.sound.update', { ...at(theme.id), name: 'Storm theme' })).toMatchObject(
+      { name: 'Storm theme', description: 'Low strings.' },
+    );
+    expect(
+      await run('movie.sound.update', { ...at(wind.id), description: 'A howling gale.' }),
+    ).toMatchObject({ name: 'Wind', description: 'A howling gale.' });
+    const listed = (await run('movie.sound.list', {
+      sceneId: scene.id,
+    })) as unknown as {
+      sounds: { name: string }[];
+    };
+    expect(listed.sounds.map((sound) => sound.name)).toEqual(['Wind', 'Storm theme']);
+    expect(await run('movie.sound.delete', at(wind.id))).toEqual({ soundId: wind.id });
+    await expect(run('movie.sound.delete', at(wind.id))).rejects.toThrow(/No sound/);
+  });
+
+  it('makes effects and music with their own models, and replaces what was made', async () => {
+    const { run, runtime, provider, at, add, takes } = await withScene();
+    const wind = await add({ kind: 'effect', description: 'A gale at sea.' });
+    const theme = await add({ kind: 'music', description: 'Low strings.' });
+    const first = (await run('movie.sound.generate', at(wind.id))) as unknown as Made;
+    expect(first).toMatchObject({
+      costUsd: null,
+      sound: {
+        take: { prompt: 'A gale at sea.', model: 'vendor/noises', mediaType: 'audio/mpeg' },
+      },
+    });
+    expect(await runtime.blobs.get(first.sound.take.blobKey)).toBeDefined();
+    const second = (await run('movie.sound.generate', {
+      ...at(wind.id),
+      model: 'vendor/other',
+    })) as unknown as Made;
+    expect(second.sound.take.model).toBe('vendor/other');
+    expect(await runtime.blobs.get(first.sound.take.blobKey)).toBeUndefined();
+    expect(await run('movie.sound.generate', at(theme.id))).toMatchObject({ costUsd: 0.04 });
+    expect(provider.soundRequests).toEqual([
+      { model: 'vendor/noises', kind: 'effect', prompt: 'A gale at sea.' },
+      { model: 'vendor/other', kind: 'effect', prompt: 'A gale at sea.' },
+      { model: 'vendor/composer', kind: 'music', prompt: 'Low strings.\nInstrumental, no vocals.' },
+    ]);
+    expect(await takes()).toBe(2);
+  });
+
+  it('removes the files with the sound and with the scene', async () => {
+    const { run, runtime, scene, at, add, takes } = await withScene();
+    const wind = await add({ kind: 'effect', description: 'A gale at sea.' });
+    const door = await add({ kind: 'effect', description: 'A door slams.' });
+    await run('movie.sound.generate', at(wind.id));
+    await run('movie.sound.generate', at(door.id));
+    await run('movie.sound.delete', at(wind.id));
+    expect(await takes()).toBe(1);
+    await run('movie.scene.delete', { sceneId: scene.id });
+    expect(await takes()).toBe(0);
+    expect(await runtime.store.list('projects/')).not.toContainEqual(
+      expect.objectContaining({ key: expect.stringContaining('/sounds/') as string }),
+    );
+  });
+
+  it('needs a model, asks before an agent spends, and reports failures in words', async () => {
+    const { registry, projectId, at, add } = await withScene({
+      soundError: new ProviderError('unavailable', 'fake', 'The model is busy.'),
+    });
+    const wind = await add({ kind: 'effect', description: 'A gale at sea.' });
+    const theme = await add({ kind: 'music', description: 'Low strings.' });
+    const generate = (soundId: string, actor: typeof user | typeof writer = user) =>
+      registry.executeById('movie.sound.generate', { projectId, ...at(soundId) }, { actor });
+    await expect(generate(wind.id)).rejects.toMatchObject({
+      message: 'No sound was made: The model is busy.',
+    });
+    expect((await generate(wind.id, writer)).status).toBe('needs-approval');
+    for (const key of ['sounds.model', 'music.model']) {
+      await registry.executeById('settings.set', { key, value: '' }, { actor: user });
+    }
+    await expect(generate(wind.id)).rejects.toThrow(/No model for sound effects is chosen/);
+    const blank = await add({ kind: 'effect' });
+    await expect(generate(blank.id)).rejects.toThrow(/Describe what is heard first/);
+    await expect(generate(theme.id)).rejects.toThrow(/No music model is chosen/);
+    await expect(
+      registry.executeById(
+        'movie.sound.create',
+        { projectId, sceneId: 'nowhere', kind: 'effect', description: 'x' },
+        { actor: user },
+      ),
+    ).rejects.toThrow(/No scene "nowhere"/);
+  });
+
+  it('keeps nothing when the sound is deleted while it is made', async () => {
+    const runtime = createTestRuntime();
+    const fake = createFakeProvider({});
+    const ids: { projectId: string; sceneId: string; soundId: string }[] = [];
+    const registry: CommandRegistry = new CommandRegistry({ runtime }).register(
+      ...projectCommands,
+      ...createMovieMode({
+        provider: {
+          ...fake,
+          generateSound: async (request) => {
+            await registry.executeById('movie.sound.delete', ids[0], { actor: user });
+            return fake.generateSound(request);
+          },
+        },
+      }).commands,
+    );
+    const output = async (id: string, input: unknown) => {
+      const result = await registry.executeById(id, input, { actor: user });
+      if (result.status !== 'ok') throw new Error(result.status);
+      return result.output as { id: string };
+    };
+    const project = await output('project.create', { name: 'Storm', mode: 'movie' });
+    const scene = await output('movie.scene.create', { projectId: project.id, heading: 'X' });
+    const sound = await output('movie.sound.create', {
+      projectId: project.id,
+      sceneId: scene.id,
+      kind: 'effect',
+      description: 'A gale.',
+    });
+    ids.push({ projectId: project.id, sceneId: scene.id, soundId: sound.id });
+    await expect(
+      registry.executeById(
+        'movie.sound.generate',
+        { ...ids[0], model: 'vendor/noises' },
+        {
+          actor: user,
+        },
+      ),
+    ).rejects.toThrow(/deleted while it was made/);
+    expect(await runtime.blobs.list('')).toEqual([]);
   });
 });

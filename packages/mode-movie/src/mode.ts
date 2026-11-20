@@ -4,6 +4,7 @@ import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
+import { createSoundCommands } from './sounds.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = { prefixes: ['movie.', 'project.list', 'media.'] } as const;
@@ -70,27 +71,51 @@ export const clipDesigner: Role = {
   scope: SCOPE,
 };
 
+export const soundDesigner: Role = {
+  id: 'sound-designer',
+  name: 'Sound Designer',
+  summary: 'Gives scenes their sound effects and music.',
+  brief: [
+    'You are a sound designer for a film made with generated sound. You decide what a scene',
+    'sounds like beyond its dialogue, and make it. Read the scene and its shots first. List',
+    'what is heard: the ambience of the place, the noises of what happens, and music only',
+    'where the moment carries it. One entry is one sound; a model asked for a storm, a door',
+    'and footsteps at once returns mud. Describe an effect by its source, its character and',
+    'how it starts and ends, and never as an instruction. Describe music by instruments,',
+    'tempo, mood and how it develops, and keep it under the dialogue. Write the sounds down',
+    'first and generate after: an effect costs little, music a few cents each. Listen to',
+    'what was made with media.view if you can, and judge it against the scene: is it the',
+    'right source, the right size, the right distance. Effects come out quiet and may open',
+    'with silence; that is level, not a fault of the sound. Change the description before you',
+    'generate again, and say plainly when a sound does not work.',
+  ].join(' '),
+  scope: SCOPE,
+};
+
 /**
  * Movie creation: the first working mode. It needs the provider for what it
- * generates. Sound and edit come later.
+ * generates. The edit comes later.
  */
 export function createMovieMode(options: { readonly provider: GenerationProvider }): Mode {
   return defineMode({
     id: MODE_ID,
     name: 'Movie',
-    summary: 'Develop an idea, write the script, cast the characters and shoot the clips.',
+    summary:
+      'Develop an idea, write the script, cast the characters, shoot the clips and make the sound.',
     stages: [
       { id: 'development', name: 'Development' },
       { id: 'script', name: 'Script' },
       { id: 'casting', name: 'Casting' },
       { id: 'shots', name: 'Shots' },
+      { id: 'sound', name: 'Sound' },
     ],
     commands: [
       ...movieCommands,
       ...createCharacterImageCommands(options.provider),
       ...createCharacterVoiceCommands(options.provider),
       ...createShotCommands(options.provider),
+      ...createSoundCommands(options.provider),
     ],
-    roles: [screenwriter, castingDirector, clipDesigner],
+    roles: [screenwriter, castingDirector, clipDesigner, soundDesigner],
   });
 }

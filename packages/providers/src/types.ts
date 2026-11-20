@@ -165,6 +165,24 @@ export interface SpeechResponse {
   readonly costUsd: number | null;
 }
 
+export interface SoundRequest {
+  /**
+   * For an effect, an id whose output modalities include `speech`: the models
+   * that make effects are the ones that speak. For music, one with `audio`.
+   */
+  readonly model: string;
+  readonly kind: 'effect' | 'music';
+  /** What is heard: the source, its character, how it starts and ends. */
+  readonly prompt: string;
+}
+
+export interface SoundResponse {
+  readonly model: string;
+  readonly audio: { readonly bytes: Uint8Array; readonly mediaType: string };
+  /** What the call cost in US dollars, or null when the provider did not say. */
+  readonly costUsd: number | null;
+}
+
 /** A stored file handed to a generation as a guide: a portrait, a first frame. */
 export interface MediaInput {
   readonly bytes: Uint8Array;
@@ -225,6 +243,8 @@ export interface GenerationProvider {
   chat(request: ChatRequest, options?: CallOptions): Promise<ChatResponse>;
   generateImage(request: ImageRequest, options?: CallOptions): Promise<ImageResponse>;
   generateSpeech(request: SpeechRequest, options?: CallOptions): Promise<SpeechResponse>;
+  /** A sound effect or a piece of music, without words. */
+  generateSound(request: SoundRequest, options?: CallOptions): Promise<SoundResponse>;
   /** Starts a clip and returns at once. Money is spent from here on. */
   startVideo(request: VideoRequest, options?: CallOptions): Promise<VideoJob>;
   checkVideo(jobId: string, options?: CallOptions): Promise<VideoJob>;

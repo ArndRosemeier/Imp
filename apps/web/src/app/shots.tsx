@@ -68,6 +68,37 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
   );
 }
 
+/** The scenes of the script as tabs, for the views that work scene by scene. */
+export function SceneTabs({
+  scenes,
+  sceneId,
+  onSelect,
+}: {
+  scenes: readonly { id: string; position: number; heading: string }[];
+  sceneId: string | undefined;
+  onSelect: (sceneId: string) => void;
+}): ReactElement {
+  return (
+    <div className="chips" role="tablist" aria-label="Scenes">
+      {scenes.map((candidate) => (
+        <button
+          key={candidate.id}
+          role="tab"
+          className="chip"
+          aria-selected={candidate.id === sceneId}
+          onClick={() => {
+            onSelect(candidate.id);
+          }}
+        >
+          <span>
+            {candidate.position} · {candidate.heading === '' ? 'Untitled' : candidate.heading}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ShotCard({
   shot,
   cast,
@@ -265,23 +296,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         />
       </div>
       <Problem text={outline.error ?? listed.error ?? error ?? video.error} />
-      <div className="chips" role="tablist" aria-label="Scenes">
-        {scenes.map((candidate) => (
-          <button
-            key={candidate.id}
-            role="tab"
-            className="chip"
-            aria-selected={candidate.id === sceneId}
-            onClick={() => {
-              setSelectedId(candidate.id);
-            }}
-          >
-            <span>
-              {candidate.position} · {candidate.heading === '' ? 'Untitled' : candidate.heading}
-            </span>
-          </button>
-        ))}
-      </div>
+      <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         outline.data !== undefined && (
           <p className="muted">

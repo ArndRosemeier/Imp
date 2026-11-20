@@ -67,6 +67,18 @@ export const ErrorResponse = z.object({
   error: z.object({ message: z.string() }),
 });
 
+/** One event of a streamed chat completion that carries audio. */
+export const AudioStreamChunk = z.object({
+  choices: z
+    .array(
+      z.object({
+        delta: z.object({ audio: z.object({ data: z.string().nullish() }).nullish() }).nullish(),
+      }),
+    )
+    .nullish(),
+  usage: z.object({ cost: z.number().nullish() }).nullish(),
+});
+
 /** A video job, as returned when it is started and each time it is looked at. */
 export const VideoJobResponse = z.object({
   id: z.string().min(1),

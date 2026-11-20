@@ -25,6 +25,9 @@ const scenePrefix = (projectId: string): string => `${base(projectId)}scenes/`;
 /** Shots are kept under their scene, so removing a scene removes them and their clips. */
 export const shotPrefix = (projectId: string, sceneId?: string): string =>
   `${base(projectId)}shots/${sceneId === undefined ? '' : `${sceneId}/`}`;
+/** Sounds are kept under their scene too. */
+export const soundPrefix = (projectId: string, sceneId?: string): string =>
+  `${base(projectId)}sounds/${sceneId === undefined ? '' : `${sceneId}/`}`;
 export const movieSceneKey = (projectId: string, sceneId: string): string =>
   `${scenePrefix(projectId)}${sceneId}`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
@@ -208,7 +211,7 @@ export const sceneDelete = defineCommand({
   id: 'movie.scene.delete',
   title: 'Delete scene',
   description:
-    'Removes a scene from the script. Its text, its shots and their clips are lost. Later scenes move up.',
+    'Removes a scene from the script. Its text, its shots with their clips and its sounds are lost. Later scenes move up.',
   effect: 'destructive',
   input: z.object({ projectId: ProjectId, sceneId: z.string() }),
   output: z.object({ sceneId: z.string(), remaining: z.number() }),
@@ -221,14 +224,16 @@ export const sceneDelete = defineCommand({
     }
     await runtime.store.batch([
       { type: 'delete', key: `${scenePrefix(projectId)}${sceneId}` },
-      ...(await runtime.store.list(shotPrefix(projectId, sceneId))).map((entry) => ({
-        type: 'delete' as const,
-        key: entry.key,
-      })),
+      ...[
+        ...(await runtime.store.list(shotPrefix(projectId, sceneId))),
+        ...(await runtime.store.list(soundPrefix(projectId, sceneId))),
+      ].map((entry) => ({ type: 'delete' as const, key: entry.key })),
       ...renumbered(projectId, remaining),
     ]);
-    for (const blobKey of await runtime.blobs.list(shotPrefix(projectId, sceneId))) {
-      await runtime.blobs.delete(blobKey);
+    for (const prefix of [shotPrefix(projectId, sceneId), soundPrefix(projectId, sceneId)]) {
+      for (const blobKey of await runtime.blobs.list(prefix)) {
+        await runtime.blobs.delete(blobKey);
+      }
     }
     return { sceneId, remaining: remaining.length };
   },

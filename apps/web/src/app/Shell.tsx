@@ -1,4 +1,5 @@
 import { ShotsView } from './shots.js';
+import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
@@ -51,6 +52,7 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
   if (stage === 'casting') return <CastingView key={project.id} project={project} />;
   if (stage === 'shots') return <ShotsView key={project.id} project={project} />;
+  if (stage === 'sound') return <SoundView key={project.id} project={project} />;
   return null;
 }
 

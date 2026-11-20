@@ -24,6 +24,8 @@ export {
   type ModelInfo,
   type VideoJob,
   type VideoRequest,
+  type SoundRequest,
+  type SoundResponse,
   type SpeechRequest,
   type SpeechResponse,
   type ToolCall,
