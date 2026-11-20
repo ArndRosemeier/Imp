@@ -1,4 +1,4 @@
-import type { Command } from '@imp/core';
+import type { Command, ProjectSupport } from '@imp/core';
 import type { Role } from './role.js';
 
 /** One step of a mode's workflow, shown in the navigation. Stages can be visited in any order. */
@@ -20,6 +20,8 @@ export interface Mode {
   readonly stages: readonly Stage[];
   readonly commands: readonly Command[];
   readonly roles: readonly Role[];
+  /** Templates, progress for the start screen, and what can be copied between projects. */
+  readonly project?: ProjectSupport;
 }
 
 /** Checks a mode's own consistency once, at start-up, instead of failing later in use. */

@@ -29,7 +29,17 @@ export interface Calls {
   start: { args: []; result: { commands: readonly CommandInfo[]; modes: readonly ModeInfo[] } };
   /** Runs a command as the user. */
   run: { args: [commandId: string, input: unknown]; result: ExecutionResult<unknown> };
-  blob: { args: [key: string]; result: StoredFile | undefined };
+  /** Reads a stored file. With `take`, an export is removed once read: it was only waiting to be saved. */
+  blob: { args: [key: string, take?: boolean]; result: StoredFile | undefined };
+  /**
+   * Hands the core a file the person picked, in parts small enough for any
+   * channel. The last part names its media type and answers with the key it
+   * is stored under, for a command such as project.import to read.
+   */
+  upload: {
+    args: [uploadId: string, part: Uint8Array, last: { mediaType: string } | null];
+    result: { key: string } | null;
+  };
   models: { args: []; result: readonly ModelInfo[] };
   verify: { args: []; result: undefined };
 }
