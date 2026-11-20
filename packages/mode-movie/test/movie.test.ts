@@ -205,8 +205,22 @@ describe('characters', () => {
     await run('movie.character.update', { characterId: mara.id, voice: 'Low and dry.' });
     expect(await run('movie.character.list', {})).toEqual({
       characters: [
-        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
-        { id: tomas.id, name: 'Tomas', part: '', portraitId: null, voiceOnly: false },
+        {
+          id: mara.id,
+          name: 'Mara',
+          part: 'protagonist',
+          portraitId: null,
+          voiceOnly: false,
+          ownLane: false,
+        },
+        {
+          id: tomas.id,
+          name: 'Tomas',
+          part: '',
+          portraitId: null,
+          voiceOnly: false,
+          ownLane: false,
+        },
       ],
     });
     expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
@@ -227,6 +241,7 @@ describe('characters', () => {
         portraitId: null,
         voiceSample: null,
         voiceOnly: false,
+        ownLane: false,
       },
       expect.objectContaining({ name: 'Tomas' }),
     ]);
@@ -311,6 +326,7 @@ describe('character images', () => {
           part: 'protagonist',
           portraitId: first.image.id,
           voiceOnly: false,
+          ownLane: false,
         },
       ],
     });
@@ -455,7 +471,14 @@ describe('character voice samples', () => {
     // The outline of the cast does not carry it.
     expect(await run('movie.character.list', {})).toEqual({
       characters: [
-        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null, voiceOnly: false },
+        {
+          id: mara.id,
+          name: 'Mara',
+          part: 'protagonist',
+          portraitId: null,
+          voiceOnly: false,
+          ownLane: false,
+        },
       ],
     });
   });
@@ -669,7 +692,11 @@ describe('shots and clips', () => {
       'The lamp turns.\nMara: Seventy, grey braid.\nNobody in the picture speaks; a voice-over is added later.',
     );
     const unset = Character.parse(
-      await run('movie.character.update', { characterId: narrator.id, voiceOnly: false }),
+      await run('movie.character.update', {
+        characterId: narrator.id,
+        voiceOnly: false,
+        ownLane: false,
+      }),
     );
     expect(unset.voiceOnly).toBe(false);
   });
@@ -823,6 +850,80 @@ describe('shots and clips', () => {
     await expect(run('movie.shot.dialogue.generate', at(talker.id))).rejects.toThrow(
       /No speech model/,
     );
+  });
+
+  it('keeps the lines of an own-lane character on a lane: add, record, change, undo, remove', async () => {
+    const { run, registry, runtime, provider, scene, mara } = await withScene();
+    const narrator = Character.parse(
+      await run('movie.character.create', {
+        name: 'Narrator',
+        voice: 'Warm, slow.',
+        voiceOnly: true,
+        ownLane: true,
+      }),
+    );
+    const base = { sceneId: scene.id };
+    await expect(
+      run('movie.edit.line.add', { ...base, characterId: mara.id, text: 'Hello.' }),
+    ).rejects.toThrow(/own lane/);
+    const line = (await run('movie.edit.line.add', {
+      ...base,
+      characterId: narrator.id,
+      text: 'The lamp had burned for a century.',
+      delivery: 'Hushed.',
+      startSeconds: 1,
+    })) as unknown as { id: string };
+    await expect(run('movie.edit.line.record', { ...base, lineId: line.id })).rejects.toThrow(
+      /No speech model/,
+    );
+    await registry.executeById(
+      'settings.set',
+      { key: 'speech.model', value: 'vendor/speaker' },
+      { actor: user },
+    );
+    const recorded = await run('movie.edit.line.record', { ...base, lineId: line.id });
+    expect(recorded).toMatchObject({ recorded: true, outdated: false });
+    expect(provider.speechRequests.at(-1)).toMatchObject({
+      text: 'The lamp had burned for a century.',
+      instructions: expect.stringContaining('Narrator') as string,
+    });
+
+    let cut = (await run('movie.edit.get', base)) as unknown as {
+      lanes: { characterId: string; name: string; voiceOnly: boolean }[];
+      lines: { id: string; startSeconds: number; recorded: boolean; outdated: boolean }[];
+    };
+    expect(cut.lanes).toEqual([{ characterId: narrator.id, name: 'Narrator', voiceOnly: true }]);
+    expect(cut.lines).toMatchObject([{ id: line.id, startSeconds: 1, recorded: true }]);
+
+    await run('movie.edit.line.update', {
+      ...base,
+      lineId: line.id,
+      text: 'A century.',
+      volume: 0.8,
+    });
+    cut = (await run('movie.edit.get', base)) as unknown as typeof cut;
+    expect(cut.lines[0]).toMatchObject({ outdated: true });
+    await run('movie.edit.undo', base);
+    cut = (await run('movie.edit.get', base)) as unknown as typeof cut;
+    expect(cut.lines[0]).toMatchObject({ outdated: false });
+    await expect(
+      run('movie.edit.line.update', { ...base, lineId: 'nowhere', volume: 1 }),
+    ).rejects.toThrow(/No line/);
+
+    const overview = (await run('movie.edit.film', {})) as unknown as { totalCostUsd: number };
+    expect(overview.totalCostUsd).toBeGreaterThanOrEqual(0);
+    expect(await run('movie.edit.line.remove', { ...base, lineId: line.id })).toEqual({
+      lineId: line.id,
+      removed: true,
+    });
+    expect(await run('movie.edit.line.remove', { ...base, lineId: line.id })).toEqual({
+      lineId: line.id,
+      removed: false,
+    });
+    await run('movie.edit.undo', base);
+    expect(((await run('movie.edit.get', base)) as unknown as typeof cut).lines).toHaveLength(1);
+    await run('movie.scene.delete', base);
+    expect((await runtime.blobs.list('')).filter((key) => key.includes('/lines/'))).toHaveLength(0);
   });
 
   it('refuses a video model that cannot make a film before spending anything', async () => {

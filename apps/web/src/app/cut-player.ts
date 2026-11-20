@@ -80,6 +80,25 @@ export const Placement = z.object({
 });
 export type Placement = z.infer<typeof Placement>;
 
+export const Line = z.object({
+  id: z.string(),
+  characterId: z.string(),
+  text: z.string(),
+  delivery: z.string(),
+  startSeconds: z.number(),
+  trimStartSeconds: z.number(),
+  volume: z.number(),
+  fadeInSeconds: z.number(),
+  fadeOutSeconds: z.number(),
+  recorded: z.boolean(),
+  outdated: z.boolean(),
+  durationSeconds: z.number(),
+  take: z.object({ blobKey: z.string() }).nullable(),
+});
+export type Line = z.infer<typeof Line>;
+
+export const Lane = z.object({ characterId: z.string(), name: z.string(), voiceOnly: z.boolean() });
+
 export const Cut = z.object({
   totalSeconds: z.number(),
   canUndo: z.boolean(),
@@ -89,6 +108,8 @@ export const Cut = z.object({
     z.object({ shotId: z.string(), position: z.number(), description: z.string() }),
   ),
   sounds: z.array(Placement),
+  lanes: z.array(Lane),
+  lines: z.array(Line),
 });
 export type Cut = z.infer<typeof Cut>;
 
@@ -127,6 +148,35 @@ export function placementKey(placement: Placement, source: Source): string | und
   }
   const shot = source.shots.find((candidate) => candidate.id === placement.shotId);
   return placement.source === 'clip' ? (shot?.clip?.blobKey ?? undefined) : shot?.dialogue?.blobKey;
+}
+
+/** A line of a character lane plays like a placed sound. */
+function linePlacement(line: Line): Placement {
+  return {
+    id: line.id,
+    source: 'sound',
+    soundId: '',
+    sceneId: '',
+    shotId: '',
+    trimStartSeconds: line.trimStartSeconds,
+    startSeconds: line.startSeconds,
+    volume: line.volume,
+    fadeInSeconds: line.fadeInSeconds,
+    fadeOutSeconds: line.fadeOutSeconds,
+    loop: false,
+    name: '',
+    kind: 'dialogue',
+    recorded: line.recorded,
+  };
+}
+
+/** Every stored file a cut needs to play: clips, dialogue, sounds and lane lines. */
+export function blobKeys(source: Source, cut: Cut): string[] {
+  return [
+    ...source.shots.flatMap((shot) => [shot.clip?.blobKey, shot.dialogue?.blobKey]),
+    ...source.sounds.map((sound) => sound.take?.blobKey),
+    ...cut.lines.map((line) => line.take?.blobKey),
+  ].filter((key): key is string => typeof key === 'string');
 }
 
 export interface Look {
@@ -235,13 +285,17 @@ export class CutPlayer {
         this.#itemId = item.itemId;
       }
     }
-    for (const placement of cut.sounds) {
+    const lane = [
+      ...cut.sounds.map((placement) => ({ placement, key: placementKey(placement, source) })),
+      ...cut.lines.map((line) => ({ placement: linePlacement(line), key: line.take?.blobKey })),
+    ];
+    for (const { placement, key } of lane) {
       let player = this.#players.get(placement.id);
       if (!play) {
         player?.pause();
         continue;
       }
-      const file = urls.get(placementKey(placement, source) ?? '');
+      const file = urls.get(key ?? '');
       if (file === undefined) continue;
       if (player === undefined) {
         player = new Audio(file);

@@ -6,11 +6,23 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
+import { mp3DurationSeconds, ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
-import { editHistoryKey, editKey, movieSceneKey, shotPrefix, soundPrefix } from './commands.js';
 import {
+  characterPrefix,
+  editHistoryKey,
+  editKey,
+  linePrefix,
+  movieSceneKey,
+  shotPrefix,
+  soundPrefix,
+} from './commands.js';
+import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
+import {
+  Character,
   CutHistory,
   CutItem,
+  CutLine,
   MODE_ID,
   Scene,
   SceneCut,
@@ -161,6 +173,30 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
   return { items: laid, totalSeconds: round(at) };
 }
 
+const LineView = CutLine.extend({
+  /** Whether a recording exists. */
+  recorded: z.boolean(),
+  /** The words changed after the recording was made. */
+  outdated: z.boolean(),
+  durationSeconds: z.number(),
+});
+
+function lineView(line: CutLine): z.infer<typeof LineView> {
+  return {
+    ...line,
+    recorded: line.take !== null,
+    outdated: line.take !== null && line.take.line !== line.text,
+    durationSeconds: line.take?.durationSeconds ?? 0,
+  };
+}
+
+/** The characters that have a lane of their own, in the order they were cast. */
+async function ownLaneCharacters(store: KeyValueStore, projectId: string) {
+  return (await store.list(characterPrefix(projectId)))
+    .map((entry) => Character.parse(entry.value))
+    .filter((character) => character.ownLane);
+}
+
 /** Writes a cut, and keeps what it was so that the change can be undone. */
 async function save(
   runtime: CoreRuntime,
@@ -207,7 +243,7 @@ const InsertAt = z
   .describe('Where in the cut it goes, counted from 0. Defaults to the end.');
 
 /** The commands that put the pieces of a film together. Nothing here spends money. */
-export function createEditCommands(): readonly Command[] {
+export function createEditCommands(provider: GenerationProvider): readonly Command[] {
   async function open(runtime: CoreRuntime, commandId: string, projectId: string, sceneId: string) {
     await requireScene(runtime.store, commandId, projectId, sceneId);
     const cut = await readCut(runtime.store, projectId, sceneId);
@@ -284,6 +320,10 @@ export function createEditCommands(): readonly Command[] {
           recorded: z.boolean(),
         }),
       ),
+      lanes: z.array(
+        z.object({ characterId: z.string(), name: z.string(), voiceOnly: z.boolean() }),
+      ),
+      lines: z.array(LineView),
     }),
     handler: async ({ runtime }, { projectId, sceneId }) => {
       const { cut, items } = await open(runtime, 'movie.edit.get', projectId, sceneId);
@@ -338,6 +378,12 @@ export function createEditCommands(): readonly Command[] {
                   description: shot.description,
                 })),
         sounds: lane,
+        lanes: (await ownLaneCharacters(runtime.store, projectId)).map((character) => ({
+          characterId: character.id,
+          name: character.name,
+          voiceOnly: character.voiceOnly,
+        })),
+        lines: cut.lines.map((line) => lineView(line)),
       };
     },
   });
@@ -768,6 +814,179 @@ export function createEditCommands(): readonly Command[] {
     },
   });
 
+  const LineFields = {
+    text: z.string().min(1).max(4000).optional(),
+    delivery: z.string().max(500).optional(),
+    startSeconds: z.number().min(0).max(36000).optional(),
+    trimStartSeconds: z.number().min(0).max(600).optional(),
+    volume: z.number().min(0).max(1).optional(),
+    fadeInSeconds: z.number().min(0).max(60).optional(),
+    fadeOutSeconds: z.number().min(0).max(60).optional(),
+  };
+
+  const lineAdd = defineCommand({
+    id: 'movie.edit.line.add',
+    title: 'Add line to a character lane',
+    description:
+      'Adds a line of text to the lane of a character that has its own lane (characters with ownLane, for example a narrator; set it with movie.character.update). The line belongs to no shot: it is placed in time on that lane. Record it with movie.edit.line.record.',
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      characterId: z.string().describe('A character with its own lane, from movie.character.list.'),
+      text: z.string().min(1).max(4000),
+      delivery: z.string().max(500).default(''),
+      startSeconds: z.number().min(0).max(36000).default(0),
+      volume: z.number().min(0).max(1).default(1),
+    }),
+    output: CutLine,
+    handler: async ({ runtime }, { projectId, sceneId, characterId, ...fields }) => {
+      const id = 'movie.edit.line.add';
+      const { cut } = await open(runtime, id, projectId, sceneId);
+      const lane = (await ownLaneCharacters(runtime.store, projectId)).find(
+        (character) => character.id === characterId,
+      );
+      if (lane === undefined) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `"${characterId}" is not a character with its own lane. Set ownLane on the character first.`,
+        );
+      }
+      const line = CutLine.parse({ id: runtime.newId(), characterId, ...fields });
+      await save(runtime, projectId, cut, { ...cut, lines: [...cut.lines, line] });
+      return line;
+    },
+  });
+
+  function lineIn(cut: SceneCut, commandId: string, lineId: string): CutLine {
+    const line = cut.lines.find((candidate) => candidate.id === lineId);
+    if (line === undefined) {
+      throw new CommandError('invalid_input', commandId, `No line "${lineId}" in this scene.`);
+    }
+    return line;
+  }
+
+  const lineUpdate = defineCommand({
+    id: 'movie.edit.line.update',
+    title: 'Change line',
+    description:
+      'Changes the words, delivery, start, trim, volume or fades of a line on a character lane. Fields left out stay as they are. After changing the words the recording is out of date: record it again.',
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      lineId: z.string().describe('The id of a line from movie.edit.get.'),
+      ...LineFields,
+    }),
+    output: CutLine,
+    handler: async ({ runtime }, { projectId, sceneId, lineId, ...changes }) => {
+      const { cut } = await open(runtime, 'movie.edit.line.update', projectId, sceneId);
+      const before = lineIn(cut, 'movie.edit.line.update', lineId);
+      const next: CutLine = {
+        ...before,
+        text: changes.text ?? before.text,
+        delivery: changes.delivery ?? before.delivery,
+        startSeconds: changes.startSeconds ?? before.startSeconds,
+        trimStartSeconds: changes.trimStartSeconds ?? before.trimStartSeconds,
+        volume: changes.volume ?? before.volume,
+        fadeInSeconds: changes.fadeInSeconds ?? before.fadeInSeconds,
+        fadeOutSeconds: changes.fadeOutSeconds ?? before.fadeOutSeconds,
+      };
+      await save(runtime, projectId, cut, {
+        ...cut,
+        lines: cut.lines.map((line) => (line.id === lineId ? next : line)),
+      });
+      return next;
+    },
+  });
+
+  const lineRecord = defineCommand({
+    id: 'movie.edit.line.record',
+    title: 'Record line',
+    description:
+      'Speaks a line in the voice of its character, with its delivery, and keeps the recording on the line. It replaces an earlier recording. Costs a cent or less at the speech model (setting speech.model). Earlier recordings stay stored so that undo still works.',
+    effect: 'spend',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      lineId: z.string(),
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('A speech model from models.list. Defaults to the setting speech.model.'),
+    }),
+    output: LineView,
+    handler: async ({ runtime }, { projectId, sceneId, lineId, model: chosen }) => {
+      const id = 'movie.edit.line.record';
+      const { cut } = await open(runtime, id, projectId, sceneId);
+      const line = lineIn(cut, id, lineId);
+      const model = chosen ?? (await runtime.store.get(`settings/${SPEECH_MODEL_SETTING}`));
+      if (typeof model !== 'string' || model === '') {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `No speech model is chosen. Set the setting "${SPEECH_MODEL_SETTING}" or pass a model.`,
+        );
+      }
+      const stored = await runtime.store.get(`${characterPrefix(projectId)}${line.characterId}`);
+      if (stored === undefined) {
+        throw new CommandError('invalid_input', id, 'The character of this line was deleted.');
+      }
+      const direction = voiceDirection(Character.parse(stored), line.delivery);
+      let spoken;
+      try {
+        spoken = await provider.generateSpeech({
+          model,
+          text: line.text.trim(),
+          instructions: direction,
+        });
+      } catch (error) {
+        if (!(error instanceof ProviderError)) throw error;
+        throw new CommandError('handler_failed', id, `No line was recorded: ${error.message}`, {
+          cause: error,
+        });
+      }
+      const take = {
+        blobKey: `${linePrefix(projectId, sceneId)}${runtime.newId()}`,
+        mediaType: spoken.audio.mediaType,
+        line: line.text,
+        direction,
+        model,
+        durationSeconds: mp3DurationSeconds(spoken.audio.bytes),
+        costUsd: spoken.costUsd,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(take.blobKey, spoken.audio);
+      // The cut may have changed while the voice was made.
+      const latest = (await open(runtime, id, projectId, sceneId)).cut;
+      const current = lineIn(latest, id, lineId);
+      const next: CutLine = { ...current, take };
+      await save(runtime, projectId, latest, {
+        ...latest,
+        lines: latest.lines.map((candidate) => (candidate.id === lineId ? next : candidate)),
+      });
+      return lineView(next);
+    },
+  });
+
+  const lineRemove = defineCommand({
+    id: 'movie.edit.line.remove',
+    title: 'Remove line',
+    description: 'Takes a line off its lane. Undo brings it back.',
+    effect: 'destructive',
+    input: z.object({ projectId: ProjectId, sceneId: SceneId, lineId: z.string() }),
+    output: z.object({ lineId: z.string(), removed: z.boolean() }),
+    handler: async ({ runtime }, { projectId, sceneId, lineId }) => {
+      const { cut } = await open(runtime, 'movie.edit.line.remove', projectId, sceneId);
+      const lines = cut.lines.filter((line) => line.id !== lineId);
+      if (lines.length === cut.lines.length) return { lineId, removed: false };
+      await save(runtime, projectId, cut, { ...cut, lines });
+      return { lineId, removed: true };
+    },
+  });
+
   /** Moves one step along the history of a scene's cut, in either direction. */
   async function step(
     runtime: CoreRuntime,
@@ -867,6 +1086,7 @@ export function createEditCommands(): readonly Command[] {
         for (const entry of await runtime.store.list(soundPrefix(projectId, scene.id))) {
           cost += Sound.parse(entry.value).take?.costUsd ?? 0;
         }
+        for (const line of cut.lines) cost += line.take?.costUsd ?? 0;
         summaries.push({
           sceneId: scene.id,
           position: scene.position,
@@ -904,6 +1124,10 @@ export function createEditCommands(): readonly Command[] {
     place,
     updateSound,
     removeSound,
+    lineAdd,
+    lineUpdate,
+    lineRecord,
+    lineRemove,
     film,
   ];
 }
