@@ -658,7 +658,7 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: 'Copy between projects' }));
     await user.selectOptions(screen.getByLabelText('From', { exact: true }), 'Keeper');
     await user.selectOptions(screen.getByLabelText('Into', { exact: true }), 'Tide');
-    await user.click(await screen.findByRole('checkbox', { name: /^Tomas/ }, { timeout: 4000 }));
+    await user.click(await screen.findByRole('checkbox', { name: /^Tomas/ }));
     await user.click(screen.getByRole('button', { name: /^Copy 1/ }));
     expect(await screen.findByText(/Copied 1 into “Tide”/)).toBeTruthy();
 

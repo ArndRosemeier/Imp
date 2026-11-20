@@ -45,6 +45,10 @@ const Templates = z.object({ templates: z.array(Template) });
 const Resources = z.object({ kinds: z.array(ResourceKindInfo), items: z.array(ResourceItem) });
 const Requests = z.object({ requests: z.array(CopyRequest) });
 const Exported = z.object({ fileKey: z.string(), fileName: z.string(), sizeBytes: z.number() });
+interface Listed {
+  readonly projectId: string;
+  readonly data: z.infer<typeof Resources>;
+}
 const CopyResult = z.object({ status: z.string(), outcomes: z.array(z.unknown()).optional() });
 
 const CHOICE_LABELS: Record<CollisionChoice, string> = {
@@ -600,15 +604,18 @@ function CopyForm({
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [parentId, setParentId] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<z.infer<typeof Resources> | null>(null);
-  const [target, setTarget] = useState<z.infer<typeof Resources> | null>(null);
+  // Each list remembers whose it is, so a list can never be shown for the wrong project.
+  const [sourceList, setSource] = useState<Listed | null>(null);
+  const [targetList, setTarget] = useState<Listed | null>(null);
+  const source = sourceList?.projectId === from ? sourceList.data : null;
+  const target = targetList?.projectId === to ? targetList.data : null;
 
   useEffect(() => {
     if (from === '') return;
     let active = true;
     runCommand(imp, 'project.resources.list', { projectId: from }).then(
       (listed) => {
-        if (active) setSource(Resources.parse(listed));
+        if (active) setSource({ projectId: from, data: Resources.parse(listed) });
       },
       (reason: unknown) => {
         if (active) setError(messageOf(reason));
@@ -624,7 +631,7 @@ function CopyForm({
     let active = true;
     runCommand(imp, 'project.resources.list', { projectId: to }).then(
       (listed) => {
-        if (active) setTarget(Resources.parse(listed));
+        if (active) setTarget({ projectId: to, data: Resources.parse(listed) });
       },
       (reason: unknown) => {
         if (active) setError(messageOf(reason));
@@ -697,7 +704,6 @@ function CopyForm({
             value={from}
             onChange={(event) => {
               setFrom(event.target.value);
-              setSource(null);
               setPicked(new Set());
               if (event.target.value === to) setTo('');
             }}
