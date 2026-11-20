@@ -38,6 +38,7 @@ export {
 export { MemoryKeyValueStore } from './storage/memory.js';
 export {
   fromToolName,
+  isInScope,
   toToolDefinitions,
   toToolName,
   type ToolDefinition,

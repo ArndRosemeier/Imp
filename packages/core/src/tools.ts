@@ -30,14 +30,21 @@ export interface ToolScope {
   readonly prefixes?: readonly string[];
 }
 
+/** True when `scope` exposes `command`. Agents are held to this at execution time too. */
+export function isInScope(command: Command, scope: ToolScope = {}): boolean {
+  return (
+    (scope.effects?.includes(command.effect) ?? true) &&
+    (scope.prefixes?.some((prefix) => command.id.startsWith(prefix)) ?? true)
+  );
+}
+
 /** Derives the tools an agent may call from the same definitions the UI uses. */
 export function toToolDefinitions(
   commands: readonly Command[],
   scope: ToolScope = {},
 ): readonly ToolDefinition[] {
   return commands
-    .filter((command) => scope.effects?.includes(command.effect) ?? true)
-    .filter((command) => scope.prefixes?.some((prefix) => command.id.startsWith(prefix)) ?? true)
+    .filter((command) => isInScope(command, scope))
     .map((command) => ({
       type: 'function',
       function: {
