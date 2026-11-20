@@ -894,6 +894,17 @@ describe('App', () => {
   });
 });
 
+describe('fades of a placed sound', () => {
+  it('follows the audio editor: linear, or a soft S, and silent outside the sound', async () => {
+    const { fadeGain } = await import('../src/app/cut-player.js');
+    expect(fadeGain(1, 10, 2, 0, 'linear')).toBeCloseTo(0.5);
+    expect(fadeGain(1, 10, 2, 0, 'smooth')).toBeCloseTo(0.5);
+    expect(fadeGain(0.5, 10, 2, 0, 'smooth')).toBeCloseTo(0.1464, 3);
+    expect(fadeGain(9, 10, 0, 2, 'linear')).toBeCloseTo(0.5);
+    expect(fadeGain(5, 10, 0, 0, 'linear')).toBe(1);
+  });
+});
+
 describe('title cards in an exported video', () => {
   it('wraps words into lines that fit', async () => {
     const { wrapLines } = await import('../src/app/export.js');
