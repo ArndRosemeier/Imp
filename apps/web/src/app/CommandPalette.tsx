@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, PlayIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, PlayIcon, XIcon } from '@phosphor-icons/react';
 import {
   useEffect,
   useMemo,
@@ -180,18 +180,41 @@ export function CommandPalette({
   );
 
   return (
-    <dialog ref={dialog} className="palette" aria-label="Commands" onClose={onClose}>
+    // A tap on the dimmed backdrop lands on the dialog itself and closes it, as Escape does;
+    // a tablet has no Escape key.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events
+    <dialog
+      ref={dialog}
+      className="palette"
+      aria-label="Commands"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) dialog.current?.close();
+      }}
+    >
       {selected === null ? (
         <>
-          <input
-            className="input palette-search"
-            aria-label="Search commands"
-            placeholder="Search commands"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-            }}
-          />
+          <div className="palette-head">
+            <input
+              className="input palette-search"
+              aria-label="Search commands"
+              placeholder="Search commands"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
+            />
+            <button
+              type="button"
+              className="button quiet"
+              aria-label="Close commands"
+              onClick={() => {
+                dialog.current?.close();
+              }}
+            >
+              <XIcon aria-hidden="true" />
+            </button>
+          </div>
           <ul className="palette-list">
             {commands.map((command) => (
               <li key={command.id}>

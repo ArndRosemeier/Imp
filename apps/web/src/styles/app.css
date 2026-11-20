@@ -83,8 +83,10 @@ a {
   cursor: pointer;
   white-space: nowrap;
 }
-.button:hover:not(:disabled) {
-  border-color: var(--ink-muted);
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    border-color: var(--ink-muted);
+  }
 }
 .button:disabled {
   opacity: 0.5;
@@ -101,9 +103,11 @@ a {
   color: var(--ink-muted);
   padding: 0 12px;
 }
-.button.quiet:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: transparent;
+@media (hover: hover) {
+  .button.quiet:hover:not(:disabled) {
+    color: var(--ink);
+    border-color: transparent;
+  }
 }
 .field {
   display: flex;
@@ -192,10 +196,13 @@ textarea.input {
 
 /* Shell */
 .shell {
-  height: 100%;
+  /* The visible height, which leaves room for a tablet's on-screen keyboard. */
+  height: var(--app-height, 100%);
   display: grid;
   grid-template-rows: 60px minmax(0, 1fr) auto;
-  grid-template-columns: var(--nav-width, 220px) minmax(0, 1fr) var(--crew-width, 360px);
+  /* The crew panel never takes more than 45% of the window, so the stage keeps room on a tablet. */
+  --crew-column: min(var(--crew-width, 360px), 45vw);
+  grid-template-columns: var(--nav-width, 220px) minmax(0, 1fr) var(--crew-column);
   grid-template-areas: 'top top top' 'nav main crew' 'nav strip crew';
 }
 .topbar {
@@ -250,8 +257,10 @@ kbd {
   text-align: left;
   cursor: pointer;
 }
-.nav-item:hover:not(:disabled) {
-  background: var(--surface);
+@media (hover: hover) {
+  .nav-item:hover:not(:disabled) {
+    background: var(--surface);
+  }
 }
 .nav-item[aria-current='page'] {
   background: var(--accent);
@@ -268,6 +277,7 @@ kbd {
 }
 .main {
   grid-area: main;
+  container: main / inline-size;
   overflow-y: auto;
   padding: 36px 48px;
   display: flex;
@@ -401,7 +411,7 @@ kbd {
 /* Command palette */
 dialog.palette {
   width: min(640px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 96px));
+  max-height: min(640px, calc(var(--app-height, 100vh) - 12vh - 24px));
   margin-top: 12vh;
   padding: 0;
   border: 1px solid var(--line-strong);
@@ -417,9 +427,18 @@ dialog.palette[open] {
 dialog.palette::backdrop {
   background: rgb(0 0 0 / 0.5);
 }
-.palette-search {
-  border: none;
+.palette-search:focus-visible {
+  outline: none;
+}
+.palette-head {
+  display: flex;
+  align-items: center;
+  padding-right: var(--space-2);
   border-bottom: 1px solid var(--line);
+}
+.palette-search {
+  flex: 1;
+  border: none;
   border-radius: 0;
   background: none;
   min-height: 56px;
@@ -446,9 +465,13 @@ dialog.palette::backdrop {
   text-align: left;
   cursor: pointer;
 }
-.palette-option:hover,
 .palette-option:focus-visible {
   background: var(--surface);
+}
+@media (hover: hover) {
+  .palette-option:hover {
+    background: var(--surface);
+  }
 }
 .palette-option .muted {
   grid-column: 1 / -1;
@@ -494,10 +517,14 @@ dialog.palette::backdrop {
   border-radius: 2px;
   background: transparent;
 }
-.resizer:hover::after,
 .resizer:focus-visible::after,
 .resizer[data-dragging='true']::after {
   background: var(--accent);
+}
+@media (hover: hover) {
+  .resizer:hover::after {
+    background: var(--accent);
+  }
 }
 .resizer:focus-visible {
   outline: none;
@@ -508,11 +535,38 @@ dialog.palette::backdrop {
     display: none;
   }
   .shell {
-    grid-template-columns: 72px minmax(0, 1fr) 320px;
+    grid-template-columns: 88px minmax(0, 1fr) var(--crew-column);
   }
-  .nav-item span,
+  /* A rail: each place is an icon over its name, so it can be told apart and tapped. */
   .nav-item small,
   .nav .eyebrow {
+    display: none;
+  }
+  .nav {
+    padding: 16px 8px;
+    gap: 2px;
+  }
+  .nav-item {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 56px;
+    padding: 6px 2px;
+    text-align: center;
+  }
+  .nav-item span {
+    font-size: 10.5px;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+  }
+  .crew-toggle .label {
     display: none;
   }
   .main {
@@ -637,9 +691,11 @@ input.input.script {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chip:hover {
-  border-color: var(--line-strong);
-  color: var(--ink);
+@media (hover: hover) {
+  .chip:hover {
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
 }
 .chip[aria-selected='true'] {
   border-color: var(--accent);
@@ -813,8 +869,10 @@ input.input.script {
   cursor: pointer;
   opacity: 0.7;
 }
-.thumb:hover {
-  opacity: 1;
+@media (hover: hover) {
+  .thumb:hover {
+    opacity: 1;
+  }
 }
 .thumb[aria-pressed='true'] {
   opacity: 1;
@@ -987,6 +1045,9 @@ input.input.script {
   height: 22px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .timeline-ruler .tick {
   position: absolute;
@@ -1024,7 +1085,19 @@ input.input.script {
   color: var(--ink);
   cursor: grab;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  /* A finger on a piece scrolls the timeline until the piece is selected; then it moves it. */
+  touch-action: pan-x pan-y;
+}
+.lane .block.selected {
   touch-action: none;
+}
+.lane .block.lifted {
+  z-index: 4;
+  cursor: grabbing;
+  opacity: 0.9;
+  box-shadow: var(--shadow-overlay);
 }
 .lane .block.selected {
   outline: 2px solid var(--accent);
@@ -1058,7 +1131,7 @@ input.input.script {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 7px;
+  width: var(--handle);
   cursor: ew-resize;
   background: color-mix(in srgb, var(--ink) 22%, transparent);
   touch-action: none;
@@ -1090,7 +1163,8 @@ input.input.script {
   padding: 6px 10px;
   border-bottom: 1px solid var(--line);
 }
-@media (max-width: 900px) {
+/* By the room the stage really has, which depends on the side panels as much as on the window. */
+@container main (max-width: 680px) {
   .editor-top {
     grid-template-columns: 1fr;
   }
@@ -1121,6 +1195,154 @@ input.input.script {
 }
 .lane {
   height: 58px;
+}
+
+/* Crew panel closed */
+.shell[data-crew='closed'] {
+  --crew-column: 0px;
+}
+.shell[data-crew='closed'] .crew {
+  display: none;
+}
+.crew-toggle[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+/* Touch and tablets */
+html {
+  /* No double-tap zoom delay and no grey flash on tap; pinch still zooms the page. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+@media (pointer: coarse) {
+  /* Below 16 pixels, iPadOS zooms the page in when a field gets the focus. */
+  .input,
+  .select,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .button.quiet,
+  .button.small {
+    min-width: var(--hit);
+  }
+  .choice {
+    min-height: var(--hit);
+  }
+  input[type='range'] {
+    min-height: var(--hit);
+    accent-color: var(--accent);
+  }
+  .choice input {
+    width: 22px;
+    height: 22px;
+  }
+  .thumb {
+    width: 54px;
+    height: 72px;
+  }
+  /* Keyboard hints mean nothing without a keyboard. */
+  .palette-trigger kbd {
+    display: none;
+  }
+  /* No hover on glass: the panel edges show a grip, and are wide enough for a thumb. */
+  .resizer {
+    width: 24px;
+  }
+  .resizer[data-side='left'],
+  .resizer[data-side='right'] {
+    margin-left: -12px;
+  }
+  .resizer::after {
+    inset: 50% 9px auto;
+    height: 44px;
+    translate: 0 -50%;
+    background: var(--line-strong);
+    border-radius: var(--radius-pill);
+  }
+  .main {
+    overscroll-behavior: contain;
+  }
+  .thread {
+    overscroll-behavior: contain;
+  }
+}
+
+/* Upright tablets and phones */
+.orientation-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: var(--ground);
+}
+.orientation-card {
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+.orientation-card svg {
+  color: var(--accent);
+}
+
+/* The Edit timeline under a finger */
+@media (pointer: coarse) {
+  .timeline-ruler {
+    height: 36px;
+  }
+  .timeline-ruler .tick {
+    top: 10px;
+  }
+  .lane {
+    height: 68px;
+  }
+  .lane .block {
+    top: 20px;
+    height: 46px;
+  }
+  .field.compact.zoom {
+    flex: 0 0 220px;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .field.compact.zoom > span {
+    font-size: 12px;
+  }
+  .strip {
+    max-height: 64px;
+  }
+  /* Trim handles belong to the selected piece only, so a swipe never trims by accident. */
+  .lane .block:not(.selected) .handle {
+    display: none;
+  }
+  .handle {
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  .handle::after {
+    content: '';
+    width: 3px;
+    height: 18px;
+    border-radius: 2px;
+    background: var(--accent-ink);
+    opacity: 0.7;
+  }
+  .lane .block.selected .block-label {
+    padding: 0 calc(var(--handle) + 6px);
+  }
+  .timeline-scroll {
+    overscroll-behavior-x: contain;
+  }
 }
 
 /* Audio */
