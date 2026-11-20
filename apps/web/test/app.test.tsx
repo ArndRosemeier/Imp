@@ -513,6 +513,17 @@ describe('App', () => {
         true,
       );
     });
+    await user.type(within(shot).getByLabelText('What we see'), 'Mara climbs into the light.');
+    await user.tab();
+    const paint = within(shot).getByRole('button', { name: /Paint frame/ });
+    await vi.waitFor(() => {
+      expect(paint).toHaveProperty('disabled', false);
+    });
+    await user.click(paint);
+    expect(await within(shot).findByText('The clip starts exactly on this frame.')).toBeTruthy();
+    expect(provider.imageRequests.at(-1)?.prompt).toContain('The first frame of a film shot');
+    // The place's picture of that view guides the frame.
+    expect(provider.imageRequests.at(-1)?.references).toHaveLength(1);
   });
 
   it('breaks a scene into shots and makes a clip that arrives later', async () => {

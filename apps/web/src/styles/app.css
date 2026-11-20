@@ -2549,3 +2549,14 @@ dialog.modal::backdrop {
 .scene-place .field {
   flex: 1 1 200px;
 }
+.key-frames {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.key-frames h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}

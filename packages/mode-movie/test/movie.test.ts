@@ -16,7 +16,9 @@ import {
   castingDirector,
   Character,
   clipPrompt,
+  asStartFrame,
   createMovieMode,
+  type FrameImageEncoder,
   MAX_CLIP_GUIDES,
   readSetting,
   screenwriter,
@@ -27,13 +29,16 @@ import {
 const user = { kind: 'user', id: 'arnd' } as const;
 const writer = { kind: 'agent', id: 'w', role: 'screenwriter' } as const;
 
-async function setup(providerOptions: Parameters<typeof createFakeProvider>[0] = {}) {
+async function setup(
+  providerOptions: Parameters<typeof createFakeProvider>[0] = {},
+  frameImage?: FrameImageEncoder,
+) {
   const runtime = createTestRuntime();
   const provider = createFakeProvider(providerOptions);
   const registry = new CommandRegistry({ runtime }).register(
     ...projectCommands,
     ...settingsCommands,
-    ...createMovieMode({ provider }).commands,
+    ...createMovieMode(frameImage === undefined ? { provider } : { provider, frameImage }).commands,
     ...createWorldCommands({ provider }),
   );
   const created = await registry.execute(
@@ -635,6 +640,8 @@ describe('shots and clips', () => {
       line: '',
       delivery: '',
       dialogue: null,
+      frames: [],
+      frameId: null,
       clip: null,
     });
     expect(await run('movie.shot.list', { sceneId: scene.id })).toEqual({
@@ -1449,8 +1456,14 @@ describe('sounds', () => {
 });
 
 describe('locations and objects in scenes and shots', () => {
-  const withWorld = async (options: Parameters<typeof setup>[0] = {}) => {
-    const context = await setup(options);
+  // The browser host re-encodes pictures as JPEG; here a stand-in relabels them.
+  const toJpeg: FrameImageEncoder = (image) =>
+    Promise.resolve({ ...image, mediaType: 'image/jpeg' });
+  const withWorld = async (
+    options: Parameters<typeof setup>[0] = {},
+    frameImage: FrameImageEncoder | null = toJpeg,
+  ) => {
+    const context = await setup(options, frameImage ?? undefined);
     const { run, registry } = context;
     for (const [key, value] of [
       ['video.model', 'vendor/clips'],
@@ -1600,6 +1613,156 @@ describe('locations and objects in scenes and shots', () => {
       shotId: shot.id,
     })) as unknown as { clip: { portraits: number; guides: string[] } };
     expect(started.clip).toMatchObject({ portraits: 0, guides: [] });
+  });
+
+  it('paints a key frame from the place, the portraits and the objects, and starts the clip on it', async () => {
+    const { run, provider, runtime, scene, stairs, watch, lamp } = await withWorld();
+    const mara = await run('movie.character.create', { name: 'Mara', appearance: 'Grey braid.' });
+    await run('movie.character.image.generate', { characterId: mara.id });
+    await run('world.location.image.generate', { locationId: lamp.id, viewId: stairs.id });
+    await run('world.object.image.generate', { objectId: watch.id });
+    const shot = await run('movie.shot.create', {
+      sceneId: scene.id,
+      description: 'Mara climbs into the light',
+      performance: 'She pulls herself up the last step',
+      characterIds: [mara.id],
+      viewId: stairs.id,
+      objects: [{ objectId: watch.id }],
+      line: 'Who is there?',
+    });
+    const at = { sceneId: scene.id, shotId: shot.id };
+    const before = provider.imageRequests.length;
+    const painted = (await run('movie.shot.frame.generate', at)) as unknown as {
+      frame: { id: string; guides: string[]; blobKey: string; prompt: string };
+    };
+    expect(painted.frame.guides).toEqual([
+      'Lamp room · From the stairs (the place)',
+      'Mara',
+      'Pocket watch',
+    ]);
+    const request = provider.imageRequests[before];
+    expect(request?.references).toHaveLength(3);
+    expect(request?.aspectRatio).toBe('16:9');
+    expect(request?.prompt).toContain('The first frame of a film shot');
+    expect(request?.prompt).toContain('Mara: Grey braid.');
+    expect(request?.prompt).toContain(
+      'The moment it opens on: She pulls herself up the last step.',
+    );
+    expect(request?.prompt).not.toContain('Who is there');
+    // Kept as JPEG, which video models take as a start frame where they refuse WebP.
+    expect((await runtime.blobs.get(painted.frame.blobKey))?.mediaType).toBe('image/jpeg');
+    const second = (await run('movie.shot.frame.generate', {
+      ...at,
+      direction: 'closer',
+    })) as unknown as { frame: { id: string } };
+    expect(provider.imageRequests[before + 1]?.prompt).toContain('closer.');
+    // The first frame stays chosen until another is picked.
+    expect(Shot.parse(await run('movie.shot.get', at)).frameId).toBe(painted.frame.id);
+
+    const started = (await run('movie.shot.clip.generate', at)) as unknown as {
+      clip: { startFrameId: string | null; portraits: number; guides: string[] };
+    };
+    expect(started.clip).toMatchObject({ startFrameId: painted.frame.id, portraits: 0 });
+    expect(started.clip.guides).toHaveLength(3);
+    const video = provider.videoRequests.at(-1);
+    expect(video?.firstFrame?.mediaType).toBe('image/jpeg');
+    expect(video?.references).toBeUndefined();
+
+    await run('movie.shot.frame.select', { ...at, frameId: second.frame.id });
+    await run('movie.shot.frame.delete', { ...at, frameId: second.frame.id });
+    expect(Shot.parse(await run('movie.shot.get', at)).frameId).toBe(painted.frame.id);
+    await run('movie.shot.frame.select', { ...at, frameId: null });
+    const fromWords = (await run('movie.shot.clip.generate', at)) as unknown as {
+      clip: { startFrameId: string | null; portraits: number };
+    };
+    expect(fromWords.clip).toMatchObject({ startFrameId: null, portraits: 1 });
+    await expect(run('movie.shot.frame.select', { ...at, frameId: 'gone' })).rejects.toThrow(
+      /No key frame/,
+    );
+    await expect(run('movie.shot.frame.delete', { ...at, frameId: 'gone' })).rejects.toThrow(
+      /No key frame/,
+    );
+    await run('movie.shot.frame.delete', { ...at, frameId: painted.frame.id });
+    expect(Shot.parse(await run('movie.shot.get', at))).toMatchObject({
+      frames: [],
+      frameId: null,
+    });
+  });
+
+  it('falls back from the key frame to guides when the model takes no start picture', async () => {
+    const { run, provider, scene, lamp } = await withWorld({
+      videoRefusesFirstFrame: true,
+      imageRefusesReferences: true,
+    });
+    await run('world.location.image.generate', { locationId: lamp.id });
+    const shot = await run('movie.shot.create', { sceneId: scene.id, description: 'The lamp.' });
+    const at = { sceneId: scene.id, shotId: shot.id };
+    const painted = (await run('movie.shot.frame.generate', at)) as unknown as {
+      frame: { guides: string[]; prompt: string };
+    };
+    // The image model took no references, so the frame was painted from the words.
+    expect(painted.frame.guides).toEqual([]);
+    expect(painted.frame.prompt).not.toContain('reference images');
+    const started = (await run('movie.shot.clip.generate', at)) as unknown as {
+      clip: { startFrameId: string | null; guides: string[] };
+    };
+    expect(started.clip).toMatchObject({
+      startFrameId: null,
+      guides: ['Lamp room · Establishing'],
+    });
+    expect(provider.videoRequests.at(-1)?.references).toHaveLength(1);
+  });
+
+  it('uses a frame the host cannot re-encode as a guide, not as the start', async () => {
+    const { run, provider, runtime, scene } = await withWorld({}, null);
+    const shot = await run('movie.shot.create', { sceneId: scene.id, description: 'The lamp.' });
+    const at = { sceneId: scene.id, shotId: shot.id };
+    const painted = (await run('movie.shot.frame.generate', at)) as unknown as {
+      frame: { blobKey: string; mediaType: string };
+    };
+    expect(painted.frame.mediaType).toBe('image/webp');
+    expect((await runtime.blobs.get(painted.frame.blobKey))?.mediaType).toBe('image/webp');
+    const started = (await run('movie.shot.clip.generate', at)) as unknown as {
+      clip: { startFrameId: string | null };
+    };
+    expect(started.clip.startFrameId).toBeNull();
+    expect(provider.videoRequests.at(-1)?.firstFrame).toBeUndefined();
+  });
+
+  it('turns a picture into a start frame only as JPEG or PNG', async () => {
+    const webp = { bytes: new Uint8Array([1]), mediaType: 'image/webp' };
+    const png = { bytes: new Uint8Array([2]), mediaType: 'image/png' };
+    expect(await asStartFrame(png, undefined)).toBe(png);
+    expect(await asStartFrame(webp, undefined)).toBeUndefined();
+    expect(await asStartFrame(webp, () => Promise.resolve(undefined))).toBeUndefined();
+    expect(await asStartFrame(webp, () => Promise.resolve(webp))).toBeUndefined();
+    expect(
+      await asStartFrame(webp, () => Promise.reject(new Error('cannot decode'))),
+    ).toBeUndefined();
+    expect((await asStartFrame(webp, () => Promise.resolve(png)))?.mediaType).toBe('image/png');
+  });
+
+  it('refuses to paint a frame without a description or an image model', async () => {
+    const { run, registry, scene } = await withWorld();
+    const empty = await run('movie.shot.create', { sceneId: scene.id });
+    await expect(
+      run('movie.shot.frame.generate', { sceneId: scene.id, shotId: empty.id }),
+    ).rejects.toThrow(/Describe what the shot shows/);
+    const shot = await run('movie.shot.create', { sceneId: scene.id, description: 'X' });
+    await registry.executeById('settings.set', { key: 'images.model', value: '' }, { actor: user });
+    await expect(
+      run('movie.shot.frame.generate', { sceneId: scene.id, shotId: shot.id }),
+    ).rejects.toThrow(/No image model/);
+  });
+
+  it('reports a failed painting', async () => {
+    const { run, scene } = await withWorld({
+      imageError: new ProviderError('unavailable', 'fake', 'Down.'),
+    });
+    const shot = await run('movie.shot.create', { sceneId: scene.id, description: 'X' });
+    await expect(
+      run('movie.shot.frame.generate', { sceneId: scene.id, shotId: shot.id }),
+    ).rejects.toThrow(/No frame was painted: Down/);
   });
 
   it('draws the world in the tone of the film', async () => {
