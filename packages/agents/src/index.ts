@@ -8,8 +8,8 @@ export {
   type AgentRun,
   type Conversation,
 } from './commands.js';
-export { CrewMember, createCrewCommands, readCrewMember } from './crew.js';
-export { RoleCatalog, coordinatorRole, type Role } from './role.js';
+export { CrewMember, createCrewCommands, readCrewMember, type CrewCommandOptions } from './crew.js';
+export { RoleCatalog, StoredRole, coordinatorRole, type Role } from './role.js';
 export {
   runAgent,
   type AgentRunOptions,

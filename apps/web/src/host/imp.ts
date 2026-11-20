@@ -70,7 +70,9 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...projectCommands,
     ...MODES.flatMap((mode) => mode.commands),
-    ...createCrewCommands(roles),
+    ...createCrewCommands(roles, {
+      commandIds: () => registry.list().map((command) => command.id),
+    }),
     ...createAgentCommands({ registry, provider, roles }),
   );
   return {

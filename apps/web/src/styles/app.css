@@ -702,3 +702,35 @@ input.input.script {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.tag.neutral {
+  color: var(--ink-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+.choices {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.choices legend {
+  padding: 0 0 6px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  cursor: pointer;
+}
+.choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}

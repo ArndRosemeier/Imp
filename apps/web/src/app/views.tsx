@@ -1,13 +1,16 @@
 import { CrewMember } from '@imp/agents';
 import { ActivityEntry } from '@imp/core';
-import { TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
-import { useState, type ReactElement } from 'react';
+import { PlusIcon, TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
+import { useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { ConfirmButton } from './Field.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
-  roles: z.array(z.object({ id: z.string(), name: z.string(), summary: z.string() })),
+  roles: z.array(
+    z.object({ id: z.string(), name: z.string(), summary: z.string(), custom: z.boolean() }),
+  ),
 });
 const ActivityList = z.object({ entries: z.array(ActivityEntry) });
 const SettingList = z.object({ settings: z.array(z.object({ key: z.string(), value: z.json() })) });
@@ -17,7 +20,7 @@ export function CrewView(): ReactElement {
   const crew = useLive(['crew/'], async (current) =>
     CrewList.parse(await runCommand(current, 'crew.list', {})),
   );
-  const roles = useLive([], async (current) =>
+  const roles = useLive(['roles/'], async (current) =>
     RoleList.parse(await runCommand(current, 'crew.roles', {})),
   );
   const coordinator = useLive(['settings/'], async (current) => {
@@ -26,6 +29,7 @@ export function CrewView(): ReactElement {
     return { value: await read('coordinator.member'), model: await read('coordinator.model') };
   });
   const [hireError, setHireError] = useState<string | null>(null);
+  const [defining, setDefining] = useState(false);
   const hiredRoles = new Set((crew.data?.crew ?? []).map((member) => member.roleId));
   const model = coordinator.data?.model;
 
@@ -68,20 +72,43 @@ export function CrewView(): ReactElement {
         ))}
       </div>
       <section className="stack" aria-labelledby="roles-heading">
-        <h2 id="roles-heading">Roles</h2>
+        <div className="row spread wrap">
+          <h2 id="roles-heading">Roles</h2>
+          {!defining && (
+            <button
+              className="button"
+              onClick={() => {
+                setDefining(true);
+              }}
+            >
+              <PlusIcon aria-hidden="true" /> New role
+            </button>
+          )}
+        </div>
         <p className="muted">
           Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator
-          or run “Hire agent” from the command palette.
+          or run “Hire agent” from the command palette. You can define roles of your own, and so can
+          the coordinator.
         </p>
         {hireError !== null && (
           <p className="error" role="alert">
             {hireError}
           </p>
         )}
+        {defining && (
+          <RoleForm
+            onDone={() => {
+              setDefining(false);
+            }}
+          />
+        )}
         <div className="grid">
           {(roles.data?.roles ?? []).map((role) => (
             <article key={role.id} className="card stack">
-              <h3>{role.name}</h3>
+              <div className="row spread">
+                <h3>{role.name}</h3>
+                {role.custom && <span className="tag neutral">Custom</span>}
+              </div>
               <p className="muted">{role.summary}</p>
               <div className="row">
                 {hiredRoles.has(role.id) ? (
@@ -102,12 +129,172 @@ export function CrewView(): ReactElement {
                     <UserPlusIcon aria-hidden="true" /> Hire {role.name}
                   </button>
                 )}
+                {role.custom && !hiredRoles.has(role.id) && (
+                  <ConfirmButton
+                    label="Delete role"
+                    question="Delete this role for good?"
+                    onConfirm={() => {
+                      runCommand(imp, 'crew.role.delete', { id: role.id }).catch(
+                        (error: unknown) => {
+                          setHireError(messageOf(error));
+                        },
+                      );
+                    }}
+                  >
+                    <TrashIcon aria-hidden="true" />
+                  </ConfirmButton>
+                )}
               </div>
             </article>
           ))}
         </div>
       </section>
     </>
+  );
+}
+
+/** Defines a custom role. What it may use is picked from the groups of commands that exist. */
+function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
+  const imp = useImp();
+  const groups = [
+    ...new Set(imp.registry.list().map((command) => command.id.split('.')[0] ?? command.id)),
+  ].sort();
+  const [name, setName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [brief, setBrief] = useState('');
+  const [chosen, setChosen] = useState<readonly string[]>([]);
+  const [change, setChange] = useState(true);
+  const [spend, setSpend] = useState(false);
+  const [destroy, setDestroy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    runCommand(imp, 'crew.role.create', {
+      name: name.trim(),
+      summary: summary.trim(),
+      brief: brief.trim(),
+      commands: chosen.map((group) => `${group}.`),
+      effects: [
+        'read',
+        ...(change ? ['write'] : []),
+        ...(spend ? ['spend'] : []),
+        ...(destroy ? ['destructive'] : []),
+      ],
+    }).then(onDone, (reason: unknown) => {
+      setError(messageOf(reason));
+    });
+  };
+  const toggle = (group: string): void => {
+    setChosen(
+      chosen.includes(group) ? chosen.filter((item) => item !== group) : [...chosen, group],
+    );
+  };
+
+  return (
+    <form className="card stack page" onSubmit={submit} aria-label="New role">
+      <div className="field">
+        <label htmlFor="role-name">Name</label>
+        <input
+          id="role-name"
+          className="input"
+          value={name}
+          placeholder="Dialogue Polisher"
+          onChange={(event) => {
+            setName(event.target.value);
+          }}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="role-summary">In one line</label>
+        <input
+          id="role-summary"
+          className="input"
+          value={summary}
+          placeholder="Tightens dialogue without changing what is said."
+          onChange={(event) => {
+            setSummary(event.target.value);
+          }}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor="role-brief">Instructions</label>
+        <textarea
+          id="role-brief"
+          className="input"
+          rows={5}
+          value={brief}
+          placeholder="What this agent does, how it works and what it must respect."
+          onChange={(event) => {
+            setBrief(event.target.value);
+          }}
+        />
+      </div>
+      <fieldset className="choices">
+        <legend>May use</legend>
+        {groups.map((group) => (
+          <label key={group} className="choice">
+            <input
+              type="checkbox"
+              checked={chosen.includes(group)}
+              onChange={() => {
+                toggle(group);
+              }}
+            />
+            {group}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset className="choices">
+        <legend>Beyond reading, may</legend>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={change}
+            onChange={() => {
+              setChange(!change);
+            }}
+          />
+          change things
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={spend}
+            onChange={() => {
+              setSpend(!spend);
+            }}
+          />
+          ask to spend money
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={destroy}
+            onChange={() => {
+              setDestroy(!destroy);
+            }}
+          />
+          ask to delete things
+        </label>
+      </fieldset>
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="row">
+        <button
+          className="button primary"
+          disabled={name.trim() === '' || brief.trim() === '' || chosen.length === 0}
+        >
+          Create the role
+        </button>
+        <button type="button" className="button quiet" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

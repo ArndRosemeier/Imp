@@ -340,4 +340,36 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /Start over/ }));
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
   });
+
+  it('defines a custom role, hires for it and deletes it again', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: /New role/ }));
+    const form = screen.getByRole('form', { name: 'New role' });
+    await user.type(within(form).getByLabelText('Name'), 'Dialogue Polisher');
+    await user.type(within(form).getByLabelText('Instructions'), 'Tighten the dialogue.');
+    expect(within(form).getByRole('button', { name: /Create the role/ })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    await user.click(within(form).getByLabelText('movie'));
+    // A critic reads and does not change anything.
+    await user.click(within(form).getByLabelText('change things'));
+    await user.click(within(form).getByLabelText('ask to delete things'));
+    await user.click(within(form).getByRole('button', { name: /Create the role/ }));
+
+    await user.click(await screen.findByRole('button', { name: /Hire Dialogue Polisher/ }));
+    await screen.findByLabelText('Talking to');
+    expect(await imp.store.get('roles/dialogue-polisher')).toMatchObject({
+      scope: { prefixes: ['movie.'], effects: ['read', 'destructive'] },
+    });
+    // A role someone holds cannot be deleted, so the button is offered only after dismissal.
+    expect(screen.queryByRole('button', { name: /Delete role/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Dismiss Dialogue Polisher' }));
+    await user.click(await screen.findByRole('button', { name: /Delete role/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('roles/dialogue-polisher')).toBeUndefined();
+    });
+  });
 });
