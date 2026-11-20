@@ -6,7 +6,15 @@ import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
   ChatsCircleIcon,
+  FilmReelIcon,
   FilmSlateIcon,
+  LightbulbIcon,
+  MapPinIcon,
+  MaskHappyIcon,
+  MicrophoneIcon,
+  ScrollIcon,
+  VideoCameraIcon,
+  WaveformIcon,
   GearSixIcon,
   MagnifyingGlassIcon,
   MoonIcon,
@@ -26,6 +34,21 @@ import { Resizer, usePanelWidth } from './Resizer.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
+
+/**
+ * One icon per stage, so the stages stay apart when the navigation shrinks
+ * to a rail of icons, as it does on a tablet.
+ */
+const STAGE_ICONS: Readonly<Record<string, Icon>> = {
+  development: LightbulbIcon,
+  script: ScrollIcon,
+  casting: MaskHappyIcon,
+  design: MapPinIcon,
+  shots: VideoCameraIcon,
+  sound: WaveformIcon,
+  edit: FilmReelIcon,
+  audio: MicrophoneIcon,
+};
 
 const WORKSPACE: readonly { id: string; label: string; icon: Icon }[] = [
   { id: 'projects', label: 'Projects', icon: SquaresFourIcon },
@@ -233,19 +256,22 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       </header>
       <nav className="nav" aria-label="Workspace">
         <div className="eyebrow">{mode?.name ?? 'Project'}</div>
-        {stages.map((stage) => (
-          <button
-            key={stage.id}
-            className="nav-item"
-            aria-current={view === stage.id ? 'page' : undefined}
-            onClick={() => {
-              setView(stage.id);
-            }}
-          >
-            <FilmSlateIcon aria-hidden="true" size={18} />
-            <span>{stage.name}</span>
-          </button>
-        ))}
+        {stages.map((stage) => {
+          const StageIcon = STAGE_ICONS[stage.id] ?? FilmSlateIcon;
+          return (
+            <button
+              key={stage.id}
+              className="nav-item"
+              aria-current={view === stage.id ? 'page' : undefined}
+              onClick={() => {
+                setView(stage.id);
+              }}
+            >
+              <StageIcon aria-hidden="true" size={18} />
+              <span>{stage.name}</span>
+            </button>
+          );
+        })}
         <div className="eyebrow">Workspace</div>
         {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
           <button
