@@ -2,7 +2,7 @@
 import { MemoryKeyValueStore, settingsGet } from '@imp/core';
 import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
@@ -52,6 +52,7 @@ async function completeSetup(user: ReturnType<typeof userEvent.setup>) {
 beforeAll(() => {
   // jsdom implements neither scrolling nor the modal dialog methods.
   Element.prototype.scrollIntoView = () => undefined;
+  Element.prototype.setPointerCapture = () => undefined;
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
     this.open = true;
   };
@@ -240,5 +241,39 @@ describe('App', () => {
     expect(provider.requests[0]?.messages[0]?.content).toContain(`projectId "${projectId}"`);
     await user.click(screen.getByRole('button', { name: 'Script' }));
     expect(await screen.findByRole('tab', { name: /1 · EXT\. HARBOUR - DUSK/ })).toBeTruthy();
+  });
+
+  it('resizes the side panels with the keyboard and remembers the widths', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    const nav = screen.getByRole('separator', { name: 'Resize the navigation' });
+    const crew = screen.getByRole('separator', { name: 'Resize the crew panel' });
+    expect(nav.getAttribute('aria-valuenow')).toBe('220');
+
+    nav.focus();
+    await user.keyboard('{ArrowRight}{ArrowRight}');
+    expect(nav.getAttribute('aria-valuenow')).toBe('252');
+    await user.keyboard('{Home}');
+    expect(nav.getAttribute('aria-valuenow')).toBe('168');
+
+    // The crew panel is on the right, so it grows towards the left.
+    crew.focus();
+    await user.keyboard('{ArrowLeft}');
+    expect(crew.getAttribute('aria-valuenow')).toBe('376');
+    expect(localStorage.getItem('imp.width.crew')).toBe('376');
+    expect(
+      document.querySelector<HTMLElement>('.shell')?.style.getPropertyValue('--crew-width'),
+    ).toBe('376px');
+
+    // Dragging the left edge of the crew panel 100 px to the left widens it by 100 px.
+    fireEvent.pointerDown(crew, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerMove(crew, { clientX: 800, pointerId: 1 });
+    fireEvent.pointerUp(crew, { pointerId: 1 });
+    fireEvent.pointerMove(crew, { clientX: 500, pointerId: 1 });
+    expect(crew.getAttribute('aria-valuenow')).toBe('476');
+
+    await user.dblClick(crew);
+    expect(crew.getAttribute('aria-valuenow')).toBe('360');
+    expect(localStorage.getItem('imp.width.crew')).toBeNull();
   });
 });
