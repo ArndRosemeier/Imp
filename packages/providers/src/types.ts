@@ -70,6 +70,11 @@ export interface ChatRequest {
   readonly model: string;
   readonly messages: readonly ChatMessage[];
   readonly tools?: readonly ToolDefinition[];
+  /**
+   * Lets the model look things up on the web while it answers. The provider
+   * runs the searches; they are part of the cost of the call.
+   */
+  readonly webSearch?: boolean;
   readonly temperature?: number;
   readonly maxOutputTokens?: number;
 }

@@ -45,7 +45,8 @@ export function toInput(fields: readonly Field[], values: Record<string, string>
   for (const field of fields) {
     const raw = values[field.name] ?? '';
     if (field.kind === 'boolean') {
-      input[field.name] = raw === 'true';
+      // An untouched box says nothing, so the command's own default applies.
+      if (raw !== '') input[field.name] = raw === 'true';
     } else if (raw.trim() !== '') {
       input[field.name] =
         field.kind === 'number' ? Number(raw) : field.kind === 'json' ? JSON.parse(raw) : raw;
@@ -96,11 +97,12 @@ function CommandForm({ command, onBack }: { command: Command; onBack: () => void
           {field.kind === 'boolean' ? (
             <select
               className="input"
-              value={values[field.name] ?? 'false'}
+              value={values[field.name] ?? ''}
               onChange={(event) => {
                 setValues({ ...values, [field.name]: event.target.value });
               }}
             >
+              <option value="">As it is by default</option>
               <option value="false">No</option>
               <option value="true">Yes</option>
             </select>

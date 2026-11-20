@@ -22,6 +22,8 @@ export interface Role {
    * Left out, every command in scope is a tool.
    */
   readonly direct?: readonly string[];
+  /** Whether agents hired for this role can search the web unless the hire says otherwise. */
+  readonly webSearch?: boolean;
 }
 
 export const ROLE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
@@ -39,6 +41,7 @@ export const StoredRole = z.object({
     effects: z.array(z.enum(['read', 'write', 'spend', 'destructive'])).min(1),
     prefixes: z.array(z.string().min(1)).min(1),
   }),
+  webSearch: z.boolean().default(false),
 });
 export type StoredRole = z.infer<typeof StoredRole>;
 
@@ -49,6 +52,7 @@ function toRole(stored: StoredRole): Role {
     summary: stored.summary,
     brief: stored.brief,
     scope: { prefixes: stored.scope.prefixes, effects: stored.scope.effects },
+    webSearch: stored.webSearch,
   };
 }
 

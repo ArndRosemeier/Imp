@@ -126,6 +126,9 @@ function kindForStatus(status: number): ProviderErrorKind {
 }
 
 /** Talks to OpenRouter's HTTP API. Holds no state besides its options. */
+/** OpenRouter's own search tool. It replaced the `web` plugin and the `:online` suffix. */
+const WEB_SEARCH_TOOL = 'openrouter:web_search';
+
 export function createOpenRouterProvider(options: OpenRouterOptions): GenerationProvider {
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 
@@ -223,13 +226,16 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
     },
 
     async chat(request: ChatRequest, call = {}): Promise<ChatResponse> {
+      // Web search is a tool OpenRouter runs itself, listed beside the ones the caller runs.
+      const tools = [
+        ...(request.tools ?? []),
+        ...(request.webSearch === true ? [{ type: WEB_SEARCH_TOOL }] : []),
+      ];
       const body = {
         model: request.model,
         messages: request.messages.map(toWireMessage),
         usage: { include: true },
-        ...(request.tools !== undefined && request.tools.length > 0
-          ? { tools: request.tools }
-          : {}),
+        ...(tools.length > 0 ? { tools } : {}),
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
         ...(request.maxOutputTokens === undefined ? {} : { max_tokens: request.maxOutputTokens }),
       };

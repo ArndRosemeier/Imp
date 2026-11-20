@@ -15,6 +15,8 @@ export const CrewMember = z.object({
   model: z.string().min(1),
   /** The most this agent may spend on a single run, in US dollars. */
   budgetUsdPerRun: z.number().positive(),
+  /** Whether this agent can look things up on the web while it works. */
+  webSearch: z.boolean().default(false),
   hiredAt: z.iso.datetime(),
 });
 export type CrewMember = z.infer<typeof CrewMember>;
@@ -45,6 +47,11 @@ const RoleFields = {
     .min(1)
     .describe(
       'Which kinds of command the role may use. Spending and destroying are still put to the user first.',
+    ),
+  webSearch: z
+    .boolean()
+    .describe(
+      'Whether agents in this role can search the web, for research, fact checks or references. Each search costs about a cent.',
     ),
 };
 
@@ -130,6 +137,7 @@ export function createCrewCommands(
       brief: z.string(),
       commands: z.array(z.string()),
       effects: z.array(z.string()),
+      webSearch: z.boolean(),
     }),
     handler: async ({ runtime }, { id }) => {
       const role = (await roles.all(runtime.store)).find((candidate) => candidate.id === id);
@@ -144,6 +152,7 @@ export function createCrewCommands(
         brief: role.brief,
         commands: [...(role.scope.prefixes ?? [''])],
         effects: [...(role.scope.effects ?? ['read', 'write', 'spend', 'destructive'])],
+        webSearch: role.webSearch ?? false,
       };
     },
   });
@@ -163,6 +172,7 @@ export function createCrewCommands(
         .describe('Lower-case and dashed. Defaults to the name in that form.'),
       summary: RoleFields.summary.default(''),
       effects: RoleFields.effects.default(['read', 'write']),
+      webSearch: RoleFields.webSearch.default(false),
     }),
     output: StoredRole,
     handler: async ({ runtime }, input) => {
@@ -184,6 +194,7 @@ export function createCrewCommands(
         summary: input.summary,
         brief: input.brief,
         scope: { prefixes: input.commands, effects: input.effects },
+        webSearch: input.webSearch,
       };
       await runtime.store.batch([{ type: 'put', key: `${CUSTOM_ROLE_PREFIX}${id}`, value: role }]);
       return role;
@@ -210,6 +221,7 @@ export function createCrewCommands(
           prefixes: changes.commands ?? current.scope.prefixes,
           effects: changes.effects ?? current.scope.effects,
         },
+        webSearch: changes.webSearch ?? current.webSearch,
       };
       await runtime.store.batch([{ type: 'put', key: `${CUSTOM_ROLE_PREFIX}${id}`, value: role }]);
       return role;
@@ -251,6 +263,12 @@ export function createCrewCommands(
       model: z.string().min(1).describe('A model id from the provider catalog.'),
       name: z.string().min(1).optional().describe('Display name. Defaults to the role name.'),
       budgetUsdPerRun: z.number().positive().default(1),
+      webSearch: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the agent can search the web while it works. Defaults to what the role says.',
+        ),
     }),
     output: CrewMember,
     handler: async ({ runtime }, input) => {
@@ -270,11 +288,43 @@ export function createCrewCommands(
         name: input.name ?? role.name,
         model: input.model,
         budgetUsdPerRun: input.budgetUsdPerRun,
+        webSearch: input.webSearch ?? role.webSearch ?? false,
         hiredAt: runtime.now().toISOString(),
       };
       await runtime.store.batch([
         { type: 'put', key: `${CREW_PREFIX}${member.id}`, value: member },
       ]);
+      return member;
+    },
+  });
+
+  const update = defineCommand({
+    id: 'crew.update',
+    title: 'Change agent',
+    description:
+      'Changes an agent on the crew: its name, model, budget per run, or whether it can search the web. Fields left out stay as they are. The conversation with it is kept.',
+    effect: 'write',
+    input: z.object({
+      id: z.string().describe('A crew member id from crew.list.'),
+      name: z.string().min(1).optional(),
+      model: z.string().min(1).optional().describe('A model id from models.list.'),
+      budgetUsdPerRun: z.number().positive().optional(),
+      webSearch: z.boolean().optional(),
+    }),
+    output: CrewMember,
+    handler: async ({ runtime }, { id, ...changes }) => {
+      const current = await readCrewMember(runtime.store, id);
+      if (current === undefined) {
+        throw new CommandError('invalid_input', 'crew.update', `No crew member "${id}".`);
+      }
+      const member: CrewMember = {
+        ...current,
+        name: changes.name ?? current.name,
+        model: changes.model ?? current.model,
+        budgetUsdPerRun: changes.budgetUsdPerRun ?? current.budgetUsdPerRun,
+        webSearch: changes.webSearch ?? current.webSearch,
+      };
+      await runtime.store.batch([{ type: 'put', key: `${CREW_PREFIX}${id}`, value: member }]);
       return member;
     },
   });
@@ -309,5 +359,5 @@ export function createCrewCommands(
     },
   });
 
-  return [roleList, roleGet, roleCreate, roleUpdate, roleDelete, hire, list, dismiss];
+  return [roleList, roleGet, roleCreate, roleUpdate, roleDelete, hire, update, list, dismiss];
 }
