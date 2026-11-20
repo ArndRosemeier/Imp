@@ -22,4 +22,6 @@ export {
   EMPTY_DEVELOPMENT,
   MODE_ID,
   Scene,
+  VoiceSample,
 } from './schema.js';
+export { createCharacterVoiceCommands, SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';

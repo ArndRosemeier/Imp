@@ -21,6 +21,8 @@ export {
   type ImageResponse,
   type Modality,
   type ModelInfo,
+  type SpeechRequest,
+  type SpeechResponse,
   type ToolCall,
   type Usage,
 } from './types.js';

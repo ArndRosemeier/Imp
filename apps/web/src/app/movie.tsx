@@ -1,9 +1,16 @@
 import type { Project } from '@imp/core';
-import { Character, Development, IMAGE_MODEL_SETTING, Scene } from '@imp/mode-movie';
+import {
+  Character,
+  Development,
+  IMAGE_MODEL_SETTING,
+  Scene,
+  SPEECH_MODEL_SETTING,
+} from '@imp/mode-movie';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   FilmSlateIcon,
+  MicrophoneIcon,
   PlusIcon,
   SparkleIcon,
   TrashIcon,
@@ -291,16 +298,17 @@ const CHARACTER_FIELDS: readonly {
 const ImageModels = z.object({ models: z.array(z.object({ id: z.string(), name: z.string() })) });
 const StringSetting = z.object({ value: z.json() });
 
-/** Reads the setting that names the image model, and the models it can be set to. */
-function useImageModel(): {
+/** Reads a setting that names a generation model, and the models it can be set to. */
+function useModelSetting(
+  key: string,
+  output: 'image' | 'speech',
+): {
   model: string | null;
   models: readonly { id: string; name: string }[];
   error: string | null;
 } {
-  const setting = useLive([`settings/${IMAGE_MODEL_SETTING}`], async (imp) => {
-    const { value } = StringSetting.parse(
-      await runCommand(imp, 'settings.get', { key: IMAGE_MODEL_SETTING }),
-    );
+  const setting = useLive([`settings/${key}`], async (imp) => {
+    const { value } = StringSetting.parse(await runCommand(imp, 'settings.get', { key }));
     return typeof value === 'string' && value !== '' ? value : null;
   });
   // The catalog does not live in the store, so it is read once per visit.
@@ -311,7 +319,7 @@ function useImageModel(): {
   });
   useEffect(() => {
     let active = true;
-    runCommand(imp, 'models.list', { output: 'image' }).then(
+    runCommand(imp, 'models.list', { output }).then(
       (listed) => {
         if (active) setCatalog({ data: ImageModels.parse(listed), error: null });
       },
@@ -322,7 +330,7 @@ function useImageModel(): {
     return () => {
       active = false;
     };
-  }, [imp]);
+  }, [imp, output]);
   return {
     model: setting.data ?? null,
     models: catalog.data?.models ?? [],
@@ -363,7 +371,7 @@ function CharacterImages({
 }: {
   character: Character;
   model: string | null;
-  act: (id: string, input: Record<string, unknown>) => Promise<unknown>;
+  act: Act;
 }): ReactElement {
   const directionId = useId();
   const [direction, setDirection] = useState('');
@@ -456,6 +464,143 @@ function CharacterImages({
   );
 }
 
+type Act = (id: string, input: Record<string, unknown>) => Promise<unknown>;
+
+function ModelPicker({
+  id,
+  label,
+  empty,
+  setting,
+  choice,
+  act,
+}: {
+  id: string;
+  label: string;
+  empty: string;
+  setting: string;
+  choice: ReturnType<typeof useModelSetting>;
+  act: Act;
+}): ReactElement {
+  return (
+    <div className="field model-picker">
+      <label htmlFor={id}>{label}</label>
+      <select
+        id={id}
+        className="select"
+        value={choice.model ?? ''}
+        onChange={(event) => {
+          void act('settings.set', { key: setting, value: event.target.value });
+        }}
+      >
+        {choice.model === null && <option value="">{empty}</option>}
+        {choice.model !== null && !choice.models.some((model) => model.id === choice.model) && (
+          <option value={choice.model}>{choice.model}</option>
+        )}
+        {choice.models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** The recording of a character's voice: play it, and record a line with a delivery. */
+function CharacterVoice({
+  character,
+  model,
+  act,
+}: {
+  character: Character;
+  model: string | null;
+  act: Act;
+}): ReactElement {
+  const lineId = useId();
+  const deliveryId = useId();
+  const [line, setLine] = useState('');
+  const [delivery, setDelivery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const sample = character.voiceSample;
+  const url = useBlobUrl(sample?.blobKey);
+  const at = { characterId: character.id };
+
+  const record = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    setBusy(true);
+    void act('movie.character.voice.generate', {
+      ...at,
+      ...(line.trim() === '' ? {} : { line: line.trim() }),
+      ...(delivery.trim() === '' ? {} : { delivery: delivery.trim() }),
+    }).finally(() => {
+      setBusy(false);
+    });
+  };
+
+  return (
+    <form className="stack voice" onSubmit={record} aria-label={`Voice of ${character.name}`}>
+      {sample !== null && (
+        <figure className="voice-sample">
+          {url !== null && (
+            // The words spoken are the caption below; a generated clip has no caption track.
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <audio controls src={url} aria-label={`Voice sample of ${character.name}`} />
+          )}
+          <figcaption className="muted">“{sample.line}”</figcaption>
+        </figure>
+      )}
+      <div className="field">
+        <label htmlFor={lineId}>Line to record</label>
+        <input
+          id={lineId}
+          type="text"
+          className="input"
+          value={line}
+          placeholder={`Hello. My name is ${character.name}.`}
+          onChange={(event) => {
+            setLine(event.target.value);
+          }}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={deliveryId}>Delivery</label>
+        <input
+          id={deliveryId}
+          type="text"
+          className="input"
+          value={delivery}
+          placeholder="Shouting over a storm, out of breath"
+          onChange={(event) => {
+            setDelivery(event.target.value);
+          }}
+        />
+      </div>
+      <div className="row wrap">
+        <button
+          type="submit"
+          className="button"
+          disabled={busy || model === null}
+          title={model === null ? 'Choose a voice model first.' : `Spoken by ${model}`}
+        >
+          <MicrophoneIcon aria-hidden="true" />{' '}
+          {busy ? 'Recording…' : sample === null ? 'Record voice' : 'Record again'}
+        </button>
+        {sample !== null && (
+          <ConfirmButton
+            label="Delete recording"
+            question="Delete this recording for good?"
+            onConfirm={() => {
+              void act('movie.character.voice.delete', at);
+            }}
+          >
+            <TrashIcon aria-hidden="true" />
+          </ConfirmButton>
+        )}
+      </div>
+    </form>
+  );
+}
+
 export function CastingView({ project }: { project: Project }): ReactElement {
   const listed = useLive([moviePrefix(project)], async (imp) =>
     CharacterList.parse(
@@ -463,7 +608,8 @@ export function CastingView({ project }: { project: Project }): ReactElement {
     ),
   );
   const { act, error } = useAct(project);
-  const images = useImageModel();
+  const images = useModelSetting(IMAGE_MODEL_SETTING, 'image');
+  const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
   const characters = listed.data?.characters ?? [];
   return (
     <>
@@ -481,28 +627,25 @@ export function CastingView({ project }: { project: Project }): ReactElement {
           <PlusIcon aria-hidden="true" /> Add character
         </button>
       </div>
-      <div className="field image-model">
-        <label htmlFor="image-model">Image model</label>
-        <select
+      <div className="row wrap model-pickers">
+        <ModelPicker
           id="image-model"
-          className="select"
-          value={images.model ?? ''}
-          onChange={(event) => {
-            void act('settings.set', { key: IMAGE_MODEL_SETTING, value: event.target.value });
-          }}
-        >
-          {images.model === null && <option value="">Choose a model to make portraits</option>}
-          {images.model !== null && !images.models.some(({ id }) => id === images.model) && (
-            <option value={images.model}>{images.model}</option>
-          )}
-          {images.models.map(({ id, name }) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
+          label="Image model"
+          empty="Choose a model to make portraits"
+          setting={IMAGE_MODEL_SETTING}
+          choice={images}
+          act={act}
+        />
+        <ModelPicker
+          id="speech-model"
+          label="Voice model"
+          empty="Choose a model to record voices"
+          setting={SPEECH_MODEL_SETTING}
+          choice={speech}
+          act={act}
+        />
       </div>
-      <Problem text={listed.error ?? error ?? images.error} />
+      <Problem text={listed.error ?? error ?? images.error ?? speech.error} />
       {listed.data !== undefined && characters.length === 0 && (
         <p className="muted">
           Nobody is cast yet. Add a character, or ask the Casting Director to build the cast from
@@ -535,6 +678,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                 }
               />
             ))}
+            <CharacterVoice character={character} model={speech.model} act={act} />
             <div className="row">
               <ConfirmButton
                 label="Delete character"

@@ -29,6 +29,7 @@ function start(replies: readonly ScriptedChatReply[] = []) {
       model('vendor/writer'),
       model('~vendor/latest'),
       model('vendor/painter', { outputModalities: ['image'] }),
+      model('vendor/speaker', { outputModalities: ['speech'] }),
       model('vendor/no-tools', { supportsTools: false }),
     ],
   });
@@ -263,6 +264,30 @@ describe('App', () => {
     await vi.waitFor(async () => {
       expect((await stored()).images).toHaveLength(1);
       expect(await imp.blobs.list('')).toHaveLength(1);
+    });
+
+    // The voice: nothing before a model is chosen, then a line with its delivery.
+    const voice = within(card).getByRole('form', { name: 'Voice of New character' });
+    const recordButton = within(voice).getByRole('button', { name: /Record voice/ });
+    expect(recordButton).toHaveProperty('disabled', true);
+    await user.selectOptions(screen.getByLabelText('Voice model'), 'vendor/speaker');
+    await vi.waitFor(() => {
+      expect(recordButton).toHaveProperty('disabled', false);
+    });
+    await user.type(within(voice).getByLabelText('Line to record'), 'Get back!');
+    await user.type(within(voice).getByLabelText('Delivery'), 'Shouting.');
+    await user.click(recordButton);
+    expect(await within(voice).findByLabelText('Voice sample of New character')).toBeTruthy();
+    expect(provider.speechRequests[0]).toMatchObject({
+      model: 'vendor/speaker',
+      text: 'Get back!',
+      instructions: expect.stringContaining('Delivery: Shouting.') as string,
+    });
+    await user.click(within(voice).getByRole('button', { name: /Delete recording/ }));
+    await user.click(within(voice).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(async () => {
+      expect(await imp.blobs.list('')).toHaveLength(1);
+      expect(within(voice).queryByLabelText('Voice sample of New character')).toBeNull();
     });
   });
 

@@ -10,7 +10,11 @@ export interface HttpRequest {
 export interface HttpResponse {
   readonly ok: boolean;
   readonly status: number;
+  /** The media type the server gave for the body, or null when it gave none. */
+  readonly contentType: string | null;
   text(): Promise<string>;
+  /** The body as it came, for audio and other binary answers. Never decoded as text. */
+  bytes(): Promise<Uint8Array>;
 }
 
 /**

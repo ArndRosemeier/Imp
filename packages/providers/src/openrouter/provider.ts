@@ -17,6 +17,8 @@ import {
   type ImageResponse,
   type Modality,
   type ModelInfo,
+  type SpeechRequest,
+  type SpeechResponse,
   type ToolCall,
 } from '../types.js';
 import {
@@ -203,8 +205,9 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
     body: unknown,
     call: CallOptions,
     authenticated: boolean,
-  ): Promise<unknown> {
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    binary = false,
+  ): Promise<{ json: unknown; bytes: Uint8Array | null; contentType: string | null }> {
+    const headers: Record<string, string> = { Accept: binary ? '*/*' : 'application/json' };
     if (authenticated) {
       headers['Authorization'] = `Bearer ${await options.apiKey()}`;
     }
@@ -217,6 +220,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
 
     let response: HttpResponse;
     let text: string;
+    let bytes: Uint8Array | null = null;
     try {
       response = await options.fetch(`${baseUrl}${path}`, {
         method,
@@ -224,7 +228,13 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         ...(call.signal === undefined ? {} : { signal: call.signal }),
       });
-      text = await response.text();
+      // A refusal is JSON even where the answer is binary.
+      if (binary && response.ok) {
+        bytes = await response.bytes();
+        text = '';
+      } else {
+        text = await response.text();
+      }
     } catch (cause) {
       throw new ProviderError('network', OPENROUTER_ID, 'Could not reach OpenRouter.', { cause });
     }
@@ -246,8 +256,11 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         { status: response.status },
       );
     }
-    return json;
+    return { json, bytes, contentType: response.contentType };
   }
+
+  const sendJson = async (...args: Parameters<typeof send>): Promise<unknown> =>
+    (await send(...args)).json;
 
   function parse<S extends z.ZodType>(schema: S, json: unknown, what: string): z.output<S> {
     const parsed = schema.safeParse(json);
@@ -271,7 +284,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
 
     async listModels(call = {}): Promise<readonly ModelInfo[]> {
       // Without this parameter the catalog omits image, speech and video models.
-      const json = await send('/models?output_modalities=all', 'GET', undefined, call, false);
+      const json = await sendJson('/models?output_modalities=all', 'GET', undefined, call, false);
       return parse(ModelsResponse, json, 'the model catalog').data.map((model) => ({
         id: model.id,
         name: model.name ?? model.id,
@@ -287,7 +300,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
     },
 
     async verifyCredentials(call = {}): Promise<void> {
-      await send('/key', 'GET', undefined, call, true);
+      await sendJson('/key', 'GET', undefined, call, true);
     },
 
     async chat(request: ChatRequest, call = {}): Promise<ChatResponse> {
@@ -304,7 +317,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
         ...(request.maxOutputTokens === undefined ? {} : { max_tokens: request.maxOutputTokens }),
       };
-      const json = await send('/chat/completions', 'POST', body, call, true);
+      const json = await sendJson('/chat/completions', 'POST', body, call, true);
       const completion = parse(ChatCompletionResponse, json, 'a chat completion');
       const choice = completion.choices[0];
       if (choice === undefined) {
@@ -341,7 +354,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(request.aspectRatio === undefined ? {} : { aspect_ratio: request.aspectRatio }),
         ...(request.seed === undefined ? {} : { seed: request.seed }),
       };
-      const json = await send('/images', 'POST', body, call, true);
+      const json = await sendJson('/images', 'POST', body, call, true);
       const generation = parse(ImageGenerationResponse, json, 'an image');
       const images = generation.data.map((image) => {
         const bytes = typeof image.b64_json === 'string' ? decodeBase64(image.b64_json) : undefined;
@@ -355,6 +368,27 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         return { bytes, mediaType: image.media_type ?? 'image/png' };
       });
       return { model: request.model, images, costUsd: generation.usage?.cost ?? null };
+    },
+
+    async generateSpeech(request: SpeechRequest, call = {}): Promise<SpeechResponse> {
+      const body = {
+        model: request.model,
+        input: request.text,
+        // Without a format the service answers with raw samples no player can open.
+        response_format: 'mp3',
+        ...(request.instructions === undefined ? {} : { instructions: request.instructions }),
+      };
+      const { bytes, contentType } = await send('/audio/speech', 'POST', body, call, true, true);
+      const mediaType = contentType?.split(';')[0]?.trim() ?? '';
+      if (bytes === null || bytes.length === 0 || !mediaType.startsWith('audio/')) {
+        throw new ProviderError(
+          'invalid_response',
+          OPENROUTER_ID,
+          'OpenRouter returned speech without readable audio.',
+        );
+      }
+      // The price of speech is not part of the answer.
+      return { model: request.model, audio: { bytes, mediaType }, costUsd: null };
     },
   };
 }

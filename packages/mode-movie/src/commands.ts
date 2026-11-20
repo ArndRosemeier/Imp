@@ -14,6 +14,7 @@ import {
   EMPTY_DEVELOPMENT,
   MODE_ID,
   Scene,
+  VoiceSample,
 } from './schema.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
@@ -222,7 +223,12 @@ export const sceneDelete = defineCommand({
 
 // Casting
 
-const CharacterFields = Character.omit({ id: true, images: true, portraitId: true });
+const CharacterFields = Character.omit({
+  id: true,
+  images: true,
+  portraitId: true,
+  voiceSample: true,
+});
 
 export const characterList = defineCommand({
   id: 'movie.character.list',
@@ -234,9 +240,12 @@ export const characterList = defineCommand({
   output: z.object({
     characters: z.array(
       // `images` is spelled out because a field with a default would otherwise fill itself in.
-      Character.omit({ images: true })
+      Character.omit({ images: true, voiceSample: true })
         .partial({ description: true, appearance: true, voice: true })
-        .extend({ images: z.array(CharacterImage).optional() }),
+        .extend({
+          images: z.array(CharacterImage).optional(),
+          voiceSample: VoiceSample.nullable().optional(),
+        }),
     ),
   }),
   handler: async ({ runtime }, { projectId, full }) => {
@@ -296,7 +305,13 @@ export const characterCreate = defineCommand({
   output: Character,
   handler: async ({ runtime }, { projectId, ...fields }) => {
     await requireProject(runtime.store, 'movie.character.create', projectId, MODE_ID);
-    const character: Character = { id: runtime.newId(), ...fields, images: [], portraitId: null };
+    const character: Character = {
+      id: runtime.newId(),
+      ...fields,
+      images: [],
+      portraitId: null,
+      voiceSample: null,
+    };
     await runtime.store.batch([
       { type: 'put', key: `${characterPrefix(projectId)}${character.id}`, value: character },
     ]);
@@ -332,6 +347,7 @@ export const characterUpdate = defineCommand({
       voice: changes.voice ?? current.voice,
       images: current.images,
       portraitId: current.portraitId,
+      voiceSample: current.voiceSample,
     };
     await runtime.store.batch([{ type: 'put', key, value: next }]);
     return next;
@@ -341,7 +357,7 @@ export const characterUpdate = defineCommand({
 export const characterDelete = defineCommand({
   id: 'movie.character.delete',
   title: 'Delete character',
-  description: 'Removes a character from the cast. Its details and images are lost.',
+  description: 'Removes a character from the cast. Its details, images and voice sample are lost.',
   effect: 'destructive',
   input: z.object({ projectId: ProjectId, characterId: z.string() }),
   output: z.object({ characterId: z.string() }),

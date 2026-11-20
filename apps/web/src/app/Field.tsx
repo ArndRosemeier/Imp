@@ -86,6 +86,7 @@ export function ConfirmButton({
   if (!asking) {
     return (
       <button
+        type="button"
         className="button quiet"
         onClick={() => {
           setAsking(true);
@@ -99,6 +100,7 @@ export function ConfirmButton({
     <span className="row" role="group" aria-label={question}>
       <span className="muted">{question}</span>
       <button
+        type="button"
         className="button danger"
         onClick={() => {
           setAsking(false);
@@ -108,6 +110,7 @@ export function ConfirmButton({
         Delete
       </button>
       <button
+        type="button"
         className="button quiet"
         onClick={() => {
           setAsking(false);

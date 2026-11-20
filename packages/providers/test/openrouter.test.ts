@@ -497,6 +497,44 @@ describe('OpenRouter provider: images', () => {
     }
   });
 
+  it('asks for speech as mp3 and returns the bytes as they came', async () => {
+    const audio = new Uint8Array([73, 68, 51, 255, 0, 128]);
+    const { provider, calls } = setup(
+      { status: 200, bytes: audio, contentType: 'audio/mpeg; charset=binary' },
+      { status: 200, bytes: audio, contentType: 'audio/mpeg' },
+    );
+    expect(
+      await provider.generateSpeech({ model: 'v/speaker', text: 'Hello.', instructions: 'Low.' }),
+    ).toEqual({
+      model: 'v/speaker',
+      audio: { bytes: audio, mediaType: 'audio/mpeg' },
+      costUsd: null,
+    });
+    await provider.generateSpeech({ model: 'v/speaker', text: 'Hello.' });
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/audio/speech');
+    expect(calls.map((call) => JSON.parse(call.request.body ?? '') as unknown)).toEqual([
+      { model: 'v/speaker', input: 'Hello.', response_format: 'mp3', instructions: 'Low.' },
+      { model: 'v/speaker', input: 'Hello.', response_format: 'mp3' },
+    ]);
+  });
+
+  it('refuses speech that is not audio, and passes refusals on', async () => {
+    for (const reply of [
+      { status: 200, bytes: new Uint8Array(), contentType: 'audio/mpeg' },
+      { status: 200, bytes: new Uint8Array([1]), contentType: 'text/html' },
+    ]) {
+      const { provider } = setup(reply);
+      expect(await kindOf(provider.generateSpeech({ model: 'm', text: 'x' }))).toBe(
+        'invalid_response',
+      );
+    }
+    const { provider } = setup({ status: 402, body: { error: { message: 'No credit' } } });
+    await expect(provider.generateSpeech({ model: 'm', text: 'x' })).rejects.toMatchObject({
+      kind: 'insufficient_credit',
+      message: 'OpenRouter refused the request: No credit',
+    });
+  });
+
   it('passes provider refusals on', async () => {
     const { provider } = setup({ status: 402, body: { error: { message: 'No credit' } } });
     expect(await kindOf(provider.generateImage({ model: 'm', prompt: 'x' }))).toBe(

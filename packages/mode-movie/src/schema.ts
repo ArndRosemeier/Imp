@@ -35,6 +35,19 @@ export const CharacterImage = z.object({
 });
 export type CharacterImage = z.infer<typeof CharacterImage>;
 
+/** A spoken line in a character's voice, kept as a blob. */
+export const VoiceSample = z.object({
+  blobKey: z.string(),
+  mediaType: z.string(),
+  /** What is said in the recording. */
+  line: z.string(),
+  /** The direction the speech model was given. */
+  direction: z.string(),
+  model: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export type VoiceSample = z.infer<typeof VoiceSample>;
+
 export const Character = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -47,5 +60,7 @@ export const Character = z.object({
   images: z.array(CharacterImage).default([]),
   /** The image that stands for the character, or null while there is none. */
   portraitId: z.string().nullable().default(null),
+  /** A recording of how the character sounds, or null before one was made. */
+  voiceSample: VoiceSample.nullable().default(null),
 });
 export type Character = z.infer<typeof Character>;
