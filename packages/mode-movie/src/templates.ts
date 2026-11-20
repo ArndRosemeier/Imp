@@ -40,6 +40,7 @@ function build(draft: Draft) {
         portraitId: null,
         voiceSample: null,
         voiceOnly: false,
+        ownLane: false,
       };
       records.push({ key: character(value.id), value });
     }
