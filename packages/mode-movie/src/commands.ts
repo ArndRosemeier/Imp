@@ -28,6 +28,11 @@ export const shotPrefix = (projectId: string, sceneId?: string): string =>
 /** Sounds are kept under their scene too. */
 export const soundPrefix = (projectId: string, sceneId?: string): string =>
   `${base(projectId)}sounds/${sceneId === undefined ? '' : `${sceneId}/`}`;
+/** The cut of a scene. */
+export const editKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}edit/${sceneId}`;
+export const editHistoryKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}edit-history/${sceneId}`;
 export const movieSceneKey = (projectId: string, sceneId: string): string =>
   `${scenePrefix(projectId)}${sceneId}`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
@@ -224,6 +229,8 @@ export const sceneDelete = defineCommand({
     }
     await runtime.store.batch([
       { type: 'delete', key: `${scenePrefix(projectId)}${sceneId}` },
+      { type: 'delete', key: editKey(projectId, sceneId) },
+      { type: 'delete', key: editHistoryKey(projectId, sceneId) },
       ...[
         ...(await runtime.store.list(shotPrefix(projectId, sceneId))),
         ...(await runtime.store.list(soundPrefix(projectId, sceneId))),
