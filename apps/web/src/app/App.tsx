@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import type { ImpClient } from '@imp/host';
 import { ImpContext, messageOf, runCommand } from './context.js';
+import { OrientationNotice } from './OrientationNotice.js';
 import { Setup } from './Setup.js';
 import { Shell } from './Shell.js';
 
@@ -43,6 +44,7 @@ export function App({ imp }: { imp: ImpClient }): ReactElement {
   }
   return (
     <ImpContext value={imp}>
+      <OrientationNotice />
       {stage === 'setup' && (
         <Setup
           onDone={() => {

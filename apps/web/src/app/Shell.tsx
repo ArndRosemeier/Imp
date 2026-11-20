@@ -5,7 +5,16 @@ import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
+  ChatsCircleIcon,
+  FilmReelIcon,
   FilmSlateIcon,
+  LightbulbIcon,
+  MapPinIcon,
+  MaskHappyIcon,
+  MicrophoneIcon,
+  ScrollIcon,
+  VideoCameraIcon,
+  WaveformIcon,
   GearSixIcon,
   MagnifyingGlassIcon,
   MoonIcon,
@@ -20,10 +29,26 @@ import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { CrewPanel } from './CrewPanel.js';
+import { isCoarsePointer } from './gestures.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
+
+/**
+ * One icon per stage, so the stages stay apart when the navigation shrinks
+ * to a rail of icons, as it does on a tablet.
+ */
+const STAGE_ICONS: Readonly<Record<string, Icon>> = {
+  development: LightbulbIcon,
+  script: ScrollIcon,
+  casting: MaskHappyIcon,
+  design: MapPinIcon,
+  shots: VideoCameraIcon,
+  sound: WaveformIcon,
+  edit: FilmReelIcon,
+  audio: MicrophoneIcon,
+};
 
 const WORKSPACE: readonly { id: string; label: string; icon: Icon }[] = [
   { id: 'projects', label: 'Projects', icon: SquaresFourIcon },
@@ -51,6 +76,25 @@ function useTheme(): [string, () => void] {
   ];
 }
 
+/**
+ * Whether the crew panel is shown. Remembered in this browser; on a tablet
+ * narrower than 1200 pixels it starts closed, so the stage gets the room.
+ */
+function useCrewOpen(): [boolean, () => void] {
+  const [open, setOpen] = useState(() => {
+    const stored = localStorage.getItem('imp.crew.open');
+    if (stored !== null) return stored === 'true';
+    return !(isCoarsePointer() && window.innerWidth < 1200);
+  });
+  return [
+    open,
+    () => {
+      localStorage.setItem('imp.crew.open', String(!open));
+      setOpen(!open);
+    },
+  ];
+}
+
 function StageView({ stage, project }: { stage: string; project: Project }): ReactElement | null {
   if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
@@ -73,6 +117,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [creating, setCreating] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
+  const [crewOpen, toggleCrew] = useCrewOpen();
   const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
   const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
@@ -138,6 +183,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   return (
     <div
       className="shell"
+      data-crew={crewOpen ? 'open' : 'closed'}
       style={
         {
           '--nav-width': `${String(navWidth.value)}px`,
@@ -191,6 +237,16 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           <kbd>Ctrl K</kbd>
         </button>
         <button
+          className="button quiet crew-toggle"
+          aria-label="Crew panel"
+          aria-pressed={crewOpen}
+          aria-controls="crew-panel"
+          title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
+          onClick={toggleCrew}
+        >
+          <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
+        </button>
+        <button
           className="button quiet"
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           onClick={toggleTheme}
@@ -200,19 +256,22 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       </header>
       <nav className="nav" aria-label="Workspace">
         <div className="eyebrow">{mode?.name ?? 'Project'}</div>
-        {stages.map((stage) => (
-          <button
-            key={stage.id}
-            className="nav-item"
-            aria-current={view === stage.id ? 'page' : undefined}
-            onClick={() => {
-              setView(stage.id);
-            }}
-          >
-            <FilmSlateIcon aria-hidden="true" size={18} />
-            <span>{stage.name}</span>
-          </button>
-        ))}
+        {stages.map((stage) => {
+          const StageIcon = STAGE_ICONS[stage.id] ?? FilmSlateIcon;
+          return (
+            <button
+              key={stage.id}
+              className="nav-item"
+              aria-current={view === stage.id ? 'page' : undefined}
+              onClick={() => {
+                setView(stage.id);
+              }}
+            >
+              <StageIcon aria-hidden="true" size={18} />
+              <span>{stage.name}</span>
+            </button>
+          );
+        })}
         <div className="eyebrow">Workspace</div>
         {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
           <button
@@ -250,8 +309,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       </main>
       <ActivityStrip />
       <Resizer label="Resize the navigation" side="left" width={navWidth} />
-      <Resizer label="Resize the crew panel" side="right" width={crewWidth} />
-      <div className="crew">
+      {crewOpen && <Resizer label="Resize the crew panel" side="right" width={crewWidth} />}
+      <div className="crew" id="crew-panel">
         {crew.length > 1 && (
           <div className="field crew-switch">
             <label htmlFor="talking-to">Talking to</label>
