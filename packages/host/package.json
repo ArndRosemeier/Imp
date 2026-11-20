@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@imp/agents": "workspace:*",
+    "@imp/audio": "workspace:*",
     "@imp/core": "workspace:*",
     "@imp/mode-movie": "workspace:*",
     "@imp/providers": "workspace:*"
