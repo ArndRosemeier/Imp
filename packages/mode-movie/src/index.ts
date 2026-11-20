@@ -51,3 +51,5 @@ export {
   soundPrompt,
 } from './sounds.js';
 export { createCharacterVoiceCommands, SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
+export { movieCopier, movieProjectSupport, summarizeMovie } from './project.js';
+export { movieTemplates } from './templates.js';

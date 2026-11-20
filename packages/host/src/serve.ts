@@ -1,10 +1,11 @@
-import { inputSchemaOf } from '@imp/core';
+import { EXPORT_PREFIX, inputSchemaOf, UPLOAD_PREFIX } from '@imp/core';
 import type { Imp } from './imp.js';
 import type { Port } from './port.js';
 import { toWireError, type Calls, type Reply, type Request } from './protocol.js';
 import { createMemorySecretStore, type SecretStore } from './secrets.js';
 
 const USER = { kind: 'user', id: 'local' } as const;
+const UPLOAD_ID = /^[A-Za-z0-9-]{8,64}$/;
 
 /**
  * Answers the interface on one port. `open` builds the core around the secrets
@@ -20,6 +21,8 @@ export function serveImp(
   let opened: Promise<Imp> | undefined;
   const core = (): Promise<Imp> => (opened ??= Promise.resolve(open(secrets)));
   const subscriptions = new Map<number, () => void>();
+  /** Parts of files on their way in, by upload. */
+  const uploads = new Map<string, Uint8Array[]>();
   const send = (reply: Reply): void => {
     port.postMessage(reply);
   };
@@ -48,9 +51,30 @@ export function serveImp(
     },
     run: async (commandId, input) =>
       (await core()).registry.executeById(commandId, input, { actor: USER }),
-    blob: async (key) => {
-      const blob = await (await core()).blobs.get(key);
+    blob: async (key, take = false) => {
+      const imp = await core();
+      const blob = await imp.blobs.get(key);
+      if (take && key.startsWith(EXPORT_PREFIX)) await imp.blobs.delete(key);
       return blob === undefined ? undefined : { bytes: blob.bytes, mediaType: blob.mediaType };
+    },
+    upload: async (uploadId, part, last) => {
+      if (!UPLOAD_ID.test(uploadId)) throw new Error('Not an upload id.');
+      const parts = uploads.get(uploadId) ?? [];
+      parts.push(part);
+      if (last === null) {
+        uploads.set(uploadId, parts);
+        return null;
+      }
+      uploads.delete(uploadId);
+      const bytes = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+      let at = 0;
+      for (const p of parts) {
+        bytes.set(p, at);
+        at += p.length;
+      }
+      const key = `${UPLOAD_PREFIX}${uploadId}`;
+      await (await core()).blobs.put(key, { bytes, mediaType: last.mediaType });
+      return { key };
     },
     models: async () => (await core()).provider.listModels(),
     verify: async () => {
@@ -99,6 +123,7 @@ export function serveImp(
   // For when the other end goes away: stop telling it of changes.
   return () => {
     port.onmessage = null;
+    uploads.clear();
     for (const stop of subscriptions.values()) stop();
     subscriptions.clear();
   };

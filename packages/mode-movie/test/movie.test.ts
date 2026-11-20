@@ -73,7 +73,14 @@ describe('the movie mode', () => {
     const outside = projectCommands.filter((command: Command) =>
       isInScope(command, screenwriter.scope),
     );
-    expect(outside.map((command) => command.id)).toEqual(['project.list']);
+    expect(outside.map((command) => command.id).sort()).toEqual([
+      'project.list',
+      'project.resources.copy',
+      'project.resources.list',
+      'project.resources.request.get',
+      'project.resources.request.list',
+      'project.resources.request.resolve',
+    ]);
     expect(movieMode.commands.every((command) => isInScope(command, castingDirector.scope))).toBe(
       true,
     );
