@@ -39,6 +39,11 @@
   --space-5: 24px;
   --space-6: 36px;
   --control-height: 44px;
+  /* The smallest thing a finger or pointer must hit, and the grab width of an edge. */
+  --hit: 44px;
+  --handle: 8px;
+  /* The height that is really visible: smaller while a touch keyboard is open. Set by viewport.ts. */
+  --app-height: 100dvh;
   --shadow-overlay: 0 24px 80px rgb(0 0 0 / 0.55);
 }
 
@@ -62,4 +67,13 @@
   --track-2: #9b3f55;
   --track-3: #56702a;
   --shadow-overlay: 0 24px 80px rgb(60 40 10 / 0.2);
+}
+
+/* Fingers instead of a mouse: tablets. Larger targets and grab edges, same look. */
+@media (pointer: coarse) {
+  :root {
+    --hit: 48px;
+    --control-height: 48px;
+    --handle: 22px;
+  }
 }
