@@ -541,6 +541,11 @@ describe('App', () => {
     const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
+    // jsdom cannot record video, so export says so instead of offering a broken button.
+    expect(screen.getByText(/cannot record video/)).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /Export film/ }).disabled).toBe(
+      true,
+    );
 
     await user.click(first);
     expect(await screen.findByText(/Shot 1/, { selector: 'h3' })).toBeTruthy();
@@ -696,5 +701,15 @@ describe('App', () => {
     await vi.waitFor(async () => {
       expect(await imp.store.get('roles/dialogue-polisher')).toBeUndefined();
     });
+  });
+});
+
+describe('title cards in an exported video', () => {
+  it('wraps words into lines that fit', async () => {
+    const { wrapLines } = await import('../src/app/export.js');
+    const fits = (line: string): boolean => line.length <= 10;
+    expect(wrapLines('One two three four', fits)).toEqual(['One two', 'three four']);
+    expect(wrapLines('A\nB', fits)).toEqual(['A', 'B']);
+    expect(wrapLines('', fits)).toEqual(['']);
   });
 });
