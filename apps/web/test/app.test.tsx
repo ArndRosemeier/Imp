@@ -631,6 +631,41 @@ describe('App', () => {
     expect(await imp.blobs.list('')).toEqual([]);
   });
 
+  it('opens an audio document and edits its tracks with undo', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+
+    await user.click(screen.getByRole('button', { name: 'Audio' }));
+    expect(await screen.findByText(/No sounds are recorded yet/)).toBeTruthy();
+    await user.type(screen.getByLabelText('Name'), 'Lamp room');
+    await user.click(screen.getByRole('button', { name: /Start empty/ }));
+    expect(await screen.findByRole('tab', { name: 'Lamp room' })).toBeTruthy();
+    expect(await screen.findByText('1 track')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: /Add track/ }));
+    expect(await screen.findByText('2 tracks')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Mute Track 2' }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mute Track 2' })).toHaveProperty(
+        'ariaPressed',
+        'true',
+      );
+    });
+    expect(await screen.findByRole('heading', { name: 'Audio' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mute Track 2' })).toHaveProperty(
+        'ariaPressed',
+        'false',
+      );
+    });
+    expect(screen.getByRole('button', { name: 'Play' })).toHaveProperty('disabled', true);
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);
