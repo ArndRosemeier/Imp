@@ -242,6 +242,7 @@ function Timeline({
 }): ReactElement {
   const edges = useDrag();
   const audioDrag = useDrag();
+  const lineDrag = useDrag();
   const moving = useDrag();
   const scroller = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
@@ -514,6 +515,30 @@ function Timeline({
               onSelect({ kind: 'line', id });
             }}
             act={act}
+            drag={(line, selected) => ({
+              dx: lineDrag.dragging?.id === line.id ? lineDrag.dragging.dx / scale : 0,
+              props: {
+                onPointerDown: (event) => {
+                  if (!grabs(event, selected)) return;
+                  lineDrag.start(event, line.id, 'move');
+                  onSelect({ kind: 'line', id: line.id });
+                },
+                onPointerMove: lineDrag.move,
+                onPointerCancel: lineDrag.cancel,
+                onPointerUp: (event) => {
+                  lineDrag.end(event, (id, _edge, distance) => {
+                    void act('movie.edit.line.update', {
+                      sceneId,
+                      lineId: id,
+                      startSeconds: Math.max(
+                        0,
+                        Math.round((line.startSeconds + distance / scale) * 10) / 10,
+                      ),
+                    });
+                  });
+                },
+              },
+            })}
           />
           <div className="playhead" style={{ left: at * scale }} aria-hidden="true" />
         </div>
