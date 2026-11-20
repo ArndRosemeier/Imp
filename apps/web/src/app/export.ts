@@ -1,5 +1,5 @@
 import type { ImpClient } from '@imp/host';
-import { CutPlayer, loadCut, type Look } from './cut-player.js';
+import { blobKeys, CutPlayer, loadCut, type Look } from './cut-player.js';
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -109,14 +109,8 @@ export async function recordScenes(
 
   const made: string[] = [];
   const urls = new Map<string, string>();
-  const keys = new Set(
-    loaded.flatMap((scene) => [
-      ...scene.shots.flatMap((shot) => [shot.clip?.blobKey, shot.dialogue?.blobKey]),
-      ...scene.sounds.map((sound) => sound.take?.blobKey),
-    ]),
-  );
+  const keys = new Set(loaded.flatMap((scene) => blobKeys(scene, scene.cut)));
   for (const key of keys) {
-    if (typeof key !== 'string') continue;
     const blob = await imp.blob(key);
     if (blob === undefined) continue;
     const url = URL.createObjectURL(new Blob([blob.bytes.slice()], { type: blob.mediaType }));

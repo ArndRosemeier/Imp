@@ -537,8 +537,22 @@ describe('App', () => {
       await call('movie.shot.clip.check', at);
     }
 
+    await call('movie.character.create', {
+      projectId,
+      name: 'Narrator',
+      voiceOnly: true,
+      ownLane: true,
+    });
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     expect(await screen.findByText(/2 of 2 pieces ready/)).toBeTruthy();
+    // A character with its own lane gets a lane, where lines are added at the playhead.
+    await user.click(await screen.findByRole('button', { name: /Add a line to Narrator/ }));
+    expect(await screen.findByText(/not recorded/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Narrator: New line/ })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Remove line/ }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Narrator: New line/ })).toBeNull();
+    });
     const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
