@@ -21,6 +21,20 @@ export const ModelsResponse = z.object({
   ),
 });
 
+/** What each video model can make. A separate list from the general catalog. */
+export const VideoModelsResponse = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      supported_resolutions: z.array(z.string()).nullish(),
+      supported_aspect_ratios: z.array(z.string()).nullish(),
+      supported_durations: z.array(z.number()).nullish(),
+      supported_frame_images: z.array(z.string()).nullish(),
+      generate_audio: z.boolean().nullish(),
+    }),
+  ),
+});
+
 export const ChatCompletionResponse = z.object({
   model: z.string().optional(),
   choices: z

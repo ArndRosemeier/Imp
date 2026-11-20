@@ -13,12 +13,31 @@ export const MODALITIES = [
 ] as const;
 export type Modality = (typeof MODALITIES)[number];
 
+/**
+ * What a video model says it can make. Models differ widely: some make clips
+ * from a description, some only work on a photo or an existing video.
+ */
+export interface VideoAbilities {
+  /** The lengths in seconds it makes. Empty when it makes no clip of a chosen length. */
+  readonly durationsSeconds: readonly number[];
+  /** For example `720p`. Empty when it does not say. */
+  readonly resolutions: readonly string[];
+  /** For example `16:9`. Empty when it does not say. */
+  readonly aspectRatios: readonly string[];
+  /** `first_frame` and `last_frame`: the pictures a clip can be made to start or end on. */
+  readonly frameImages: readonly string[];
+  /** Whether it makes its own sound; null when the catalog does not say. */
+  readonly nativeAudio: boolean | null;
+}
+
 export interface ModelInfo {
   /** The id to pass back to the provider, exactly as it reported it. */
   readonly id: string;
   readonly name: string;
   readonly inputModalities: readonly Modality[];
   readonly outputModalities: readonly Modality[];
+  /** Set for video models, when the provider reports what they can make. */
+  readonly video?: VideoAbilities;
   readonly contextLength: number | null;
   /** True when the model accepts tool definitions, which agents need. */
   readonly supportsTools: boolean;

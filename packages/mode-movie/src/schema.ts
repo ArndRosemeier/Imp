@@ -115,10 +115,32 @@ export const Clip = z.object({
   progress: z.number().nullable(),
   /** Why it failed. */
   error: z.string().nullable(),
+  /** The length it was asked for, in seconds. Null for clips made before this was kept. */
+  durationSeconds: z.number().nullable().default(null),
+  /** Whether the shot's dialogue was recorded apart, so the clip itself is silent. */
+  silent: z.boolean().default(false),
   costUsd: z.number().nullable(),
   createdAt: z.iso.datetime(),
 });
 export type Clip = z.infer<typeof Clip>;
+
+/**
+ * The spoken line of a shot, recorded in the voice of its speaker. Video
+ * models invent a voice of their own from the text, so the dialogue is made
+ * apart and laid over a silent clip.
+ */
+export const DialogueTake = z.object({
+  blobKey: z.string(),
+  mediaType: z.string(),
+  /** The words and direction it was recorded with; when they differ from the shot, it is out of date. */
+  line: z.string(),
+  direction: z.string(),
+  model: z.string(),
+  durationSeconds: z.number().nullable(),
+  costUsd: z.number().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type DialogueTake = z.infer<typeof DialogueTake>;
 
 /** One uninterrupted piece of film within a scene. */
 export const Shot = z.object({
@@ -148,6 +170,7 @@ export const Shot = z.object({
     .describe(
       'How the line is said: emotion, intensity, pace, breath. For example "screaming over the wind, voice cracking".',
     ),
+  dialogue: DialogueTake.nullable().default(null),
   clip: Clip.nullable().default(null),
 });
 export type Shot = z.infer<typeof Shot>;

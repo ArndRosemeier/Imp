@@ -1,5 +1,10 @@
 import { defineCommand, type Command } from '@imp/core';
-import { MODALITIES, type GenerationProvider, type ModelInfo } from '@imp/providers';
+import {
+  describeVideoModel,
+  MODALITIES,
+  type GenerationProvider,
+  type ModelInfo,
+} from '@imp/providers';
 import { z } from 'zod';
 
 const MAX_MODELS = 25;
@@ -33,6 +38,12 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
         .boolean()
         .default(false)
         .describe('Only models that can call tools, which an agent needs.'),
+      all: z
+        .boolean()
+        .default(false)
+        .describe(
+          'For video: also list models that cannot make clips from a description, such as editors and avatar makers. They come with the reason. By default they are left out.',
+        ),
       sort: z
         .enum(['family', 'price'])
         .default('family')
@@ -48,6 +59,10 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
           /** Null when the catalog gives no price per token, as for most image models. */
           inputUsdPerMillion: z.number().nullable(),
           outputUsdPerMillion: z.number().nullable(),
+          /** For video models: what each can do, for example its lengths and whether it makes sound. */
+          abilities: z.array(z.string()).optional(),
+          /** For video models that cannot make clips from a description: why. */
+          unsuitable: z.string().optional(),
         }),
       ),
       /** How many matched in all; the list is cut to keep it short. */
@@ -59,6 +74,7 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
         .filter(
           (model) =>
             model.outputModalities.includes(input.output) &&
+            (input.output !== 'video' || input.all || describeVideoModel(model).fits) &&
             (!input.tools || model.supportsTools) &&
             (search === '' ||
               model.id.toLowerCase().includes(search) ||
@@ -71,12 +87,21 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
             (a.id < b.id ? -1 : 1),
         );
       return {
-        models: matches.slice(0, MAX_MODELS).map(({ id, name, pricing }) => ({
-          id,
-          name,
-          inputUsdPerMillion: perMillion(pricing.promptUsdPerToken),
-          outputUsdPerMillion: perMillion(pricing.completionUsdPerToken),
-        })),
+        models: matches.slice(0, MAX_MODELS).map((model) => {
+          const video = input.output === 'video' ? describeVideoModel(model) : undefined;
+          return {
+            id: model.id,
+            name: model.name,
+            inputUsdPerMillion: perMillion(model.pricing.promptUsdPerToken),
+            outputUsdPerMillion: perMillion(model.pricing.completionUsdPerToken),
+            ...(video === undefined || video.notes.length === 0
+              ? {}
+              : { abilities: [...video.notes] }),
+            ...(video?.problem === null || video?.problem === undefined
+              ? {}
+              : { unsuitable: video.problem }),
+          };
+        }),
         total: matches.length,
       };
     },

@@ -486,7 +486,7 @@ describe('App', () => {
       await vi.advanceTimersByTimeAsync(10_000);
       await vi.advanceTimersByTimeAsync(10_000);
       expect(await within(card).findByLabelText('Clip of shot 1')).toBeTruthy();
-      expect(within(card).getByText(/vendor\/clips · \$0\.20/)).toBeTruthy();
+      expect(within(card).getByText(/vendor\/clips.*\$0\.20/)).toBeTruthy();
 
       await user.click(within(card).getByRole('button', { name: /Delete clip/ }));
       await user.click(within(card).getByRole('button', { name: 'Delete' }));

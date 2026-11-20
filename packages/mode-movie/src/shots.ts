@@ -6,17 +6,33 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { ProviderError, type GenerationProvider, type MediaInput } from '@imp/providers';
+import {
+  describeVideoModel,
+  fitDuration,
+  fitResolution,
+  mp3DurationSeconds,
+  ProviderError,
+  type GenerationProvider,
+  type MediaInput,
+  type ModelInfo,
+} from '@imp/providers';
 import { z } from 'zod';
 import { characterPrefix, movieDevelopmentKey, movieSceneKey, shotPrefix } from './commands.js';
-import { Character, Clip, Development, MODE_ID, Shot } from './schema.js';
+import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
+import { Character, Clip, Development, DialogueTake, MODE_ID, Shot } from './schema.js';
 
 /** The setting that names the model clips are made with when a call does not say. */
 export const VIDEO_MODEL_SETTING = 'video.model';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 const SceneId = z.string().describe('The id of a scene from movie.scene.list.');
-const ShotFields = Shot.omit({ id: true, sceneId: true, position: true, clip: true });
+const ShotFields = Shot.omit({
+  id: true,
+  sceneId: true,
+  position: true,
+  clip: true,
+  dialogue: true,
+});
 
 const shotKey = (projectId: string, sceneId: string, shotId: string): string =>
   `${shotPrefix(projectId, sceneId)}${shotId}`;
@@ -70,14 +86,24 @@ async function readCast(store: KeyValueStore, projectId: string, shot: Shot) {
  * by who says it and how, because models take the emotion from the words and
  * not from the situation; the bodies are directed in a sentence of their own.
  */
-export function clipPrompt(shot: Shot, cast: readonly Character[], tone: string): string {
+export function clipPrompt(
+  shot: Shot,
+  cast: readonly Character[],
+  tone: string,
+  /** The line is recorded apart and laid over the clip, so the clip must not voice it. */
+  dialogueApart = false,
+): string {
   const speaker = cast.find((character) => character.id === shot.speakerId);
   const said =
     shot.line.trim() === ''
       ? 'Nobody speaks.'
-      : `${speaker?.name ?? 'A voice'} says${
-          shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
-        } "${shot.line.trim()}"`;
+      : dialogueApart
+        ? `${speaker?.name ?? 'Someone'} speaks${
+            shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
+          } and the lips move, but no sound is heard: the voice is added later.`
+        : `${speaker?.name ?? 'A voice'} says${
+            shot.delivery.trim() === '' ? '' : `, ${shot.delivery.trim().replace(/[.!?]+$/, '')},`
+          } "${shot.line.trim()}"`;
   return [
     shot.description,
     ...cast.map((character) =>
@@ -99,13 +125,35 @@ async function deleteClipFile(runtime: CoreRuntime, clip: Clip | null): Promise<
   if (blobKey !== null) await runtime.blobs.delete(blobKey);
 }
 
+async function deleteDialogueFile(
+  runtime: CoreRuntime,
+  dialogue: DialogueTake | null,
+): Promise<void> {
+  if (dialogue !== null) await runtime.blobs.delete(dialogue.blobKey);
+}
+
+/** Rough speaking time when the file's length cannot be read: about 2.5 words a second. */
+function spokenSeconds(line: string): number {
+  return Math.max(1, line.trim().split(/\s+/).length / 2.5);
+}
+
+/** What the provider knows of a model, or nothing when it cannot be asked. */
+async function findModel(provider: GenerationProvider, id: string): Promise<ModelInfo | undefined> {
+  try {
+    return (await provider.listModels()).find((model) => model.id === id);
+  } catch (error) {
+    if (error instanceof ProviderError) return undefined;
+    throw error;
+  }
+}
+
 /** The commands for the shots of a scene and their clips. They need a provider to generate. */
 export function createShotCommands(provider: GenerationProvider): readonly Command[] {
   const list = defineCommand({
     id: 'movie.shot.list',
     title: 'List shots',
     description:
-      'Returns the shots of a scene in order: id, what is seen, the line and whether there is a clip. The details of a shot come from movie.shot.get.',
+      'Returns the shots of a scene in order: id, what is seen, the line and whether there is dialogue and a clip. The details of a shot come from movie.shot.get.',
     effect: 'read',
     input: z.object({
       projectId: ProjectId,
@@ -117,6 +165,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         z.union([
           Shot,
           Shot.pick({ id: true, position: true, description: true, line: true }).extend({
+            dialogue: z.boolean(),
             clip: Clip.shape.status.nullable(),
           }),
         ]),
@@ -133,6 +182,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
                 position: shot.position,
                 description: shot.description,
                 line: shot.line,
+                dialogue: shot.dialogue !== null,
                 clip: shot.clip?.status ?? null,
               },
         ),
@@ -170,6 +220,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         speakerId: fields.speakerId ?? null,
         line: fields.line ?? '',
         delivery: fields.delivery ?? '',
+        dialogue: null,
         clip: null,
       };
       await runtime.store.batch([
@@ -183,7 +234,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.shot.update',
     title: 'Change shot',
     description:
-      'Changes a shot. Fields left out stay as they are. An existing clip is kept; generate again to see the change.',
+      'Changes a shot. Fields left out stay as they are. An existing clip and dialogue are kept; generate again to see the change.',
     effect: 'write',
     input: ShotFields.partial().extend(At),
     output: Shot,
@@ -228,6 +279,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         })),
       ]);
       await deleteClipFile(runtime, shot.clip);
+      await deleteDialogueFile(runtime, shot.dialogue);
       return { shotId: shot.id, remaining: remaining.length };
     },
   });
@@ -236,7 +288,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.shot.clip.generate',
     title: 'Generate clip',
     description:
-      'Starts making the video clip of a shot from its description, performance and line, guided by the portraits of its characters where the model takes them (the clip says how many were used). Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip. Costs money at the video model, more than anything else here.',
+      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). When the shot has dialogue (movie.shot.dialogue.generate) the clip is made silent and long enough for it; the voice is played over it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip. Costs money at the video model, more than anything else here.',
     effect: 'spend',
     input: z.object({
       ...At,
@@ -252,14 +304,18 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         .int()
         .min(1)
         .max(30)
-        .default(4)
-        .describe('Models take only certain lengths; a refusal names them.'),
-      resolution: z.string().default('720p'),
+        .optional()
+        .describe(
+          'Seconds wanted. Defaults to the length of the dialogue, or 4. The nearest length the model makes is used.',
+        ),
+      resolution: z.string().default('720p').describe('The nearest size the model makes is used.'),
       aspectRatio: z.string().default('16:9'),
       audio: z
         .boolean()
         .optional()
-        .describe('Whether the clip has sound. Defaults to yes when the shot has a line.'),
+        .describe(
+          'Whether the clip has sound of its own, in which the model invents the voice. Defaults to no when the shot has dialogue, and to yes when it has a line without dialogue.',
+        ),
       portraits: z
         .boolean()
         .default(true)
@@ -282,10 +338,30 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
       if (shot.description.trim() === '') {
         throw new CommandError('invalid_input', id, 'Describe what the shot shows first.');
       }
+      const info = await findModel(provider, model);
+      if (info !== undefined) {
+        const verdict = describeVideoModel(info);
+        if (!verdict.fits) {
+          throw new CommandError(
+            'invalid_input',
+            id,
+            `${model} cannot be used for clips: ${verdict.problem ?? 'it does not fit.'} Pick another from models.list with output "video".`,
+          );
+        }
+      }
       const cast = await readCast(runtime.store, input.projectId, shot);
       const development = await runtime.store.get(movieDevelopmentKey(input.projectId));
       const tone = development === undefined ? '' : Development.parse(development).tone;
-      const prompt = clipPrompt(shot, cast, tone);
+      const dialogueApart = shot.dialogue !== null && shot.line.trim() !== '';
+      const prompt = clipPrompt(shot, cast, tone, dialogueApart);
+      const durationSeconds = fitDuration(
+        info?.video,
+        input.durationSeconds ??
+          (dialogueApart && typeof shot.dialogue?.durationSeconds === 'number'
+            ? Math.ceil(shot.dialogue.durationSeconds + 0.5)
+            : 4),
+      );
+      const audio = input.audio ?? (dialogueApart ? false : shot.line.trim() !== '');
 
       const references: MediaInput[] = [];
       if (input.portraits) {
@@ -300,10 +376,10 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
       const request = {
         model,
         prompt,
-        durationSeconds: input.durationSeconds,
-        resolution: input.resolution,
+        durationSeconds,
+        resolution: fitResolution(info?.video, input.resolution),
         aspectRatio: input.aspectRatio,
-        audio: input.audio ?? shot.line.trim() !== '',
+        audio,
       };
       let job;
       let portraits = references.length;
@@ -341,6 +417,8 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         portraits,
         progress: job.progress,
         error: job.error,
+        durationSeconds,
+        silent: !audio,
         costUsd: job.costUsd,
         createdAt: runtime.now().toISOString(),
       };
@@ -429,5 +507,111 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
     },
   });
 
-  return [list, get, create, update, remove, clipGenerate, clipCheck, clipDelete];
+  const dialogueGenerate = defineCommand({
+    id: 'movie.shot.dialogue.generate',
+    title: 'Record dialogue',
+    description:
+      "Records the line of a shot in the voice of its speaker, directed by the voice written for the character and the shot's delivery, and keeps it as the dialogue of the shot, replacing an earlier one. Clips are then made silent and as long as the dialogue, and the dialogue is played over them. The speaker and a line must be set. Costs a little at the speech model.",
+    effect: 'spend',
+    input: z.object({
+      ...At,
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          `A model from models.list with output "speech". Defaults to the setting "${SPEECH_MODEL_SETTING}".`,
+        ),
+    }),
+    output: z.object({ dialogue: DialogueTake }),
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.shot.dialogue.generate';
+      const { key, shot } = await loadShot(runtime.store, id, input);
+      if (shot.speakerId === null || shot.line.trim() === '') {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'Set the speaker and the line of the shot first.',
+        );
+      }
+      const model = input.model ?? (await runtime.store.get(`settings/${SPEECH_MODEL_SETTING}`));
+      if (typeof model !== 'string' || model === '') {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `No speech model is chosen. Set the setting "${SPEECH_MODEL_SETTING}" to an id from models.list with output "speech", or pass a model.`,
+        );
+      }
+      const stored = await runtime.store.get(
+        `${characterPrefix(input.projectId)}${shot.speakerId}`,
+      );
+      if (stored === undefined) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `The speaker "${shot.speakerId}" is not a character.`,
+        );
+      }
+      const speaker = Character.parse(stored);
+      const direction = voiceDirection(speaker, shot.delivery);
+      let spoken;
+      try {
+        spoken = await provider.generateSpeech({
+          model,
+          text: shot.line.trim(),
+          instructions: direction,
+        });
+      } catch (error) {
+        if (!(error instanceof ProviderError)) throw error;
+        throw new CommandError('handler_failed', id, `No dialogue was recorded: ${error.message}`, {
+          cause: error,
+        });
+      }
+      const dialogue: DialogueTake = {
+        blobKey: `${key}/dialogue/${runtime.newId()}`,
+        mediaType: spoken.audio.mediaType,
+        line: shot.line,
+        direction,
+        model,
+        durationSeconds:
+          mp3DurationSeconds(spoken.audio.bytes) ?? Math.round(spokenSeconds(shot.line) * 10) / 10,
+        costUsd: spoken.costUsd,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(dialogue.blobKey, spoken.audio);
+      const latest = (await loadShot(runtime.store, id, input)).shot;
+      await runtime.store.batch([{ type: 'put', key, value: { ...latest, dialogue } }]);
+      await deleteDialogueFile(runtime, latest.dialogue);
+      return { dialogue };
+    },
+  });
+
+  const dialogueDelete = defineCommand({
+    id: 'movie.shot.dialogue.delete',
+    title: 'Delete dialogue',
+    description: 'Removes the recorded dialogue of a shot. The line stays.',
+    effect: 'destructive',
+    input: z.object(At),
+    output: z.object({ shotId: z.string(), deleted: z.boolean() }),
+    handler: async ({ runtime }, at) => {
+      const { key, shot } = await loadShot(runtime.store, 'movie.shot.dialogue.delete', at);
+      if (shot.dialogue === null) return { shotId: shot.id, deleted: false };
+      await runtime.store.batch([{ type: 'put', key, value: { ...shot, dialogue: null } }]);
+      await deleteDialogueFile(runtime, shot.dialogue);
+      return { shotId: shot.id, deleted: true };
+    },
+  });
+
+  return [
+    list,
+    get,
+    create,
+    update,
+    remove,
+    dialogueGenerate,
+    dialogueDelete,
+    clipGenerate,
+    clipCheck,
+    clipDelete,
+  ];
 }

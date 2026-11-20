@@ -18,6 +18,7 @@ import {
   type Modality,
   type MediaInput,
   type ModelInfo,
+  type VideoAbilities,
   type VideoJob,
   type VideoRequest,
   type SoundRequest,
@@ -33,6 +34,7 @@ import {
   ImageGenerationResponse,
   ModelsResponse,
   VideoJobResponse,
+  VideoModelsResponse,
 } from './schemas.js';
 
 export const OPENROUTER_ID = 'openrouter';
@@ -57,6 +59,9 @@ function toModalities(values: readonly string[] | null | undefined): Modality[] 
     KNOWN_MODALITIES.has(value) ? (value as Modality) : 'other',
   );
 }
+
+const videoOf = (video: VideoAbilities | undefined): { video?: VideoAbilities } =>
+  video === undefined ? {} : { video };
 
 function toPrice(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value.trim() === '') {
@@ -291,6 +296,30 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
   const sendJson = async (...args: Parameters<typeof send>): Promise<unknown> =>
     (await send(...args)).json;
 
+  /**
+   * What the video models can make. Without it the catalog is still useful, so
+   * a failure here only means that abilities are not known.
+   */
+  async function videoAbilities(call: CallOptions): Promise<Map<string, VideoAbilities>> {
+    const abilities = new Map<string, VideoAbilities>();
+    try {
+      const json = await sendJson('/videos/models', 'GET', undefined, call, false);
+      for (const model of parse(VideoModelsResponse, json, 'the video models').data) {
+        abilities.set(model.id, {
+          // -1 means that the model chooses the length itself.
+          durationsSeconds: (model.supported_durations ?? []).filter((seconds) => seconds > 0),
+          resolutions: model.supported_resolutions ?? [],
+          aspectRatios: model.supported_aspect_ratios ?? [],
+          frameImages: model.supported_frame_images ?? [],
+          nativeAudio: model.generate_audio ?? null,
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof ProviderError)) throw error;
+    }
+    return abilities;
+  }
+
   /** Speech models answer with the audio itself. */
   async function speak(body: unknown, call: CallOptions, what: string) {
     const { bytes, contentType } = await send('/audio/speech', 'POST', body, call, true, true);
@@ -392,12 +421,16 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
 
     async listModels(call = {}): Promise<readonly ModelInfo[]> {
       // Without this parameter the catalog omits image, speech and video models.
-      const json = await sendJson('/models?output_modalities=all', 'GET', undefined, call, false);
+      const [json, abilities] = await Promise.all([
+        sendJson('/models?output_modalities=all', 'GET', undefined, call, false),
+        videoAbilities(call),
+      ]);
       return parse(ModelsResponse, json, 'the model catalog').data.map((model) => ({
         id: model.id,
         name: model.name ?? model.id,
         inputModalities: toModalities(model.architecture?.input_modalities),
         outputModalities: toModalities(model.architecture?.output_modalities),
+        ...videoOf(abilities.get(model.id)),
         contextLength: model.context_length ?? null,
         supportsTools: model.supported_parameters?.includes('tools') ?? false,
         pricing: {

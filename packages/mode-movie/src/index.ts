@@ -25,6 +25,7 @@ export {
   Character,
   CharacterImage,
   Clip,
+  DialogueTake,
   Development,
   EMPTY_DEVELOPMENT,
   MODE_ID,

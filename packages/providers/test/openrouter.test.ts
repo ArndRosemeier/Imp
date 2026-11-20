@@ -34,6 +34,51 @@ async function kindOf(promise: Promise<unknown>): Promise<ProviderErrorKind | 'n
 }
 
 describe('OpenRouter provider: models', () => {
+  it('adds what video models can make, and leaves it out when that list is not there', async () => {
+    const entry = (id: string, output: string[]) => ({
+      id,
+      architecture: { input_modalities: ['text'], output_modalities: output },
+    });
+    const catalog = {
+      status: 200,
+      body: { data: [entry('v/clips', ['video']), entry('v/text', ['text'])] },
+    };
+    const { provider, calls } = setup(catalog, {
+      status: 200,
+      body: {
+        data: [
+          {
+            id: 'v/clips',
+            supported_durations: [-1, 4, 8],
+            supported_resolutions: ['720p'],
+            supported_aspect_ratios: null,
+            supported_frame_images: ['first_frame'],
+            generate_audio: true,
+          },
+        ],
+      },
+    });
+    const [clips, text] = await provider.listModels();
+    expect(clips?.video).toEqual({
+      durationsSeconds: [4, 8],
+      resolutions: ['720p'],
+      aspectRatios: [],
+      frameImages: ['first_frame'],
+      nativeAudio: true,
+    });
+    expect(text).not.toHaveProperty('video');
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://example.test/api/v1/models?output_modalities=all',
+      'https://example.test/api/v1/videos/models',
+    ]);
+
+    const without = setup(catalog, { status: 503, body: { error: { message: 'Busy' } } });
+    expect((await without.provider.listModels()).map((model) => model.id)).toEqual([
+      'v/clips',
+      'v/text',
+    ]);
+  });
+
   it('asks for every modality and needs no key', async () => {
     const { provider, calls } = setup({ status: 200, body: { data: [] } });
     expect(await provider.listModels()).toEqual([]);
