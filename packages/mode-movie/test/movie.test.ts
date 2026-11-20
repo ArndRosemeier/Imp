@@ -4,18 +4,26 @@ import {
   isInScope,
   projectCommands,
   projectCreate,
+  settingsCommands,
   type Command,
 } from '@imp/core';
+import { ProviderError } from '@imp/providers';
 import { createTestRuntime } from '@imp/core/testing';
 import { describe, expect, it } from 'vitest';
-import { castingDirector, movieCommands, movieMode, screenwriter } from '../src/index.js';
+import { createFakeProvider } from '@imp/providers/testing';
+import { castingDirector, createMovieMode, screenwriter } from '../src/index.js';
 
 const user = { kind: 'user', id: 'arnd' } as const;
 const writer = { kind: 'agent', id: 'w', role: 'screenwriter' } as const;
 
-async function setup() {
+async function setup(providerOptions: Parameters<typeof createFakeProvider>[0] = {}) {
   const runtime = createTestRuntime();
-  const registry = new CommandRegistry({ runtime }).register(...projectCommands, ...movieCommands);
+  const provider = createFakeProvider(providerOptions);
+  const registry = new CommandRegistry({ runtime }).register(
+    ...projectCommands,
+    ...settingsCommands,
+    ...createMovieMode({ provider }).commands,
+  );
   const created = await registry.execute(
     projectCreate,
     { name: 'The Lighthouse Keeper', mode: 'movie' },
@@ -32,7 +40,7 @@ async function setup() {
     if (result.status !== 'ok') throw new Error(`${id}: ${result.status}`);
     return result.output as { id: string } & Record<string, unknown>;
   };
-  return { runtime, registry, projectId, run };
+  return { runtime, registry, provider, projectId, run };
 }
 
 interface Listed {
@@ -43,13 +51,16 @@ const headings = (listed: unknown): string[] =>
 
 describe('the movie mode', () => {
   it('is a consistent mode with its roles limited to its own commands', () => {
+    const movieMode = createMovieMode({ provider: createFakeProvider({}) });
     expect(movieMode.stages.map((stage) => stage.id)).toEqual(['development', 'script', 'casting']);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
       isInScope(command, screenwriter.scope),
     );
     expect(outside.map((command) => command.id)).toEqual(['project.list']);
-    expect(movieCommands.every((command) => isInScope(command, castingDirector.scope))).toBe(true);
+    expect(movieMode.commands.every((command) => isInScope(command, castingDirector.scope))).toBe(
+      true,
+    );
   });
 
   it('refuses projects that do not exist or belong to another mode', async () => {
@@ -179,8 +190,8 @@ describe('characters', () => {
     await run('movie.character.update', { characterId: mara.id, voice: 'Low and dry.' });
     expect(await run('movie.character.list', {})).toEqual({
       characters: [
-        { id: mara.id, name: 'Mara', part: 'protagonist' },
-        { id: tomas.id, name: 'Tomas', part: '' },
+        { id: mara.id, name: 'Mara', part: 'protagonist', portraitId: null },
+        { id: tomas.id, name: 'Tomas', part: '', portraitId: null },
       ],
     });
     expect(await run('movie.character.get', { characterId: mara.id })).toMatchObject({
@@ -197,6 +208,8 @@ describe('characters', () => {
         description: '',
         appearance: 'Sixty, wiry, grey braid.',
         voice: 'Low and dry.',
+        images: [],
+        portraitId: null,
       },
       expect.objectContaining({ name: 'Tomas' }),
     ]);
@@ -208,6 +221,174 @@ describe('characters', () => {
       await expect(
         registry.executeById(id, { projectId, characterId: tomas.id }, { actor: user }),
       ).rejects.toMatchObject({ code: 'invalid_input' });
+    }
+  });
+});
+
+describe('character images', () => {
+  interface Made {
+    image: { id: string; blobKey: string; prompt: string; model: string; mediaType: string };
+    costUsd: number;
+  }
+  const withMara = async (options: Parameters<typeof setup>[0] = {}) => {
+    const context = await setup(options);
+    const mara = await context.run('movie.character.create', {
+      name: 'Mara',
+      part: 'protagonist',
+      appearance: 'Seventy, wiry, grey braid.',
+    });
+    await context.registry.executeById(
+      'settings.set',
+      { key: 'images.model', value: 'vendor/painter' },
+      { actor: user },
+    );
+    const make = async (input: Record<string, unknown> = {}) =>
+      (await context.run('movie.character.image.generate', {
+        characterId: mara.id,
+        ...input,
+      })) as unknown as Made;
+    const read = async () =>
+      (await context.run('movie.character.get', { characterId: mara.id })) as unknown as {
+        images: { id: string }[];
+        portraitId: string | null;
+      };
+    return { ...context, mara, make, read };
+  };
+
+  it('generates from the appearance and the tone, stores the file and sets the first portrait', async () => {
+    const { run, runtime, provider, make, read } = await withMara();
+    await run('movie.development.update', { tone: 'Quiet, wet, warm.' });
+    const first = await make();
+    expect(provider.imageRequests[0]).toEqual({
+      model: 'vendor/painter',
+      prompt:
+        'Character portrait of Mara, protagonist. Seventy, wiry, grey braid. Visual style: Quiet, wet, warm.',
+      aspectRatio: '3:4',
+    });
+    expect(first.costUsd).toBe(0.01);
+    expect(first.image).toMatchObject({ model: 'vendor/painter', mediaType: 'image/webp' });
+    expect((await runtime.blobs.get(first.image.blobKey))?.mediaType).toBe('image/webp');
+
+    const second = await make({
+      direction: 'In profile.',
+      model: 'other/painter',
+      aspectRatio: '1:1',
+    });
+    expect(provider.imageRequests[1]).toMatchObject({
+      model: 'other/painter',
+      aspectRatio: '1:1',
+      prompt: expect.stringContaining('In profile.') as string,
+    });
+    const third = await make({ prompt: 'Just this.' });
+    expect(third.image.prompt).toBe('Just this.');
+    expect(await read()).toMatchObject({
+      portraitId: first.image.id,
+      images: [{ id: first.image.id }, { id: second.image.id }, { id: third.image.id }],
+    });
+    // The outline says which image stands for the character without carrying the list.
+    expect(await run('movie.character.list', {})).toEqual({
+      characters: [
+        {
+          id: expect.any(String) as string,
+          name: 'Mara',
+          part: 'protagonist',
+          portraitId: first.image.id,
+        },
+      ],
+    });
+  });
+
+  it('chooses a portrait and deletes images, moving the portrait on', async () => {
+    const { run, runtime, mara, make, read } = await withMara();
+    const first = await make();
+    const second = await make();
+    const third = await make();
+    const at = { characterId: mara.id };
+    expect(await run('movie.character.image.select', { ...at, imageId: second.image.id })).toEqual({
+      characterId: mara.id,
+      portraitId: second.image.id,
+    });
+    // Deleting another image leaves the portrait; deleting the portrait hands it to the newest.
+    expect(
+      await run('movie.character.image.delete', { ...at, imageId: first.image.id }),
+    ).toMatchObject({
+      portraitId: second.image.id,
+    });
+    expect(
+      await run('movie.character.image.delete', { ...at, imageId: second.image.id }),
+    ).toMatchObject({
+      portraitId: third.image.id,
+    });
+    expect(await runtime.blobs.list('')).toEqual([third.image.blobKey]);
+    expect(
+      await run('movie.character.image.delete', { ...at, imageId: third.image.id }),
+    ).toMatchObject({
+      portraitId: null,
+    });
+    expect(await read()).toMatchObject({ images: [], portraitId: null });
+  });
+
+  it('removes the files with the character', async () => {
+    const { run, runtime, mara, make } = await withMara();
+    await make();
+    await make();
+    await run('movie.character.delete', { characterId: mara.id });
+    expect(await runtime.blobs.list('')).toEqual([]);
+  });
+
+  it('falls back to the description, and needs a model from somewhere', async () => {
+    const { run, registry, provider, projectId } = await setup();
+    const bare = await run('movie.character.create', {
+      name: 'Tomas',
+      description: 'A quiet clerk.',
+    });
+    await expect(
+      registry.executeById(
+        'movie.character.image.generate',
+        { projectId, characterId: bare.id },
+        { actor: user },
+      ),
+    ).rejects.toThrow(/No image model is chosen/);
+    await run('movie.character.image.generate', { characterId: bare.id, model: 'vendor/painter' });
+    expect(provider.imageRequests[0]?.prompt).toBe('Character portrait of Tomas. A quiet clerk.');
+  });
+
+  it('asks before an agent spends, and reports failures in words', async () => {
+    const { registry, projectId, mara } = await withMara({
+      imageError: new ProviderError('insufficient_credit', 'fake', 'No credit left.'),
+    });
+    const input = { projectId, characterId: mara.id };
+    const asked = await registry.executeById('movie.character.image.generate', input, {
+      actor: { kind: 'agent', id: 'c', role: 'casting-director' },
+    });
+    expect(asked.status).toBe('needs-approval');
+    await expect(
+      registry.executeById('movie.character.image.generate', input, { actor: user }),
+    ).rejects.toMatchObject({
+      code: 'handler_failed',
+      message: 'No image was made: No credit left.',
+    });
+  });
+
+  it('refuses unknown characters and images', async () => {
+    const { registry, projectId, mara } = await withMara();
+    for (const id of ['generate', 'select', 'delete']) {
+      await expect(
+        registry.executeById(
+          `movie.character.image.${id}`,
+          { projectId, characterId: 'nobody', imageId: 'x' },
+          { actor: user },
+        ),
+      ).rejects.toThrow(/No character/);
+    }
+    for (const id of ['select', 'delete']) {
+      await expect(
+        registry.executeById(
+          `movie.character.image.${id}`,
+          { projectId, characterId: mara.id, imageId: 'x' },
+          { actor: user },
+        ),
+      ).rejects.toThrow(/No image "x"/);
     }
   });
 });

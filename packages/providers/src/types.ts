@@ -93,6 +93,29 @@ export interface ChatResponse {
   readonly usage: Usage;
 }
 
+export interface ImageRequest {
+  /** An id from the catalog whose output modalities include `image`. */
+  readonly model: string;
+  readonly prompt: string;
+  /** Width to height, for example `3:4`. Left out, the model decides. */
+  readonly aspectRatio?: string;
+  /** The same seed, prompt and model give the same image, where the model supports it. */
+  readonly seed?: number;
+}
+
+export interface GeneratedImage {
+  readonly bytes: Uint8Array;
+  /** What the bytes are, for example `image/webp`. Models choose their own format. */
+  readonly mediaType: string;
+}
+
+export interface ImageResponse {
+  readonly model: string;
+  readonly images: readonly GeneratedImage[];
+  /** What the call cost in US dollars, or null when the provider did not say. */
+  readonly costUsd: number | null;
+}
+
 /** Lets a caller cancel a request. Structurally matches the platform `AbortSignal`. */
 export interface CancelSignal {
   readonly aborted: boolean;
@@ -105,13 +128,14 @@ export interface CallOptions {
 /**
  * A source of generation. Callers ask for a capability and a model and never
  * for a provider-specific endpoint, so providers can be added or swapped.
- * Image, audio and video capabilities join this interface as modes need them.
+ * Audio and video capabilities join this interface as modes need them.
  */
 export interface GenerationProvider {
   readonly id: string;
   /** The live catalog. Model ids are never hardcoded; they are chosen from this. */
   listModels(options?: CallOptions): Promise<readonly ModelInfo[]>;
   chat(request: ChatRequest, options?: CallOptions): Promise<ChatResponse>;
+  generateImage(request: ImageRequest, options?: CallOptions): Promise<ImageResponse>;
   /** Resolves when the stored credentials are accepted, and throws a `ProviderError` otherwise. */
   verifyCredentials(options?: CallOptions): Promise<void>;
 }

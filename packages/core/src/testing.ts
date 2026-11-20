@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { CoreRuntime } from './runtime.js';
+import { MemoryBlobStore, type BlobStore } from './storage/blob.js';
 import type { KeyValueChange, KeyValueStore } from './storage/kv.js';
 import { MemoryKeyValueStore } from './storage/memory.js';
 
-/** A runtime with a memory store, a clock that advances 1 ms per reading and counted ids. */
+/** A runtime with memory stores, a clock that advances 1 ms per reading and counted ids. */
 export function createTestRuntime(store: KeyValueStore = new MemoryKeyValueStore()): CoreRuntime {
   let tick = 0;
   let nextId = 0;
   return {
     store,
+    blobs: new MemoryBlobStore(),
     now: () => new Date(Date.UTC(2026, 0, 1) + tick++),
     newId: () => `id-${String(++nextId).padStart(4, '0')}`,
   };
@@ -99,6 +101,68 @@ export function describeKeyValueStoreContract(
       unsubscribe();
       await store.batch([{ type: 'delete', key: 'p/a' }]);
       expect(seen).toEqual([[{ type: 'put', key: 'p/a', value: 1 }]]);
+    });
+  });
+}
+
+/**
+ * The contract every blob storage implementation must pass. Call it from the
+ * test file of each implementation with a factory that returns an empty store.
+ */
+export function describeBlobStoreContract(
+  name: string,
+  createStore: () => BlobStore | Promise<BlobStore>,
+): void {
+  const bytes = (...values: number[]): Uint8Array => new Uint8Array(values);
+
+  describe(`${name} (BlobStore contract)`, () => {
+    it('returns undefined for a missing key', async () => {
+      const store = await createStore();
+      expect(await store.get('missing/key')).toBeUndefined();
+    });
+
+    it('stores bytes of every value with their media type, and replaces them', async () => {
+      const store = await createStore();
+      const all = new Uint8Array(256).map((_, index) => index);
+      await store.put('a/b', { bytes: all, mediaType: 'image/webp' });
+      const read = await store.get('a/b');
+      expect(read?.mediaType).toBe('image/webp');
+      expect([...(read?.bytes ?? [])]).toEqual([...all]);
+
+      await store.put('a/b', { bytes: bytes(1, 2), mediaType: 'image/png' });
+      const replaced = await store.get('a/b');
+      expect(replaced?.mediaType).toBe('image/png');
+      expect([...(replaced?.bytes ?? [])]).toEqual([1, 2]);
+    });
+
+    it('does not let callers change what is stored', async () => {
+      const store = await createStore();
+      const given = bytes(1, 2, 3);
+      await store.put('a', { bytes: given, mediaType: 'x/y' });
+      given[0] = 9;
+      const first = await store.get('a');
+      if (first !== undefined) first.bytes[1] = 9;
+      expect([...((await store.get('a'))?.bytes ?? [])]).toEqual([1, 2, 3]);
+    });
+
+    it('lists keys by prefix, sorted, and deletes', async () => {
+      const store = await createStore();
+      for (const key of ['p/b', 'p/a', 'q/a']) {
+        await store.put(key, { bytes: bytes(0), mediaType: 'x/y' });
+      }
+      expect(await store.list('p/')).toEqual(['p/a', 'p/b']);
+      expect(await store.list('')).toEqual(['p/a', 'p/b', 'q/a']);
+      await store.delete('p/a');
+      await store.delete('never/there');
+      expect(await store.list('p/')).toEqual(['p/b']);
+      expect(await store.get('p/a')).toBeUndefined();
+    });
+
+    it('rejects malformed keys', async () => {
+      const store = await createStore();
+      await expect(store.put('bad key', { bytes: bytes(0), mediaType: 'x/y' })).rejects.toThrow(
+        /Invalid store key/,
+      );
     });
   });
 }

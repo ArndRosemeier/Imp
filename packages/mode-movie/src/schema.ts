@@ -23,6 +23,18 @@ export const Scene = z.object({
 });
 export type Scene = z.infer<typeof Scene>;
 
+/** A generated picture of a character. The bytes are in the blob store under `blobKey`. */
+export const CharacterImage = z.object({
+  id: z.string(),
+  blobKey: z.string(),
+  mediaType: z.string(),
+  /** The prompt and model it was made with, so it can be made again or varied. */
+  prompt: z.string(),
+  model: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export type CharacterImage = z.infer<typeof CharacterImage>;
+
 export const Character = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -32,5 +44,8 @@ export const Character = z.object({
     .string()
     .describe('How the character looks, precise enough to generate images from.'),
   voice: z.string().describe('How the character sounds and speaks.'),
+  images: z.array(CharacterImage).default([]),
+  /** The image that stands for the character, or null while there is none. */
+  portraitId: z.string().nullable().default(null),
 });
 export type Character = z.infer<typeof Character>;

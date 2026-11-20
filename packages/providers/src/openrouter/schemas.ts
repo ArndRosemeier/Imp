@@ -51,6 +51,18 @@ export const ChatCompletionResponse = z.object({
     .nullish(),
 });
 
+export const ImageGenerationResponse = z.object({
+  data: z
+    .array(
+      z.object({
+        b64_json: z.string().nullish(),
+        media_type: z.string().nullish(),
+      }),
+    )
+    .min(1),
+  usage: z.object({ cost: z.number().nullish() }).nullish(),
+});
+
 export const ErrorResponse = z.object({
   error: z.object({ message: z.string() }),
 });

@@ -18,3 +18,4 @@ export {
   type PendingApproval,
 } from './run.js';
 export { defineMode, type Mode, type Stage } from './mode.js';
+export { createModelCommands } from './models.js';

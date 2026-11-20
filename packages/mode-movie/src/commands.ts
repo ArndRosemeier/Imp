@@ -7,14 +7,22 @@ import {
   type KeyValueStore,
 } from '@imp/core';
 import { z } from 'zod';
-import { Character, Development, EMPTY_DEVELOPMENT, MODE_ID, Scene } from './schema.js';
+import {
+  Character,
+  CharacterImage,
+  Development,
+  EMPTY_DEVELOPMENT,
+  MODE_ID,
+  Scene,
+} from './schema.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 
 const base = (projectId: string): string => `${projectPrefix(projectId)}movie/`;
 const developmentKey = (projectId: string): string => `${base(projectId)}development`;
 const scenePrefix = (projectId: string): string => `${base(projectId)}scenes/`;
-const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
+export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
+export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
 async function readScenes(store: KeyValueStore, projectId: string): Promise<Scene[]> {
   return (await store.list(scenePrefix(projectId)))
@@ -214,17 +222,22 @@ export const sceneDelete = defineCommand({
 
 // Casting
 
-const CharacterFields = Character.omit({ id: true });
+const CharacterFields = Character.omit({ id: true, images: true, portraitId: true });
 
 export const characterList = defineCommand({
   id: 'movie.character.list',
   title: 'List characters',
   description:
-    'Returns the cast of a movie project: id, name and part of each character. The details of a character come from movie.character.get.',
+    'Returns the cast of a movie project: id, name, part and portrait of each character. The details of a character come from movie.character.get.',
   effect: 'read',
   input: z.object({ projectId: ProjectId, full: Full }),
   output: z.object({
-    characters: z.array(Character.partial({ description: true, appearance: true, voice: true })),
+    characters: z.array(
+      // `images` is spelled out because a field with a default would otherwise fill itself in.
+      Character.omit({ images: true })
+        .partial({ description: true, appearance: true, voice: true })
+        .extend({ images: z.array(CharacterImage).optional() }),
+    ),
   }),
   handler: async ({ runtime }, { projectId, full }) => {
     await requireProject(runtime.store, 'movie.character.list', projectId, MODE_ID);
@@ -233,7 +246,14 @@ export const characterList = defineCommand({
         .map((entry) => Character.parse(entry.value))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((character) =>
-          full ? character : { id: character.id, name: character.name, part: character.part },
+          full
+            ? character
+            : {
+                id: character.id,
+                name: character.name,
+                part: character.part,
+                portraitId: character.portraitId,
+              },
         ),
     };
   },
@@ -276,7 +296,7 @@ export const characterCreate = defineCommand({
   output: Character,
   handler: async ({ runtime }, { projectId, ...fields }) => {
     await requireProject(runtime.store, 'movie.character.create', projectId, MODE_ID);
-    const character: Character = { id: runtime.newId(), ...fields };
+    const character: Character = { id: runtime.newId(), ...fields, images: [], portraitId: null };
     await runtime.store.batch([
       { type: 'put', key: `${characterPrefix(projectId)}${character.id}`, value: character },
     ]);
@@ -310,6 +330,8 @@ export const characterUpdate = defineCommand({
       description: changes.description ?? current.description,
       appearance: changes.appearance ?? current.appearance,
       voice: changes.voice ?? current.voice,
+      images: current.images,
+      portraitId: current.portraitId,
     };
     await runtime.store.batch([{ type: 'put', key, value: next }]);
     return next;
@@ -319,7 +341,7 @@ export const characterUpdate = defineCommand({
 export const characterDelete = defineCommand({
   id: 'movie.character.delete',
   title: 'Delete character',
-  description: 'Removes a character from the cast. Its details are lost.',
+  description: 'Removes a character from the cast. Its details and images are lost.',
   effect: 'destructive',
   input: z.object({ projectId: ProjectId, characterId: z.string() }),
   output: z.object({ characterId: z.string() }),
@@ -334,6 +356,9 @@ export const characterDelete = defineCommand({
       );
     }
     await runtime.store.batch([{ type: 'delete', key }]);
+    for (const blobKey of await runtime.blobs.list(`${key}/`)) {
+      await runtime.blobs.delete(blobKey);
+    }
     return { characterId };
   },
 });

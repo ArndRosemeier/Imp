@@ -362,3 +362,65 @@ describe('OpenRouter provider: chat', () => {
     expect(scripted.calls[0]?.request.headers).not.toHaveProperty('X-Title');
   });
 });
+
+describe('OpenRouter provider: images', () => {
+  it('sends the request and returns the bytes with their type and the cost', async () => {
+    const { provider, calls } = setup({
+      status: 200,
+      body: {
+        // "AQID/w==" is the bytes 1, 2, 3, 255.
+        data: [{ b64_json: 'AQID/w==', media_type: 'image/webp' }, { b64_json: 'AAEC' }],
+        usage: { cost: 0.01 },
+      },
+    });
+    const result = await provider.generateImage({
+      model: 'vendor/painter',
+      prompt: 'A lighthouse.',
+      aspectRatio: '3:4',
+      seed: 7,
+    });
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/images');
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
+      model: 'vendor/painter',
+      prompt: 'A lighthouse.',
+      aspect_ratio: '3:4',
+      seed: 7,
+    });
+    expect(result.costUsd).toBe(0.01);
+    expect(result.images.map((image) => [[...image.bytes], image.mediaType])).toEqual([
+      [[1, 2, 3, 255], 'image/webp'],
+      [[0, 1, 2], 'image/png'],
+    ]);
+  });
+
+  it('leaves out what was not asked for and reports a missing cost as null', async () => {
+    const { provider, calls } = setup({ status: 200, body: { data: [{ b64_json: 'AA==' }] } });
+    const result = await provider.generateImage({ model: 'vendor/painter', prompt: 'x' });
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
+      model: 'vendor/painter',
+      prompt: 'x',
+    });
+    expect(result.costUsd).toBeNull();
+  });
+
+  it('refuses an image without readable data', async () => {
+    for (const image of [
+      { url: 'https://example.test/i.png' },
+      { b64_json: 'not base64!' },
+      { b64_json: 'A' },
+      { b64_json: '' },
+    ]) {
+      const { provider } = setup({ status: 200, body: { data: [image] } });
+      expect(await kindOf(provider.generateImage({ model: 'm', prompt: 'x' }))).toBe(
+        'invalid_response',
+      );
+    }
+  });
+
+  it('passes provider refusals on', async () => {
+    const { provider } = setup({ status: 402, body: { error: { message: 'No credit' } } });
+    expect(await kindOf(provider.generateImage({ model: 'm', prompt: 'x' }))).toBe(
+      'insufficient_credit',
+    );
+  });
+});

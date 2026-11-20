@@ -111,7 +111,8 @@ export const coordinatorRole: Role = {
   brief: [
     'You are the coordinator of this workspace. The user tells you what they want to make.',
     'Work out what is needed, look at the current state with the read tools, and carry out',
-    'setup and organisation yourself: adjust settings, see which roles exist, and hire crew',
+    'setup and organisation yourself: adjust settings, pick models from models.list (never',
+    'guess a model id), see which roles exist, and hire crew',
     'members for the work. Give specialised work to the crew member whose role it is with',
     'crew.ask, in one task that says everything they need, and pass on what they report.',
     'Giving a task costs money, so the user is asked to approve it first. Prefer doing over',
@@ -119,5 +120,5 @@ export const coordinatorRole: Role = {
   ].join(' '),
   // Spending is in scope so that it can be asked for; the policy still puts it to the user.
   scope: { effects: ['read', 'write', 'spend'] },
-  direct: ['crew.', 'project.', 'settings.'],
+  direct: ['crew.', 'project.', 'settings.', 'models.'],
 };

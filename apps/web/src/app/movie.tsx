@@ -1,15 +1,16 @@
 import type { Project } from '@imp/core';
-import { Character, Development, Scene } from '@imp/mode-movie';
+import { Character, Development, IMAGE_MODEL_SETTING, Scene } from '@imp/mode-movie';
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
   FilmSlateIcon,
   PlusIcon,
+  SparkleIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useEffect, useId, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
-import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
@@ -287,6 +288,174 @@ const CHARACTER_FIELDS: readonly {
   { key: 'voice', label: 'Voice', rows: 4, placeholder: 'Pitch, pace, accent, manner.' },
 ];
 
+const ImageModels = z.object({ models: z.array(z.object({ id: z.string(), name: z.string() })) });
+const StringSetting = z.object({ value: z.json() });
+
+/** Reads the setting that names the image model, and the models it can be set to. */
+function useImageModel(): {
+  model: string | null;
+  models: readonly { id: string; name: string }[];
+  error: string | null;
+} {
+  const setting = useLive([`settings/${IMAGE_MODEL_SETTING}`], async (imp) => {
+    const { value } = StringSetting.parse(
+      await runCommand(imp, 'settings.get', { key: IMAGE_MODEL_SETTING }),
+    );
+    return typeof value === 'string' && value !== '' ? value : null;
+  });
+  // The catalog does not live in the store, so it is read once per visit.
+  const imp = useImp();
+  const [catalog, setCatalog] = useState<Live<z.infer<typeof ImageModels>>>({
+    data: undefined,
+    error: null,
+  });
+  useEffect(() => {
+    let active = true;
+    runCommand(imp, 'models.list', { output: 'image' }).then(
+      (listed) => {
+        if (active) setCatalog({ data: ImageModels.parse(listed), error: null });
+      },
+      (reason: unknown) => {
+        if (active) setCatalog({ data: undefined, error: messageOf(reason) });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [imp]);
+  return {
+    model: setting.data ?? null,
+    models: catalog.data?.models ?? [],
+    error: setting.error ?? catalog.error,
+  };
+}
+
+/** Turns a stored image into something an `img` can show, and frees it again afterwards. */
+function useBlobUrl(blobKey: string | undefined): string | null {
+  const imp = useImp();
+  const [shown, setShown] = useState<{ key: string; url: string } | null>(null);
+  useEffect(() => {
+    if (blobKey === undefined) return undefined;
+    let url: string | null = null;
+    let active = true;
+    void imp.blobs.get(blobKey).then((blob) => {
+      if (!active || blob === undefined) return;
+      url = URL.createObjectURL(new Blob([blob.bytes.slice()], { type: blob.mediaType }));
+      setShown({ key: blobKey, url });
+    });
+    return () => {
+      active = false;
+      if (url !== null) URL.revokeObjectURL(url);
+    };
+  }, [imp, blobKey]);
+  return shown !== null && shown.key === blobKey ? shown.url : null;
+}
+
+function StoredImage({ blobKey, alt }: { blobKey: string; alt: string }): ReactElement | null {
+  const url = useBlobUrl(blobKey);
+  return url === null ? null : <img src={url} alt={alt} />;
+}
+
+function CharacterImages({
+  character,
+  model,
+  act,
+}: {
+  character: Character;
+  model: string | null;
+  act: (id: string, input: Record<string, unknown>) => Promise<unknown>;
+}): ReactElement {
+  const directionId = useId();
+  const [direction, setDirection] = useState('');
+  const [busy, setBusy] = useState(false);
+  const portrait = character.images.find((image) => image.id === character.portraitId);
+  const at = { characterId: character.id };
+
+  const generate = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    setBusy(true);
+    void act('movie.character.image.generate', {
+      ...at,
+      ...(direction.trim() === '' ? {} : { direction: direction.trim() }),
+    }).finally(() => {
+      setBusy(false);
+    });
+  };
+
+  return (
+    <div className="stack">
+      <div className="portrait" aria-busy={busy}>
+        {portrait === undefined ? (
+          <span className="portrait-empty" aria-hidden="true">
+            {character.name.slice(0, 1).toUpperCase()}
+          </span>
+        ) : (
+          <StoredImage blobKey={portrait.blobKey} alt={`Portrait of ${character.name}`} />
+        )}
+        {busy && (
+          <span className="portrait-busy" role="status">
+            Developing…
+          </span>
+        )}
+      </div>
+      {character.images.length > 1 && (
+        <div className="thumbs" role="group" aria-label={`Images of ${character.name}`}>
+          {character.images.map((image, index) => (
+            <button
+              key={image.id}
+              className="thumb"
+              aria-pressed={image.id === character.portraitId}
+              aria-label={`Use image ${String(index + 1)} as the portrait`}
+              title={image.prompt}
+              onClick={() => {
+                void act('movie.character.image.select', { ...at, imageId: image.id });
+              }}
+            >
+              <StoredImage blobKey={image.blobKey} alt="" />
+            </button>
+          ))}
+        </div>
+      )}
+      <form className="row portrait-make" onSubmit={generate}>
+        <label className="sr-only" htmlFor={directionId}>
+          Direction for the next image
+        </label>
+        <input
+          id={directionId}
+          type="text"
+          className="input"
+          value={direction}
+          placeholder="Direction, e.g. in profile, at night"
+          onChange={(event) => {
+            setDirection(event.target.value);
+          }}
+        />
+        <button
+          type="submit"
+          className="button"
+          disabled={busy || model === null}
+          title={model === null ? 'Choose an image model first.' : `Made with ${model}`}
+        >
+          <SparkleIcon aria-hidden="true" /> {portrait === undefined ? 'Portrait' : 'Another'}
+        </button>
+      </form>
+      {portrait !== undefined && (
+        <div className="row">
+          <ConfirmButton
+            label="Delete image"
+            question="Delete this image for good?"
+            onConfirm={() => {
+              void act('movie.character.image.delete', { ...at, imageId: portrait.id });
+            }}
+          >
+            <TrashIcon aria-hidden="true" />
+          </ConfirmButton>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CastingView({ project }: { project: Project }): ReactElement {
   const listed = useLive([moviePrefix(project)], async (imp) =>
     CharacterList.parse(
@@ -294,6 +463,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
     ),
   );
   const { act, error } = useAct(project);
+  const images = useImageModel();
   const characters = listed.data?.characters ?? [];
   return (
     <>
@@ -311,7 +481,28 @@ export function CastingView({ project }: { project: Project }): ReactElement {
           <PlusIcon aria-hidden="true" /> Add character
         </button>
       </div>
-      <Problem text={listed.error ?? error} />
+      <div className="field image-model">
+        <label htmlFor="image-model">Image model</label>
+        <select
+          id="image-model"
+          className="select"
+          value={images.model ?? ''}
+          onChange={(event) => {
+            void act('settings.set', { key: IMAGE_MODEL_SETTING, value: event.target.value });
+          }}
+        >
+          {images.model === null && <option value="">Choose a model to make portraits</option>}
+          {images.model !== null && !images.models.some(({ id }) => id === images.model) && (
+            <option value={images.model}>{images.model}</option>
+          )}
+          {images.models.map(({ id, name }) => (
+            <option key={id} value={id}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Problem text={listed.error ?? error ?? images.error} />
       {listed.data !== undefined && characters.length === 0 && (
         <p className="muted">
           Nobody is cast yet. Add a character, or ask the Casting Director to build the cast from
@@ -322,9 +513,6 @@ export function CastingView({ project }: { project: Project }): ReactElement {
         {characters.map((character) => (
           <article key={character.id} className="card stack" aria-label={character.name}>
             <div className="row">
-              <span className="monogram" aria-hidden="true">
-                {character.name.slice(0, 1).toUpperCase()}
-              </span>
               <EditableField
                 label="Name"
                 hideLabel
@@ -334,6 +522,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                 }
               />
             </div>
+            <CharacterImages character={character} model={images.model} act={act} />
             {CHARACTER_FIELDS.map(({ key, label, rows, placeholder }) => (
               <EditableField
                 key={key}

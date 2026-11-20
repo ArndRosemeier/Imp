@@ -53,6 +53,10 @@ beforeAll(() => {
   // jsdom implements neither scrolling nor the modal dialog methods.
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.setPointerCapture = () => undefined;
+  // jsdom has no object URLs either.
+  let urls = 0;
+  URL.createObjectURL = () => `blob:test/${String((urls += 1))}`;
+  URL.revokeObjectURL = () => undefined;
   HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
     this.open = true;
   };
@@ -205,6 +209,59 @@ describe('App', () => {
     await vi.waitFor(async () => {
       const [stored] = await imp.store.list(`projects/${projectId}/movie/characters/`);
       expect(stored?.value).toMatchObject({ name: 'New character', appearance: 'Sixty, wiry.' });
+    });
+  });
+
+  it('makes portraits of a character, switches between them and deletes one', async () => {
+    const { imp, provider, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await user.click(await screen.findByRole('button', { name: /Add character/ }));
+    const card = await screen.findByRole('article', { name: 'New character' });
+
+    // Nothing can be made before a model is chosen.
+    const make = within(card).getByRole('button', { name: /Portrait/ });
+    expect(make).toHaveProperty('disabled', true);
+    await screen.findByRole('option', { name: 'vendor/painter' });
+    await user.selectOptions(screen.getByLabelText('Image model'), 'vendor/painter');
+    await vi.waitFor(() => {
+      expect(make).toHaveProperty('disabled', false);
+    });
+
+    await user.click(make);
+    expect(
+      await within(card).findByRole('img', { name: 'Portrait of New character' }),
+    ).toBeTruthy();
+    await user.type(within(card).getByLabelText('Direction for the next image'), 'In profile.');
+    await user.click(within(card).getByRole('button', { name: /Another/ }));
+    const second = await within(card).findByRole('button', { name: 'Use image 2 as the portrait' });
+    expect(provider.imageRequests.map((request) => request.model)).toEqual([
+      'vendor/painter',
+      'vendor/painter',
+    ]);
+    expect(provider.imageRequests[1]?.prompt).toContain('In profile.');
+
+    const stored = async () => {
+      const [entry] = await imp.store.list('project-index/');
+      const characters = await imp.store.list(
+        `projects/${(entry?.value as { id: string }).id}/movie/characters/`,
+      );
+      return characters[0]?.value as { images: { id: string }[]; portraitId: string };
+    };
+    await user.click(second);
+    await vi.waitFor(async () => {
+      const character = await stored();
+      expect(character.portraitId).toBe(character.images[1]?.id);
+    });
+    await user.click(within(card).getByRole('button', { name: /Delete image/ }));
+    await user.click(within(card).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(async () => {
+      expect((await stored()).images).toHaveLength(1);
+      expect(await imp.blobs.list('')).toHaveLength(1);
     });
   });
 
