@@ -19,14 +19,17 @@ export function App({ imp }: { imp: Imp }): ReactElement {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    isSetUp(imp).then(
-      (ready) => {
-        setStage(ready ? 'ready' : 'setup');
-      },
-      (reason: unknown) => {
-        setError(messageOf(reason));
-      },
-    );
+    imp
+      .start()
+      .then(() => isSetUp(imp))
+      .then(
+        (ready) => {
+          setStage(ready ? 'ready' : 'setup');
+        },
+        (reason: unknown) => {
+          setError(messageOf(reason));
+        },
+      );
   }, [imp]);
 
   if (error !== null) {

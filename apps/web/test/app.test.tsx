@@ -278,4 +278,66 @@ describe('App', () => {
     expect(crew.getAttribute('aria-valuenow')).toBe('360');
     expect(localStorage.getItem('imp.width.crew')).toBeNull();
   });
+
+  it('keeps the conversation across a restart and resumes after an approval', async () => {
+    const { imp, provider, user } = start([
+      {
+        toolCalls: [
+          {
+            id: 'c1',
+            name: 'run_command',
+            arguments: { id: 'project.delete', input: { projectId: 'nope' } },
+            argumentsText: '{"id":"project.delete","input":{"projectId":"nope"}}',
+          },
+        ],
+      },
+      { content: 'Waiting for you.' },
+    ]);
+    await completeSetup(user);
+    // Deleting is outside what the coordinator may do, so it cannot even ask for it.
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Delete it.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Waiting for you.')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Needs your approval' })).toBeNull();
+
+    // A second page on the same store shows the same conversation.
+    cleanup();
+    render(<App imp={imp} />);
+    expect(await screen.findByText('Waiting for you.')).toBeTruthy();
+    expect(screen.getByText('Delete it.')).toBeTruthy();
+
+    // Hiring a specialist and handing it work goes through an approval and then continues.
+    await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));
+    await screen.findByLabelText('Talking to');
+    const crew = await imp.store.list('crew/');
+    const writer = crew
+      .map((entry) => entry.value as { id: string; roleId: string })
+      .find((member) => member.roleId === 'screenwriter');
+    const args = { memberId: writer?.id ?? '', task: 'Write a scene.' };
+    provider.script(
+      {
+        toolCalls: [
+          { id: 'c2', name: 'crew__ask', arguments: args, argumentsText: JSON.stringify(args) },
+        ],
+      },
+      { content: 'I asked the Screenwriter.' },
+      { content: 'Scene written.' },
+      { content: 'The Screenwriter is done.' },
+    );
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Get a scene written.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    const approval = await screen.findByRole('region', { name: 'Needs your approval' });
+    expect(within(approval).getByText('Give an agent a task')).toBeTruthy();
+    // The request names the crew member instead of showing an id.
+    expect(within(approval).getByText('Screenwriter')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Send/ })).toHaveProperty('disabled', true);
+    await user.click(within(approval).getByRole('button', { name: /Approve/ }));
+
+    expect(await screen.findByText('The Screenwriter is done.')).toBeTruthy();
+    expect(screen.getByText('Approved: crew.ask')).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Needs your approval' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /Start over/ }));
+    expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
+  });
 });

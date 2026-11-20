@@ -66,8 +66,11 @@ export interface AgentRunOptions {
   readonly provider: GenerationProvider;
   readonly member: CrewMember;
   readonly role: Role;
-  /** What the agent is asked to do in this run. */
-  readonly task: string;
+  /**
+   * What the agent is asked to do in this run. Left out, the run continues
+   * from the history as it stands, for example after an approval.
+   */
+  readonly task?: string;
   /** Facts for this run, such as the current project, added to the agent's instructions. */
   readonly context?: string;
   /** Earlier messages to continue from, without the system message. */
@@ -75,6 +78,8 @@ export interface AgentRunOptions {
   /** The most model calls this run may make. */
   readonly maxSteps?: number;
   readonly signal?: CancelSignal;
+  /** Called with the conversation so far whenever it has grown, so it can be shown or stored. */
+  readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
 }
 
 const DEFAULT_MAX_STEPS = 20;
@@ -143,14 +148,15 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     cache: true,
   };
 
-  const messages: ChatMessage[] = [
-    ...(options.history ?? []),
-    {
+  const messages: ChatMessage[] = [...(options.history ?? [])];
+  if (options.task !== undefined) {
+    messages.push({
       role: 'user',
       content: options.task,
       ...(options.context === undefined ? {} : { context: options.context }),
-    },
-  ];
+    });
+  }
+  await options.onProgress?.(messages);
   const pendingApprovals: PendingApproval[] = [];
   const usage = { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0 };
   let costUsd = 0;
@@ -242,11 +248,13 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
 
     if (response.toolCalls.length === 0) {
       finalText = response.content;
+      await options.onProgress?.(messages);
       return finish(pendingApprovals.length > 0 ? 'awaiting-approval' : 'completed');
     }
     for (const call of response.toolCalls) {
       messages.push({ role: 'tool', toolCallId: call.id, content: await execute(call) });
     }
+    await options.onProgress?.(messages);
   }
   return finish('step-limit');
 }

@@ -43,12 +43,19 @@ export function createFakeProvider(script: {
   readonly replies?: readonly ScriptedChatReply[];
   /** When set, `verifyCredentials` rejects with it. */
   readonly credentialsError?: ProviderError;
-}): GenerationProvider & { readonly requests: ChatRequest[] } {
+}): GenerationProvider & {
+  readonly requests: ChatRequest[];
+  /** Adds replies to the end of the script, for ones that depend on what happened first. */
+  script(...replies: ScriptedChatReply[]): void;
+} {
   const queue = [...(script.replies ?? [])];
   const requests: ChatRequest[] = [];
   return {
     id: 'fake',
     requests,
+    script: (...replies) => {
+      queue.push(...replies);
+    },
     listModels: () => Promise.resolve(script.models ?? []),
     verifyCredentials: () =>
       script.credentialsError === undefined

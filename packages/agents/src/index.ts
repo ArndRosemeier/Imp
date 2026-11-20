@@ -1,9 +1,12 @@
 export {
   AgentRunSchema,
   ChatMessageSchema,
+  ConversationSchema,
   createAgentCommands,
+  releaseInterruptedRuns,
   type AgentCommandOptions,
   type AgentRun,
+  type Conversation,
 } from './commands.js';
 export { CrewMember, createCrewCommands, readCrewMember } from './crew.js';
 export { RoleCatalog, coordinatorRole, type Role } from './role.js';
