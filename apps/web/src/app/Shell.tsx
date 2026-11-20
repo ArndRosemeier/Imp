@@ -19,6 +19,7 @@ import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { CrewPanel } from './CrewPanel.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
+import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 
@@ -52,6 +53,7 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
   if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
   if (stage === 'casting') return <CastingView key={project.id} project={project} />;
+  if (stage === 'design') return <DesignView key={project.id} project={project} />;
   if (stage === 'shots') return <ShotsView key={project.id} project={project} />;
   if (stage === 'sound') return <SoundView key={project.id} project={project} />;
   if (stage === 'edit') return <EditView key={project.id} project={project} />;
