@@ -96,6 +96,10 @@ export async function summarizeMovie(
   const filled = Object.values(development).filter((text) => text.trim() !== '').length;
   const written = scenes.filter((scene) => scene.body.trim() !== '').length;
   const portrayed = characters.filter((character) => character.portraitId !== null).length;
+  // A voice-only character, such as a narrator, is cast once it has a voice.
+  const cast = characters.filter((character) =>
+    character.voiceOnly ? character.voiceSample !== null : character.portraitId !== null,
+  ).length;
   const voiced = characters.filter((character) => character.voiceSample !== null).length;
   const ready = shots.filter((shot) => shot.clip?.status === 'ready').length;
   const made = sounds.filter((sound) => sound.take !== null).length;
@@ -132,7 +136,7 @@ export async function summarizeMovie(
       {
         id: 'casting',
         name: 'Casting',
-        done: portrayed,
+        done: cast,
         total: characters.length,
         note:
           characters.length === 0

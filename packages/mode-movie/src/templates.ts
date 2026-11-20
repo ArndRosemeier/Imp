@@ -39,6 +39,7 @@ function build(draft: Draft) {
         images: [],
         portraitId: null,
         voiceSample: null,
+        voiceOnly: false,
       };
       records.push({ key: character(value.id), value });
     }
