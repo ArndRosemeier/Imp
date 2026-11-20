@@ -30,7 +30,7 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
   useEffect(() => {
     if (!hasKey) return;
     let active = true;
-    imp.provider.listModels().then(
+    imp.listModels().then(
       (all) => {
         if (active) setModels(agentModels(all));
       },
@@ -48,7 +48,7 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
     setBusy(true);
     setError(null);
     imp.secrets.setKey(key.trim());
-    imp.provider.verifyCredentials().then(
+    imp.verifyCredentials().then(
       () => {
         setHasKey(true);
         setBusy(false);

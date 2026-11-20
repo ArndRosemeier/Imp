@@ -8,7 +8,10 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
-import { createImp } from '../src/host/imp.js';
+import { connectImp } from '../src/host/client.js';
+import { createImp, type Imp } from '../src/host/imp.js';
+import { createLocalPorts } from '../src/host/port.js';
+import { serveImp } from '../src/host/serve.js';
 import { createLocalSecretStore } from '../src/host/secrets.js';
 
 const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
@@ -21,6 +24,13 @@ const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
   pricing: { promptUsdPerToken: null, completionUsdPerToken: null },
   ...extra,
 });
+
+/** The interface reaches the core only through messages, as it does with a worker. */
+function connect(imp: Imp) {
+  const [page, core] = createLocalPorts();
+  serveImp(() => imp, core);
+  return connectImp(page, imp.secrets);
+}
 
 function start(replies: readonly ScriptedChatReply[] = []) {
   const provider = createFakeProvider({
@@ -40,7 +50,7 @@ function start(replies: readonly ScriptedChatReply[] = []) {
     secrets: createLocalSecretStore(),
     provider,
   });
-  render(<App imp={imp} />);
+  render(<App imp={connect(imp)} />);
   return { imp, provider, user: userEvent.setup() };
 }
 
@@ -85,14 +95,19 @@ describe('helpers', () => {
     expect(agentModels(list).map((entry) => entry.id)).toEqual(['~z/latest', 'a/model', 'b/model']);
   });
 
-  it('derives form fields from a command schema and builds its input', () => {
-    const fields = fieldsOf(
+  it('derives form fields from a command schema and builds its input', async () => {
+    const client = connect(
       createImp({
         store: new MemoryKeyValueStore(),
         secrets: createLocalSecretStore(),
         provider: createFakeProvider({}),
-      }).registry.get('crew.hire'),
+      }),
     );
+    expect(client.commands).toEqual([]);
+    await client.start();
+    const hire = client.commands.find((command) => command.id === 'crew.hire');
+    if (hire === undefined) throw new Error('crew.hire is not registered');
+    const fields = fieldsOf(hire);
     expect(fields.map(({ name, kind, required }) => ({ name, kind, required }))).toEqual([
       { name: 'roleId', kind: 'string', required: true },
       { name: 'model', kind: 'string', required: true },
@@ -387,7 +402,7 @@ describe('App', () => {
 
     // A second page on the same store shows the same conversation.
     cleanup();
-    render(<App imp={imp} />);
+    render(<App imp={connect(imp)} />);
     expect(await screen.findByText('Waiting for you.')).toBeTruthy();
     expect(screen.getByText('Delete it.')).toBeTruthy();
 

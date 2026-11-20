@@ -38,6 +38,39 @@ export function isInScope(command: Command, scope: ToolScope = {}): boolean {
   );
 }
 
+/**
+ * The JSON Schema of what a command takes, for models and for forms. A field
+ * that takes any JSON value is described by a schema that refers to itself,
+ * which some model providers refuse outright; such a field is left open
+ * instead, which says the same thing.
+ */
+export function inputSchemaOf(command: Command): Record<string, unknown> {
+  const schema = z.toJSONSchema(command.input, { io: 'input' }) as Record<string, unknown>;
+  const defs = (schema['$defs'] ?? {}) as Record<string, unknown>;
+  const loops = new Set(
+    Object.keys(defs)
+      .map((name) => `#/$defs/${name}`)
+      .filter((ref) => JSON.stringify(defs[ref.slice(8)]).includes(`"${ref}"`)),
+  );
+  if (loops.size === 0) return schema;
+  const open = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(open);
+    if (typeof value !== 'object' || value === null) return value;
+    const { $ref: ref, ...rest } = value as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(typeof ref === 'string' && loops.has(ref) ? rest : value).map(
+        ([key, inner]) => [key, open(inner)],
+      ),
+    );
+  };
+  const rest = Object.fromEntries(Object.entries(schema).filter(([key]) => key !== '$defs'));
+  const kept = Object.entries(defs).filter(([name]) => !loops.has(`#/$defs/${name}`));
+  return {
+    ...(open(rest) as Record<string, unknown>),
+    ...(kept.length === 0 ? {} : { $defs: open(Object.fromEntries(kept)) }),
+  };
+}
+
 /** Derives the tools an agent may call from the same definitions the UI uses. */
 export function toToolDefinitions(
   commands: readonly Command[],
@@ -50,7 +83,7 @@ export function toToolDefinitions(
       function: {
         name: toToolName(command.id),
         description: command.description,
-        parameters: z.toJSONSchema(command.input, { io: 'input' }),
+        parameters: inputSchemaOf(command),
       },
     }));
 }

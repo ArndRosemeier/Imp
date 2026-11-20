@@ -1,12 +1,12 @@
 import { useEffect, useState, type ReactElement } from 'react';
-import type { Imp } from '../host/imp.js';
+import type { ImpClient } from '../host/client.js';
 import { ImpContext, messageOf, runCommand } from './context.js';
 import { Setup } from './Setup.js';
 import { Shell } from './Shell.js';
 
 type Stage = 'loading' | 'setup' | 'ready';
 
-async function isSetUp(imp: Imp): Promise<boolean> {
+async function isSetUp(imp: ImpClient): Promise<boolean> {
   if (imp.secrets.getKey() === null) return false;
   const coordinator = (await runCommand(imp, 'settings.get', { key: 'coordinator.member' })) as {
     value: unknown;
@@ -14,7 +14,7 @@ async function isSetUp(imp: Imp): Promise<boolean> {
   return coordinator.value !== null;
 }
 
-export function App({ imp }: { imp: Imp }): ReactElement {
+export function App({ imp }: { imp: ImpClient }): ReactElement {
   const [stage, setStage] = useState<Stage>('loading');
   const [error, setError] = useState<string | null>(null);
 

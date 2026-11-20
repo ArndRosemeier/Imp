@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   CommandRegistry,
+  defineCommand,
   fromToolName,
+  inputSchemaOf,
   settingsCommands,
   toToolDefinitions,
   toToolName,
@@ -29,6 +32,29 @@ describe('tool definitions', () => {
         parameters: { type: 'object', required: ['key', 'value'] },
       },
     });
+  });
+
+  it('leaves a field that takes any JSON value open instead of describing it by a loop', () => {
+    const set = inputSchemaOf(registry.get('settings.set'));
+    expect(JSON.stringify(set)).not.toContain('$ref');
+    expect(set).not.toHaveProperty('$defs');
+    expect(set).toMatchObject({ properties: { key: { type: 'string' }, value: {} } });
+    const shared = z.object({ name: z.string() }).meta({ id: 'Named' });
+    const mixed = defineCommand({
+      id: 'test.mixed',
+      title: 'Mixed',
+      description: 'Takes a shared shape twice and any value in a list.',
+      effect: 'read',
+      input: z.object({ a: shared, b: shared, any: z.array(z.json()) }),
+      output: z.object({}),
+      handler: () => Promise.resolve({}),
+    });
+    expect(inputSchemaOf(mixed)).toMatchObject({
+      properties: { a: { $ref: '#/$defs/Named' }, any: { type: 'array', items: {} } },
+      $defs: { Named: { type: 'object' } },
+    });
+    expect(Object.keys(inputSchemaOf(mixed)['$defs'] as object)).toEqual(['Named']);
+    expect(inputSchemaOf(registry.get('settings.get'))).not.toHaveProperty('$defs');
   });
 
   it('narrows the tools to a scope', () => {

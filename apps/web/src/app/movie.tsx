@@ -346,7 +346,7 @@ export function useBlobUrl(blobKey: string | undefined): string | null {
     if (blobKey === undefined) return undefined;
     let url: string | null = null;
     let active = true;
-    void imp.blobs.get(blobKey).then((blob) => {
+    void imp.blob(blobKey).then((blob) => {
       if (!active || blob === undefined) return;
       url = URL.createObjectURL(new Blob([blob.bytes.slice()], { type: blob.mediaType }));
       setShown({ key: blobKey, url });

@@ -1,12 +1,12 @@
 import type { Actor } from '@imp/core';
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { Imp } from '../host/imp.js';
+import type { ImpClient } from '../host/client.js';
 
 export const USER: Actor = { kind: 'user', id: 'local' };
 
-export const ImpContext = createContext<Imp | null>(null);
+export const ImpContext = createContext<ImpClient | null>(null);
 
-export function useImp(): Imp {
+export function useImp(): ImpClient {
   const imp = useContext(ImpContext);
   if (imp === null) {
     throw new Error('useImp must be used inside ImpContext.');
@@ -18,8 +18,8 @@ export function useImp(): Imp {
  * Runs a command as the user and returns its output. The user is never asked
  * for approval by the default policy, so anything but `ok` is a bug.
  */
-export async function runCommand(imp: Imp, id: string, input: unknown): Promise<unknown> {
-  const result = await imp.registry.executeById(id, input, { actor: USER });
+export async function runCommand(imp: ImpClient, id: string, input: unknown): Promise<unknown> {
+  const result = await imp.run(id, input);
   if (result.status !== 'ok') {
     throw new Error(`"${id}" was not run: ${result.status}`);
   }
@@ -45,7 +45,10 @@ export interface Live<T> {
  * Reads through a command and reads again whenever the store changes under
  * one of the prefixes. Views stay current no matter who made the change.
  */
-export function useLive<T>(prefixes: readonly string[], load: (imp: Imp) => Promise<T>): Live<T> {
+export function useLive<T>(
+  prefixes: readonly string[],
+  load: (imp: ImpClient) => Promise<T>,
+): Live<T> {
   const imp = useImp();
   const [state, setState] = useState<Live<T>>({ data: undefined, error: null });
   const key = prefixes.join('|');
@@ -63,7 +66,7 @@ export function useLive<T>(prefixes: readonly string[], load: (imp: Imp) => Prom
       );
     };
     refresh();
-    const unsubscribes = key.split('|').map((prefix) => imp.store.subscribe(prefix, refresh));
+    const unsubscribes = key.split('|').map((prefix) => imp.subscribe(prefix, refresh));
     return () => {
       active = false;
       for (const unsubscribe of unsubscribes) unsubscribe();

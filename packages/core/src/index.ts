@@ -57,4 +57,5 @@ export {
   toToolName,
   type ToolDefinition,
   type ToolScope,
+  inputSchemaOf,
 } from './tools.js';

@@ -1,5 +1,4 @@
-import type { Command, ToolDefinition } from '@imp/core';
-import { z } from 'zod';
+import { inputSchemaOf, type Command, type ToolDefinition } from '@imp/core';
 
 /** Names without a double underscore can never collide with a command's tool name. */
 export const FIND_TOOL = 'find_commands';
@@ -82,7 +81,7 @@ export function findCommands(commands: readonly Command[], query: string): unkno
       id: command.id,
       description: command.description,
       effect: command.effect,
-      input: z.toJSONSchema(command.input, { io: 'input' }),
+      input: inputSchemaOf(command),
     }));
   return matches.length > 0
     ? { matches }
