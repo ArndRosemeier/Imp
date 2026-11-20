@@ -50,7 +50,7 @@ function ApprovalRequest({
       .object({ crew: z.array(z.object({ id: z.string(), name: z.string() })) })
       .parse(await runCommand(current, 'crew.list', {})),
   );
-  const title = imp.registry.has(commandId) ? imp.registry.get(commandId).title : commandId;
+  const title = imp.commands.find((command) => command.id === commandId)?.title ?? commandId;
   const fields =
     typeof input === 'object' && input !== null && !Array.isArray(input)
       ? Object.entries(input)

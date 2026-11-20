@@ -173,7 +173,7 @@ export function CrewView(): ReactElement {
 function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
   const imp = useImp();
   const groups = [
-    ...new Set(imp.registry.list().map((command) => command.id.split('.')[0] ?? command.id)),
+    ...new Set(imp.commands.map((command) => command.id.split('.')[0] ?? command.id)),
   ].sort();
   const [name, setName] = useState('');
   const [summary, setSummary] = useState('');

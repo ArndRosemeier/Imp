@@ -63,11 +63,15 @@ new mode is a new package and not a change to the core.
 
 ## The web app today
 
-`apps/web` assembles the core in `src/host/imp.ts` and renders the workspace
-from it. Views read through commands with `useLive`, which reads again when the
-store changes, so the screen stays current whoever made the change. The
-OpenRouter key is held in `localStorage`, outside the key-value store, so no
-command can return it.
+`apps/web` assembles the core in `src/host/imp.ts` and runs it in a worker
+(`src/host/worker.ts`). The interface reaches it only through messages
+(`src/host/protocol.ts`): run a command as the user, be told when the store
+changes under a prefix, fetch a stored file, list models, check the key. Only
+plain data crosses, so the same protocol can later reach a local server. Views
+read through commands with `useLive`, which reads again when the store changes,
+so the screen stays current whoever made the change. The OpenRouter key is held
+in `localStorage` on the page, outside the key-value store, so no command can
+return it; the page hands it to the worker, which keeps it in memory.
 
-The core currently runs on the page's main thread behind the same registry
-interface. Moving it into a worker is planned and does not change any view.
+The tests run the whole interface over the same protocol, with both ends in
+one thread and every message cloned as between a page and a worker.

@@ -1,4 +1,3 @@
-import type { Command } from '@imp/core';
 import { ArrowLeftIcon, PlayIcon } from '@phosphor-icons/react';
 import {
   useEffect,
@@ -8,7 +7,7 @@ import {
   type SyntheticEvent,
   type ReactElement,
 } from 'react';
-import { z } from 'zod';
+import type { CommandInfo } from '../host/protocol.js';
 import { messageOf, runCommand, useImp } from './context.js';
 
 interface Field {
@@ -19,8 +18,8 @@ interface Field {
 }
 
 /** Derives form fields from the same schema an agent receives as tool parameters. */
-export function fieldsOf(command: Command): Field[] {
-  const schema = z.toJSONSchema(command.input, { io: 'input' }) as {
+export function fieldsOf(command: CommandInfo): Field[] {
+  const schema = command.input as {
     properties?: Record<string, { type?: unknown; description?: string }>;
     required?: string[];
   };
@@ -55,7 +54,13 @@ export function toInput(fields: readonly Field[], values: Record<string, string>
   return input;
 }
 
-function CommandForm({ command, onBack }: { command: Command; onBack: () => void }): ReactElement {
+function CommandForm({
+  command,
+  onBack,
+}: {
+  command: CommandInfo;
+  onBack: () => void;
+}): ReactElement {
   const imp = useImp();
   const fields = useMemo(() => fieldsOf(command), [command]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -155,7 +160,7 @@ export function CommandPalette({
   const imp = useImp();
   const dialog = useRef<HTMLDialogElement>(null);
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<Command | null>(null);
+  const [selected, setSelected] = useState<CommandInfo | null>(null);
 
   useEffect(() => {
     const element = dialog.current;
@@ -170,11 +175,9 @@ export function CommandPalette({
   }, [open]);
 
   const needle = query.trim().toLowerCase();
-  const commands = imp.registry
-    .list()
-    .filter((command) =>
-      `${command.id} ${command.title} ${command.description}`.toLowerCase().includes(needle),
-    );
+  const commands = imp.commands.filter((command) =>
+    `${command.id} ${command.title} ${command.description}`.toLowerCase().includes(needle),
+  );
 
   return (
     <dialog ref={dialog} className="palette" aria-label="Commands" onClose={onClose}>
