@@ -1,9 +1,9 @@
 import { SoundPlacement, Track, type AudioLink, type LengthOf, snapSeconds } from '@imp/audio';
 import { CommandError, type CoreRuntime, type KeyValueStore } from '@imp/core';
-import { editHistoryKey, editKey, shotPrefix, soundPrefix } from './commands.js';
+import { characterPrefix, editHistoryKey, editKey, shotPrefix, soundPrefix } from './commands.js';
 import { itemTimes, itemsOf, readCut, requireScene, save } from './edit.js';
-import type { CutItem } from './schema.js';
-import { CutHistory, SceneCut, Shot, Sound } from './schema.js';
+import type { CutItem, CutLine } from './schema.js';
+import { Character, CutHistory, SceneCut, Shot, Sound } from './schema.js';
 
 /**
  * The tracks a scene's sound is shown on in the audio editor. The Edit stage
@@ -16,6 +16,10 @@ const TRACKS = [
   { id: 'music', name: 'Music' },
 ] as const;
 type TrackId = (typeof TRACKS)[number]['id'];
+
+/** Characters with a lane of their own (a narrator, say) get a track each, holding their lines. */
+const LANE = 'lane-';
+const LINE = 'line-';
 
 /** Regions that stand for the sound an item plays with its picture, not a placement of the lane. */
 const ATTACHED = { dialogue: 'item-dialogue-', clip: 'item-clip-' } as const;
@@ -157,18 +161,63 @@ async function readScene(
     );
   }
 
+  // Each character with a lane of their own, with their recorded lines.
+  const cast = (await runtime.store.list(characterPrefix(projectId))).map((entry) =>
+    Character.parse(entry.value),
+  );
+  const lanes = cast.filter((character) =>
+    character.ownLane ? true : cut.lines.some((line) => line.characterId === character.id),
+  );
+  const lineLengths = new Map<string, number>();
+  const laneTracks = [];
+  for (const character of lanes) {
+    const lines = [];
+    for (const line of cut.lines) {
+      if (line.characterId !== character.id || line.take === null) continue;
+      const length = line.take.durationSeconds ?? (await lengthOf(line.take.blobKey)) ?? 0.01;
+      lineLengths.set(line.id, length);
+      lines.push(
+        SoundPlacement.parse({
+          id: `${LINE}${line.id}`,
+          source: 'file',
+          blobKey: line.take.blobKey,
+          label: line.text.slice(0, 120),
+          soundId: '',
+          trimStartSeconds: line.trimStartSeconds,
+          startSeconds: line.startSeconds,
+          durationSeconds: snapSeconds(Math.max(0.01, length - line.trimStartSeconds)),
+          volume: line.volume,
+          fadeInSeconds: line.fadeInSeconds,
+          fadeOutSeconds: line.fadeOutSeconds,
+          loop: false,
+        }),
+      );
+    }
+    laneTracks.push(
+      Track.parse({
+        id: `${LANE}${character.id}`,
+        name: character.name.slice(0, 80),
+        regions: lines.sort((a, b) => a.startSeconds - b.startSeconds),
+      }),
+    );
+  }
+
   return {
     name: `Scene ${String(scene.position)}: ${scene.heading}`.slice(0, 120),
-    tracks: TRACKS.map((track) =>
-      Track.parse({
-        id: track.id,
-        name: track.name,
-        regions: (regions.get(track.id) ?? []).sort((a, b) => a.startSeconds - b.startSeconds),
-      }),
-    ),
+    tracks: [
+      ...TRACKS.map((track) =>
+        Track.parse({
+          id: track.id,
+          name: track.name,
+          regions: (regions.get(track.id) ?? []).sort((a, b) => a.startSeconds - b.startSeconds),
+        }),
+      ),
+      ...laneTracks,
+    ],
     cut,
     items,
     pieces,
+    lineLengths,
   };
 }
 
@@ -213,7 +262,9 @@ export function createSceneAudioLink(): AudioLink {
     write: async (runtime, projectId, sceneId, tracks, lengthOf) => {
       const fresh = await readScene(runtime, projectId, sceneId, lengthOf);
       for (const track of tracks) {
-        const fixed = TRACKS.some((candidate) => candidate.id === track.id);
+        const fixed =
+          TRACKS.some((candidate) => candidate.id === track.id) ||
+          fresh.tracks.some((candidate) => candidate.id === track.id);
         if (!fixed || track.gainDb !== 0 || track.pan !== 0) {
           throw new CommandError(
             'invalid_input',
@@ -231,7 +282,35 @@ export function createSceneAudioLink(): AudioLink {
       const sounds: SoundPlacement[] = [];
       const seen = new Set<string>();
 
-      for (const region of tracks.flatMap((track) => track.regions)) {
+      const lines: CutLine[] = [];
+      for (const track of tracks) {
+        if (!track.id.startsWith(LANE)) continue;
+        for (const region of track.regions) {
+          seen.add(region.id);
+          const line = fresh.cut.lines.find((candidate) => `${LINE}${candidate.id}` === region.id);
+          const length = line === undefined ? undefined : fresh.lineLengths.get(line.id);
+          const plays = length === undefined ? 0 : length - region.trimStartSeconds;
+          if (line === undefined || Math.abs((region.durationSeconds ?? plays) - plays) > 0.002) {
+            throw new CommandError(
+              'invalid_input',
+              ID,
+              "A character's line plays to its end: move it, trim its start, fade or level it, or remove it, but split or shorten it on the Edit stage by recording it again.",
+            );
+          }
+          lines.push({
+            ...line,
+            startSeconds: region.startSeconds,
+            trimStartSeconds: region.trimStartSeconds,
+            volume: region.volume,
+            fadeInSeconds: region.fadeInSeconds,
+            fadeOutSeconds: region.fadeOutSeconds,
+          });
+        }
+      }
+      // Lines not yet recorded are not shown, and stay.
+      lines.push(...fresh.cut.lines.filter((line) => line.take === null));
+
+      for (const region of tracks.filter((t) => !t.id.startsWith(LANE)).flatMap((t) => t.regions)) {
         seen.add(region.id);
         const old = before.get(region.id);
         const kind = region.id.startsWith(ATTACHED.dialogue)
@@ -286,6 +365,8 @@ export function createSceneAudioLink(): AudioLink {
         ...fresh.cut,
         items: itemsChanged || fresh.cut.items !== null ? items : null,
         sounds,
+        // In the order they were, so that an untouched cut stays the same.
+        lines: fresh.cut.lines.flatMap((line) => lines.filter((kept) => kept.id === line.id)),
       });
       await save(runtime, projectId, fresh.cut, after);
     },

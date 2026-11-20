@@ -289,6 +289,79 @@ describe("a scene's sound in the audio editor", () => {
     expect(muted.document.tracks[3]?.mute).toBe(true);
   });
 
+  it('gives a character with a lane of their own a track of their lines', async () => {
+    const { runtime, run, projectId, sceneId, cut, open } = await setup();
+    await runtime.blobs.put('take/narration', { bytes: tone(2, 0.3), mediaType: 'audio/wav' });
+    const base = `projects/${projectId}/movie/`;
+    const now = new Date(0).toISOString();
+    const take = {
+      blobKey: 'take/narration',
+      mediaType: 'audio/wav',
+      line: 'It was the last night.',
+      direction: '',
+      model: 'm',
+      durationSeconds: 2,
+      costUsd: null,
+      createdAt: now,
+    };
+    const stored = await cut();
+    await runtime.store.batch([
+      {
+        type: 'put',
+        key: `${base}characters/narrator`,
+        value: {
+          id: 'narrator',
+          name: 'Narrator',
+          part: 'narrator',
+          description: '',
+          appearance: '',
+          voice: 'Old and warm.',
+          voiceOnly: true,
+          ownLane: true,
+        },
+      },
+      {
+        type: 'put',
+        key: `${base}edit/${sceneId}`,
+        value: {
+          ...stored,
+          lines: [
+            {
+              id: 'l1',
+              characterId: 'narrator',
+              text: 'It was the last night.',
+              take,
+              startSeconds: 4,
+            },
+            { id: 'l2', characterId: 'narrator', text: 'Not yet recorded.' },
+          ],
+        },
+      },
+    ]);
+    const doc = await open();
+    const docId = doc.id;
+    expect(doc.tracks.at(-1)).toMatchObject({ id: 'lane-narrator', name: 'Narrator' });
+    expect(spans(doc, 'lane-narrator')).toEqual([[4, 6]]);
+    await run('audio.region.update', {
+      projectId,
+      docId,
+      regionId: 'line-l1',
+      startSeconds: 5,
+      trimStartSeconds: 0.5,
+      durationSeconds: 1.5,
+      fadeInSeconds: 0.2,
+    });
+    expect((await cut()).lines).toMatchObject([
+      { id: 'l1', startSeconds: 5, trimStartSeconds: 0.5, fadeInSeconds: 0.2 },
+      { id: 'l2' },
+    ]);
+    await expect(
+      run('audio.region.split', { projectId, docId, regionId: 'line-l1', atSeconds: 6 }),
+    ).rejects.toThrow(/plays to its end/);
+    await run('audio.region.remove', { projectId, docId, regionId: 'line-l1' });
+    expect((await cut()).lines.map((line) => line.id)).toEqual(['l2']);
+  });
+
   it('mixes what it can decode and names what it cannot', async () => {
     const { run, projectId, open } = await setup();
     const docId = (await open()).id;
