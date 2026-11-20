@@ -127,6 +127,12 @@ describe('runAgent', () => {
     expect(provider.requests[1]?.messages.at(-1)).toMatchObject({ role: 'tool' });
   });
 
+  it('adds the context of the run to the instructions', async () => {
+    const { run, provider } = setup([{ content: 'ok' }]);
+    await run({ context: 'Current project id: p-1' });
+    expect(provider.requests[0]?.messages[0]?.content).toContain('Current project id: p-1');
+  });
+
   it('continues from earlier messages', async () => {
     const { run, provider } = setup([{ content: 'Still dark.' }]);
     await run({

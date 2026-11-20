@@ -1,7 +1,7 @@
 import { CrewMember } from '@imp/agents';
 import { ActivityEntry } from '@imp/core';
-import { TrashIcon } from '@phosphor-icons/react';
-import type { ReactElement } from 'react';
+import { TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
+import { useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 
@@ -20,11 +20,14 @@ export function CrewView(): ReactElement {
   const roles = useLive([], async (current) =>
     RoleList.parse(await runCommand(current, 'crew.roles', {})),
   );
-  const coordinator = useLive(['settings/'], async (current) =>
-    z
-      .object({ value: z.json() })
-      .parse(await runCommand(current, 'settings.get', { key: 'coordinator.member' })),
-  );
+  const coordinator = useLive(['settings/'], async (current) => {
+    const read = async (key: string): Promise<unknown> =>
+      z.object({ value: z.json() }).parse(await runCommand(current, 'settings.get', { key })).value;
+    return { value: await read('coordinator.member'), model: await read('coordinator.model') };
+  });
+  const [hireError, setHireError] = useState<string | null>(null);
+  const hiredRoles = new Set((crew.data?.crew ?? []).map((member) => member.roleId));
+  const model = coordinator.data?.model;
 
   return (
     <>
@@ -67,14 +70,39 @@ export function CrewView(): ReactElement {
       <section className="stack" aria-labelledby="roles-heading">
         <h2 id="roles-heading">Roles</h2>
         <p className="muted">
-          Working modes add roles. Movie creation will bring the Screenwriter and the Casting
-          Director. To hire, ask the coordinator or run “Hire agent” from the command palette.
+          Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator
+          or run “Hire agent” from the command palette.
         </p>
+        {hireError !== null && (
+          <p className="error" role="alert">
+            {hireError}
+          </p>
+        )}
         <div className="grid">
           {(roles.data?.roles ?? []).map((role) => (
             <article key={role.id} className="card stack">
               <h3>{role.name}</h3>
               <p className="muted">{role.summary}</p>
+              <div className="row">
+                {hiredRoles.has(role.id) ? (
+                  <span className="tag">On the crew</span>
+                ) : (
+                  <button
+                    className="button"
+                    disabled={typeof model !== 'string'}
+                    onClick={() => {
+                      setHireError(null);
+                      runCommand(imp, 'crew.hire', { roleId: role.id, model }).catch(
+                        (error: unknown) => {
+                          setHireError(messageOf(error));
+                        },
+                      );
+                    }}
+                  >
+                    <UserPlusIcon aria-hidden="true" /> Hire {role.name}
+                  </button>
+                )}
+              </div>
             </article>
           ))}
         </div>

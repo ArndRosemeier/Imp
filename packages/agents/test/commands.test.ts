@@ -75,10 +75,15 @@ describe('crew.ask', () => {
     ]);
     const coordinator = await hire('coordinator');
     const first = AgentRunSchema.parse(
-      await run('crew.ask', { memberId: coordinator.id, task: 'Make it dark.' }),
+      await run('crew.ask', {
+        memberId: coordinator.id,
+        task: 'Make it dark.',
+        context: 'Project: p-1',
+      }),
     );
     expect(first).toMatchObject({ status: 'completed', finalText: 'Theme set.', steps: 2 });
     expect(await runtime.store.get('settings/theme')).toBe('dark');
+    expect(provider.requests[0]?.messages[0]?.content).toContain('Project: p-1');
 
     const second = AgentRunSchema.parse(
       await run('crew.ask', {

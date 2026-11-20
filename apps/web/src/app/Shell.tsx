@@ -1,9 +1,11 @@
 import { CrewMember } from '@imp/agents';
+import { Project } from '@imp/core';
 import {
   FilmSlateIcon,
   GearSixIcon,
   MagnifyingGlassIcon,
   MoonIcon,
+  PlusIcon,
   SunIcon,
   UsersThreeIcon,
   type Icon,
@@ -11,19 +13,22 @@ import {
 import { useEffect, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
-import { runCommand, useLive } from './context.js';
+import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { CrewPanel } from './CrewPanel.js';
+import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 
-type View = 'crew' | 'settings';
-const VIEWS: readonly { id: View; label: string; icon: Icon }[] = [
+const WORKSPACE: readonly { id: string; label: string; icon: Icon }[] = [
   { id: 'crew', label: 'Crew', icon: UsersThreeIcon },
   { id: 'settings', label: 'Settings', icon: GearSixIcon },
 ];
-const COMING = ['Development', 'Script', 'Casting'];
+const NEW_PROJECT = 'new-project';
+/** The setting that says which project is open. Agents can read and change it too. */
+const CURRENT_PROJECT = 'project.current';
 
-const Coordinator = z.object({ value: z.json() });
+const SettingValue = z.object({ value: z.json() });
 const CrewList = z.object({ crew: z.array(CrewMember) });
+const ProjectList = z.object({ projects: z.array(Project) });
 
 function useTheme(): [string, () => void] {
   const [theme, setTheme] = useState(() => localStorage.getItem('imp.theme') ?? 'dark');
@@ -39,18 +44,47 @@ function useTheme(): [string, () => void] {
   ];
 }
 
+function StageView({ stage, project }: { stage: string; project: Project }): ReactElement | null {
+  if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
+  if (stage === 'script') return <ScriptView key={project.id} project={project} />;
+  if (stage === 'casting') return <CastingView key={project.id} project={project} />;
+  return null;
+}
+
 export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
-  const [view, setView] = useState<View>('crew');
+  const imp = useImp();
+  const [view, setView] = useState('crew');
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
 
-  const coordinator = useLive(['crew/', 'settings/'], async (imp) => {
-    const { value } = Coordinator.parse(
-      await runCommand(imp, 'settings.get', { key: 'coordinator.member' }),
-    );
-    const { crew } = CrewList.parse(await runCommand(imp, 'crew.list', {}));
-    return crew.find((member) => member.id === value) ?? null;
+  const state = useLive(['crew/', 'settings/', 'project-index/'], async (current) => {
+    const setting = async (key: string): Promise<unknown> =>
+      SettingValue.parse(await runCommand(current, 'settings.get', { key })).value;
+    const { crew } = CrewList.parse(await runCommand(current, 'crew.list', {}));
+    const { projects } = ProjectList.parse(await runCommand(current, 'project.list', {}));
+    const coordinatorId = await setting('coordinator.member');
+    const projectId = await setting(CURRENT_PROJECT);
+    return {
+      crew,
+      projects,
+      coordinator: crew.find((member) => member.id === coordinatorId) ?? null,
+      project: projects.find((project) => project.id === projectId) ?? projects.at(-1) ?? null,
+    };
   });
+  const crew = state.data?.crew ?? [];
+  const projects = state.data?.projects ?? [];
+  const project = state.data?.project ?? null;
+  const mode = imp.modes.find((candidate) => candidate.id === (project?.mode ?? 'movie'));
+  const stages = mode?.stages ?? [];
+  const active =
+    crew.find((member) => member.id === talkingTo) ?? state.data?.coordinator ?? crew[0];
+
+  const openProject = (id: string): void => {
+    runCommand(imp, 'settings.set', { key: CURRENT_PROJECT, value: id }).catch((error: unknown) => {
+      console.error(messageOf(error));
+    });
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -65,10 +99,60 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     };
   }, []);
 
+  const viewLabel =
+    [...WORKSPACE, ...stages.map((stage) => ({ id: stage.id, label: stage.name }))].find(
+      (candidate) => candidate.id === view,
+    )?.label ?? 'New project';
+  const context =
+    project === null
+      ? `No project is open. A new one is made with project.create; the setting "${CURRENT_PROJECT}" holds the id of the open project.`
+      : `Open project: "${project.name}" (projectId "${project.id}", mode ${project.mode}). The user is looking at: ${viewLabel}.`;
+
+  const isStage = stages.some((stage) => stage.id === view);
+  const startMovie = (
+    <StartMovie
+      onCreated={(created) => {
+        openProject(created.id);
+        if (view === NEW_PROJECT) setView(stages[0]?.id ?? 'crew');
+      }}
+    />
+  );
+
   return (
     <div className="shell">
       <header className="topbar">
         <div className="wordmark">Imp</div>
+        {projects.length > 0 && (
+          <div className="row project-switch">
+            <label className="sr-only" htmlFor="project-select">
+              Project
+            </label>
+            <select
+              id="project-select"
+              className="select"
+              value={project?.id ?? ''}
+              onChange={(event) => {
+                openProject(event.target.value);
+              }}
+            >
+              {projects.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="button quiet"
+              aria-label="New project"
+              title="New project"
+              onClick={() => {
+                setView(NEW_PROJECT);
+              }}
+            >
+              <PlusIcon aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <button
           className="button palette-trigger"
           onClick={() => {
@@ -89,8 +173,22 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
         </button>
       </header>
       <nav className="nav" aria-label="Workspace">
+        <div className="eyebrow">{mode?.name ?? 'Project'}</div>
+        {stages.map((stage) => (
+          <button
+            key={stage.id}
+            className="nav-item"
+            aria-current={view === stage.id ? 'page' : undefined}
+            onClick={() => {
+              setView(stage.id);
+            }}
+          >
+            <FilmSlateIcon aria-hidden="true" size={18} />
+            <span>{stage.name}</span>
+          </button>
+        ))}
         <div className="eyebrow">Workspace</div>
-        {VIEWS.map(({ id, label, icon: IconComponent }) => (
+        {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
           <button
             key={id}
             className="nav-item"
@@ -103,30 +201,52 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             <span>{label}</span>
           </button>
         ))}
-        <div className="eyebrow">Movie</div>
-        {COMING.map((label) => (
-          <button key={label} className="nav-item" disabled>
-            <FilmSlateIcon aria-hidden="true" size={18} />
-            <span>{label}</span>
-            <small>soon</small>
-          </button>
-        ))}
       </nav>
       <main className="main">
-        {view === 'crew' ? <CrewView /> : <SettingsView onForgetKey={onForgetKey} />}
+        {view === 'crew' && <CrewView />}
+        {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
+        {view === NEW_PROJECT && startMovie}
+        {isStage &&
+          state.data !== undefined &&
+          (project === null ? startMovie : <StageView stage={view} project={project} />)}
       </main>
       <ActivityStrip />
-      {coordinator.data ? (
-        <CrewPanel key={coordinator.data.id} member={coordinator.data} />
-      ) : (
-        <aside className="crew" aria-label="Coordinator">
+      <div className="crew">
+        {crew.length > 1 && (
+          <div className="field crew-switch">
+            <label htmlFor="talking-to">Talking to</label>
+            <select
+              id="talking-to"
+              className="select"
+              value={active?.id ?? ''}
+              onChange={(event) => {
+                setTalkingTo(event.target.value);
+              }}
+            >
+              {crew.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {crew.map((member) => (
+          <CrewPanel
+            key={member.id}
+            member={member}
+            context={context}
+            hidden={member.id !== active?.id}
+          />
+        ))}
+        {crew.length === 0 && (
           <div className="crew-head">
             <p className="muted">
-              {coordinator.error ?? 'No coordinator is hired. Hire one from the command palette.'}
+              {state.error ?? 'Nobody is on the crew. Hire someone from the Crew view.'}
             </p>
           </div>
-        </aside>
-      )}
+        )}
+      </div>
       <CommandPalette
         open={paletteOpen}
         onClose={() => {

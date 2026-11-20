@@ -1,11 +1,19 @@
-import { coordinatorRole, createAgentCommands, createCrewCommands, RoleCatalog } from '@imp/agents';
+import {
+  coordinatorRole,
+  createAgentCommands,
+  createCrewCommands,
+  RoleCatalog,
+  type Mode,
+} from '@imp/agents';
 import {
   activityCommands,
   CommandRegistry,
+  projectCommands,
   settingsCommands,
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
+import { movieMode } from '@imp/mode-movie';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -14,6 +22,8 @@ export interface Imp {
   readonly registry: CommandRegistry;
   readonly provider: GenerationProvider;
   readonly roles: RoleCatalog;
+  /** The working modes this build ships with. */
+  readonly modes: readonly Mode[];
   readonly store: KeyValueStore;
   readonly secrets: SecretStore;
 }
@@ -33,6 +43,9 @@ export interface ImpOptions {
   readonly provider?: GenerationProvider;
 }
 
+/** Adding a working mode to the app is adding it to this list. */
+const MODES: readonly Mode[] = [movieMode];
+
 /** Assembles the core for the browser host. */
 export function createImp(options: ImpOptions): Imp {
   const runtime: CoreRuntime = {
@@ -40,7 +53,7 @@ export function createImp(options: ImpOptions): Imp {
     now: () => new Date(),
     newId: () => crypto.randomUUID(),
   };
-  const roles = new RoleCatalog([coordinatorRole]);
+  const roles = new RoleCatalog([coordinatorRole, ...MODES.flatMap((mode) => mode.roles)]);
   const provider =
     options.provider ??
     createOpenRouterProvider({
@@ -52,8 +65,17 @@ export function createImp(options: ImpOptions): Imp {
   registry.register(
     ...settingsCommands,
     ...activityCommands,
+    ...projectCommands,
+    ...MODES.flatMap((mode) => mode.commands),
     ...createCrewCommands(roles),
     ...createAgentCommands({ registry, provider, roles }),
   );
-  return { registry, provider, roles, store: options.store, secrets: options.secrets };
+  return {
+    registry,
+    provider,
+    roles,
+    modes: MODES,
+    store: options.store,
+    secrets: options.secrets,
+  };
 }

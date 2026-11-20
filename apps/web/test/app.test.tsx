@@ -4,7 +4,7 @@ import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
@@ -166,5 +166,79 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Run' }));
     expect(await screen.findByLabelText('Result')).toBeTruthy();
     expect(await imp.store.get('settings/budget.daily')).toBe(5);
+  });
+
+  it('starts a movie and edits development, script and cast through commands', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+
+    await user.type(await screen.findByLabelText('Logline'), 'A keeper finds a living light.');
+    await user.tab();
+    const [project] = await imp.store.list('project-index/');
+    const projectId = (project?.value as { id: string }).id;
+    await vi.waitFor(async () => {
+      expect(await imp.store.get(`projects/${projectId}/movie/development`)).toMatchObject({
+        logline: 'A keeper finds a living light.',
+      });
+    });
+    expect(screen.getByLabelText('Project')).toHaveProperty('value', projectId);
+
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    await user.click(await screen.findByRole('button', { name: /Add scene/ }));
+    await user.type(await screen.findByLabelText('Scene heading'), 'INT. LAMP ROOM - NIGHT');
+    await user.tab();
+    expect(await screen.findByRole('tab', { name: /1 · INT\. LAMP ROOM - NIGHT/ })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Delete scene/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText(/There are no scenes yet/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await user.click(await screen.findByRole('button', { name: /Add character/ }));
+    const card = await screen.findByRole('article', { name: 'New character' });
+    await user.type(within(card).getByLabelText('Appearance'), 'Sixty, wiry.');
+    await user.tab();
+    await vi.waitFor(async () => {
+      const [stored] = await imp.store.list(`projects/${projectId}/movie/characters/`);
+      expect(stored?.value).toMatchObject({ name: 'New character', appearance: 'Sixty, wiry.' });
+    });
+  });
+
+  it('hires a screenwriter who writes into the open project', async () => {
+    // The scripted model cannot know the project id, so the call is completed further down.
+    const call = {
+      id: 'c1',
+      name: 'movie__scene__create',
+      arguments: { projectId: '', heading: 'EXT. HARBOUR - DUSK' },
+      argumentsText: '',
+    };
+    const { imp, provider, user } = start([
+      { toolCalls: [call] },
+      { content: 'The opening scene is in.' },
+    ]);
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    await user.type(await screen.findByLabelText('Working title'), 'Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByRole('heading', { name: 'Script' });
+    const [project] = await imp.store.list('project-index/');
+    const projectId = (project?.value as { id: string }).id;
+    call.arguments.projectId = projectId;
+    call.argumentsText = JSON.stringify(call.arguments);
+
+    await user.click(screen.getByRole('button', { name: 'Crew' }));
+    await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));
+    await user.selectOptions(await screen.findByLabelText('Talking to'), 'Screenwriter');
+    await user.type(screen.getByLabelText('Message to Screenwriter'), 'Write the opening.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+
+    const panel = screen.getByRole('complementary', { name: /Conversation with Screenwriter/ });
+    expect(await within(panel).findByText('The opening scene is in.')).toBeTruthy();
+    expect(provider.requests[0]?.messages[0]?.content).toContain(`projectId "${projectId}"`);
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    expect(await screen.findByRole('tab', { name: /1 · EXT\. HARBOUR - DUSK/ })).toBeTruthy();
   });
 });

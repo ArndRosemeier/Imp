@@ -1,7 +1,7 @@
 import { AgentRunSchema, type AgentRun, type CrewMember } from '@imp/agents';
 import { fromToolName } from '@imp/core';
 import { CheckIcon, PaperPlaneRightIcon, WrenchIcon, XIcon } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState, type SyntheticEvent, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { messageOf, runCommand, useImp } from './context.js';
 import { RichText } from './RichText.js';
 
@@ -24,7 +24,17 @@ function outcomeOf(content: string): string {
 }
 
 /** The conversation with one crew member, with what it did and what it asks approval for. */
-export function CrewPanel({ member }: { member: CrewMember }): ReactElement {
+export function CrewPanel({
+  member,
+  context,
+  hidden = false,
+}: {
+  member: CrewMember;
+  /** What the agent should know about where the user is, sent with every message. */
+  context: string;
+  /** A hidden panel keeps its conversation while the user talks to someone else. */
+  hidden?: boolean;
+}): ReactElement {
   const imp = useImp();
   const [messages, setMessages] = useState<Messages>([]);
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -48,7 +58,7 @@ export function CrewPanel({ member }: { member: CrewMember }): ReactElement {
     setNote(null);
     const history = messages;
     setMessages([...history, { role: 'user', content: task }]);
-    runCommand(imp, 'crew.ask', { memberId: member.id, task, history }).then(
+    runCommand(imp, 'crew.ask', { memberId: member.id, task, history, context }).then(
       (output) => {
         const run = AgentRunSchema.parse(output);
         setMessages(run.messages);
@@ -85,7 +95,7 @@ export function CrewPanel({ member }: { member: CrewMember }): ReactElement {
   };
 
   return (
-    <aside className="crew" aria-label={`Conversation with ${member.name}`}>
+    <aside className="crew-panel" aria-label={`Conversation with ${member.name}`} hidden={hidden}>
       <div className="crew-head stack">
         <div className="row spread">
           <h2>{member.name}</h2>
