@@ -427,6 +427,9 @@ dialog.palette[open] {
 dialog.palette::backdrop {
   background: rgb(0 0 0 / 0.5);
 }
+.palette-search:focus-visible {
+  outline: none;
+}
 .palette-head {
   display: flex;
   align-items: center;
@@ -434,6 +437,7 @@ dialog.palette::backdrop {
   border-bottom: 1px solid var(--line);
 }
 .palette-search {
+  flex: 1;
   border: none;
   border-radius: 0;
   background: none;
@@ -1211,6 +1215,10 @@ html {
   .choice {
     min-height: var(--hit);
   }
+  input[type='range'] {
+    min-height: var(--hit);
+    accent-color: var(--accent);
+  }
   .choice input {
     width: 22px;
     height: 22px;
@@ -1280,7 +1288,20 @@ html {
     height: 68px;
   }
   .lane .block {
+    top: 20px;
     height: 46px;
+  }
+  .field.compact.zoom {
+    flex: 0 0 220px;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .field.compact.zoom > span {
+    font-size: 12px;
+  }
+  .strip {
+    max-height: 64px;
   }
   /* Trim handles belong to the selected piece only, so a swipe never trims by accident. */
   .lane .block:not(.selected) .handle {
@@ -1304,6 +1325,9 @@ html {
   }
   .timeline-scroll {
     overscroll-behavior-x: contain;
+  }
+}
+
 /* Audio */
 .audio-editor {
   container-type: inline-size;

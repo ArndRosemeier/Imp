@@ -35,7 +35,7 @@ import {
   type Source,
 } from './cut-player.js';
 import { ExportBar } from './ExportBar.js';
-import { usePinchZoom } from './gestures.js';
+import { useCoarsePointer, usePinchZoom } from './gestures.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { SceneTabs } from './shots.js';
@@ -208,7 +208,6 @@ function useDrag() {
     id: string;
     edge: string;
     dx: number;
-    x: number;
   } | null>(null);
   const origin = useRef(0);
   const slop = useRef(2);
@@ -220,13 +219,11 @@ function useDrag() {
       event.currentTarget.setPointerCapture(event.pointerId);
       origin.current = event.clientX;
       slop.current = event.pointerType === 'touch' ? 8 : 2;
-      setDragging({ id, edge, dx: 0, x: event.clientX });
+      setDragging({ id, edge, dx: 0 });
     },
     move: (event: PointerEvent) => {
       setDragging((before) =>
-        before === null
-          ? null
-          : { ...before, dx: event.clientX - origin.current, x: event.clientX },
+        before === null ? null : { ...before, dx: event.clientX - origin.current },
       );
     },
     end: (event: PointerEvent, done: (id: string, edge: string, distance: number) => void) => {
@@ -279,17 +276,24 @@ function Timeline({
   const scroller = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [scrubbing, setScrubbing] = useState(false);
+  // The second of the timeline where a picture piece was grabbed.
+  const [grabbed, setGrabbed] = useState(0);
   // The second under the fingers stays under them while pinching.
   const pending = useRef<{ second: number; offset: number } | null>(null);
+  // Several pinch steps can arrive before the next render, so they build on each other here.
+  const zooming = useRef(scale);
   usePinchZoom(scroller, (factor, clientX) => {
     const box = scroller.current?.getBoundingClientRect();
     if (box === undefined || scroller.current === null) return;
     const offset = clientX - box.left;
-    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
-    pending.current = { second: (scroller.current.scrollLeft + offset) / scale, offset };
+    const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, zooming.current * factor));
+    zooming.current = next;
+    // Measured against what is on screen, which still has the rendered scale.
+    pending.current ??= { second: (scroller.current.scrollLeft + offset) / scale, offset };
     onZoom(next);
   });
   useEffect(() => {
+    zooming.current = scale;
     const anchor = pending.current;
     if (anchor === null || scroller.current === null) return;
     pending.current = null;
@@ -324,7 +328,7 @@ function Timeline({
     moving.dragging === null || Math.abs(moving.dragging.dx) < 2
       ? undefined
       : playing.find((candidate) => {
-          const second = secondAt(moving.dragging?.x ?? 0);
+          const second = grabbed + (moving.dragging?.dx ?? 0) / scale;
           return (
             candidate.itemId !== movingId &&
             second >= candidate.startsAtSeconds &&
@@ -403,7 +407,9 @@ function Timeline({
                     if (event.key === 'Enter') onSelect({ kind: 'item', id: item.itemId });
                   }}
                   onPointerDown={(event) => {
-                    if (grabs(event, selected)) moving.start(event, item.itemId, 'move');
+                    if (!grabs(event, selected)) return;
+                    setGrabbed(secondAt(event.clientX));
+                    moving.start(event, item.itemId, 'move');
                   }}
                   onPointerMove={moving.move}
                   onPointerUp={(event) => {
@@ -552,6 +558,7 @@ function SceneEditor({
     cutting: boolean;
   } | null>(null);
   const [placing, setPlacing] = useState('');
+  const coarse = useCoarsePointer();
   const data = live.data;
   const shots = data?.shots;
   const sounds = data?.sounds;
@@ -689,9 +696,9 @@ function SceneEditor({
         <div className="stack inspector" aria-label="Selected piece">
           {item === undefined && placement === undefined && (
             <p className="muted">
-              Select a piece on the timeline to change it. Drag a picture onto another to reorder,
-              drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the
-              playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes.
+              {coarse
+                ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead.'
+                : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes.'}
             </p>
           )}
           {item !== undefined && (
