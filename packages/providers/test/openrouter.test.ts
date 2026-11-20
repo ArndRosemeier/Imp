@@ -519,6 +519,20 @@ describe('OpenRouter provider: images', () => {
     ]);
   });
 
+  it('sends reference images for a picture as data URLs', async () => {
+    const { provider, calls } = setup({ status: 200, body: { data: [{ b64_json: 'AA==' }] } });
+    await provider.generateImage({
+      model: 'vendor/painter',
+      prompt: 'The same room from the door.',
+      references: [{ bytes: new Uint8Array([1, 2, 3]), mediaType: 'image/png' }],
+    });
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
+      model: 'vendor/painter',
+      prompt: 'The same room from the door.',
+      input_references: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AQID' } }],
+    });
+  });
+
   it('leaves out what was not asked for and reports a missing cost as null', async () => {
     const { provider, calls } = setup({ status: 200, body: { data: [{ b64_json: 'AA==' }] } });
     const result = await provider.generateImage({ model: 'vendor/painter', prompt: 'x' });

@@ -74,6 +74,10 @@ export const Placement = z.object({
   fadeInSeconds: z.number(),
   fadeOutSeconds: z.number(),
   loop: z.boolean(),
+  durationSeconds: z.number().nullable().default(null),
+  pan: z.number().default(0),
+  gainDb: z.number().default(0),
+  fadeCurve: z.enum(['linear', 'smooth']).default('linear'),
   name: z.string(),
   kind: z.enum(['effect', 'music', 'clip', 'dialogue']),
   recorded: z.boolean(),
@@ -150,6 +154,23 @@ export function placementKey(placement: Placement, source: Source): string | und
   return placement.source === 'clip' ? (shot?.clip?.blobKey ?? undefined) : shot?.dialogue?.blobKey;
 }
 
+/** Decibels to a gain factor: the formula of dbToGain in @imp/audio. */
+const dbToGain = (db: number): number => 10 ** (db / 20);
+
+/** The gain of the fades, as fadeGain in @imp/audio computes it for the audio editor. */
+export function fadeGain(
+  offset: number,
+  length: number,
+  fadeIn: number,
+  fadeOut: number,
+  curve: 'linear' | 'smooth',
+): number {
+  const shape = (x: number): number => (curve === 'linear' ? x : 0.5 - 0.5 * Math.cos(Math.PI * x));
+  const rise = fadeIn > 0 ? Math.min(1, offset / fadeIn) : 1;
+  const fall = fadeOut > 0 ? Math.min(1, (length - offset) / fadeOut) : 1;
+  return shape(Math.max(0, rise)) * shape(Math.max(0, fall));
+}
+
 /** A line of a character lane plays like a placed sound. */
 function linePlacement(line: Line): Placement {
   return {
@@ -164,6 +185,10 @@ function linePlacement(line: Line): Placement {
     fadeInSeconds: line.fadeInSeconds,
     fadeOutSeconds: line.fadeOutSeconds,
     loop: false,
+    durationSeconds: null,
+    pan: 0,
+    gainDb: 0,
+    fadeCurve: 'linear',
     name: '',
     kind: 'dialogue',
     recorded: line.recorded,
@@ -308,19 +333,28 @@ export class CutPlayer {
         player.pause();
         continue;
       }
-      const length = placement.loop
+      const natural = placement.loop
         ? cut.totalSeconds - placement.startSeconds
         : player.duration - placement.trimStartSeconds;
+      const length =
+        placement.durationSeconds === null ? natural : Math.min(placement.durationSeconds, natural);
       if (Number.isFinite(length) && since > length) {
         player.pause();
         continue;
       }
-      const up = placement.fadeInSeconds > 0 ? Math.min(1, since / placement.fadeInSeconds) : 1;
-      const down =
-        placement.fadeOutSeconds > 0 && Number.isFinite(length)
-          ? Math.min(1, (length - since) / placement.fadeOutSeconds)
-          : 1;
-      player.volume = Math.max(0, Math.min(1, placement.volume * up * down));
+      // Fades and gain as the audio editor mixes them. Pan needs a Web Audio graph per
+      // element and is not applied here or in the export yet.
+      const fades = fadeGain(
+        since,
+        length,
+        placement.fadeInSeconds,
+        placement.fadeOutSeconds,
+        placement.fadeCurve,
+      );
+      player.volume = Math.max(
+        0,
+        Math.min(1, placement.volume * dbToGain(placement.gainDb) * fades),
+      );
       if (player.paused) {
         const into = since + placement.trimStartSeconds;
         player.currentTime = placement.loop && player.duration > 0 ? into % player.duration : into;

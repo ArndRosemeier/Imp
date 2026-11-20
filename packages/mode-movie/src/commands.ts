@@ -6,6 +6,7 @@ import {
   type Command,
   type KeyValueStore,
 } from '@imp/core';
+import { readElement } from '@imp/world';
 import { z } from 'zod';
 import {
   Character,
@@ -54,6 +55,36 @@ function renumbered(projectId: string, scenes: readonly Scene[]) {
     key: `${scenePrefix(projectId)}${scene.id}`,
     value: { ...scene, position: index + 1 },
   }));
+}
+
+/**
+ * Fails the command unless the location exists and has the state. A state
+ * without a location means nothing, so it is refused too.
+ */
+export async function requireLocationState(
+  store: KeyValueStore,
+  commandId: string,
+  projectId: string,
+  locationId: string | null,
+  stateId: string | null,
+): Promise<void> {
+  if (locationId === null) {
+    if (stateId !== null) {
+      throw new CommandError('invalid_input', commandId, 'A state needs a location.');
+    }
+    return;
+  }
+  const location = await readElement(store, projectId, 'location', locationId);
+  if (location === undefined) {
+    throw new CommandError('invalid_input', commandId, `No location "${locationId}".`);
+  }
+  if (stateId !== null && !location.states.some((state) => state.id === stateId)) {
+    throw new CommandError(
+      'invalid_input',
+      commandId,
+      `${location.name} has no state "${stateId}". Add it with world.location.state.add.`,
+    );
+  }
 }
 
 function clamp(position: number | undefined, length: number): number {
@@ -158,11 +189,20 @@ export const sceneCreate = defineCommand({
     heading: Scene.shape.heading,
     summary: Scene.shape.summary.default(''),
     body: Scene.shape.body.default(''),
+    locationId: Scene.shape.locationId,
+    locationStateId: Scene.shape.locationStateId,
     position: z.number().int().positive().optional().describe('Where to insert it, starting at 1.'),
   }),
   output: Scene,
   handler: async ({ runtime }, input) => {
     await requireProject(runtime.store, 'movie.scene.create', input.projectId, MODE_ID);
+    await requireLocationState(
+      runtime.store,
+      'movie.scene.create',
+      input.projectId,
+      input.locationId,
+      input.locationStateId,
+    );
     const scenes = await readScenes(runtime.store, input.projectId);
     const index = clamp(input.position, scenes.length);
     const scene: Scene = {
@@ -171,6 +211,8 @@ export const sceneCreate = defineCommand({
       heading: input.heading,
       summary: input.summary,
       body: input.body,
+      locationId: input.locationId,
+      locationStateId: input.locationStateId,
     };
     scenes.splice(index, 0, scene);
     await runtime.store.batch(renumbered(input.projectId, scenes));
@@ -182,7 +224,7 @@ export const sceneUpdate = defineCommand({
   id: 'movie.scene.update',
   title: 'Change scene',
   description:
-    'Changes the heading, summary or text of a scene, or moves it to another position. Fields left out stay as they are.',
+    'Changes the heading, summary, text, location or location state of a scene, or moves it to another position. Fields left out stay as they are; changing the location without a state resets the state.',
   effect: 'write',
   input: z.object({
     projectId: ProjectId,
@@ -190,6 +232,16 @@ export const sceneUpdate = defineCommand({
     heading: Scene.shape.heading.optional(),
     summary: Scene.shape.summary.optional(),
     body: Scene.shape.body.optional(),
+    locationId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(Scene.shape.locationId.description ?? ''),
+    locationStateId: z
+      .string()
+      .nullable()
+      .optional()
+      .describe(Scene.shape.locationStateId.description ?? ''),
     position: z.number().int().positive().optional().describe('The new position, starting at 1.'),
   }),
   output: Scene,
@@ -201,11 +253,27 @@ export const sceneUpdate = defineCommand({
     if (current === undefined) {
       throw new CommandError('invalid_input', 'movie.scene.update', `No scene "${input.sceneId}".`);
     }
+    const locationId = input.locationId === undefined ? current.locationId : input.locationId;
+    const locationStateId =
+      input.locationStateId !== undefined
+        ? input.locationStateId
+        : locationId === current.locationId
+          ? current.locationStateId
+          : null;
+    await requireLocationState(
+      runtime.store,
+      'movie.scene.update',
+      input.projectId,
+      locationId,
+      locationStateId,
+    );
     const changed: Scene = {
       ...current,
       heading: input.heading ?? current.heading,
       summary: input.summary ?? current.summary,
       body: input.body ?? current.body,
+      locationId,
+      locationStateId,
     };
     scenes.splice(from, 1);
     const to = input.position === undefined ? from : clamp(input.position, scenes.length);

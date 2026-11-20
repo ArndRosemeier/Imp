@@ -4,6 +4,7 @@
 import { CommandRegistry, createProjectCommands, projectPrefix, settingsCommands } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
 import { createFakeProvider } from '@imp/providers/testing';
+import { createWorldCommands } from '@imp/world';
 import { describe, expect, it } from 'vitest';
 import { createMovieMode, movieTemplates } from '../src/index.js';
 
@@ -12,11 +13,13 @@ const agent = { kind: 'agent', id: 'c', role: 'casting-director' } as const;
 
 function setup() {
   const runtime = createTestRuntime();
-  const mode = createMovieMode({ provider: createFakeProvider({}) });
+  const provider = createFakeProvider({});
+  const mode = createMovieMode({ provider });
   const registry = new CommandRegistry({ runtime }).register(
     ...createProjectCommands([{ mode: mode.id, ...mode.project }]),
     ...settingsCommands,
     ...mode.commands,
+    ...createWorldCommands({ provider }),
   );
   const run = async (
     id: string,
@@ -175,6 +178,7 @@ describe('movie progress', () => {
       development: '1/4 1 of 4 parts written',
       script: '1/2 1 of 2 scenes written',
       casting: '1/1 1 character, 1 with a portrait, 0 with a voice',
+      design: '0/0 No locations or objects',
       shots: '1/2 1 of 2 clips ready',
       sound: '0/1 0 of 1 sound made',
       edit: '1/2 1 of 2 scenes cut',
@@ -188,6 +192,7 @@ describe('movie progress', () => {
       'Not started',
       'No scenes',
       'No characters',
+      'No locations or objects',
       'No shots',
       'No sounds',
       'Nothing to cut',
@@ -203,6 +208,8 @@ describe('copying movie resources', () => {
     expect(listed.kinds.map((k: { id: string }) => k.id)).toEqual([
       'development',
       'character',
+      'location',
+      'object',
       'scene',
       'shot',
       'sound',
@@ -426,6 +433,84 @@ describe('copying movie resources', () => {
     });
     expect(whole.status).toBe('copied');
     expect(whole.outcomes.map((o: { kind: string }) => o.kind)).toEqual(['scene']);
+  });
+
+  it('brings the places and objects a scene shows along, with their pictures and larger places', async () => {
+    const context = setup();
+    const { run, runtime } = context;
+    await run('settings.set', { key: 'images.model', value: 'vendor/painter' });
+    const from = await context.project('From');
+    const to = await context.project('To');
+    const at = (projectId: string) => ({ projectId });
+    const tower = await run('world.location.create', { ...at(from.id), name: 'Lighthouse' });
+    const lamp = await run('world.location.create', {
+      ...at(from.id),
+      name: 'Lamp room',
+      parentId: tower.id,
+    });
+    const night = await run('world.location.state.add', {
+      ...at(from.id),
+      locationId: lamp.id,
+      name: 'Night',
+    });
+    const picture = await run('world.location.image.generate', {
+      ...at(from.id),
+      locationId: lamp.id,
+    });
+    const watch = await run('world.object.create', { ...at(from.id), name: 'Pocket watch' });
+    const scene = await run('movie.scene.create', {
+      ...at(from.id),
+      heading: 'INT. LAMP ROOM - NIGHT',
+      locationId: lamp.id,
+      locationStateId: night.id,
+    });
+    await run('movie.shot.create', {
+      ...at(from.id),
+      sceneId: scene.id,
+      objects: [{ objectId: watch.id }],
+    });
+    // The target already has a lamp room of its own.
+    await run('world.location.create', { ...at(to.id), name: 'Lamp room' });
+
+    const listed = await run('project.resources.list', { projectId: from.id });
+    expect(
+      listed.items
+        .filter((i: { kind: string }) => i.kind === 'location')
+        .map((i: { name: string; detail: string }) => `${i.name}: ${i.detail}`),
+    ).toEqual(['Lamp room: 1 view · 1 state · 1 picture', 'Lighthouse: 1 view · 0 pictures']);
+
+    const asked = await run('project.resources.copy', {
+      fromProjectId: from.id,
+      toProjectId: to.id,
+      items: [{ kind: 'scene', id: scene.id }],
+    });
+    expect(asked.status).toBe('waiting-for-person');
+    expect(
+      asked.collisions.map(
+        (i: { kind: string; name: string; reason: string }) => `${i.kind} ${i.name} ${i.reason}`,
+      ),
+    ).toEqual(['location Lamp room needed']);
+    await run('project.resources.request.resolve', {
+      requestId: asked.requestId,
+      choices: { [`location:${lamp.id}`]: 'keepBoth' },
+    });
+    const places = (await run('world.location.list', { projectId: to.id, full: true })).items;
+    expect(places.map((p: { name: string }) => p.name)).toEqual([
+      'Lamp room',
+      'Lamp room (2)',
+      'Lighthouse',
+    ]);
+    const copy = places.find((p: { name: string }) => p.name === 'Lamp room (2)');
+    expect(copy.id).not.toBe(lamp.id);
+    expect(copy.parentId).toBe(tower.id);
+    expect(copy.images[0].blobKey).toContain(`projects/${to.id}/world/locations/${copy.id}/`);
+    expect(await runtime.blobs.get(copy.images[0].blobKey)).toBeDefined();
+    expect(picture.image.blobKey).toContain(from.id);
+    // The copied scene points at the copy.
+    const scenes = (await run('movie.scene.list', { projectId: to.id })).scenes;
+    expect(scenes[0].locationId).toBe(copy.id);
+    const objects = (await run('world.object.list', { projectId: to.id })).items;
+    expect(objects.map((o: { name: string }) => o.name)).toEqual(['Pocket watch']);
   });
 
   it('refuses what is not there', async () => {

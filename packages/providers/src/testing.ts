@@ -66,6 +66,8 @@ export function createFakeProvider(script: {
   readonly credentialsError?: ProviderError;
   /** When set, `generateImage` rejects with it. */
   readonly imageError?: ProviderError;
+  /** When true, `generateImage` refuses requests that carry reference images. */
+  readonly imageRefusesReferences?: boolean;
   /** When set, `generateSpeech` rejects with it. */
   readonly speechError?: ProviderError;
   /** When set, `generateSound` rejects with it. */
@@ -161,6 +163,11 @@ export function createFakeProvider(script: {
       imageRequests.push(request);
       if (script.imageError !== undefined) {
         return Promise.reject(script.imageError);
+      }
+      if (script.imageRefusesReferences === true && (request.references?.length ?? 0) > 0) {
+        return Promise.reject(
+          new ProviderError('bad_request', 'fake', 'This model takes no reference images.'),
+        );
       }
       // The bytes differ per call, so tests can tell generated images apart.
       return Promise.resolve({

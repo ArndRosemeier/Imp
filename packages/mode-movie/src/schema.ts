@@ -21,6 +21,18 @@ export const Scene = z.object({
   heading: z.string().describe('The slug line, for example "INT. LIGHTHOUSE, LAMP ROOM - NIGHT".'),
   summary: z.string().describe('What happens in the scene, in a sentence or two.'),
   body: z.string().describe('The scene in screenplay form: action lines and dialogue.'),
+  locationId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe('Where the scene happens: a location from world.location.list, or null.'),
+  locationStateId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      'The state the location is in during the scene, for example "Night, storm", or null for its usual look.',
+    ),
 });
 export type Scene = z.infer<typeof Scene>;
 
@@ -122,6 +134,8 @@ export const Clip = z.object({
   model: z.string(),
   /** How many portraits guided it. Zero when the model takes none. */
   portraits: z.number().int().default(0),
+  /** What the guiding images showed, by name: characters, the location's view, objects. */
+  guides: z.array(z.string()).default([]),
   /** Percent done, where the model reports it. */
   progress: z.number().nullable(),
   /** Why it failed. */
@@ -170,6 +184,38 @@ export const Shot = z.object({
     .describe(
       'What the bodies do, as visibly as the moment needs: who moves how, and how the others react. Video models underplay movement unless it is spelled out.',
     ),
+  locationId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe("The location seen, when it is not the scene's. Null for the scene's location."),
+  locationStateId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      "The state of the location in this shot, when it differs from the scene's. Null to follow the scene.",
+    ),
+  viewId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      "The view of the location the shot is filmed from (its views are in world.location.get), or null for the location's first view. Shots of one place from different sides use different views.",
+    ),
+  objects: z
+    .array(
+      z.object({
+        objectId: z.string().describe('An object from world.object.list.'),
+        stateId: z
+          .string()
+          .nullable()
+          .default(null)
+          .describe('The state it is in, or null for its usual look.'),
+      }),
+    )
+    .default([])
+    .describe('The objects seen in the shot. Their look and picture guide the clip.'),
   speakerId: z.string().nullable().describe('Who speaks the line, or null for a silent shot.'),
   line: z
     .string()

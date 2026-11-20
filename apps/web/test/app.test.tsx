@@ -453,6 +453,68 @@ describe('App', () => {
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
   });
 
+  it('designs a location from two views, links it to a scene and films a shot from a view', async () => {
+    const { provider, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+
+    await user.click(screen.getByRole('button', { name: 'Design' }));
+    expect(await screen.findByText(/No places yet/)).toBeTruthy();
+    await user.selectOptions(await screen.findByLabelText('Image model'), 'vendor/painter');
+    await user.click(screen.getByRole('button', { name: /Add location/ }));
+    const card = await screen.findByRole('article', { name: 'New location' });
+    await user.type(within(card).getByLabelText('Look'), 'Round iron room.');
+    await user.tab();
+    await user.click(within(card).getByRole('button', { name: /Draw/ }));
+    await vi.waitFor(() => {
+      expect(provider.imageRequests).toHaveLength(1);
+    });
+    expect(provider.imageRequests[0]?.prompt).toContain('Round iron room.');
+
+    await user.type(within(card).getByLabelText('Add view'), 'From the stairs');
+    await user.click(within(card).getByRole('button', { name: /Add view/ }));
+    expect(
+      await within(card).findByRole('heading', { name: 'View · From the stairs' }),
+    ).toBeTruthy();
+    expect(within(card).getByText(/Stand-in/)).toBeTruthy();
+    await user.click(within(card).getByRole('button', { name: /Draw/ }));
+    await vi.waitFor(() => {
+      expect(provider.imageRequests).toHaveLength(2);
+    });
+    // The second view is drawn to agree with the first.
+    expect(provider.imageRequests[1]?.references).toHaveLength(1);
+    await user.type(within(card).getByLabelText('Add state'), 'Night');
+    await user.click(within(card).getByRole('button', { name: /Add state/ }));
+    expect(await within(card).findByRole('heading', { name: 'State · Night' })).toBeTruthy();
+    expect(
+      within(card).getByRole('button', { name: 'From the stairs, Night, not drawn' }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('tab', { name: /Objects/ }));
+    await user.click(await screen.findByRole('button', { name: /Add object/ }));
+    await screen.findByRole('article', { name: 'New object' });
+
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    await user.click(await screen.findByRole('button', { name: /Add scene/ }));
+    await user.selectOptions(await screen.findByLabelText('Location'), 'New location');
+    await user.selectOptions(await screen.findByLabelText('State'), 'Night');
+
+    await user.click(screen.getByRole('button', { name: 'Shots' }));
+    await user.click(await screen.findByRole('button', { name: /Add shot/ }));
+    const shot = await screen.findByRole('article', { name: 'Shot 1' });
+    await user.selectOptions(await within(shot).findByLabelText(/Filmed from/), 'From the stairs');
+    await user.click(within(shot).getByRole('checkbox', { name: 'New object' }));
+    await vi.waitFor(() => {
+      expect(within(shot).getByRole('checkbox', { name: 'New object' })).toHaveProperty(
+        'checked',
+        true,
+      );
+    });
+  });
+
   it('breaks a scene into shots and makes a clip that arrives later', async () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
@@ -917,6 +979,17 @@ describe('App', () => {
     await vi.waitFor(async () => {
       expect(await imp.store.get('roles/dialogue-polisher')).toBeUndefined();
     });
+  });
+});
+
+describe('fades of a placed sound', () => {
+  it('follows the audio editor: linear, or a soft S, and silent outside the sound', async () => {
+    const { fadeGain } = await import('../src/app/cut-player.js');
+    expect(fadeGain(1, 10, 2, 0, 'linear')).toBeCloseTo(0.5);
+    expect(fadeGain(1, 10, 2, 0, 'smooth')).toBeCloseTo(0.5);
+    expect(fadeGain(0.5, 10, 2, 0, 'smooth')).toBeCloseTo(0.1464, 3);
+    expect(fadeGain(9, 10, 0, 2, 'linear')).toBeCloseTo(0.5);
+    expect(fadeGain(5, 10, 0, 0, 'linear')).toBe(1);
   });
 });
 

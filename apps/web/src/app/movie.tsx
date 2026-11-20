@@ -19,6 +19,7 @@ import { useEffect, useId, useState, type ReactElement, type SyntheticEvent } fr
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
+import { ScenePlace, useWorld } from './place.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const CharacterList = z.object({ characters: z.array(Character) });
@@ -161,6 +162,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
     ),
   );
   const { act, error } = useAct(project);
+  const world = useWorld(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const scenes = listed.data?.scenes ?? [];
   const scene = scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0];
@@ -220,6 +222,13 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             value={scene.heading}
             placeholder="INT. LOCATION - TIME"
             onCommit={(heading) => act('movie.scene.update', { sceneId: scene.id, heading })}
+          />
+          <ScenePlace
+            sceneId={scene.id}
+            locationId={scene.locationId}
+            stateId={scene.locationStateId}
+            locations={world.locations}
+            act={act}
           />
           <EditableField
             label="Summary"

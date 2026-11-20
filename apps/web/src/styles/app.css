@@ -2388,3 +2388,164 @@ dialog.modal::backdrop {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Design: locations and objects */
+.kind-switch {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  align-self: flex-end;
+}
+.kind-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: calc(var(--hit) - 8px);
+  padding: 0 18px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.kind-segment[aria-selected='true'] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.chip.with-thumb {
+  padding-left: 4px;
+}
+.chip-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.card.design {
+  max-width: 920px;
+  margin-top: var(--space-4);
+}
+.plate {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--accent-wash), transparent 70%), var(--surface-raised);
+  display: grid;
+  place-items: center;
+}
+.plate.object {
+  aspect-ratio: 1 / 1;
+  max-width: 520px;
+  width: 100%;
+  justify-self: center;
+}
+.plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.plate-empty {
+  max-width: 34ch;
+  padding: var(--space-5);
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.25;
+  color: var(--ink-muted);
+}
+.plate-note {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / 0.6);
+  color: #ede6da;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.thumbs.wide .thumb {
+  width: 96px;
+  height: 54px;
+}
+.sheet-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet {
+  border-collapse: separate;
+  border-spacing: var(--space-2);
+  margin: calc(-1 * var(--space-2));
+}
+.sheet th {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  text-align: left;
+  white-space: nowrap;
+}
+.sheet th[scope='row'] {
+  padding-right: var(--space-2);
+  color: var(--ink-soft);
+}
+.sheet th[scope='row'] .tag {
+  margin-left: var(--space-2);
+}
+.sheet-cell {
+  display: grid;
+  place-items: center;
+  width: max(112px, calc(var(--hit) * 16 / 9));
+  height: max(63px, var(--hit));
+  padding: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.sheet-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sheet-cell:has(img) {
+  border-style: solid;
+  border-color: var(--line);
+}
+.sheet-cell[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  color: var(--accent);
+}
+.design-adds {
+  gap: var(--space-3);
+}
+.add-named {
+  flex: 1 1 320px;
+}
+.add-named .input {
+  flex: 1;
+  min-width: 0;
+}
+.design-part {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.scene-place {
+  align-items: flex-end;
+}
+.scene-place .field {
+  flex: 1 1 200px;
+}

@@ -1,8 +1,8 @@
 import { defineMode, type Mode, type Role } from '@imp/agents';
 import type { GenerationProvider } from '@imp/providers';
-import { movieCommands } from './commands.js';
+import { movieCommands, movieDevelopmentKey } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
-import { MODE_ID } from './schema.js';
+import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
 import { libraryCommands } from './library.js';
@@ -11,7 +11,7 @@ import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = {
-  prefixes: ['movie.', 'project.list', 'project.resources.', 'media.'],
+  prefixes: ['movie.', 'world.', 'project.list', 'project.resources.', 'media.'],
 } as const;
 
 export const screenwriter: Role = {
@@ -26,7 +26,10 @@ export const screenwriter: Role = {
     'line as the heading, action lines in the present tense, character names in capitals',
     'above their dialogue. Give every scene a one or two sentence summary. Save your work',
     'with the tools as you go, one scene per call, and revise scenes instead of duplicating',
-    'them. Show, do not tell, and keep dialogue short.',
+    'them. Show, do not tell, and keep dialogue short. Link each scene to the place it',
+    'happens in (locationId, from world.location.list) and the state the place is in, such as',
+    'night or after the fire; when a place or state does not exist yet, create it with only a',
+    'name and a description and leave its look to the Production Designer.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -80,6 +83,38 @@ export const clipDesigner: Role = {
     'film from a description and are refused.',
     'Judge voice and body separately against what the moment needs, say plainly when a take',
     'is too calm, and change the shot before you ask to generate again.',
+    "Each shot happens in its scene's location; give it the view of that location it is filmed",
+    'from (viewId, from world.location.get), so that shots from different sides show one place,',
+    'and list the objects seen with their state. Ask the Production Designer for a view that is',
+    'missing rather than describing the room anew in the shot.',
+  ].join(' '),
+  scope: SCOPE,
+};
+
+export const productionDesigner: Role = {
+  id: 'production-designer',
+  name: 'Production Designer',
+  summary: 'Designs the locations and objects and makes their reference pictures.',
+  brief: [
+    'You are a production designer for a film made with generated images and video. You define',
+    'the places the story happens in and the objects that matter to it, so that every clip',
+    'shows the same place and the same object. Read the development notes and the script',
+    'outline first, and the scenes a place or object appears in when you need detail.',
+    'Create one location per place (world.location.create) and one object per prop that is',
+    'seen more than once or matters to the story (world.object.create). Write the look so',
+    'precisely that an image model would draw the same thing every time: architecture or',
+    'shape, materials, colours, wear, light. For a location also write the layout, where',
+    'things are relative to each other, which keeps different camera angles in agreement, and',
+    'the ambience. Places inside a larger place name it as their parent. Give each location',
+    'the views the script needs (world.location.view.add), each a camera position the scenes',
+    'are filmed from, such as "From the door" or "Toward the sea window", and the states the',
+    'story puts it in, such as "Night, storm" (world.location.state.add). Objects get states',
+    'like "Cracked" the same way. Make pictures with world.location.image.generate and',
+    'world.object.image.generate: the master view first, because the other views and states',
+    'are drawn to agree with it. Look at each picture with media.view, judge it against the',
+    'look and against the other views, say what is wrong, generate again with a direction',
+    'where needed, and select the best as the key picture. Pictures cost money; make the words',
+    'right first. If you cannot be shown images, say so and leave the choice to the user.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -158,11 +193,12 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
     id: MODE_ID,
     name: 'Movie',
     summary:
-      'Develop an idea, write the script, cast the characters, shoot the clips and make the sound.',
+      'Develop an idea, write the script, cast the characters, design the places and objects, shoot the clips and make the sound.',
     stages: [
       { id: 'development', name: 'Development' },
       { id: 'script', name: 'Script' },
       { id: 'casting', name: 'Casting' },
+      { id: 'design', name: 'Design' },
       { id: 'shots', name: 'Shots' },
       { id: 'sound', name: 'Sound' },
       { id: 'edit', name: 'Edit' },
@@ -177,7 +213,20 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...createEditCommands(options.provider),
       ...libraryCommands,
     ],
-    roles: [screenwriter, castingDirector, clipDesigner, soundDesigner, filmEditor, soundEditor],
+    roles: [
+      screenwriter,
+      castingDirector,
+      productionDesigner,
+      clipDesigner,
+      soundDesigner,
+      filmEditor,
+      soundEditor,
+    ],
     project: movieProjectSupport,
+    // The pictures of the world are drawn in the film's tone.
+    visualStyle: async (store, projectId) => {
+      const stored = await store.get(movieDevelopmentKey(projectId));
+      return stored === undefined ? '' : Development.parse(stored).tone;
+    },
   });
 }

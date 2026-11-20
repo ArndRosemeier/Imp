@@ -15,6 +15,7 @@
     "@imp/audio": "workspace:*",
     "@imp/core": "workspace:*",
     "@imp/mode-movie": "workspace:*",
+    "@imp/world": "workspace:*",
     "@imp/providers": "workspace:*"
   }
 }

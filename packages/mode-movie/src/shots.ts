@@ -16,13 +16,41 @@ import {
   type MediaInput,
   type ModelInfo,
 } from '@imp/providers';
+import {
+  keyImageOf,
+  readElement,
+  type Location,
+  type State,
+  type View,
+  type WorldImage,
+  type WorldObject,
+} from '@imp/world';
 import { z } from 'zod';
-import { characterPrefix, movieDevelopmentKey, movieSceneKey, shotPrefix } from './commands.js';
+import {
+  characterPrefix,
+  movieDevelopmentKey,
+  movieSceneKey,
+  requireLocationState,
+  shotPrefix,
+} from './commands.js';
 import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
-import { Character, Clip, Development, DialogueTake, MODE_ID, Shot } from './schema.js';
+import { Character, Clip, Development, DialogueTake, MODE_ID, Scene, Shot } from './schema.js';
 
 /** The setting that names the model clips are made with when a call does not say. */
 export const VIDEO_MODEL_SETTING = 'video.model';
+
+/** Guiding images beyond the portraits stop at this many in all; video models take only a few. */
+export const MAX_CLIP_GUIDES = 4;
+
+/** Where a shot happens and what is in it, from the world of the project. */
+export interface ShotSetting {
+  readonly location?: {
+    readonly element: Location;
+    readonly view: View;
+    readonly state: State | null;
+  };
+  readonly objects: readonly { readonly element: WorldObject; readonly state: State | null }[];
+}
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 const SceneId = z.string().describe('The id of a scene from movie.scene.list.');
@@ -69,6 +97,64 @@ async function loadShot(
   return { key, shot: Shot.parse(stored) };
 }
 
+/**
+ * The location, view and objects of a shot. The location and its state come
+ * from the scene unless the shot names its own. What no longer exists is left out.
+ */
+export async function readSetting(
+  store: KeyValueStore,
+  projectId: string,
+  shot: Shot,
+): Promise<ShotSetting> {
+  let locationId = shot.locationId;
+  let stateId = shot.locationStateId;
+  if (locationId === null) {
+    const stored = await store.get(movieSceneKey(projectId, shot.sceneId));
+    const scene = stored === undefined ? undefined : Scene.parse(stored);
+    locationId = scene?.locationId ?? null;
+    stateId ??= scene?.locationStateId ?? null;
+  }
+  const place =
+    locationId === null ? undefined : await readElement(store, projectId, 'location', locationId);
+  const objects: { element: WorldObject; state: State | null }[] = [];
+  for (const seen of shot.objects) {
+    const element = await readElement(store, projectId, 'object', seen.objectId);
+    if (element?.kind !== 'object') continue;
+    objects.push({
+      element,
+      state: element.states.find((state) => state.id === seen.stateId) ?? null,
+    });
+  }
+  if (place?.kind !== 'location') return { objects };
+  const view = place.views.find((candidate) => candidate.id === shot.viewId) ?? place.views[0];
+  if (view === undefined) return { objects };
+  return {
+    location: {
+      element: place,
+      view,
+      state: place.states.find((state) => state.id === stateId) ?? null,
+    },
+    objects,
+  };
+}
+
+/** The pictures of the world that guide a clip, closest first, with what each shows. */
+function settingGuides(setting: ShotSetting): { image: WorldImage; name: string }[] {
+  const guides: { image: WorldImage; name: string }[] = [];
+  if (setting.location !== undefined) {
+    const { element, view, state } = setting.location;
+    const image = keyImageOf(element, view.id, state?.id ?? null);
+    if (image !== undefined) guides.push({ image, name: `${element.name} · ${view.name}` });
+  }
+  for (const { element, state } of setting.objects) {
+    const image = keyImageOf(element, null, state?.id ?? null);
+    if (image !== undefined) guides.push({ image, name: element.name });
+  }
+  return guides;
+}
+
+const clause = (text: string): string => text.trim().replace(/[.!?]+$/, '');
+
 async function readCast(store: KeyValueStore, projectId: string, shot: Shot) {
   const cast: Character[] = [];
   for (const id of new Set([
@@ -92,7 +178,37 @@ export function clipPrompt(
   tone: string,
   /** The line is recorded apart and laid over the clip, so the clip must not voice it. */
   dialogueApart = false,
+  /** Where it happens and which objects are seen. */
+  setting: ShotSetting = { objects: [] },
 ): string {
+  const place = setting.location;
+  const where =
+    place === undefined
+      ? ''
+      : [
+          `Location: ${place.element.name}, seen from "${place.view.name}"${
+            place.view.description.trim() === '' ? '' : `: ${clause(place.view.description)}`
+          }.`,
+          place.element.look.trim() === '' ? '' : `${clause(place.element.look)}.`,
+          place.state === null
+            ? ''
+            : `${place.state.name}${
+                place.state.description.trim() === '' ? '' : `: ${clause(place.state.description)}`
+              }.`,
+        ]
+          .filter((part) => part !== '')
+          .join(' ');
+  const things = setting.objects.map(({ element, state }) =>
+    [
+      `${element.name}:`,
+      element.look.trim() === '' ? clause(element.description) : clause(element.look),
+      state === null
+        ? ''
+        : `(${state.name}${state.description.trim() === '' ? '' : `: ${clause(state.description)}`})`,
+    ]
+      .filter((part) => part !== '')
+      .join(' '),
+  );
   const speaker = cast.find((character) => character.id === shot.speakerId);
   const onScreen = cast.filter((character) => !character.voiceOnly);
   const said =
@@ -109,9 +225,11 @@ export function clipPrompt(
             } "${shot.line.trim()}"`;
   return [
     shot.description,
+    where,
     ...onScreen.map((character) =>
       character.appearance === '' ? '' : `${character.name}: ${character.appearance}`,
     ),
+    ...things,
     shot.performance === '' ? '' : `Performance: ${shot.performance}`,
     said,
     tone === '' ? '' : `Visual style: ${tone}`,
@@ -122,6 +240,49 @@ export function clipPrompt(
 }
 
 const At = { projectId: ProjectId, sceneId: SceneId, shotId: z.string() };
+
+/** Fails the command when a shot names a location, view, state or object that does not exist. */
+async function requireShotSetting(
+  store: KeyValueStore,
+  commandId: string,
+  projectId: string,
+  shot: Shot,
+): Promise<void> {
+  if (shot.locationId !== null) {
+    await requireLocationState(store, commandId, projectId, shot.locationId, shot.locationStateId);
+  }
+  if (shot.viewId !== null) {
+    const setting = await readSetting(store, projectId, { ...shot, objects: [] });
+    const place = setting.location?.element;
+    if (place === undefined) {
+      throw new CommandError(
+        'invalid_input',
+        commandId,
+        'A view needs a location: give the shot or its scene one first.',
+      );
+    }
+    if (!place.views.some((view) => view.id === shot.viewId)) {
+      throw new CommandError(
+        'invalid_input',
+        commandId,
+        `${place.name} has no view "${shot.viewId}". Its views are in world.location.get; add one with world.location.view.add.`,
+      );
+    }
+  }
+  for (const seen of shot.objects) {
+    const object = await readElement(store, projectId, 'object', seen.objectId);
+    if (object === undefined) {
+      throw new CommandError('invalid_input', commandId, `No object "${seen.objectId}".`);
+    }
+    if (seen.stateId !== null && !object.states.some((state) => state.id === seen.stateId)) {
+      throw new CommandError(
+        'invalid_input',
+        commandId,
+        `${object.name} has no state "${seen.stateId}".`,
+      );
+    }
+  }
+}
 
 async function deleteClipFile(runtime: CoreRuntime, clip: Clip | null): Promise<void> {
   const blobKey = clip?.blobKey ?? null;
@@ -220,12 +381,17 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         description: fields.description ?? '',
         characterIds: fields.characterIds ?? [],
         performance: fields.performance ?? '',
+        locationId: fields.locationId ?? null,
+        locationStateId: fields.locationStateId ?? null,
+        viewId: fields.viewId ?? null,
+        objects: fields.objects ?? [],
         speakerId: fields.speakerId ?? null,
         line: fields.line ?? '',
         delivery: fields.delivery ?? '',
         dialogue: null,
         clip: null,
       };
+      await requireShotSetting(runtime.store, 'movie.shot.create', projectId, shot);
       await runtime.store.batch([
         { type: 'put', key: shotKey(projectId, sceneId, shot.id), value: shot },
       ]);
@@ -252,10 +418,16 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         description: changes.description ?? shot.description,
         characterIds: changes.characterIds ?? shot.characterIds,
         performance: changes.performance ?? shot.performance,
+        locationId: changes.locationId === undefined ? shot.locationId : changes.locationId,
+        locationStateId:
+          changes.locationStateId === undefined ? shot.locationStateId : changes.locationStateId,
+        viewId: changes.viewId === undefined ? shot.viewId : changes.viewId,
+        objects: changes.objects ?? shot.objects,
         speakerId: changes.speakerId === undefined ? shot.speakerId : changes.speakerId,
         line: changes.line ?? shot.line,
         delivery: changes.delivery ?? shot.delivery,
       };
+      await requireShotSetting(runtime.store, 'movie.shot.update', projectId, next);
       await runtime.store.batch([{ type: 'put', key, value: next }]);
       return next;
     },
@@ -356,7 +528,8 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
       const development = await runtime.store.get(movieDevelopmentKey(input.projectId));
       const tone = development === undefined ? '' : Development.parse(development).tone;
       const dialogueApart = shot.dialogue !== null && shot.line.trim() !== '';
-      const prompt = clipPrompt(shot, cast, tone, dialogueApart);
+      const setting = await readSetting(runtime.store, input.projectId, shot);
+      const prompt = clipPrompt(shot, cast, tone, dialogueApart, setting);
       const durationSeconds = fitDuration(
         info?.video,
         input.durationSeconds ??
@@ -367,12 +540,25 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
       const audio = input.audio ?? (dialogueApart ? false : shot.line.trim() !== '');
 
       const references: MediaInput[] = [];
+      const guides: string[] = [];
+      let portraitCount = 0;
       if (input.portraits) {
         for (const character of cast.filter((candidate) => !candidate.voiceOnly)) {
           const portrait = character.images.find((image) => image.id === character.portraitId);
           const blob =
             portrait === undefined ? undefined : await runtime.blobs.get(portrait.blobKey);
-          if (blob !== undefined) references.push(blob);
+          if (blob === undefined) continue;
+          references.push(blob);
+          guides.push(character.name);
+          portraitCount += 1;
+        }
+        // The place and the objects follow the people, as many as the model is likely to take.
+        for (const guide of settingGuides(setting)) {
+          if (references.length >= MAX_CLIP_GUIDES) break;
+          const blob = await runtime.blobs.get(guide.image.blobKey);
+          if (blob === undefined) continue;
+          references.push(blob);
+          guides.push(guide.name);
         }
       }
 
@@ -385,7 +571,8 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         audio,
       };
       let job;
-      let portraits = references.length;
+      let portraits = portraitCount;
+      let guided = guides;
       try {
         try {
           job = await provider.startVideo(
@@ -397,11 +584,12 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
           if (
             !(error instanceof ProviderError) ||
             error.kind !== 'bad_request' ||
-            portraits === 0
+            references.length === 0
           ) {
             throw error;
           }
           portraits = 0;
+          guided = [];
           job = await provider.startVideo(request);
         }
       } catch (error) {
@@ -418,6 +606,7 @@ export function createShotCommands(provider: GenerationProvider): readonly Comma
         prompt,
         model,
         portraits,
+        guides: guided,
         progress: job.progress,
         error: job.error,
         durationSeconds,
