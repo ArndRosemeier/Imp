@@ -45,6 +45,7 @@ export {
 } from './schema.js';
 export { createEditCommands } from './edit.js';
 export { LibrarySound, soundLibrary } from './library.js';
+export { createSceneAudioLink } from './scene-audio.js';
 export {
   clipPrompt,
   createShotCommands,

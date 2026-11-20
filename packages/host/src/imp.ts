@@ -20,7 +20,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { createMovieMode } from '@imp/mode-movie';
+import { createMovieMode, createSceneAudioLink } from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
@@ -89,7 +89,10 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
-    ...createAudioCommands({ codec: createDefaultAudioCodec() }),
+    ...createAudioCommands({
+      codec: createDefaultAudioCodec(),
+      links: [createSceneAudioLink()],
+    }),
     ...createWorldCommands({
       provider,
       // The world is drawn in the style the project's mode keeps.
