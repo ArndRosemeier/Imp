@@ -63,6 +63,7 @@ beforeAll(() => {
   // jsdom implements neither scrolling nor the modal dialog methods.
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.setPointerCapture = () => undefined;
+  Element.prototype.releasePointerCapture = () => undefined;
   // Nor does it play media.
   HTMLMediaElement.prototype.pause = () => undefined;
   HTMLMediaElement.prototype.play = () => Promise.resolve();
@@ -377,6 +378,16 @@ describe('App', () => {
     await user.dblClick(crew);
     expect(crew.getAttribute('aria-valuenow')).toBe('360');
     expect(localStorage.getItem('imp.width.crew')).toBeNull();
+    // The crew panel can be put away, for example to give a tablet's stage the room.
+    const toggle = screen.getByRole('button', { name: 'Crew panel' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('.shell')?.getAttribute('data-crew')).toBe('closed');
+    expect(screen.queryByRole('separator', { name: 'Resize the crew panel' })).toBeNull();
+    expect(localStorage.getItem('imp.crew.open')).toBe('false');
+    await user.click(toggle);
+    expect(screen.getByRole('separator', { name: 'Resize the crew panel' })).toBeTruthy();
   });
 
   it('keeps the conversation across a restart and resumes after an approval', async () => {
@@ -646,6 +657,21 @@ describe('App', () => {
     await vi.waitFor(() => {
       expect(screen.queryByRole('button', { name: /Title 2: Title/ })).toBeNull();
     });
+
+    // A piece moves by dragging it onto another; at 48 pixels a second, shot 3
+    // starts at 384 and shot 1 covers 0 to 192.
+    const drag = (pointerType: string) => {
+      const last = screen.getByRole('button', { name: /Shot 3: Mara/ });
+      const at = (clientX: number) => ({ clientX, pointerId: 2, pointerType });
+      fireEvent.pointerDown(last, at(400));
+      fireEvent.pointerMove(last, at(100));
+      fireEvent.pointerUp(last, at(100));
+    };
+    // A finger on a piece that is not selected scrolls instead of moving it.
+    drag('touch');
+    expect(screen.getByRole('button', { name: /Shot 3: Mara/ })).toBeTruthy();
+    drag('mouse');
+    expect(await screen.findByRole('button', { name: /Shot 1: Mara/ })).toBeTruthy();
   });
 
   it('manages projects from the start screen: templates, duplicates, export, import, delete', async () => {

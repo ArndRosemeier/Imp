@@ -7,6 +7,7 @@ import { App } from './app/App.js';
 import { connectImp, createHttpPort, type EventStream, type ImpClient, type Port } from '@imp/host';
 import { createLocalSecretStore } from './host/secrets.js';
 import { servedByLocalServer } from './host/served.js';
+import { followVisualViewport } from './app/viewport.js';
 import './styles/tokens.css';
 import './styles/app.css';
 
@@ -15,6 +16,9 @@ if (root === null) {
   throw new Error('The page has no #root element.');
 }
 document.documentElement.dataset['theme'] = localStorage.getItem('imp.theme') ?? 'dark';
+
+// Touch devices get an on-screen keyboard that covers the page; keep the app above it.
+if (matchMedia('(pointer: coarse)').matches) followVisualViewport();
 
 // Ask the browser not to evict the data under storage pressure.
 void navigator.storage.persist();
