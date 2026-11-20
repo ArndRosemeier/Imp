@@ -47,6 +47,11 @@ export function placementSpan(
   return { start, end: start + length, sourceStart, sourceLength: available };
 }
 
+/** Decibels to a gain factor. */
+export function dbToGain(db: number): number {
+  return 10 ** (db / 20);
+}
+
 function shape(curve: FadeCurve, x: number): number {
   return curve === 'linear' ? x : 0.5 - 0.5 * Math.cos(Math.PI * x);
 }
@@ -98,14 +103,14 @@ export function renderBlock(
     const fadeIn = toFrames(placement.fadeInSeconds);
     const fadeOut = toFrames(placement.fadeOutSeconds);
     const [panLeft, panRight] = panGains(placement.pan);
+    const level = placement.volume * dbToGain(placement.gainDb);
     const [sourceLeft, sourceRight] = source.channels;
     const from = Math.max(span.start, startFrame);
     const to = Math.min(span.end, blockEnd);
     for (let frame = from; frame < to; frame++) {
       const offset = frame - span.start;
       const at = span.sourceStart + (offset % span.sourceLength);
-      const gain =
-        placement.volume * fadeGain(offset, length, fadeIn, fadeOut, placement.fadeCurve);
+      const gain = level * fadeGain(offset, length, fadeIn, fadeOut, placement.fadeCurve);
       const index = frame - startFrame;
       left[index] = (left[index] ?? 0) + (sourceLeft[at] ?? 0) * gain * panLeft;
       right[index] = (right[index] ?? 0) + (sourceRight[at] ?? 0) * gain * panRight;

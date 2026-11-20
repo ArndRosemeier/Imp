@@ -67,6 +67,7 @@ describe('the movie mode', () => {
       'shots',
       'sound',
       'edit',
+      'audio',
     ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();
     const outside = projectCommands.filter((command: Command) =>
@@ -440,6 +441,11 @@ describe('character voice samples', () => {
   it('records an introduction in the written voice and keeps it with the character', async () => {
     const { run, runtime, provider, mara, record } = await withMara();
     const first = await record();
+    expect(await run('movie.sound.library', {})).toMatchObject({
+      sounds: [
+        { kind: 'voice', label: expect.stringContaining('voice sample') as string, sceneId: null },
+      ],
+    });
     expect(provider.speechRequests[0]).toEqual({
       model: 'vendor/speaker',
       text: 'Hello. My name is Mara.',
@@ -773,6 +779,15 @@ describe('shots and clips', () => {
       instructions: expect.stringContaining('Delivery: Screaming over the wind.') as string,
     });
     expect(spoken.dialogue).toMatchObject({ line: 'Tomas! Get away from the rail!' });
+    expect(await run('movie.sound.library', {})).toMatchObject({
+      sounds: [
+        {
+          key: spoken.dialogue.blobKey,
+          kind: 'dialogue',
+          label: 'Shot 1: Tomas! Get away from the rail!',
+        },
+      ],
+    });
     expect(await run('movie.shot.list', { sceneId: shot['sceneId'] })).toMatchObject({
       shots: [{ dialogue: true }],
     });
@@ -1219,6 +1234,13 @@ describe('sounds', () => {
       { model: 'vendor/composer', kind: 'music', prompt: 'Low strings.\nInstrumental, no vocals.' },
     ]);
     expect(await takes()).toBe(2);
+    const library = (await run('movie.sound.library', {})) as unknown as {
+      sounds: { label: string; kind: string }[];
+    };
+    expect(library.sounds.map((sound) => [sound.kind, sound.label])).toEqual([
+      ['effect', 'Sound effect'],
+      ['music', 'Music'],
+    ]);
   });
 
   it('removes the files with the sound and with the scene', async () => {

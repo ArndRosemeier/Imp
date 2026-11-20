@@ -2,6 +2,7 @@ import { CommandError, defineCommand, type BlobStore, type Command } from '@imp/
 import { z } from 'zod';
 import type { AudioCodec } from './codec.js';
 import { UnsupportedAudioError } from './codec.js';
+import { createAudioDocCommands } from './doc-commands.js';
 import { toDecibels } from './pcm.js';
 import { waveform } from './peaks.js';
 import { AudioSources, MissingSourceError } from './sources.js';
@@ -114,5 +115,9 @@ export function createAudioCommands(options: AudioCommandOptions): readonly Comm
     },
   });
 
-  return [inspect, shape];
+  return [
+    inspect,
+    shape,
+    ...createAudioDocCommands({ sources: (runtime) => sourcesFor(runtime.blobs) }),
+  ];
 }
