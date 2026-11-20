@@ -1,3 +1,4 @@
+import { AudioView } from './audio.js';
 import { EditView } from './edit.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
@@ -55,6 +56,7 @@ function StageView({ stage, project }: { stage: string; project: Project }): Rea
   if (stage === 'shots') return <ShotsView key={project.id} project={project} />;
   if (stage === 'sound') return <SoundView key={project.id} project={project} />;
   if (stage === 'edit') return <EditView key={project.id} project={project} />;
+  if (stage === 'audio') return <AudioView key={project.id} project={project} />;
   return null;
 }
 
