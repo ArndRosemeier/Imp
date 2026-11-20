@@ -6,6 +6,23 @@ export {
   type AudioFormat,
 } from './codec.js';
 export { createAudioCommands, type AudioCommandOptions } from './commands.js';
+export { audioRenderKey } from './doc-commands.js';
+export {
+  AudioDoc,
+  copyRange,
+  deleteRange,
+  docDuration,
+  insertSilence,
+  Marker,
+  pasteAt,
+  regionDuration,
+  regionEnd,
+  renderDoc,
+  silenceRange,
+  splitRegion,
+  Track,
+  withDuration,
+} from './doc.js';
 export {
   forEngine,
   frameCount,
@@ -28,6 +45,7 @@ export {
 } from './peaks.js';
 export { FadeCurve, SoundPlacement } from './placement.js';
 export {
+  dbToGain,
   fadeGain,
   panGains,
   placementSpan,
