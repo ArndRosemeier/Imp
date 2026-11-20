@@ -19,9 +19,9 @@ export default tseslint.config(
     },
   },
   {
-    // The core must run unchanged in a browser worker and in the local server,
-    // so it may not reach for either host.
-    files: ['packages/core/src/**/*.ts'],
+    // The core and the providers must run unchanged in a browser worker and in the local server,
+    // so they may not reach for either host.
+    files: ['packages/{core,providers}/src/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
