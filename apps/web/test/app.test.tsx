@@ -8,10 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
-import { connectImp } from '../src/host/client.js';
-import { createImp, type Imp } from '../src/host/imp.js';
-import { createLocalPorts } from '../src/host/port.js';
-import { serveImp } from '../src/host/serve.js';
+import { connectImp, createImp, createLocalPorts, serveImp, type Imp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
 
 const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
@@ -561,6 +558,31 @@ describe('App', () => {
     }
     expect(await screen.findByText(/This scene is silent so far/)).toBeTruthy();
     expect(await imp.blobs.list('')).toEqual([]);
+  });
+
+  it('says where it runs, and offers the download only when it runs in the browser', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    const link = await screen.findByRole('link', { name: /Download Imp for your computer/ });
+    expect(link.getAttribute('href')).toBe('./imp-server.zip');
+
+    cleanup();
+    const mark = document.createElement('meta');
+    mark.setAttribute('name', 'imp-host');
+    mark.setAttribute('content', 'server');
+    document.head.append(mark);
+    try {
+      const served = start();
+      // The key is still in this browser, so setup goes on at the coordinator.
+      await served.user.type(await screen.findByLabelText(/Model/), 'vendor/writer');
+      await served.user.click(screen.getByRole('button', { name: /Hire the coordinator/ }));
+      await served.user.click(await screen.findByRole('button', { name: 'Settings' }));
+      expect(await screen.findByText(/Imp runs on this computer/)).toBeTruthy();
+      expect(screen.queryByRole('link', { name: /Download Imp/ })).toBeNull();
+    } finally {
+      mark.remove();
+    }
   });
 
   it('switches web search on for a crew member', async () => {

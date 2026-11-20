@@ -1,6 +1,6 @@
 import type { Actor } from '@imp/core';
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { ImpClient } from '../host/client.js';
+import type { ImpClient } from '@imp/host';
 
 export const USER: Actor = { kind: 'user', id: 'local' };
 

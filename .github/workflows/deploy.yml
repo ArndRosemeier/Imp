@@ -28,6 +28,9 @@ jobs:
       # Nothing is published unless the same checks that guard a pull request pass.
       - run: pnpm check
       - run: pnpm --filter @imp/web build
+      - run: pnpm --filter @imp/server build
+      # The download for people's own computers is one more static file of the site.
+      - run: cd apps/server/dist && zip -qr ../../web/dist/imp-server.zip imp-server
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/dist

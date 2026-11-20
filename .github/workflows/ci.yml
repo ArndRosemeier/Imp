@@ -29,3 +29,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:coverage
       - run: pnpm --filter @imp/web build
+      - run: pnpm --filter @imp/server build
+      # The packaged server must start by itself, without the workspace around it.
+      - run: cp -r apps/server/dist/imp-server "$RUNNER_TEMP/imp-server" && node "$RUNNER_TEMP/imp-server/imp.mjs" --help

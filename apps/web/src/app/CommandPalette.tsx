@@ -7,7 +7,7 @@ import {
   type SyntheticEvent,
   type ReactElement,
 } from 'react';
-import type { CommandInfo } from '../host/protocol.js';
+import type { CommandInfo } from '@imp/host';
 import { messageOf, runCommand, useImp } from './context.js';
 
 interface Field {

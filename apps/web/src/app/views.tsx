@@ -1,9 +1,10 @@
 import { CrewMember } from '@imp/agents';
 import { ActivityEntry } from '@imp/core';
-import { PlusIcon, TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
+import { DownloadSimpleIcon, PlusIcon, TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
 import { useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
@@ -358,6 +359,32 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
             Remove the key from this browser
           </button>
         </div>
+      </section>
+      <section className="card stack" aria-labelledby="host-heading">
+        <h3 id="host-heading">Where Imp runs</h3>
+        {servedByLocalServer() ? (
+          <p className="muted">
+            Imp runs on this computer. Your projects and media are files in its data folder, and
+            every browser window you open here shows the same work.
+          </p>
+        ) : (
+          <>
+            <p className="muted">
+              Imp runs inside this browser, and your projects are kept in the browser&rsquo;s own
+              storage. You can also run it on your computer: your work is then kept as files in a
+              folder of yours, with room for large media. It needs Node.js 22 or newer.
+            </p>
+            <div className="row">
+              <a className="button" href="./imp-server.zip" download>
+                <DownloadSimpleIcon aria-hidden="true" /> Download Imp for your computer
+              </a>
+            </div>
+            <p className="muted">
+              Unzip it, run <span className="mono">node imp.mjs</span> in the folder and open the
+              address it prints. Work done in the browser does not move over by itself.
+            </p>
+          </>
+        )}
       </section>
     </>
   );

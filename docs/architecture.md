@@ -28,12 +28,12 @@ agent must ask before spending money or destroying something.
 | Package           | Holds                                                                | Status  |
 | ----------------- | -------------------------------------------------------------------- | ------- |
 | `@imp/core`       | Commands, registry, policy, activity log, storage contract, settings | started |
-| `@imp/providers`  | Generation provider interface and the OpenRouter adapter             | planned |
-| `@imp/agents`     | Crew, tasks, the tool loop, approvals, budgets, the coordinator      | planned |
+| `@imp/providers`  | Generation provider interface and the OpenRouter adapter             | started |
+| `@imp/agents`     | Crew, tasks, the tool loop, approvals, budgets, the coordinator      | started |
 | `@imp/mode-movie` | The movie mode: development, script, casting                         | started |
 | `@imp/ui`         | Design tokens and shared components                                  | planned |
 | `apps/web`        | The workspace, and the browser host that runs the core in a worker   | started |
-| `apps/server`     | The optional local server that runs the same core on Node            | planned |
+| `apps/server`     | The optional local server that runs the same core on Node            | started |
 
 ## Two hosts, one core
 
@@ -67,11 +67,20 @@ new mode is a new package and not a change to the core.
 (`src/host/worker.ts`). The interface reaches it only through messages
 (`src/host/protocol.ts`): run a command as the user, be told when the store
 changes under a prefix, fetch a stored file, list models, check the key. Only
-plain data crosses, so the same protocol can later reach a local server. Views
+plain data crosses, so the same protocol also reaches the local server. Views
 read through commands with `useLive`, which reads again when the store changes,
 so the screen stays current whoever made the change. The OpenRouter key is held
 in `localStorage` on the page, outside the key-value store, so no command can
 return it; the page hands it to the worker, which keeps it in memory.
+
+`apps/server` is the local server: the same core on files (`file-store.ts`: a
+journal for the data, one file per medium), reached over the same protocol by
+HTTP, with messages posted and answers on one event stream (`server.ts`). It
+serves the built interface and marks the page it serves, which is how the
+interface knows to connect to it and not to start a worker. It listens on this
+computer only and refuses requests that name another host or come from another
+site's page. `pnpm --filter @imp/server build` makes one folder with one script
+that needs only Node; the deploy puts it into the site as `imp-server.zip`.
 
 The tests run the whole interface over the same protocol, with both ends in
 one thread and every message cloned as between a page and a worker.
