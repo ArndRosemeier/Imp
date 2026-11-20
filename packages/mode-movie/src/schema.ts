@@ -63,6 +63,11 @@ export const Character = z.object({
   portraitId: z.string().nullable().default(null),
   /** A recording of how the character sounds, or null before one was made. */
   voiceSample: VoiceSample.nullable().default(null),
+  /**
+   * A voice that is heard but never seen, such as a narrator. It stays out of
+   * every clip prompt and portrait list; its lines are recorded apart.
+   */
+  voiceOnly: z.boolean().default(false),
 });
 export type Character = z.infer<typeof Character>;
 
