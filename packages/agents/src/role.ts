@@ -1,4 +1,5 @@
-import type { ToolScope } from '@imp/core';
+import type { KeyValueStore, ToolScope } from '@imp/core';
+import { z } from 'zod';
 
 /**
  * A job an agent can be hired for. Modes contribute roles; the user or the
@@ -23,9 +24,38 @@ export interface Role {
   readonly direct?: readonly string[];
 }
 
-const ROLE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+export const ROLE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-/** The roles available for hire. Built once from what the enabled modes contribute. */
+/** Where the roles defined while using the app are kept, by role id. */
+export const CUSTOM_ROLE_PREFIX = 'roles/';
+
+/** A role as stored data. Built-in roles come from code and are never stored. */
+export const StoredRole = z.object({
+  id: z.string().regex(ROLE_ID),
+  name: z.string().min(1),
+  summary: z.string(),
+  brief: z.string().min(1),
+  scope: z.object({
+    effects: z.array(z.enum(['read', 'write', 'spend', 'destructive'])).min(1),
+    prefixes: z.array(z.string().min(1)).min(1),
+  }),
+});
+export type StoredRole = z.infer<typeof StoredRole>;
+
+function toRole(stored: StoredRole): Role {
+  return {
+    id: stored.id,
+    name: stored.name,
+    summary: stored.summary,
+    brief: stored.brief,
+    scope: { prefixes: stored.scope.prefixes, effects: stored.scope.effects },
+  };
+}
+
+/**
+ * The roles available for hire: the ones the enabled modes contribute, fixed
+ * at start-up, plus the ones people or agents define while using the app.
+ */
 export class RoleCatalog {
   readonly #roles = new Map<string, Role>();
 
@@ -47,6 +77,25 @@ export class RoleCatalog {
 
   list(): readonly Role[] {
     return [...this.#roles.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  /** A built-in role, or one defined while using the app. Built-in ones win. */
+  async find(store: KeyValueStore, id: string): Promise<Role | undefined> {
+    const builtIn = this.#roles.get(id);
+    if (builtIn !== undefined) return builtIn;
+    const stored = await store.get(`${CUSTOM_ROLE_PREFIX}${id}`);
+    return stored === undefined ? undefined : toRole(StoredRole.parse(stored));
+  }
+
+  /** Every role that can be hired for, sorted by id, with whether it is a custom one. */
+  async all(store: KeyValueStore): Promise<readonly (Role & { readonly custom: boolean })[]> {
+    const custom = (await store.list(CUSTOM_ROLE_PREFIX))
+      .map((entry) => toRole(StoredRole.parse(entry.value)))
+      .filter((role) => !this.#roles.has(role.id));
+    return [
+      ...this.list().map((role) => ({ ...role, custom: false })),
+      ...custom.map((role) => ({ ...role, custom: true })),
+    ].sort((a, b) => (a.id < b.id ? -1 : 1));
   }
 }
 

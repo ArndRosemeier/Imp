@@ -179,7 +179,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     if (member === undefined) {
       throw new CommandError('invalid_input', commandId, `No crew member "${memberId}".`);
     }
-    const role = roles.get(member.roleId);
+    const role = await roles.find(store, member.roleId);
     if (role === undefined) {
       throw new CommandError(
         'invalid_input',
