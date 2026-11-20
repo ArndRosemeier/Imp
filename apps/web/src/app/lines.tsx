@@ -1,5 +1,5 @@
 import { MicrophoneIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
-import type { ReactElement } from 'react';
+import type { PointerEvent, ReactElement } from 'react';
 import type { Cut, Line } from './cut-player.js';
 import { EditableField } from './Field.js';
 import type { Act } from './movie.js';
@@ -21,6 +21,7 @@ export function CharacterLanes({
   selectedId,
   onSelect,
   act,
+  drag,
 }: {
   cut: Cut;
   scale: number;
@@ -29,6 +30,19 @@ export function CharacterLanes({
   selectedId: string | null;
   onSelect: (lineId: string) => void;
   act: Act;
+  /** Pointer handlers that move a line sideways, and how far it is dragged now, in seconds. */
+  drag: (
+    line: Line,
+    selected: boolean,
+  ) => {
+    dx: number;
+    props: {
+      onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+      onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
+      onPointerUp: (event: PointerEvent<HTMLDivElement>) => void;
+      onPointerCancel: () => void;
+    };
+  };
 }): ReactElement {
   return (
     <>
@@ -57,32 +71,36 @@ export function CharacterLanes({
           </span>
           {cut.lines
             .filter((line) => line.characterId === lane.characterId)
-            .map((line) => (
-              <div
-                key={line.id}
-                className={`block block-dialogue${selectedId === line.id ? ' selected' : ''}${line.recorded ? '' : ' empty'}`}
-                style={{
-                  left: line.startSeconds * scale,
-                  width: Math.max(
-                    MIN_BLOCK_PX,
-                    Math.max(line.durationSeconds - line.trimStartSeconds, 0.5) * scale,
-                  ),
-                }}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selectedId === line.id}
-                aria-label={`${lane.name}: ${line.text.slice(0, 40)}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelect(line.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') onSelect(line.id);
-                }}
-              >
-                <span className="block-label">{line.text}</span>
-              </div>
-            ))}
+            .map((line) => {
+              const { dx, props } = drag(line, selectedId === line.id);
+              return (
+                <div
+                  {...props}
+                  key={line.id}
+                  className={`block block-dialogue${selectedId === line.id ? ' selected' : ''}${line.recorded ? '' : ' empty'}`}
+                  style={{
+                    left: Math.max(0, line.startSeconds + dx) * scale,
+                    width: Math.max(
+                      MIN_BLOCK_PX,
+                      Math.max(line.durationSeconds - line.trimStartSeconds, 0.5) * scale,
+                    ),
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedId === line.id}
+                  aria-label={`${lane.name}: ${line.text.slice(0, 40)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelect(line.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') onSelect(line.id);
+                  }}
+                >
+                  <span className="block-label">{line.text}</span>
+                </div>
+              );
+            })}
         </div>
       ))}
     </>
