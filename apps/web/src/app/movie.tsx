@@ -710,6 +710,19 @@ export function CastingView({ project }: { project: Project }): ReactElement {
               />
               Voice only (a narrator: heard, never seen)
             </label>
+            <label className="row">
+              <input
+                type="checkbox"
+                checked={character.ownLane}
+                onChange={(event) => {
+                  void act('movie.character.update', {
+                    characterId: character.id,
+                    ownLane: event.target.checked,
+                  });
+                }}
+              />
+              Own lane in the Edit stage (lines placed in time)
+            </label>
             <CharacterVoice character={character} model={speech.model} act={act} />
             <div className="row">
               <ConfirmButton

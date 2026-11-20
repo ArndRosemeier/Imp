@@ -80,6 +80,11 @@ export const Character = z.object({
    * every clip prompt and portrait list; its lines are recorded apart.
    */
   voiceOnly: z.boolean().default(false),
+  /**
+   * Gets a lane of its own in the Edit stage, where its free-standing lines are
+   * recorded and placed in time. A narrator has both this and voiceOnly.
+   */
+  ownLane: z.boolean().default(false),
 });
 export type Character = z.infer<typeof Character>;
 
@@ -265,10 +270,31 @@ export type CutItem = z.infer<typeof CutItem>;
  * them. While items is null the cut is the scene's shots in order, whole;
  * the first edit makes it explicit.
  */
+/**
+ * A line of a character with a lane of its own: spoken words that belong to no
+ * shot, placed on the character's lane at a time of the scene.
+ */
+export const CutLine = z.object({
+  id: z.string(),
+  characterId: z.string(),
+  text: z.string(),
+  delivery: z.string().default(''),
+  /** The recording, or null before one was made. */
+  take: DialogueTake.nullable().default(null),
+  /** Seconds from the start of the scene. */
+  startSeconds: z.number().min(0).default(0),
+  trimStartSeconds: z.number().min(0).default(0),
+  volume: z.number().min(0).max(1).default(1),
+  fadeInSeconds: z.number().min(0).default(0),
+  fadeOutSeconds: z.number().min(0).default(0),
+});
+export type CutLine = z.infer<typeof CutLine>;
+
 export const SceneCut = z.object({
   sceneId: z.string(),
   items: z.array(CutItem).nullable().default(null),
   sounds: z.array(SoundPlacement).default([]),
+  lines: z.array(CutLine).default([]),
 });
 export type SceneCut = z.infer<typeof SceneCut>;
 

@@ -210,7 +210,7 @@ export function createMovieMode(options: { readonly provider: GenerationProvider
       ...createCharacterVoiceCommands(options.provider),
       ...createShotCommands(options.provider),
       ...createSoundCommands(options.provider),
-      ...createEditCommands(),
+      ...createEditCommands(options.provider),
       ...libraryCommands,
     ],
     roles: [
