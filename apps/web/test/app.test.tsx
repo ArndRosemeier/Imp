@@ -30,6 +30,7 @@ function start(replies: readonly ScriptedChatReply[] = []) {
       model('~vendor/latest'),
       model('vendor/painter', { outputModalities: ['image'] }),
       model('vendor/speaker', { outputModalities: ['speech'] }),
+      model('vendor/clips', { outputModalities: ['video'] }),
       model('vendor/no-tools', { supportsTools: false }),
     ],
   });
@@ -422,6 +423,68 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: /Start over/ }));
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
+  });
+
+  it('breaks a scene into shots and makes a clip that arrives later', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const { imp, provider, user } = start();
+      await completeSetup(user);
+      await user.click(screen.getByRole('button', { name: 'Development' }));
+      await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+      await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+      await screen.findByLabelText('Logline');
+
+      await user.click(screen.getByRole('button', { name: 'Shots' }));
+      expect(await screen.findByText(/there are no scenes yet/)).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: 'Script' }));
+      await user.click(await screen.findByRole('button', { name: /Add scene/ }));
+      await user.type(await screen.findByLabelText('Scene heading'), 'INT. LAMP ROOM - NIGHT');
+      await user.tab();
+      await user.click(screen.getByRole('button', { name: 'Casting' }));
+      await user.click(await screen.findByRole('button', { name: /Add character/ }));
+      await screen.findByRole('article', { name: 'New character' });
+
+      await user.click(screen.getByRole('button', { name: 'Shots' }));
+      expect(await screen.findByText(/This scene has no shots yet/)).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: /Add shot/ }));
+      const card = await screen.findByRole('article', { name: 'Shot 1' });
+      const generate = within(card).getByRole('button', { name: /Generate clip/ });
+      expect(generate).toHaveProperty('disabled', true);
+      await user.selectOptions(await screen.findByLabelText('Video model'), 'vendor/clips');
+      await user.type(within(card).getByLabelText('What we see'), 'The lamp turns.');
+      await user.tab();
+      await user.click(within(card).getByRole('checkbox', { name: 'New character' }));
+      await user.selectOptions(within(card).getByLabelText('Spoken by'), 'New character');
+      await user.type(within(card).getByLabelText('Line, as it is said'), 'Get back!');
+      await user.tab();
+      await vi.waitFor(() => {
+        expect(generate).toHaveProperty('disabled', false);
+      });
+
+      await user.click(generate);
+      expect(await within(card).findByText(/Being made, 50%/)).toBeTruthy();
+      expect(provider.videoRequests[0]).toMatchObject({
+        model: 'vendor/clips',
+        audio: true,
+        prompt: expect.stringContaining('New character says "Get back!"') as string,
+      });
+      // The view looks again by itself until the clip is there.
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(await within(card).findByLabelText('Clip of shot 1')).toBeTruthy();
+      expect(within(card).getByText(/vendor\/clips · \$0\.20/)).toBeTruthy();
+
+      await user.click(within(card).getByRole('button', { name: /Delete clip/ }));
+      await user.click(within(card).getByRole('button', { name: 'Delete' }));
+      expect(await within(card).findByText('No clip yet')).toBeTruthy();
+      await user.click(within(card).getByRole('button', { name: /Delete shot/ }));
+      await user.click(within(card).getByRole('button', { name: 'Delete' }));
+      expect(await screen.findByText(/This scene has no shots yet/)).toBeTruthy();
+      expect(await imp.blobs.list('')).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('switches web search on for a crew member', async () => {

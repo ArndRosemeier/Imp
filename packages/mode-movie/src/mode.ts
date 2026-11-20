@@ -3,6 +3,7 @@ import type { GenerationProvider } from '@imp/providers';
 import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
 import { MODE_ID } from './schema.js';
+import { createShotCommands } from './shots.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = { prefixes: ['movie.', 'project.list', 'media.'] } as const;
@@ -48,25 +49,48 @@ export const castingDirector: Role = {
   scope: SCOPE,
 };
 
+export const clipDesigner: Role = {
+  id: 'clip-designer',
+  name: 'Clip Designer',
+  summary: 'Breaks scenes into shots and makes the video clips.',
+  brief: [
+    'You are a clip designer for a film made with generated video. You turn a scene into',
+    'shots and the shots into clips. Read the scene and the characters in it first. A shot is',
+    'one uninterrupted piece of film of a few seconds with at most one spoken line; split',
+    'anything longer. Video models do not act unless told to. They take the emotion of a',
+    'line from its wording and punctuation, not from the situation, so write each line the',
+    'way it is said in that moment and give it a delivery; a line written flat is spoken flat',
+    'even in a storm. They underplay bodies, so say in the performance who moves how, how',
+    'far, how fast, and how the others in the frame react. Generating a clip costs real',
+    'money: make a shot right in words first, and generate one clip at a time. A clip takes a',
+    'minute or more; check on it, and when it is ready watch it with media.view if you can.',
+    'Judge voice and body separately against what the moment needs, say plainly when a take',
+    'is too calm, and change the shot before you ask to generate again.',
+  ].join(' '),
+  scope: SCOPE,
+};
+
 /**
  * Movie creation: the first working mode. It needs the provider for what it
- * generates. Storyboard, shots, sound and edit come later.
+ * generates. Sound and edit come later.
  */
 export function createMovieMode(options: { readonly provider: GenerationProvider }): Mode {
   return defineMode({
     id: MODE_ID,
     name: 'Movie',
-    summary: 'Develop an idea, write the script and cast the characters.',
+    summary: 'Develop an idea, write the script, cast the characters and shoot the clips.',
     stages: [
       { id: 'development', name: 'Development' },
       { id: 'script', name: 'Script' },
       { id: 'casting', name: 'Casting' },
+      { id: 'shots', name: 'Shots' },
     ],
     commands: [
       ...movieCommands,
       ...createCharacterImageCommands(options.provider),
       ...createCharacterVoiceCommands(options.provider),
+      ...createShotCommands(options.provider),
     ],
-    roles: [screenwriter, castingDirector],
+    roles: [screenwriter, castingDirector, clipDesigner],
   });
 }

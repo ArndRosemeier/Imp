@@ -64,3 +64,57 @@ export const Character = z.object({
   voiceSample: VoiceSample.nullable().default(null),
 });
 export type Character = z.infer<typeof Character>;
+
+/** A generated clip of a shot. Clips take minutes, so one starts as a job and becomes a file. */
+export const Clip = z.object({
+  status: z.enum(['pending', 'ready', 'failed']),
+  /** The provider's job, to look at again while it is being made and to download from. */
+  jobId: z.string(),
+  /** Where the video is, once it is ready. */
+  blobKey: z.string().nullable(),
+  mediaType: z.string().nullable(),
+  /** The prompt and model it was made with, so it can be made again or varied. */
+  prompt: z.string(),
+  model: z.string(),
+  /** How many portraits guided it. Zero when the model takes none. */
+  portraits: z.number().int().default(0),
+  /** Percent done, where the model reports it. */
+  progress: z.number().nullable(),
+  /** Why it failed. */
+  error: z.string().nullable(),
+  costUsd: z.number().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type Clip = z.infer<typeof Clip>;
+
+/** One uninterrupted piece of film within a scene. */
+export const Shot = z.object({
+  id: z.string(),
+  sceneId: z.string(),
+  /** Where the shot sits in its scene, starting at 1. */
+  position: z.number().int().positive(),
+  description: z
+    .string()
+    .describe('What the camera shows: place, framing, movement, light. One shot, a few seconds.'),
+  characterIds: z
+    .array(z.string())
+    .describe('The characters seen in the shot. Their appearance and portrait guide the clip.'),
+  performance: z
+    .string()
+    .describe(
+      'What the bodies do, as visibly as the moment needs: who moves how, and how the others react. Video models underplay movement unless it is spelled out.',
+    ),
+  speakerId: z.string().nullable().describe('Who speaks the line, or null for a silent shot.'),
+  line: z
+    .string()
+    .describe(
+      'The words spoken, written the way they are said. Punctuation and wording carry the emotion: a line written flat is spoken flat, whatever happens in the picture.',
+    ),
+  delivery: z
+    .string()
+    .describe(
+      'How the line is said: emotion, intensity, pace, breath. For example "screaming over the wind, voice cracking".',
+    ),
+  clip: Clip.nullable().default(null),
+});
+export type Shot = z.infer<typeof Shot>;

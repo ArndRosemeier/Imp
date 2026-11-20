@@ -16,7 +16,10 @@ import {
   type ImageRequest,
   type ImageResponse,
   type Modality,
+  type MediaInput,
   type ModelInfo,
+  type VideoJob,
+  type VideoRequest,
   type SpeechRequest,
   type SpeechResponse,
   type ToolCall,
@@ -26,6 +29,7 @@ import {
   ErrorResponse,
   ImageGenerationResponse,
   ModelsResponse,
+  VideoJobResponse,
 } from './schemas.js';
 
 export const OPENROUTER_ID = 'openrouter';
@@ -83,6 +87,11 @@ function parseArguments(text: string): JsonValue | undefined {
 function toWireContent(text: string, cache: boolean | undefined): unknown {
   return cache === true ? [{ type: 'text', text, cache_control: { type: 'ephemeral' } }] : text;
 }
+
+const toImagePart = (image: MediaInput): Record<string, unknown> => ({
+  type: 'image_url',
+  image_url: { url: `data:${image.mediaType};base64,${encodeBase64(image.bytes)}` },
+});
 
 /** The audio format names the API knows, by the second half of the media type. */
 const AUDIO_FORMATS: Readonly<Record<string, string>> = { mpeg: 'mp3', 'x-wav': 'wav', mp4: 'm4a' };
@@ -262,6 +271,21 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
   const sendJson = async (...args: Parameters<typeof send>): Promise<unknown> =>
     (await send(...args)).json;
 
+  function toVideoJob(json: unknown): VideoJob {
+    const job = parse(VideoJobResponse, json, 'a video job');
+    const done = job.status === 'completed';
+    const waiting = job.status === 'pending' || job.status === 'in_progress';
+    const reason = typeof job.error === 'string' ? job.error : job.error?.message;
+    return {
+      id: job.id,
+      status: done ? 'completed' : waiting ? 'pending' : 'failed',
+      progress: job.progress ?? null,
+      // Cancelled and expired jobs come without a reason of their own.
+      error: done || waiting ? null : (reason ?? `The job was ${job.status}.`),
+      costUsd: job.usage?.cost ?? null,
+    };
+  }
+
   function parse<S extends z.ZodType>(schema: S, json: unknown, what: string): z.output<S> {
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
@@ -389,6 +413,43 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
       }
       // The price of speech is not part of the answer.
       return { model: request.model, audio: { bytes, mediaType }, costUsd: null };
+    },
+
+    async startVideo(request: VideoRequest, call = {}): Promise<VideoJob> {
+      const body = {
+        model: request.model,
+        prompt: request.prompt,
+        generate_audio: request.audio,
+        ...(request.durationSeconds === undefined ? {} : { duration: request.durationSeconds }),
+        ...(request.resolution === undefined ? {} : { resolution: request.resolution }),
+        ...(request.aspectRatio === undefined ? {} : { aspect_ratio: request.aspectRatio }),
+        ...(request.references === undefined || request.references.length === 0
+          ? {}
+          : { input_references: request.references.map(toImagePart) }),
+        ...(request.firstFrame === undefined
+          ? {}
+          : { frame_images: [{ ...toImagePart(request.firstFrame), frame_type: 'first_frame' }] }),
+      };
+      return toVideoJob(await sendJson('/videos', 'POST', body, call, true));
+    },
+
+    async checkVideo(jobId: string, call = {}): Promise<VideoJob> {
+      const path = `/videos/${encodeURIComponent(jobId)}`;
+      return toVideoJob(await sendJson(path, 'GET', undefined, call, true));
+    },
+
+    async downloadVideo(jobId: string, call = {}): Promise<MediaInput> {
+      const path = `/videos/${encodeURIComponent(jobId)}/content?index=0`;
+      const { bytes, contentType } = await send(path, 'GET', undefined, call, true, true);
+      const mediaType = contentType?.split(';')[0]?.trim() ?? '';
+      if (bytes === null || bytes.length === 0 || !mediaType.startsWith('video/')) {
+        throw new ProviderError(
+          'invalid_response',
+          OPENROUTER_ID,
+          'OpenRouter returned a clip without readable video.',
+        );
+      }
+      return { bytes, mediaType };
     },
   };
 }

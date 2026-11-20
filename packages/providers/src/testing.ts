@@ -7,6 +7,8 @@ import type {
   ImageRequest,
   ModelInfo,
   SpeechRequest,
+  VideoJob,
+  VideoRequest,
 } from './types.js';
 
 export interface RecordedHttpCall {
@@ -65,10 +67,19 @@ export function createFakeProvider(script: {
   readonly imageError?: ProviderError;
   /** When set, `generateSpeech` rejects with it. */
   readonly speechError?: ProviderError;
+  /** When set, `startVideo` rejects with it. */
+  readonly videoError?: ProviderError;
+  /** When true, `startVideo` refuses requests that carry guiding images, as many models do. */
+  readonly videoRefusesReferences?: boolean;
+  /** How many times a video job reports that it is still being made. Defaults to one. */
+  readonly videoPendingChecks?: number;
+  /** When set, video jobs end as failed with this reason. */
+  readonly videoFailure?: string;
 }): GenerationProvider & {
   readonly requests: ChatRequest[];
   readonly imageRequests: ImageRequest[];
   readonly speechRequests: SpeechRequest[];
+  readonly videoRequests: VideoRequest[];
   /** Adds replies to the end of the script, for ones that depend on what happened first. */
   script(...replies: ScriptedChatReply[]): void;
 } {
@@ -76,11 +87,48 @@ export function createFakeProvider(script: {
   const requests: ChatRequest[] = [];
   const imageRequests: ImageRequest[] = [];
   const speechRequests: SpeechRequest[] = [];
+  const videoRequests: VideoRequest[] = [];
+  const checks = new Map<string, number>();
+  const job = (id: string, status: VideoJob['status']): VideoJob => ({
+    id,
+    status,
+    progress: status === 'pending' ? 50 : null,
+    error: status === 'failed' ? (script.videoFailure ?? null) : null,
+    costUsd: status === 'completed' ? 0.2 : null,
+  });
   return {
     id: 'fake',
     requests,
     imageRequests,
     speechRequests,
+    videoRequests,
+    startVideo: (request) => {
+      videoRequests.push(request);
+      if (script.videoError !== undefined) {
+        return Promise.reject(script.videoError);
+      }
+      if (script.videoRefusesReferences === true && request.references !== undefined) {
+        return Promise.reject(
+          new ProviderError('bad_request', 'fake', 'This model takes no image references.'),
+        );
+      }
+      const id = `job-${String(videoRequests.length)}`;
+      checks.set(id, 0);
+      return Promise.resolve(job(id, 'pending'));
+    },
+    checkVideo: (jobId) => {
+      const seen = (checks.get(jobId) ?? 0) + 1;
+      checks.set(jobId, seen);
+      if (seen <= (script.videoPendingChecks ?? 1)) return Promise.resolve(job(jobId, 'pending'));
+      return Promise.resolve(
+        job(jobId, script.videoFailure === undefined ? 'completed' : 'failed'),
+      );
+    },
+    downloadVideo: (jobId) =>
+      Promise.resolve({
+        bytes: new Uint8Array([Number(jobId.split('-')[1] ?? 0)]),
+        mediaType: 'video/mp4',
+      }),
     generateSpeech: (request) => {
       speechRequests.push(request);
       if (script.speechError !== undefined) {

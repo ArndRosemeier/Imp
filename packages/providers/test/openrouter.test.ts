@@ -535,6 +535,98 @@ describe('OpenRouter provider: images', () => {
     });
   });
 
+  it('starts a clip with its guides, looks at it again and downloads it', async () => {
+    const clip = new Uint8Array([0, 0, 0, 24, 102, 116]);
+    const image = { bytes: new Uint8Array([1, 2, 3, 4]), mediaType: 'image/webp' };
+    const { provider, calls } = setup(
+      { status: 200, body: { id: 'gen-vid-1', status: 'pending', polling_url: '/x' } },
+      { status: 200, body: { id: 'gen-vid-1', status: 'in_progress', progress: 40.5 } },
+      { status: 200, body: { id: 'gen-vid-1', status: 'completed', usage: { cost: 0.21 } } },
+      { status: 200, bytes: clip, contentType: 'video/mp4' },
+      { status: 200, body: { id: 'gen-vid-2', status: 'pending' } },
+    );
+    const started = await provider.startVideo({
+      model: 'v/clips',
+      prompt: 'A lamp room at night.',
+      durationSeconds: 4,
+      resolution: '480p',
+      aspectRatio: '16:9',
+      audio: true,
+      references: [image],
+      firstFrame: image,
+    });
+    expect(started).toEqual({
+      id: 'gen-vid-1',
+      status: 'pending',
+      progress: null,
+      error: null,
+      costUsd: null,
+    });
+    expect(await provider.checkVideo('gen-vid-1')).toMatchObject({
+      status: 'pending',
+      progress: 40.5,
+    });
+    expect(await provider.checkVideo('gen-vid-1')).toMatchObject({
+      status: 'completed',
+      costUsd: 0.21,
+    });
+    expect(await provider.downloadVideo('gen-vid-1')).toEqual({
+      bytes: clip,
+      mediaType: 'video/mp4',
+    });
+    await provider.startVideo({ model: 'v/clips', prompt: 'Silent.', audio: false });
+
+    const part = { type: 'image_url', image_url: { url: 'data:image/webp;base64,AQIDBA==' } };
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
+      model: 'v/clips',
+      prompt: 'A lamp room at night.',
+      generate_audio: true,
+      duration: 4,
+      resolution: '480p',
+      aspect_ratio: '16:9',
+      input_references: [part],
+      frame_images: [{ ...part, frame_type: 'first_frame' }],
+    });
+    expect(JSON.parse(calls[4]?.request.body ?? '')).toEqual({
+      model: 'v/clips',
+      prompt: 'Silent.',
+      generate_audio: false,
+    });
+    expect(calls.map((call) => [call.request.method, call.url.replace(/^.*\/v1/, '')])).toEqual([
+      ['POST', '/videos'],
+      ['GET', '/videos/gen-vid-1'],
+      ['GET', '/videos/gen-vid-1'],
+      ['GET', '/videos/gen-vid-1/content?index=0'],
+      ['POST', '/videos'],
+    ]);
+  });
+
+  it('reports why a clip was not made, and refuses a download that is not video', async () => {
+    const { provider } = setup(
+      { status: 200, body: { id: 'j', status: 'failed', error: 'Blocked by the content filter.' } },
+      { status: 200, body: { id: 'j', status: 'failed', error: { message: 'Out of capacity.' } } },
+      { status: 200, body: { id: 'j', status: 'expired' } },
+      { status: 200, body: '<html>', contentType: 'text/html' },
+      { status: 400, body: { error: { message: 'duration must be one of 4, 6, 8' } } },
+    );
+    expect(await provider.checkVideo('j')).toMatchObject({
+      status: 'failed',
+      error: 'Blocked by the content filter.',
+    });
+    expect(await provider.checkVideo('j')).toMatchObject({ error: 'Out of capacity.' });
+    expect(await provider.checkVideo('j')).toMatchObject({
+      status: 'failed',
+      error: 'The job was expired.',
+    });
+    expect(await kindOf(provider.downloadVideo('j'))).toBe('invalid_response');
+    await expect(
+      provider.startVideo({ model: 'm', prompt: 'x', audio: false, durationSeconds: 5 }),
+    ).rejects.toMatchObject({
+      kind: 'bad_request',
+      message: 'OpenRouter refused the request: duration must be one of 4, 6, 8',
+    });
+  });
+
   it('passes provider refusals on', async () => {
     const { provider } = setup({ status: 402, body: { error: { message: 'No credit' } } });
     expect(await kindOf(provider.generateImage({ model: 'm', prompt: 'x' }))).toBe(
