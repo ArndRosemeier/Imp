@@ -20,7 +20,12 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
+import {
+  createMovieMode,
+  createSceneAudioLink,
+  type FilmRenderer,
+  type FrameImageEncoder,
+} from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
@@ -72,6 +77,8 @@ export interface ImpOptions {
    * sound plays as silence and is reported as unheard.
    */
   readonly mp4Audio?: Mp4AudioDecoder;
+  /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
+  readonly filmRenderer?: FilmRenderer;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -93,9 +100,16 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
+  const codec = createDefaultAudioCodec(
+    options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
+  );
   const modes: readonly Mode[] = [
     createMovieMode({
       provider,
+      film: {
+        codec,
+        ...(options.filmRenderer === undefined ? {} : { renderer: options.filmRenderer }),
+      },
       ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
     }),
   ];
@@ -107,9 +121,7 @@ export function createImp(options: ImpOptions): Imp {
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createAudioCommands({
-      codec: createDefaultAudioCodec(
-        options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
-      ),
+      codec,
       links: [createSceneAudioLink()],
     }),
     ...createWorldCommands({

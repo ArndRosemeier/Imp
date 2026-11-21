@@ -18,9 +18,10 @@
     "@imp/core": "workspace:*",
     "@imp/host": "workspace:*",
     "@imp/mode-movie": "workspace:*",
-    "@imp/world": "workspace:*",
     "@imp/providers": "workspace:*",
+    "@imp/world": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
+    "mediabunny": "1.65.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^4.6.7"
