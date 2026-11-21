@@ -1004,6 +1004,15 @@ describe('fades of a placed sound', () => {
   });
 });
 
+describe('pan of a placed sound', () => {
+  it('is a balance: the middle leaves both sides alone', async () => {
+    const { panGains } = await import('../src/app/cut-player.js');
+    expect(panGains(0)).toEqual([1, 1]);
+    expect(panGains(-1)).toEqual([1, 0]);
+    expect(panGains(0.5)).toEqual([0.5, 1]);
+  });
+});
+
 describe('title cards in an exported video', () => {
   it('wraps words into lines that fit', async () => {
     const { wrapLines } = await import('../src/app/export.js');

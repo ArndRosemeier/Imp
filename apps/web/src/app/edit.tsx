@@ -902,6 +902,29 @@ function SceneEditor({
                     });
                   }}
                 />
+                <NumberField
+                  label="Pan (-1 left, 1 right)"
+                  value={placement.pan}
+                  step={0.1}
+                  min={-1}
+                  max={1}
+                  onCommit={(value) => {
+                    void run('movie.edit.sound.update', { placementId: placement.id, pan: value });
+                  }}
+                />
+                <NumberField
+                  label="Gain (dB)"
+                  value={placement.gainDb}
+                  step={1}
+                  min={-60}
+                  max={24}
+                  onCommit={(value) => {
+                    void run('movie.edit.sound.update', {
+                      placementId: placement.id,
+                      gainDb: value,
+                    });
+                  }}
+                />
               </div>
               <label className="choice">
                 <input
