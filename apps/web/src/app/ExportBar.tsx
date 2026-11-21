@@ -305,7 +305,7 @@ function RecordedExport({
       <p className="muted">
         {format === null
           ? 'This browser cannot record video. Try a current Chrome, Edge or Safari.'
-          : `This browser cannot render in the background, so the cut is played through once in real time and recorded as ${format.extension.toUpperCase()}. Keep this tab visible until it finishes.`}
+          : `Films cannot be rendered in the background here, so the cut is played through once in real time and recorded as ${format.extension.toUpperCase()}. Keep this tab visible until it finishes.`}
       </p>
       {done !== null && <p role="status">{done}</p>}
       {error !== null && (
