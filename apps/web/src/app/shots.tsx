@@ -556,7 +556,14 @@ function ShotCard({
   return (
     <article ref={card} className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
       <div className="row spread">
-        <h3>Shot {shot.position}</h3>
+        <h3>
+          Shot {shot.position}
+          {shot.pickup !== null && (
+            <span className="pickup-badge" title={`Asked for from the edit: ${shot.pickup.reason}`}>
+              Pickup
+            </span>
+          )}
+        </h3>
         <ConfirmButton
           label="Delete shot"
           question="Delete this shot and its clips for good?"
@@ -567,6 +574,18 @@ function ShotCard({
           <TrashIcon aria-hidden="true" />
         </ConfirmButton>
       </div>
+      {shot.pickup !== null && shot.clip?.status !== 'ready' && (
+        <p className="pickup-note">
+          <strong>The edit needs this shot:</strong> {shot.pickup.reason}{' '}
+          <span className="muted">
+            (
+            {shot.pickup.requestedBy === 'person'
+              ? 'asked by you'
+              : `asked by the ${shot.pickup.requestedBy.replace(/-/g, ' ')}`}
+            , {shot.pickup.seconds.toFixed(1)} s)
+          </span>
+        </p>
+      )}
       <ClipPlayer shot={shot} />
       <Takes shot={shot} act={act} />
       <EditableField

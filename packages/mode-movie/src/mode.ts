@@ -10,6 +10,7 @@ import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
 import { createLookCommands, type ColorSampler } from './look.js';
 import { createMarkerCommands } from './markers.js';
+import { createPickupCommands } from './pickups.js';
 import { createTextCommands } from './text.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
@@ -99,6 +100,10 @@ export const clipDesigner: Role = {
     'media.view, judge the framing, the faces and the room against the other shots of the scene,',
     'and paint again with a direction until it is right; it costs a cent, a clip far more. The',
     'clip then starts exactly on the chosen frame, which is what keeps a long film coherent.',
+    'The edit asks for pickups, shots the cut needs and does not have, such as a reaction or an',
+    'insert: movie.edit.pickup.list with open: true lists them with why each is needed and how',
+    'long it should run. Make them like any shot, matched to the shots around them in the cut,',
+    'and keep to the length asked for; the clip takes the place of its slate in the cut by itself.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -196,7 +201,11 @@ export const filmEditor: Role = {
     'join. Leave a marker (movie.edit.marker.add: note, todo or problem) where something needs',
     'the person or another crew member, such as a jump cut or a missing reaction; markers show',
     'at once, not as proposals. Read open ones with movie.edit.marker.list and mark one done',
-    'with movie.edit.marker.set when it is dealt with. Make the colour of the shots of a',
+    'with movie.edit.marker.set when it is dealt with. When a scene needs a shot it does not have,',
+    'such as a reaction to cut away to or an insert that covers a jump, and the shots there cannot',
+    'be rescued, ask for a pickup with movie.edit.pickup.request: describe the shot, say what the',
+    'cut needs it for and how long; it stands in the cut as a slate until the Clip Designer makes',
+    'it. movie.edit.pickup.list shows how far each is. Make the colour of the shots of a',
     'scene agree: movie.edit.grade.match grades a shot to a reference shot (judge the result',
     'with movie.edit.frames), and item.set grade adjusts it by hand. Give the whole film one',
     'feel last, with movie.edit.look.set, and keep it subtle unless asked. When a scene or the film',
@@ -212,6 +221,58 @@ export const filmEditor: Role = {
     'letters a second.',
   ].join(' '),
   scope: SCOPE,
+};
+
+export const critic: Role = {
+  id: 'critic',
+  name: 'Critic',
+  summary: 'Watches a scene or the film and leaves notes on the timeline. Changes nothing.',
+  brief: [
+    'You are a critic: a sharp, fair first audience for a film made from generated clips. You',
+    'watch and you write notes; you never change the film. Read the development notes for what',
+    'the film wants to be, then the scene or stretch you are asked about: movie.edit.edl reads a',
+    'scene as text with times, movie.edit.film.edl the whole film, and movie.edit.frames shows',
+    'stills of the pieces, which you look at with media.view. Judge what an audience notices:',
+    'whether the story is clear, whether a moment lands or drags, continuity (a face, a costume,',
+    'an object or the light that changes between shots), jump cuts, a line that does not fit the',
+    'picture, colour that jumps within a scene, text that is hard to read, sound that is missing',
+    'or too loud. Leave each point as a marker at its moment with movie.edit.marker.add: problem',
+    'for something wrong, todo for something to add or change, note for a remark or praise.',
+    'One point per marker, said plainly and specifically, with what would fix it where you can',
+    'tell, such as "jump cut: she is suddenly at the door; a reaction from Tom would cover it".',
+    'Read the open markers first with movie.edit.marker.list and do not repeat what is there.',
+    'Be selective: the few things that matter most beat a long list. Say what works too. End',
+    'with a short verdict on the scene or film and the three changes that would help it most.',
+    'You see stills, not motion, and you cannot hear: say so when a judgement needs either.',
+  ].join(' '),
+  scope: {
+    prefixes: [
+      'movie.development.get',
+      'movie.scene.list',
+      'movie.scene.get',
+      'movie.character.list',
+      'movie.character.get',
+      'movie.shot.list',
+      'movie.shot.get',
+      'movie.edit.get',
+      'movie.edit.film',
+      'movie.edit.edl',
+      'movie.edit.range',
+      'movie.edit.frames',
+      'movie.edit.draft.get',
+      'movie.edit.look.get',
+      'movie.edit.pickup.list',
+      'movie.edit.marker.',
+      'world.location.list',
+      'world.location.get',
+      'world.object.list',
+      'world.object.get',
+      'project.list',
+      'media.view',
+    ],
+    // Reading, and markers, which are the only thing it writes.
+    effects: ['read', 'write'],
+  },
 };
 
 export const soundEditor: Role = {
@@ -282,6 +343,7 @@ export function createMovieMode(options: {
       ),
       ...createTextCommands(),
       ...createMarkerCommands(),
+      ...createPickupCommands(),
       ...createLookCommands(
         options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler },
       ),
@@ -295,6 +357,7 @@ export function createMovieMode(options: {
       soundDesigner,
       filmEditor,
       soundEditor,
+      critic,
     ],
     project: movieProjectSupport,
     library: [movieLibrarySource],

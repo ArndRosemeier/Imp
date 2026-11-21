@@ -25,6 +25,7 @@ import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
 import { itemsOf, laidOut, readCut, readFilmLook, requireScene } from './edit.js';
 import { pieceMatrix, type ColorMatrix } from './grade.js';
 import { createSceneAudioLink } from './scene-audio.js';
+import { slateText } from './pickups.js';
 import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
 import type { PieceTiming, Punch } from './piece-time.js';
 import type { Dip } from './transitions.js';
@@ -309,6 +310,11 @@ export async function planFilm(
       };
       if (item.kind === 'title') {
         pictures.push({ kind: 'title', text: item.text, style: titleStyle, ...common });
+        continue;
+      }
+      if (item.placeholder) {
+        // A pickup still to come is seen as its slate, so the film keeps its timing.
+        pictures.push({ kind: 'title', text: slateText(item.label), style: titleStyle, ...common });
         continue;
       }
       const key = shots.get(item.shotId)?.clip?.blobKey;

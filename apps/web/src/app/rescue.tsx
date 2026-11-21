@@ -72,7 +72,7 @@ export function RescueTools({
   run: Run;
 }): ReactElement | null {
   const titleId = useId();
-  if (item.kind !== 'shot' || item.durationSeconds <= 0) return null;
+  if (item.kind !== 'shot' || item.placeholder || item.durationSeconds <= 0) return null;
   const set = (fields: Record<string, unknown>): void => {
     void run('movie.edit.item.set', { itemId: item.itemId, ...fields });
   };

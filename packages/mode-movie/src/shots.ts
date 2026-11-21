@@ -57,7 +57,7 @@ export interface ShotSetting {
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 const SceneId = z.string().describe('The id of a scene from movie.scene.list.');
-const ShotFields = Shot.omit({
+export const ShotFields = Shot.omit({
   id: true,
   sceneId: true,
   position: true,
@@ -66,12 +66,17 @@ const ShotFields = Shot.omit({
   dialogue: true,
   frames: true,
   frameId: true,
+  pickup: true,
 });
 
-const shotKey = (projectId: string, sceneId: string, shotId: string): string =>
+export const shotKey = (projectId: string, sceneId: string, shotId: string): string =>
   `${shotPrefix(projectId, sceneId)}${shotId}`;
 
-async function readShots(store: KeyValueStore, projectId: string, sceneId: string) {
+export async function readShots(
+  store: KeyValueStore,
+  projectId: string,
+  sceneId: string,
+): Promise<Shot[]> {
   return (await store.list(shotPrefix(projectId, sceneId)))
     .map((entry) => Shot.parse(entry.value))
     .sort((a, b) => a.position - b.position);
@@ -262,7 +267,7 @@ export function clipPrompt(
 const At = { projectId: ProjectId, sceneId: SceneId, shotId: z.string() };
 
 /** Fails the command when a shot names a location, view, state or object that does not exist. */
-async function requireShotSetting(
+export async function requireShotSetting(
   store: KeyValueStore,
   commandId: string,
   projectId: string,
@@ -432,6 +437,7 @@ export function createShotCommands(
         frameId: null,
         clip: null,
         takes: [],
+        pickup: null,
       };
       await requireShotSetting(runtime.store, 'movie.shot.create', projectId, shot);
       await runtime.store.batch([

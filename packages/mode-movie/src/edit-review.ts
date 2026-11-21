@@ -141,7 +141,11 @@ export function edlText(
     if (item.durationSeconds <= 0 || !within(item.startsAtSeconds, item.durationSeconds)) continue;
     const end = item.startsAtSeconds + item.durationSeconds;
     const notes: string[] = [];
-    if (item.kind === 'shot') {
+    if (item.placeholder) {
+      notes.push(
+        `PICKUP TO COME, slate until its clip is ready${item.pickupReason === null ? '' : `: ${item.pickupReason}`}`,
+      );
+    } else if (item.kind === 'shot') {
       notes.push(
         `clip ${item.trimStartSeconds.toFixed(2)}-${(item.sourceSeconds - item.trimEndSeconds).toFixed(2)} of ${item.sourceSeconds.toFixed(2)}`,
       );

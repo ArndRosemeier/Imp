@@ -134,9 +134,13 @@ export function GradeTools({
   const titleId = useId();
   const [matching, setMatching] = useState(false);
   const [problem, setProblem] = useState('');
-  if (item.kind !== 'shot' || item.durationSeconds <= 0) return null;
+  if (item.kind !== 'shot' || item.placeholder || item.durationSeconds <= 0) return null;
   const others = items.filter(
-    (other) => other.itemId !== item.itemId && other.kind === 'shot' && other.durationSeconds > 0,
+    (other) =>
+      other.itemId !== item.itemId &&
+      other.kind === 'shot' &&
+      !other.placeholder &&
+      other.durationSeconds > 0,
   );
   const set = (fields: Partial<GradeValues>): void => {
     void run('movie.edit.item.set', { itemId: item.itemId, grade: fields });

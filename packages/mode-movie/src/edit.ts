@@ -114,7 +114,7 @@ export async function requireScene(
   return Scene.parse(stored);
 }
 
-const wholeShot = (shot: Shot): CutItem => ({
+export const wholeShot = (shot: Shot): CutItem => ({
   // The shot's own id, so that the default cut has the same ids every time it is read.
   id: shot.id,
   kind: 'shot',
@@ -172,7 +172,10 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       holdSeconds: item.holdSeconds,
     };
     const ready = item.kind === 'shot' && shot?.clip?.status === 'ready';
-    const duration = item.kind === 'title' ? item.titleSeconds : ready ? pieceSeconds(timing) : 0;
+    // A pickup without its clip stands in as a slate of its planned length.
+    const slate = item.kind === 'shot' && !ready ? (shot?.pickup?.seconds ?? 0) : 0;
+    const duration =
+      item.kind === 'title' ? item.titleSeconds : ready ? pieceSeconds(timing) : slate;
     pieces.push({ item, shot, timing, ready, duration: round(duration) });
   }
   let at = 0;
@@ -194,6 +197,8 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       shotId: item.shotId,
       label: item.kind === 'title' ? item.text : (shot?.description ?? ''),
       state,
+      placeholder: item.kind === 'shot' && !ready && duration > 0,
+      pickupReason: shot?.pickup?.reason ?? null,
       trimStartSeconds: item.trimStartSeconds,
       trimEndSeconds: item.trimEndSeconds,
       dialogueVolume: item.dialogueVolume,
@@ -215,7 +220,7 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       focusX: item.focusX,
       focusY: item.focusY,
       movingSeconds: ready ? round(movingSeconds(timing)) : 0,
-      ownSound: item.kind === 'shot' && playsOwnSound(item),
+      ownSound: item.kind === 'shot' && ready && playsOwnSound(item),
       transition: item.transition,
       transitionSeconds: item.transitionSeconds,
       overlapSeconds: duration > 0 ? overlap : 0,
@@ -295,6 +300,10 @@ export const LaidItem = z.object({
   shotId: z.string(),
   label: z.string(),
   state: ItemState,
+  /** A pickup waiting for its clip, standing in the cut as a slate of its planned length. */
+  placeholder: z.boolean(),
+  /** Why the shot was asked for, when it is a pickup. */
+  pickupReason: z.string().nullable(),
   trimStartSeconds: z.number(),
   trimEndSeconds: z.number(),
   dialogueVolume: z.number(),
