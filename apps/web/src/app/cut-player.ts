@@ -1,5 +1,10 @@
 import type { ImpClient } from '@imp/host';
 import {
+  FilmLook,
+  Grade,
+  NEUTRAL_GRADE,
+  NEUTRAL_LOOK,
+  pieceMatrix,
   placePicture,
   shadeAt,
   Shot,
@@ -8,6 +13,7 @@ import {
   TextView,
   transitionShare,
   zoomAt,
+  type ColorMatrix,
 } from '@imp/mode-movie';
 import { z } from 'zod';
 import { runCommand } from './context.js';
@@ -82,6 +88,7 @@ export const Item = z.object({
   ownSound: z.boolean().default(true),
   transition: z.enum(['cut', 'dissolve', 'dip-black', 'dip-white', 'wipe']).default('cut'),
   transitionSeconds: z.number().default(1),
+  grade: Grade.default(NEUTRAL_GRADE),
   overlapSeconds: z.number().default(0),
   dipIn: z
     .object({ color: z.enum(['black', 'white']), seconds: z.number() })
@@ -154,6 +161,8 @@ export const Cut = z.object({
   lines: z.array(Line),
   /** The text lane, each text at the time it shows. */
   texts: z.array(TextView).default([]),
+  /** The film's look, laid over every piece after its own grade. */
+  look: FilmLook.default(NEUTRAL_LOOK),
   /** Which version this is: the cut itself, or what agents propose. */
   version: z.enum(['cut', 'draft']).default('cut'),
   /** What agents propose for the scene, when they proposed anything. */
@@ -335,15 +344,25 @@ export interface ScreenLook {
   /** It lies over the other screen. */
   readonly front: boolean;
   readonly zoom?: { readonly scale: number; readonly focusX: number; readonly focusY: number };
+  /** The colour matrix of its grade and the film's look, when it has one. */
+  readonly matrix?: ColorMatrix;
 }
+
+/** The id of the SVG filter that grades a preview screen. */
+export const gradeFilterId = (slot: 0 | 1): string => `imp-grade-${String(slot)}`;
+
+/** A matrix as the values of an SVG feColorMatrix. */
+export const matrixValues = (matrix: ColorMatrix): string =>
+  matrix.map((value) => String(Math.round(value * 10000) / 10000)).join(' ');
 
 /** A screen with nothing on it. */
 export const HIDDEN: ScreenLook = { opacity: 0, wipe: null, front: false };
 
 /** The CSS of one preview screen: shown or hidden, over or under, wiped on, and zoomed. */
-export function screenStyle(screen: ScreenLook): Record<string, string | number> {
+export function screenStyle(screen: ScreenLook, slot: 0 | 1 = 0): Record<string, string | number> {
   return {
     opacity: screen.opacity,
+    ...(screen.matrix === undefined ? {} : { filter: `url(#${gradeFilterId(slot)})` }),
     zIndex: screen.front ? 2 : 1,
     ...(screen.wipe === null
       ? {}
@@ -577,6 +596,7 @@ export class CutPlayer {
         }
         continue;
       }
+      const matrix = pieceMatrix(item.grade, cut.look);
       screens[slot] = {
         opacity: (wiping ? 1 : share) * (1 - shade.black),
         wipe: wiping ? share : null,
@@ -586,6 +606,7 @@ export class CutPlayer {
           focusX: item.focusX,
           focusY: item.focusY,
         },
+        ...(matrix === null ? {} : { matrix }),
       };
       this.#show(slot, item, since, play, mix);
     }

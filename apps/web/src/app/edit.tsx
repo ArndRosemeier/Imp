@@ -13,7 +13,9 @@ import {
   TextTIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { IDENTITY_MATRIX } from '@imp/mode-movie';
 import { FilmStrip } from './film-strip.js';
+import { FilmLookPanel, GradeTools, LookView, PRESET_LABELS } from './grade.js';
 import { MarkerInspector, MarkerLane, MarkerList, type MarkerView } from './markers.js';
 import {
   useEffect,
@@ -41,8 +43,11 @@ import {
   type Look,
   type Placement,
   type Source,
+  gradeFilterId,
   HIDDEN,
+  matrixValues,
   screenStyle,
+  type ScreenLook,
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
@@ -192,6 +197,7 @@ const EMPTY_CUT: Cut = {
   lanes: [],
   lines: [],
   texts: [],
+  look: { exposure: 0, contrast: 0, temperature: 0, tint: 0, saturation: 0, preset: null },
   version: 'cut',
   draft: null,
 };
@@ -706,6 +712,7 @@ function SceneEditor({
   sceneLabel,
   act: actOnCut,
   autoplay = false,
+  canMatch = false,
   onEnded,
 }: {
   project: Project;
@@ -717,6 +724,8 @@ function SceneEditor({
   autoplay?: boolean;
   /** The scene played to its end. */
   onEnded?: () => void;
+  /** Whether this host can read clip colours, to match shots. */
+  canMatch?: boolean;
 }): ReactElement {
   const [version, setVersion] = useState<'cut' | 'draft'>('cut');
   const live = useLive(
@@ -1002,8 +1011,9 @@ function SceneEditor({
               className="preview-screen"
               aria-hidden="true"
               playsInline
-              style={screenStyle(playback.look.screens?.[1] ?? HIDDEN)}
+              style={screenStyle(playback.look.screens?.[1] ?? HIDDEN, 1)}
             />
+            <GradeFilters screens={playback.look.screens} />
             <div
               className="preview-wash"
               aria-hidden="true"
@@ -1187,6 +1197,7 @@ function SceneEditor({
               )}
               {index > 0 && <TransitionPicker item={item} run={run} />}
               <RescueTools item={item} playheadSeconds={playback.at} run={run} />
+              <GradeTools item={item} items={cut.items} run={run} canMatch={canMatch} />
               <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
             </>
           )}
@@ -1635,6 +1646,26 @@ function SceneEditor({
   );
 }
 
+/** The colour-matrix filters the two preview screens are graded with, the film renderer's numbers. */
+function GradeFilters({
+  screens,
+}: {
+  screens: readonly [ScreenLook, ScreenLook] | undefined;
+}): ReactElement {
+  return (
+    <svg className="grade-filters" aria-hidden="true" width="0" height="0">
+      {([0, 1] as const).map((slot) => {
+        const matrix = screens?.[slot].matrix;
+        return (
+          <filter key={slot} id={gradeFilterId(slot)} colorInterpolationFilters="sRGB">
+            <feColorMatrix type="matrix" values={matrixValues(matrix ?? IDENTITY_MATRIX)} />
+          </filter>
+        );
+      })}
+    </svg>
+  );
+}
+
 /** Where the choice to play on from scene to scene is remembered, per browser. */
 const PLAY_ON_KEY = 'imp.edit.play-on';
 
@@ -1647,7 +1678,10 @@ export function EditView({ project }: { project: Project }): ReactElement {
     markers: MarkerList.parse(
       await runCommand(imp, 'movie.edit.marker.list', { projectId: project.id }),
     ).markers,
+    look: LookView.parse(await runCommand(imp, 'movie.edit.look.get', { projectId: project.id })),
   }));
+  const [lookOpen, setLookOpen] = useState(false);
+  const look = live.data?.look;
   const { act, error } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoplay, setAutoplay] = useState(false);
@@ -1685,6 +1719,24 @@ export function EditView({ project }: { project: Project }): ReactElement {
             setAutoplay(false);
             setSelectedId(id);
           }}
+          tools={
+            look !== undefined && (
+              <button
+                className="button small quiet"
+                aria-pressed={lookOpen}
+                aria-expanded={lookOpen}
+                title="The colour look of the whole film"
+                onClick={() => {
+                  setLookOpen(!lookOpen);
+                }}
+              >
+                Look
+                {look.look.preset !== null && look.look.preset !== 'none'
+                  ? ` · ${PRESET_LABELS[look.look.preset] ?? look.look.preset}`
+                  : ''}
+              </button>
+            )
+          }
           onPlayOn={(on) => {
             setPlayOn(on);
             try {
@@ -1692,6 +1744,15 @@ export function EditView({ project }: { project: Project }): ReactElement {
             } catch {
               // Remembering is a convenience; without storage it is on for this visit only.
             }
+          }}
+        />
+      )}
+      {lookOpen && look !== undefined && (
+        <FilmLookPanel
+          view={look}
+          run={(id, input) => act(id, input)}
+          onClose={() => {
+            setLookOpen(false);
           }}
         />
       )}
@@ -1708,6 +1769,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
           sceneLabel={`Scene ${String(scenes.find((scene) => scene.id === sceneId)?.position ?? '')}`}
           act={act}
           autoplay={autoplay}
+          canMatch={look?.canMatch ?? false}
           onEnded={() => {
             const at = scenes.findIndex((scene) => scene.id === sceneId);
             const next = scenes[at + 1];

@@ -24,12 +24,14 @@ import {
   partsOf,
   readCut,
   readDraft,
+  readFilmLook,
   requireScene,
   save,
   viewOf,
   CutView,
   type Acting,
 } from './edit.js';
+import { gradeText, isNeutral } from './grade.js';
 import { placedMarkers, type PlacedMarker } from './markers.js';
 import { sourceTime } from './piece-time.js';
 import { CutRequest, MODE_ID, Scene, Shot, type CutDraft, type SceneCut } from './schema.js';
@@ -151,6 +153,7 @@ export function edlText(
           `zoom ${item.zoom.toFixed(2)}${item.zoomTo === null ? '' : ` to ${item.zoomTo.toFixed(2)}`} on ${item.focusX.toFixed(2)},${item.focusY.toFixed(2)}`,
         );
       }
+      if (!isNeutral(item.grade)) notes.push(`grade ${gradeText(item.grade)}`);
       if (!item.ownSound) notes.push('own sound silent');
       else {
         if (item.dialogueVolume < 1) notes.push(`dialogue ${item.dialogueVolume.toFixed(2)}`);
@@ -238,6 +241,7 @@ const FIELD_NAMES: Record<string, string> = {
   focusY: 'zoom down',
   transition: 'transition',
   transitionSeconds: 'transition length',
+  grade: 'colour',
   startSeconds: 'start',
   gainDb: 'gain (dB)',
   fadeCurve: 'fade shape',
@@ -986,7 +990,10 @@ export function createReviewCommands(
         }
         filmAt += view.totalSeconds;
       }
-      const head = `FILM · ${String(scenes.length)} scenes · ${timecode(filmAt)}`;
+      const filmLook = await readFilmLook(runtime.store, projectId);
+      const head =
+        `FILM · ${String(scenes.length)} scenes · ${timecode(filmAt)}` +
+        (isNeutral(filmLook) ? '' : `\nLOOK ${filmLook.preset ?? 'own'}: ${gradeText(filmLook)}`);
       return {
         totalSeconds: Math.round(filmAt * 1000) / 1000,
         scenes: shown,

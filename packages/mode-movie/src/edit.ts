@@ -15,6 +15,7 @@ import {
   editDraftKey,
   editHistoryKey,
   editKey,
+  filmLookKey,
   linePrefix,
   markerKey,
   movieSceneKey,
@@ -41,6 +42,7 @@ import {
   TransitionKind,
 } from './schema.js';
 import { placeText } from './text-layout.js';
+import { FilmLook, Grade, NEUTRAL_LOOK } from './grade.js';
 import { dipOf, overlapSeconds } from './transitions.js';
 import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
 
@@ -222,6 +224,7 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
         next === undefined
           ? null
           : dipOf(next.item.transition, next.item.transitionSeconds, duration),
+      grade: item.grade,
     });
     if (duration > 0) {
       at = startsAt + duration;
@@ -321,6 +324,8 @@ export const LaidItem = z.object({
   /** The dips to black or white at its edges, from its own transition and the next piece's. */
   dipIn: z.object({ color: z.enum(['black', 'white']), seconds: z.number() }).nullable(),
   dipOut: z.object({ color: z.enum(['black', 'white']), seconds: z.number() }).nullable(),
+  /** Its colour grade, before the film's look. */
+  grade: Grade,
 });
 export type LaidItem = z.infer<typeof LaidItem>;
 
@@ -369,8 +374,16 @@ export const CutView = z.object({
   spoken: z.array(SpokenLine),
   /** The text lane, each text at the time it shows (an anchored text where its anchor is now). */
   texts: z.array(TextView),
+  /** The film's look, laid over every piece after its own grade. */
+  look: FilmLook,
 });
 export type CutView = z.infer<typeof CutView>;
+
+/** The film's look: the grade over every piece. */
+export async function readFilmLook(store: KeyValueStore, projectId: string): Promise<FilmLook> {
+  const stored = await store.get(filmLookKey(projectId));
+  return stored === undefined ? NEUTRAL_LOOK : FilmLook.parse(stored);
+}
 
 /** How many changes agents propose to a scene, by whom and on what request. */
 export const DraftSummary = z.object({
@@ -537,6 +550,7 @@ export async function viewOf(
     texts: cut.texts
       .map((text) => ({ ...text, ...placeText(text, { items: laid.items, spoken }) }))
       .sort((a, b) => a.startSeconds - b.startSeconds),
+    look: await readFilmLook(store, projectId),
   };
 }
 
@@ -559,6 +573,22 @@ export async function save(
     },
   ]);
 }
+
+const GradeInput = z
+  .object({
+    exposure: z.number().min(-3).max(3).optional(),
+    contrast: z.number().min(-1).max(1).optional(),
+    temperature: z.number().min(-1).max(1).optional(),
+    tint: z.number().min(-1).max(1).optional(),
+    saturation: z.number().min(-1).max(1).optional(),
+  })
+  .describe('The colour of the shot; fields left out stay as they are.');
+
+/** An object without the fields that are undefined, so that a spread keeps what is there. */
+const withoutUndefined = <T extends object>(value: T): Partial<T> =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, field]) => field !== undefined),
+  ) as Partial<T>;
 
 const TrimFields = {
   trimStartSeconds: z.number().min(0).max(600).optional(),
@@ -975,7 +1005,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.item.set',
     title: 'Change item',
     description:
-      "Changes an item of the cut: seconds trimmed off its start and end (in seconds of the clip), the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Rescue tools for a shot: speed (0.5 slow motion, 2 double; off speed or reversed, its own sound and dialogue are silent, so lay sound on the audio lane), reverse, holdSeconds (freeze its last frame), and a punch-in: zoom (1 to 4) on focusX and focusY (shares of the frame), with zoomTo for a slow push in or pull out over the piece (null for none). A punch-in turns a wide into a closer shot or hides a flaw at the edge; keep it under about 1.5 or the picture softens. transition is how the item comes in after the one before: cut (the default), dissolve (one picture melts into the next, for time passing or a change of mood), dip-black or dip-white (a fade out and in, for a bigger break), or wipe; transitionSeconds is its length. A dissolve or wipe overlaps the two pieces, so the scene gets shorter by it; inside a scene most changes should stay cuts. Fields left out stay as they are.",
+      "Changes an item of the cut: seconds trimmed off its start and end (in seconds of the clip), the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Rescue tools for a shot: speed (0.5 slow motion, 2 double; off speed or reversed, its own sound and dialogue are silent, so lay sound on the audio lane), reverse, holdSeconds (freeze its last frame), and a punch-in: zoom (1 to 4) on focusX and focusY (shares of the frame), with zoomTo for a slow push in or pull out over the piece (null for none). A punch-in turns a wide into a closer shot or hides a flaw at the edge; keep it under about 1.5 or the picture softens. transition is how the item comes in after the one before: cut (the default), dissolve (one picture melts into the next, for time passing or a change of mood), dip-black or dip-white (a fade out and in, for a bigger break), or wipe; transitionSeconds is its length. A dissolve or wipe overlaps the two pieces, so the scene gets shorter by it; inside a scene most changes should stay cuts. grade sets the colour of a shot before the film's look: exposure in stops (-3 to 3), contrast, temperature (+ warmer), tint (+ magenta, - green) and saturation (-1 black and white), each -1 to 1 and 0 for none; only the fields given change. Use it to make shots of one scene agree; movie.edit.grade.match works one out from a reference shot. Fields left out stay as they are.",
     effect: 'write',
     input: z.object({
       projectId: ProjectId,
@@ -993,6 +1023,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       focusY: z.number().min(0).max(1).optional(),
       transition: TransitionKind.optional(),
       transitionSeconds: z.number().min(0.1).max(5).optional(),
+      grade: GradeInput.optional(),
     }),
     output: z.object({ item: CutItem }),
     handler: async ({ runtime, actor }, { projectId, sceneId, itemId, ...changes }) => {
@@ -1019,6 +1050,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         focusY: changes.focusY ?? before.focusY,
         transition: changes.transition ?? before.transition,
         transitionSeconds: changes.transitionSeconds ?? before.transitionSeconds,
+        grade: Grade.parse({ ...before.grade, ...withoutUndefined(changes.grade ?? {}) }),
       };
       if (
         before.kind === 'title' &&
@@ -1026,12 +1058,13 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
           changes.reverse !== undefined ||
           changes.holdSeconds !== undefined ||
           changes.zoom !== undefined ||
-          changes.zoomTo !== undefined)
+          changes.zoomTo !== undefined ||
+          changes.grade !== undefined)
       ) {
         throw new CommandError(
           'invalid_input',
           id,
-          'A title card has no clip to slow, reverse, freeze or zoom; change its length instead.',
+          'A title card has no clip to slow, reverse, freeze, zoom or grade; change its length instead.',
         );
       }
       await commitCut(

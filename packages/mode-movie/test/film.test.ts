@@ -291,6 +291,15 @@ describe('exporting a film', () => {
     expect(pictures[0]).toMatchObject({ dipOut: { color: 'white', seconds: 0.5 } });
     expect(pictures[1]).toMatchObject({ startSeconds: 4, dipIn: { color: 'white', seconds: 0.5 } });
     expect(pictures[1]).not.toHaveProperty('transitionIn');
+    expect(pictures[0]).not.toHaveProperty('matrix');
+
+    // Graded, the clip carries the matrix of its grade and the film's look; a card keeps its colours.
+    await run('movie.edit.look.set', { projectId, preset: 'warm' });
+    await run('movie.edit.export', { projectId, sceneIds: [first] }, editor);
+    const graded = fake.seen.job?.plan.pictures ?? [];
+    expect(graded[0]).toHaveProperty('matrix');
+    expect((graded[0] as { matrix?: number[] }).matrix).toHaveLength(20);
+    expect(graded[1]).not.toHaveProperty('matrix');
   });
 
   it("plays a sound's effects as the audio editor does", async () => {
