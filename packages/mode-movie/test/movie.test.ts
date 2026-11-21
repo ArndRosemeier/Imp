@@ -1334,6 +1334,63 @@ describe('shots and clips', () => {
     ).rejects.toThrow(/Only a shot/);
   });
 
+  it('lays a dissolve or wipe over the piece before, and dips without overlap', async () => {
+    const { run, at, add, ready, cutOf, edit, mara } = await withCuts();
+    await ready({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    const b = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(b.id), durationSeconds: 4, audio: true });
+    await run('movie.shot.clip.check', at(b.id));
+    await run('movie.shot.clip.check', at(b.id));
+    interface View {
+      totalSeconds: number;
+      items: {
+        startsAtSeconds: number;
+        overlapSeconds: number;
+        transition: string;
+        dipIn: unknown;
+        dipOut: unknown;
+      }[];
+    }
+    const view = async () => (await cutOf()) as unknown as View;
+    expect((await view()).items[1]).toMatchObject({ transition: 'cut', overlapSeconds: 0 });
+
+    // A one-second dissolve starts the door a second early, so the scene is a second shorter.
+    await edit('item.set', { itemId: b.id, transition: 'dissolve', transitionSeconds: 1 });
+    let now = await view();
+    expect(now.items[1]).toMatchObject({ startsAtSeconds: 3, overlapSeconds: 1 });
+    expect(now.totalSeconds).toBe(7);
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('dissolve in 1.0 (overlaps 1.00)');
+
+    // A long wipe overlaps at most half of either piece.
+    await edit('item.set', { itemId: b.id, transition: 'wipe', transitionSeconds: 5 });
+    now = await view();
+    expect(now.items[1]).toMatchObject({ startsAtSeconds: 2, overlapSeconds: 2 });
+    expect(now.totalSeconds).toBe(6);
+
+    // A dip keeps the length and fades each side for half the transition.
+    await edit('item.set', { itemId: b.id, transition: 'dip-black', transitionSeconds: 2 });
+    now = await view();
+    expect(now.totalSeconds).toBe(8);
+    expect(now.items[0]).toMatchObject({ dipIn: null, dipOut: { color: 'black', seconds: 1 } });
+    expect(now.items[1]).toMatchObject({
+      startsAtSeconds: 4,
+      overlapSeconds: 0,
+      dipIn: { color: 'black', seconds: 1 },
+    });
+
+    // Splitting keeps the transition on the first half; the second follows with a cut.
+    const halves = (await edit('item.split', { itemId: b.id, atSeconds: 2 })) as unknown as {
+      first: Record<string, unknown>;
+      second: Record<string, unknown>;
+    };
+    expect(halves.first).toMatchObject({ transition: 'dip-black' });
+    expect(halves.second).toMatchObject({ transition: 'cut' });
+    await expect(
+      edit('item.set', { itemId: b.id, transition: 'dissolve', transitionSeconds: 9 }),
+    ).rejects.toThrow();
+  });
+
   it('carries recorded dialogue over a silent clip into a split edit', async () => {
     const { run, registry, at, add, cutOf, edit, mara } = await withCuts();
     await registry.executeById(

@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { zoomStyle, type Item } from '../src/app/cut-player.js';
+import { HIDDEN, screenStyle, zoomStyle, type Item } from '../src/app/cut-player.js';
 import { isPlain, padShare, RescueTools } from '../src/app/rescue.js';
-import { BACKWARDS_RUN, inOrder } from '../src/host/frame-order.js';
+import { transitionNote, TransitionPicker } from '../src/app/transition.js';
+import { BACKWARDS_RUN, framesInOrder } from '../src/host/frame-order.js';
+
+/** Shows each frame framesInOrder gives, as the renderer does, one frame at a time. */
+async function inOrder<T extends object>(
+  times: readonly number[],
+  read: (rising: readonly number[]) => AsyncIterable<T | null>,
+  close: (frame: T) => void,
+  show: (frame: T | null) => Promise<void>,
+): Promise<void> {
+  for await (const frame of framesInOrder(times, read, close)) await show(frame);
+}
 
 afterEach(cleanup);
 
@@ -35,6 +46,11 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   focusY: 0.5,
   movingSeconds: 4,
   ownSound: true,
+  transition: 'cut',
+  transitionSeconds: 1,
+  overlapSeconds: 0,
+  dipIn: null,
+  dipOut: null,
   ...fields,
 });
 
@@ -90,6 +106,65 @@ describe('frames in any order', () => {
       },
     );
     expect(shown).toEqual([null, null]);
+  });
+
+  it('frees the frame it holds when the reader stops early', async () => {
+    const { closed, read, close } = decoder();
+    for await (const frame of framesInOrder([0, 1, 2], read, close)) {
+      if (frame?.time === 1) break;
+    }
+    expect(closed).toEqual([0, 1]);
+  });
+});
+
+describe('the two screens of the preview', () => {
+  it('stack, fade and wipe one screen over the other', () => {
+    expect(screenStyle(HIDDEN)).toEqual({ opacity: 0, zIndex: 1 });
+    expect(
+      screenStyle({
+        opacity: 1,
+        wipe: 0.25,
+        front: true,
+        zoom: { scale: 1, focusX: 0, focusY: 0 },
+      }),
+    ).toEqual({ opacity: 1, zIndex: 2, clipPath: 'inset(0 75% 0 0)' });
+  });
+});
+
+describe('the transition of a piece', () => {
+  it('sets how a piece comes in and how long it takes', () => {
+    const run = vi.fn(() => Promise.resolve());
+    render(<TransitionPicker item={piece()} run={run} />);
+    expect(screen.queryByLabelText('Length (s)')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dissolve' }));
+    expect(run).toHaveBeenLastCalledWith('movie.edit.item.set', {
+      itemId: 'a',
+      transition: 'dissolve',
+    });
+    cleanup();
+    render(
+      <TransitionPicker
+        item={piece({ transition: 'wipe', overlapSeconds: 1, transitionSeconds: 1 })}
+        run={run}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Wipe' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText(/Lies over the shot before for 1 s/)).toBeTruthy();
+    const length = screen.getByLabelText('Length (s)');
+    fireEvent.change(length, { target: { value: '2' } });
+    fireEvent.blur(length);
+    expect(run).toHaveBeenLastCalledWith('movie.edit.item.set', {
+      itemId: 'a',
+      transitionSeconds: 2,
+    });
+  });
+
+  it('says what each kind does to the scene', () => {
+    expect(transitionNote({ transition: 'cut', overlapSeconds: 0 })).toBe('');
+    expect(transitionNote({ transition: 'dissolve', overlapSeconds: 0 })).toMatch(/no room/);
+    expect(transitionNote({ transition: 'dip-white', overlapSeconds: 0 })).toMatch(
+      /keeps its length/,
+    );
   });
 });
 

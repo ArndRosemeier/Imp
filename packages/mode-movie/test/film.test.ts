@@ -256,6 +256,43 @@ describe('exporting a film', () => {
     expect(listed.exports.map((entry) => entry.id)).toEqual([film.id]);
   });
 
+  it('plans dissolves, wipes and dips between the pictures', async () => {
+    const fake = fakeRenderer();
+    const { run, projectId, first } = await setup(fake.renderer);
+    const card = (await run('movie.edit.title.add', {
+      projectId,
+      sceneId: first,
+      text: 'Years later',
+      seconds: 2,
+    })) as { item: { id: string } };
+    const set = async (fields: Record<string, unknown>) =>
+      run('movie.edit.item.set', { projectId, sceneId: first, itemId: card.item.id, ...fields });
+    await set({ transition: 'dissolve', transitionSeconds: 1.5 });
+    await run('movie.edit.export', { projectId, sceneIds: [first] }, editor);
+    // At most half of the two-second card: it starts one second before the clip ends.
+    expect(fake.seen.job?.plan).toMatchObject({
+      durationSeconds: 5,
+      pictures: [
+        { kind: 'clip', startSeconds: 0, durationSeconds: 4, dipOut: null },
+        {
+          kind: 'title',
+          startSeconds: 3,
+          durationSeconds: 2,
+          transitionIn: { kind: 'dissolve', seconds: 1 },
+          dipIn: null,
+        },
+      ],
+    });
+
+    await set({ transition: 'dip-white', transitionSeconds: 1 });
+    await run('movie.edit.export', { projectId, sceneIds: [first] }, editor);
+    const pictures = fake.seen.job?.plan.pictures ?? [];
+    expect(fake.seen.job?.plan.durationSeconds).toBe(6);
+    expect(pictures[0]).toMatchObject({ dipOut: { color: 'white', seconds: 0.5 } });
+    expect(pictures[1]).toMatchObject({ startSeconds: 4, dipIn: { color: 'white', seconds: 0.5 } });
+    expect(pictures[1]).not.toHaveProperty('transitionIn');
+  });
+
   it("plays a sound's effects as the audio editor does", async () => {
     const fake = fakeRenderer();
     const { runtime, run, projectId, second } = await setup(fake.renderer);

@@ -5,7 +5,7 @@ import { drawLane, type LaneText } from '../host/text-draw.js';
 import { loadTextFonts } from '../host/text-fonts.js';
 import { wrapLines } from '../host/title-lines.js';
 import { runCommand } from './context.js';
-import { blobKeys, CutPlayer, loadCut, type Look } from './cut-player.js';
+import { blobKeys, CutPlayer, HIDDEN, loadCut, type Look, type ScreenLook } from './cut-player.js';
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -51,31 +51,67 @@ interface Overlay {
   seconds: number;
 }
 
-function paint(
+/** Draws one screen of the editor's engine as the preview shows it: faded, wiped on and zoomed. */
+function drawScreen(
   g: CanvasRenderingContext2D,
   video: HTMLVideoElement,
+  screen: ScreenLook,
+): void {
+  if (screen.opacity <= 0 || video.readyState < 2 || video.videoWidth <= 0) return;
+  if (video.videoHeight <= 0) return;
+  // Fitted whole and zoomed on its focus, as the offline export draws it.
+  const at = placePicture(
+    WIDTH,
+    HEIGHT,
+    video.videoWidth,
+    video.videoHeight,
+    screen.zoom?.scale ?? 1,
+    screen.zoom?.focusX ?? 0.5,
+    screen.zoom?.focusY ?? 0.5,
+  );
+  g.save();
+  if (screen.wipe !== null) {
+    g.beginPath();
+    g.rect(0, 0, WIDTH * screen.wipe, HEIGHT);
+    g.clip();
+  }
+  g.globalAlpha = Math.min(1, screen.opacity);
+  g.drawImage(video, at.x, at.y, at.width, at.height);
+  g.restore();
+}
+
+function paint(
+  g: CanvasRenderingContext2D,
+  videos: readonly [HTMLVideoElement, HTMLVideoElement],
   look: Look,
   overlay: Overlay,
 ): void {
   g.globalAlpha = 1;
   g.fillStyle = '#000';
   g.fillRect(0, 0, WIDTH, HEIGHT);
-  if (!look.card && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-    // Fitted whole and zoomed on its focus, as the offline export draws it.
-    const at = placePicture(
-      WIDTH,
-      HEIGHT,
-      video.videoWidth,
-      video.videoHeight,
-      look.zoom?.scale ?? 1,
-      look.zoom?.focusX ?? 0.5,
-      look.zoom?.focusY ?? 0.5,
-    );
-    g.drawImage(video, at.x, at.y, at.width, at.height);
-    if (look.brightness < 1) {
-      g.fillStyle = `rgba(0, 0, 0, ${String(1 - look.brightness)})`;
-      g.fillRect(0, 0, WIDTH, HEIGHT);
+  if (!look.card) {
+    const screens: readonly ScreenLook[] = look.screens ?? [
+      {
+        opacity: look.brightness,
+        wipe: null,
+        front: true,
+        ...(look.zoom === undefined ? {} : { zoom: look.zoom }),
+      },
+      HIDDEN,
+    ];
+    // The screen behind first, then the one coming in over it.
+    for (const slot of screens[0]?.front === true ? [1, 0] : [0, 1]) {
+      const screen = screens[slot];
+      const video = videos[slot];
+      if (screen !== undefined && video !== undefined) drawScreen(g, video, screen);
     }
+  }
+  // A dip to white lies over the picture; the texts stay readable on it, as in the offline export.
+  if ((look.white ?? 0) > 0) {
+    g.globalAlpha = Math.min(1, look.white ?? 0);
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, WIDTH, HEIGHT);
+    g.globalAlpha = 1;
   }
   // The same drawing as the preview and the offline export.
   drawLane(g, {
@@ -124,10 +160,15 @@ export async function recordScenes(
   canvas.height = HEIGHT;
   const g = canvas.getContext('2d');
   if (g === null) throw new Error('This browser cannot draw the picture for the video.');
-  const video = document.createElement('video');
-  video.playsInline = true;
-  video.preload = 'auto';
-  const voice = new Audio();
+  // Two screens and two voices, as in the preview, for pieces that dissolve or wipe into each other.
+  const screen = (): HTMLVideoElement => {
+    const element = document.createElement('video');
+    element.playsInline = true;
+    element.preload = 'auto';
+    return element;
+  };
+  const videos = [screen(), screen()] as const;
+  const voices = [new Audio(), new Audio()] as const;
   const audio = new AudioContext();
   await audio.resume();
   const destination = audio.createMediaStreamDestination();
@@ -137,8 +178,7 @@ export async function recordScenes(
     routed.add(element);
     audio.createMediaElementSource(element).connect(destination);
   };
-  tap(video);
-  tap(voice);
+  for (const element of [...videos, ...voices]) tap(element);
 
   const stream = canvas.captureStream(FPS);
   for (const track of destination.stream.getAudioTracks()) stream.addTrack(track);
@@ -163,7 +203,7 @@ export async function recordScenes(
   let look: Look = { brightness: 0, title: '', card: false };
   let overlay: Overlay = { texts: [], styles, seconds: 0 };
   const drawing = setInterval(() => {
-    paint(g, video, look, { ...overlay, seconds: player?.now ?? overlay.seconds });
+    paint(g, videos, look, { ...overlay, seconds: player?.now ?? overlay.seconds });
   }, 1000 / FPS);
   let player: CutPlayer | undefined;
   try {
@@ -198,7 +238,8 @@ export async function recordScenes(
           { context: audio, destination },
         );
         player = current;
-        current.attach(video, voice);
+        current.attach(videos[0], voices[0]);
+        current.attach(videos[1], voices[1], 1);
         signal.addEventListener('abort', () => {
           resolve();
         });

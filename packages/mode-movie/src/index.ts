@@ -43,6 +43,8 @@ export {
   TextKind,
   TextStyle,
   MODE_ID,
+  PLAIN_PIECE,
+  TransitionKind,
   Scene,
   Shot,
   Sound,
@@ -87,6 +89,7 @@ export {
   PartWriter,
   planFilm,
   type FilmExportOptions,
+  type FilmEdges,
   type FilmPicture,
   type FilmPlan,
   type FilmText,
@@ -96,6 +99,15 @@ export {
 } from './film.js';
 export { LibrarySound, movieLibrarySource, soundLibrary } from './library.js';
 export { createSceneAudioLink } from './scene-audio.js';
+export {
+  dipOf,
+  overlaps,
+  overlapSeconds,
+  shadeAt,
+  transitionShare,
+  type Dip,
+  type Edges,
+} from './transitions.js';
 export {
   clipPrompt,
   createShotCommands,

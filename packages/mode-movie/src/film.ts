@@ -26,37 +26,48 @@ import { itemsOf, laidOut, readCut, requireScene } from './edit.js';
 import { createSceneAudioLink } from './scene-audio.js';
 import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
 import type { PieceTiming, Punch } from './piece-time.js';
+import type { Dip } from './transitions.js';
 import { styleOf } from './text-layout.js';
 import { filmTexts, readStyles } from './text.js';
 
+/** How a picture meets its neighbours: a dissolve or wipe over the one before, and dips at its edges. */
+export interface FilmEdges {
+  /** Laid over the end of the picture before for its first seconds; absent for a cut. */
+  readonly transitionIn?: { readonly kind: 'dissolve' | 'wipe'; readonly seconds: number };
+  readonly dipIn?: Dip | null;
+  readonly dipOut?: Dip | null;
+}
+
 /** What is on screen for a stretch of the film: a clip, or a title card on black. */
-export type FilmPicture =
-  | {
-      readonly kind: 'clip';
-      readonly startSeconds: number;
-      readonly durationSeconds: number;
-      readonly blobKey: string;
-      /** Where in the clip the stretch starts (its trim). */
-      readonly sourceStartSeconds: number;
-      readonly fadeInSeconds: number;
-      readonly fadeOutSeconds: number;
-      /**
-       * How the piece's time maps to the clip's (speed, reverse, a held last
-       * frame; see sourceTime) and its punch-in. Left out, it plays as filmed.
-       */
-      readonly timing?: PieceTiming;
-      readonly punch?: Punch;
-    }
-  | {
-      readonly kind: 'title';
-      readonly startSeconds: number;
-      readonly durationSeconds: number;
-      readonly text: string;
-      /** The film's title style, which the card's words are set in. */
-      readonly style: TextStyle;
-      readonly fadeInSeconds: number;
-      readonly fadeOutSeconds: number;
-    };
+export type FilmPicture = FilmEdges &
+  (
+    | {
+        readonly kind: 'clip';
+        readonly startSeconds: number;
+        readonly durationSeconds: number;
+        readonly blobKey: string;
+        /** Where in the clip the stretch starts (its trim). */
+        readonly sourceStartSeconds: number;
+        readonly fadeInSeconds: number;
+        readonly fadeOutSeconds: number;
+        /**
+         * How the piece's time maps to the clip's (speed, reverse, a held last
+         * frame; see sourceTime) and its punch-in. Left out, it plays as filmed.
+         */
+        readonly timing?: PieceTiming;
+        readonly punch?: Punch;
+      }
+    | {
+        readonly kind: 'title';
+        readonly startSeconds: number;
+        readonly durationSeconds: number;
+        readonly text: string;
+        /** The film's title style, which the card's words are set in. */
+        readonly style: TextStyle;
+        readonly fadeInSeconds: number;
+        readonly fadeOutSeconds: number;
+      }
+  );
 
 /** A text over the picture for a stretch of the film, with the style it is drawn in. */
 export interface FilmText {
@@ -285,6 +296,12 @@ export async function planFilm(
         durationSeconds: item.durationSeconds,
         fadeInSeconds: item.fadeInSeconds,
         fadeOutSeconds: item.fadeOutSeconds,
+        ...(item.overlapSeconds > 0 &&
+        (item.transition === 'dissolve' || item.transition === 'wipe')
+          ? { transitionIn: { kind: item.transition, seconds: item.overlapSeconds } }
+          : {}),
+        dipIn: item.dipIn,
+        dipOut: item.dipOut,
       };
       if (item.kind === 'title') {
         pictures.push({ kind: 'title', text: item.text, style: titleStyle, ...common });

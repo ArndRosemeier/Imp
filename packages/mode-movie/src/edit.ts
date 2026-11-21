@@ -37,8 +37,10 @@ import {
   Sound,
   SoundPlacement,
   TextItem,
+  TransitionKind,
 } from './schema.js';
 import { placeText } from './text-layout.js';
+import { dipOf, overlapSeconds } from './transitions.js';
 import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
@@ -151,14 +153,13 @@ export async function readCut(
  * clip is not ready take no time and are not in the film.
  */
 async function layOut(store: KeyValueStore, projectId: string, items: readonly CutItem[]) {
-  let at = 0;
-  const laid = [];
-  for (const [index, item] of items.entries()) {
+  // First how long each piece is, then where it falls: a dissolve or wipe overlaps the one before.
+  const pieces = [];
+  for (const item of items) {
     const shot =
       item.kind === 'shot'
         ? await loadShot(store, projectId, item.sceneId, item.shotId)
         : undefined;
-    const state: ItemState = item.kind === 'title' ? 'ready' : stateOf(shot);
     const timing = {
       sourceSeconds: shot === undefined ? 0 : clipSeconds(shot),
       trimStartSeconds: item.trimStartSeconds,
@@ -169,6 +170,19 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
     };
     const ready = item.kind === 'shot' && shot?.clip?.status === 'ready';
     const duration = item.kind === 'title' ? item.titleSeconds : ready ? pieceSeconds(timing) : 0;
+    pieces.push({ item, shot, timing, ready, duration: round(duration) });
+  }
+  let at = 0;
+  let end = 0;
+  let before = 0;
+  const laid = [];
+  for (const [index, { item, shot, timing, ready, duration }] of pieces.entries()) {
+    const state: ItemState = item.kind === 'title' ? 'ready' : stateOf(shot);
+    const overlap =
+      index === 0 ? 0 : overlapSeconds(item.transition, item.transitionSeconds, before, duration);
+    // The next piece that is seen decides how this one goes out.
+    const next = pieces.slice(index + 1).find((candidate) => candidate.duration > 0);
+    const startsAt = round(Math.max(0, at - overlap));
     laid.push({
       itemId: item.id,
       kind: item.kind,
@@ -186,8 +200,8 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       fadeInSeconds: item.fadeInSeconds,
       fadeOutSeconds: item.fadeOutSeconds,
       text: item.text,
-      startsAtSeconds: round(at),
-      durationSeconds: round(duration),
+      startsAtSeconds: startsAt,
+      durationSeconds: duration,
       /** How long the clip is before trims, for a split point to be chosen within. */
       sourceSeconds: shot === undefined ? 0 : round(clipSeconds(shot)),
       speed: item.speed,
@@ -199,10 +213,22 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       focusY: item.focusY,
       movingSeconds: ready ? round(movingSeconds(timing)) : 0,
       ownSound: item.kind === 'shot' && playsOwnSound(item),
+      transition: item.transition,
+      transitionSeconds: item.transitionSeconds,
+      overlapSeconds: duration > 0 ? overlap : 0,
+      dipIn: index === 0 ? null : dipOf(item.transition, item.transitionSeconds, duration),
+      dipOut:
+        next === undefined
+          ? null
+          : dipOf(next.item.transition, next.item.transitionSeconds, duration),
     });
-    at += duration;
+    if (duration > 0) {
+      at = startsAt + duration;
+      end = Math.max(end, at);
+      before = duration;
+    }
   }
-  return { items: laid, totalSeconds: round(at) };
+  return { items: laid, totalSeconds: round(end) };
 }
 
 /** The items of a cut laid out in time, with what each needs, for a film export. */
@@ -225,6 +251,7 @@ export async function itemTimes(
     durationSeconds: number;
     movingSeconds: number;
     ownSound: boolean;
+    overlapSeconds: number;
   }[];
   totalSeconds: number;
 }> {
@@ -286,6 +313,13 @@ export const LaidItem = z.object({
   movingSeconds: z.number(),
   /** Whether its own sound (clip sound or recorded dialogue) plays: only at its own speed, forwards. */
   ownSound: z.boolean(),
+  transition: TransitionKind,
+  transitionSeconds: z.number(),
+  /** How far it starts before the piece before it ends: the length of its dissolve or wipe. */
+  overlapSeconds: z.number(),
+  /** The dips to black or white at its edges, from its own transition and the next piece's. */
+  dipIn: z.object({ color: z.enum(['black', 'white']), seconds: z.number() }).nullable(),
+  dipOut: z.object({ color: z.enum(['black', 'white']), seconds: z.number() }).nullable(),
 });
 export type LaidItem = z.infer<typeof LaidItem>;
 
@@ -759,6 +793,7 @@ function splitPiece(
       ...trims.second,
       id: newId,
       fadeInSeconds: 0,
+      transition: 'cut',
       ...(middle === null ? {} : { zoom: middle }),
     },
   };
@@ -939,7 +974,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.item.set',
     title: 'Change item',
     description:
-      "Changes an item of the cut: seconds trimmed off its start and end (in seconds of the clip), the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Rescue tools for a shot: speed (0.5 slow motion, 2 double; off speed or reversed, its own sound and dialogue are silent, so lay sound on the audio lane), reverse, holdSeconds (freeze its last frame), and a punch-in: zoom (1 to 4) on focusX and focusY (shares of the frame), with zoomTo for a slow push in or pull out over the piece (null for none). A punch-in turns a wide into a closer shot or hides a flaw at the edge; keep it under about 1.5 or the picture softens. Fields left out stay as they are.",
+      "Changes an item of the cut: seconds trimmed off its start and end (in seconds of the clip), the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Rescue tools for a shot: speed (0.5 slow motion, 2 double; off speed or reversed, its own sound and dialogue are silent, so lay sound on the audio lane), reverse, holdSeconds (freeze its last frame), and a punch-in: zoom (1 to 4) on focusX and focusY (shares of the frame), with zoomTo for a slow push in or pull out over the piece (null for none). A punch-in turns a wide into a closer shot or hides a flaw at the edge; keep it under about 1.5 or the picture softens. transition is how the item comes in after the one before: cut (the default), dissolve (one picture melts into the next, for time passing or a change of mood), dip-black or dip-white (a fade out and in, for a bigger break), or wipe; transitionSeconds is its length. A dissolve or wipe overlaps the two pieces, so the scene gets shorter by it; inside a scene most changes should stay cuts. Fields left out stay as they are.",
     effect: 'write',
     input: z.object({
       projectId: ProjectId,
@@ -955,6 +990,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       zoomTo: z.number().min(1).max(4).nullable().optional(),
       focusX: z.number().min(0).max(1).optional(),
       focusY: z.number().min(0).max(1).optional(),
+      transition: TransitionKind.optional(),
+      transitionSeconds: z.number().min(0.1).max(5).optional(),
     }),
     output: z.object({ item: CutItem }),
     handler: async ({ runtime, actor }, { projectId, sceneId, itemId, ...changes }) => {
@@ -979,6 +1016,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         zoomTo: changes.zoomTo === undefined ? before.zoomTo : changes.zoomTo,
         focusX: changes.focusX ?? before.focusX,
         focusY: changes.focusY ?? before.focusY,
+        transition: changes.transition ?? before.transition,
+        transitionSeconds: changes.transitionSeconds ?? before.transitionSeconds,
       };
       if (
         before.kind === 'title' &&

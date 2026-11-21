@@ -1,6 +1,8 @@
 import {
   placePicture,
+  shadeAt,
   sourceTime,
+  transitionShare,
   zoomAt,
   type FilmPicture,
   type FilmRenderer,
@@ -25,8 +27,8 @@ import {
   type VideoSample,
   type VideoCodec,
 } from 'mediabunny';
-import { chooseFormat, fadeLevel } from './film-format.js';
-import { inOrder } from './frame-order.js';
+import { chooseFormat } from './film-format.js';
+import { framesInOrder } from './frame-order.js';
 import { drawText, drawTexts } from './text-draw.js';
 import { loadTextFonts } from './text-fonts.js';
 
@@ -157,129 +159,169 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
     g.fillStyle = '#000';
     g.fillRect(0, 0, width, height);
   };
-  const shade = (picture: FilmPicture, t: number): void => {
-    const since = t - picture.startSeconds;
-    const level = fadeLevel(
-      picture.fadeInSeconds,
-      picture.fadeOutSeconds,
-      since,
-      picture.durationSeconds - since,
+  /** Each picture is drawn whole here first, then laid on the frame: over the last one in a dissolve or wipe. */
+  const scratch = new OffscreenCanvas(width, height);
+  const layer = scratch.getContext('2d', { alpha: false });
+  if (layer === null) throw new Error('This browser cannot draw the picture of the film.');
+
+  /** A picture on screen: the frames of the film it covers and, for a clip, its decoded frames. */
+  interface Layer {
+    readonly picture: FilmPicture;
+    readonly end: number;
+    readonly frames?: AsyncGenerator<VideoSample | null, void, undefined>;
+    readonly input?: Input | undefined;
+  }
+  const open = async (picture: FilmPicture, first: number, end: number): Promise<Layer> => {
+    if (picture.kind === 'title') return { picture, end };
+    const bytes = unreadable.has(picture.blobKey) ? undefined : await job.clip(picture.blobKey);
+    const input = bytes === undefined ? undefined : openClip(bytes);
+    const track = await input?.getPrimaryVideoTrack();
+    if (track === null || track === undefined) return { picture, end, input };
+    const timing = picture.timing ?? {
+      sourceSeconds: picture.sourceStartSeconds + picture.durationSeconds,
+      trimStartSeconds: picture.sourceStartSeconds,
+      trimEndSeconds: 0,
+      speed: 1,
+      reverse: false,
+      holdSeconds: 0,
+    };
+    // The time of the clip on screen at each frame: speed, reverse and a held frame applied.
+    const times = Array.from({ length: Math.max(0, end - first) }, (_, i) =>
+      sourceTime(timing, (first + i) / fps - picture.startSeconds),
     );
-    if (level < 1) {
-      g.fillStyle = `rgba(0, 0, 0, ${String(1 - level)})`;
-      g.fillRect(0, 0, width, height);
+    const sink = new VideoSampleSink(track);
+    const frames = framesInOrder(
+      times,
+      (rising) => sink.samplesAtTimestamps(rising),
+      (sample) => {
+        sample.close();
+      },
+    );
+    return { picture, end, frames, input };
+  };
+  const shut = async (open: Layer): Promise<void> => {
+    await open.frames?.return();
+    open.input?.dispose();
+  };
+
+  /** Draws a picture as it is at a time onto the scratch canvas: black, the picture, its fades and dips. */
+  const paint = async (on: Layer, t: number): Promise<void> => {
+    const { picture } = on;
+    const since = t - picture.startSeconds;
+    layer.globalAlpha = 1;
+    layer.fillStyle = '#000';
+    layer.fillRect(0, 0, width, height);
+    if (picture.kind === 'title') {
+      // The card's own words, set in the title style; they fade with the card.
+      drawText(
+        layer,
+        {
+          kind: 'title',
+          text: picture.text,
+          style: { ...picture.style, enter: 'cut', exit: 'cut', roll: false },
+          startSeconds: 0,
+          durationSeconds: picture.durationSeconds,
+          x: null,
+          y: null,
+        },
+        0,
+        width,
+        height,
+      );
+    } else {
+      const next = on.frames === undefined ? undefined : await on.frames.next();
+      const sample = next === undefined || next.done === true ? null : next.value;
+      if (sample !== null) {
+        const punch = picture.punch ?? { zoom: 1, zoomTo: null, focusX: 0.5, focusY: 0.5 };
+        const zoom = zoomAt(
+          punch,
+          picture.durationSeconds > 0 ? since / picture.durationSeconds : 0,
+        );
+        const at = placePicture(
+          width,
+          height,
+          sample.displayWidth,
+          sample.displayHeight,
+          zoom,
+          punch.focusX,
+          punch.focusY,
+        );
+        sample.draw(layer, at.x, at.y, at.width, at.height);
+      }
+    }
+    const { black, white } = shadeAt(
+      {
+        fadeInSeconds: picture.fadeInSeconds,
+        fadeOutSeconds: picture.fadeOutSeconds,
+        dipIn: picture.dipIn ?? null,
+        dipOut: picture.dipOut ?? null,
+      },
+      since,
+      picture.durationSeconds,
+    );
+    if (black > 0) {
+      layer.fillStyle = `rgba(0, 0, 0, ${String(black)})`;
+      layer.fillRect(0, 0, width, height);
+    }
+    if (white > 0) {
+      layer.fillStyle = `rgba(255, 255, 255, ${String(white)})`;
+      layer.fillRect(0, 0, width, height);
     }
   };
-  /** The frames of the film that fall within a picture, by their times. */
-  const framesOf = (picture: FilmPicture): number => {
-    const end = Math.min(
-      totalFrames,
-      Math.round((picture.startSeconds + picture.durationSeconds) * fps),
-    );
-    return Math.max(0, end - frame);
+
+  /** Lays the scratch canvas on the frame: whole, or partly over the picture before. */
+  const lay = (picture: FilmPicture, t: number): void => {
+    const into = picture.transitionIn;
+    const share = into === undefined ? 1 : transitionShare(into.seconds, t - picture.startSeconds);
+    g.save();
+    if (into?.kind === 'wipe' && share < 1) {
+      g.beginPath();
+      g.rect(0, 0, width * share, height);
+      g.clip();
+    } else {
+      g.globalAlpha = share;
+    }
+    g.drawImage(scratch, 0, 0);
+    g.restore();
   };
 
   await loadTextFonts();
+  const layers: Layer[] = [];
   try {
     await output.start();
-    for (const picture of pictures) {
-      // Black wherever nothing is on screen.
-      while (frame < totalFrames && frame / fps < picture.startSeconds - 0.5 / fps) {
-        black();
-        await emit();
-      }
-      const count = framesOf(picture);
-      if (count === 0) continue;
-      if (picture.kind === 'title') {
-        for (let i = 0; i < count; i++) {
-          black();
-          // The card's own words, set in the title style; they fade with the card.
-          drawText(
-            g,
-            {
-              kind: 'title',
-              text: picture.text,
-              style: { ...picture.style, enter: 'cut', exit: 'cut', roll: false },
-              startSeconds: 0,
-              durationSeconds: picture.durationSeconds,
-              x: null,
-              y: null,
-            },
-            0,
-            width,
-            height,
-          );
-          shade(picture, frame / fps);
-          await emit();
-        }
-        continue;
-      }
-      const bytes = unreadable.has(picture.blobKey) ? undefined : await job.clip(picture.blobKey);
-      const input = bytes === undefined ? undefined : openClip(bytes);
-      try {
-        const track = await input?.getPrimaryVideoTrack();
-        const first = frame;
-        const timing = picture.timing ?? {
-          sourceSeconds: picture.sourceStartSeconds + picture.durationSeconds,
-          trimStartSeconds: picture.sourceStartSeconds,
-          trimEndSeconds: 0,
-          speed: 1,
-          reverse: false,
-          holdSeconds: 0,
-        };
-        const punch = picture.punch ?? { zoom: 1, zoomTo: null, focusX: 0.5, focusY: 0.5 };
-        // The time of the clip on screen at each frame: speed, reverse and a held frame applied.
-        const times = Array.from({ length: count }, (_, i) =>
-          sourceTime(timing, (first + i) / fps - picture.startSeconds),
-        );
-        const draw = async (sample: VideoSample | null): Promise<void> => {
-          black();
-          if (sample !== null) {
-            const since = frame / fps - picture.startSeconds;
-            const zoom = zoomAt(
-              punch,
-              picture.durationSeconds > 0 ? since / picture.durationSeconds : 0,
-            );
-            const at = placePicture(
-              width,
-              height,
-              sample.displayWidth,
-              sample.displayHeight,
-              zoom,
-              punch.focusX,
-              punch.focusY,
-            );
-            sample.draw(g, at.x, at.y, at.width, at.height);
-          }
-          shade(picture, frame / fps);
-          await emit();
-        };
-        if (track === null || track === undefined) {
-          for (let i = 0; i < count; i++) await draw(null);
-        } else {
-          const sink = new VideoSampleSink(track);
-          await inOrder(
-            times,
-            (rising) => sink.samplesAtTimestamps(rising),
-            (sample) => {
-              sample.close();
-            },
-            draw,
-          );
-        }
-      } finally {
-        input?.dispose();
-      }
-    }
+    let next = 0;
     while (frame < totalFrames) {
+      // Pictures come on at their first frame; two are on screen while one dissolves into the next.
+      while (next < pictures.length) {
+        const picture = pictures[next];
+        if (picture === undefined) break;
+        const first = Math.round(picture.startSeconds * fps);
+        if (first > frame) break;
+        next++;
+        const end = Math.min(
+          totalFrames,
+          Math.round((picture.startSeconds + picture.durationSeconds) * fps),
+        );
+        if (end > frame) layers.push(await open(picture, frame, end));
+      }
+      const t = frame / fps;
       black();
+      for (const on of layers) {
+        await paint(on, t);
+        lay(on.picture, t);
+      }
       await emit();
+      for (const on of layers.filter((candidate) => candidate.end <= frame)) {
+        await shut(on);
+        layers.splice(layers.indexOf(on), 1);
+      }
     }
     await soundUntil(plan.durationSeconds);
     video.close();
     sound.close();
     await output.finalize();
   } catch (error) {
+    for (const on of layers) await shut(on);
     await output.cancel();
     throw error;
   }

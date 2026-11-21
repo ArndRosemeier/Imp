@@ -35,6 +35,11 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   focusY: 0.5,
   movingSeconds: 4,
   ownSound: true,
+  transition: 'cut',
+  transitionSeconds: 1,
+  overlapSeconds: 0,
+  dipIn: null,
+  dipOut: null,
   ...fields,
 });
 
