@@ -19,7 +19,10 @@ export {
   Effect,
   EffectError,
   EqBand,
+  VOICE_PRESETS,
+  voicePreset,
   type EffectKind,
+  type VoicePreset,
 } from './effects.js';
 export { designBiquad, responseDb, type FilterSpec, type FilterType } from './dsp/biquad.js';
 export { measureLoudness, type LoudnessReport } from './dsp/loudness.js';
@@ -75,3 +78,6 @@ export {
 export { AudioSources, MissingSourceError, type SourceInfo } from './sources.js';
 export { SAMPLE_RATE, snapSeconds, toFrames, toSeconds } from './time.js';
 export { decodeWav, encodeWav, isWav } from './wav.js';
+export { recordingPrefix } from './record-commands.js';
+export { placeWords, SourceWord, Transcript, wordSpan, type PlacedWord } from './transcript.js';
+export { TRANSCRIPTION_MODEL_SETTING, type Transcriber } from './transcript-commands.js';

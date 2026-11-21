@@ -109,6 +109,16 @@ export class AudioSources {
     return processed;
   }
 
+  /**
+   * Where facts about a stored sound are kept beside it, such as what is said
+   * in it. The folder is named after the file's contents, so a changed file
+   * starts afresh.
+   */
+  async cacheFolder(key: string): Promise<string> {
+    const { bytes } = await this.#read(key);
+    return `${key}.audio/${fingerprint(bytes)}`;
+  }
+
   /** The samples of a stored sound, stereo at the engine rate. */
   async pcm(key: string): Promise<StereoPcm> {
     const { bytes, mediaType } = await this.#read(key);

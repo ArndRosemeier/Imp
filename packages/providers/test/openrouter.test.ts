@@ -595,6 +595,65 @@ describe('OpenRouter provider: images', () => {
     });
   });
 
+  it('transcribes with word timings, and without them for models that only write text', async () => {
+    const { provider, calls } = setup(
+      {
+        status: 200,
+        body: {
+          text: ' The lamp burns. ',
+          language: 'en',
+          words: [
+            { word: ' The', start: 0.4, end: 0.6 },
+            { word: 'lamp', start: 0.7, end: 1.1 },
+            { word: ' ', start: 1.1, end: 1.1 },
+            { word: 'burns.', start: 1.2, end: 1.1 },
+          ],
+          usage: { cost: 0.0004 },
+        },
+      },
+      { status: 400, body: { error: { message: 'Use "json" instead of "verbose_json".' } } },
+      { status: 200, body: { text: 'Hello.' } },
+    );
+    const audio = { bytes: new Uint8Array([1, 2, 3]), mediaType: 'audio/wav' };
+    expect(await provider.transcribe({ model: 'a/ears', audio, language: 'en' })).toEqual({
+      model: 'a/ears',
+      text: 'The lamp burns.',
+      words: [
+        { text: 'The', startSeconds: 0.4, endSeconds: 0.6 },
+        { text: 'lamp', startSeconds: 0.7, endSeconds: 1.1 },
+        { text: 'burns.', startSeconds: 1.2, endSeconds: 1.2 },
+      ],
+      language: 'en',
+      costUsd: 0.0004,
+    });
+    expect(
+      await provider.transcribe({ model: 'b/plain', audio: { ...audio, mediaType: 'audio/mpeg' } }),
+    ).toEqual({ model: 'b/plain', text: 'Hello.', words: [], language: null, costUsd: null });
+    expect(calls[0]?.url).toBe('https://example.test/api/v1/audio/transcriptions');
+    expect(calls.map((call) => JSON.parse(call.request.body ?? '') as unknown)).toEqual([
+      {
+        model: 'a/ears',
+        input_audio: { data: 'AQID', format: 'wav' },
+        language: 'en',
+        temperature: 0,
+        response_format: 'verbose_json',
+        timestamp_granularities: ['word'],
+      },
+      {
+        model: 'b/plain',
+        input_audio: { data: 'AQID', format: 'mp3' },
+        temperature: 0,
+        response_format: 'verbose_json',
+        timestamp_granularities: ['word'],
+      },
+      { model: 'b/plain', input_audio: { data: 'AQID', format: 'mp3' }, temperature: 0 },
+    ]);
+    const refused = setup({ status: 402, body: { error: { message: 'No credit' } } }).provider;
+    await expect(refused.transcribe({ model: 'm', audio })).rejects.toMatchObject({
+      kind: 'insufficient_credit',
+    });
+  });
+
   it('makes an effect with a speech model, opened so that it is not read aloud', async () => {
     const audio = new Uint8Array([73, 68, 51, 1]);
     const reply = { status: 200, bytes: audio, contentType: 'audio/mpeg' };

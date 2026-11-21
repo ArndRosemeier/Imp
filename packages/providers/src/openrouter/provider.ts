@@ -26,6 +26,8 @@ import {
   type SpeechRequest,
   type SpeechResponse,
   type ToolCall,
+  type TranscriptionRequest,
+  type TranscriptionResponse,
 } from '../types.js';
 import {
   AudioStreamChunk,
@@ -33,6 +35,7 @@ import {
   ErrorResponse,
   ImageGenerationResponse,
   ModelsResponse,
+  TranscriptionResult,
   VideoJobResponse,
   VideoModelsResponse,
 } from './schemas.js';
@@ -102,7 +105,12 @@ const toImagePart = (image: MediaInput): Record<string, unknown> => ({
 });
 
 /** The audio format names the API knows, by the second half of the media type. */
-const AUDIO_FORMATS: Readonly<Record<string, string>> = { mpeg: 'mp3', 'x-wav': 'wav', mp4: 'm4a' };
+const AUDIO_FORMATS: Readonly<Record<string, string>> = {
+  mpeg: 'mp3',
+  'x-wav': 'wav',
+  wave: 'wav',
+  mp4: 'm4a',
+};
 
 /** One attachment as a content part, or as a line of text when it cannot be sent. */
 function toMediaPart(
@@ -524,6 +532,49 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
       };
       // The price of speech is not part of the answer.
       return { model: request.model, audio: await speak(body, call, 'speech'), costUsd: null };
+    },
+
+    async transcribe(request: TranscriptionRequest, call = {}): Promise<TranscriptionResponse> {
+      const subtype = request.audio.mediaType.split('/')[1] ?? '';
+      const body = {
+        model: request.model,
+        input_audio: {
+          data: encodeBase64(request.audio.bytes),
+          format: AUDIO_FORMATS[subtype] ?? subtype,
+        },
+        ...(request.language === undefined ? {} : { language: request.language }),
+        temperature: 0,
+      };
+      let json: unknown;
+      try {
+        json = await sendJson(
+          '/audio/transcriptions',
+          'POST',
+          { ...body, response_format: 'verbose_json', timestamp_granularities: ['word'] },
+          call,
+          true,
+        );
+      } catch (error) {
+        // Some models write text only; they refuse the format that carries timings.
+        if (!(error instanceof ProviderError && error.message.includes('verbose_json'))) {
+          throw error;
+        }
+        json = await sendJson('/audio/transcriptions', 'POST', body, call, true);
+      }
+      const result = parse(TranscriptionResult, json, 'a transcription');
+      return {
+        model: request.model,
+        text: result.text.trim(),
+        words: (result.words ?? [])
+          .map((word) => ({
+            text: word.word.trim(),
+            startSeconds: word.start,
+            endSeconds: Math.max(word.start, word.end),
+          }))
+          .filter((word) => word.text !== ''),
+        language: result.language ?? null,
+        costUsd: result.usage?.cost ?? null,
+      };
     },
 
     async generateSound(request: SoundRequest, call = {}): Promise<SoundResponse> {

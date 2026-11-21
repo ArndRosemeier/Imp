@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { AudioCodec } from './codec.js';
 import { UnsupportedAudioError } from './codec.js';
 import { createAudioDocCommands, type AudioLink } from './doc-commands.js';
+import type { Transcriber } from './transcript-commands.js';
 import { toDecibels } from './pcm.js';
 import { waveform } from './peaks.js';
 import { AudioSources, MissingSourceError } from './sources.js';
@@ -12,6 +13,8 @@ export interface AudioCommandOptions {
   readonly codec: AudioCodec;
   /** Sound kept elsewhere that audio documents can open, such as a scene's sound lanes. */
   readonly links?: readonly AudioLink[];
+  /** Writes down what is said, for editing dialogue by its words. Without it, audio.transcribe fails. */
+  readonly transcribe?: Transcriber;
 }
 
 const caches = new WeakMap<AudioCodec, WeakMap<BlobStore, AudioSources>>();
@@ -135,6 +138,7 @@ export function createAudioCommands(options: AudioCommandOptions): readonly Comm
     ...createAudioDocCommands({
       sources: (runtime) => sourcesFor(runtime.blobs),
       links: options.links ?? [],
+      ...(options.transcribe === undefined ? {} : { transcribe: options.transcribe }),
     }),
   ];
 }
