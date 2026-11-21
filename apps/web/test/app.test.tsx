@@ -1006,7 +1006,7 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: /Add scene/ }));
     await screen.findByLabelText('Scene heading');
 
-    await user.click(screen.getByRole('button', { name: 'Edit', exact: true }));
+    await user.click(screen.getByRole('button', { name: /^Edit$/ }));
     await user.click(screen.getByRole('button', { name: 'Library' }));
     const library = await screen.findByRole('complementary', { name: 'Library' });
     const wav = encodeWav({ sampleRate: 8000, channels: [new Float32Array(8000)] });
