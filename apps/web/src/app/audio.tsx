@@ -37,6 +37,8 @@ import { NumberInput } from './audio-controls.js';
 import { EffectsPanel } from './audio-fx.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
+import { useLibraryDrop } from './library/drag.js';
+import { FOCUS_EVENT, type Focus } from './library/model.js';
 
 // What the audio commands return, as far as the screen reads it.
 
@@ -708,6 +710,65 @@ function AudioEditor({
   const pinch = useRef<{ distance: number; center: number; zoom: number; scroll: number } | null>(
     null,
   );
+  // Sounds from the library land on the track and at the time they are let go.
+  const timeline = useRef<HTMLDivElement>(null);
+  const loaded = live.data?.doc;
+  const dropTrack = loaded?.tracks.find((track) => track.id === trackId) ?? loaded?.tracks[0];
+  useLibraryDrop(timeline, {
+    label:
+      loaded === undefined
+        ? 'Audio editor'
+        : `${loaded.name}, ${dropTrack?.name ?? 'a new track'}, at the playhead`,
+    accepts: (asset) => {
+      if (loaded === undefined || asset.modality !== 'sound' || asset.blobKey === null) {
+        return false;
+      }
+      // A scene's sound takes only that scene's sounds and recorded dialogue.
+      if (loaded.link?.kind === 'scene') {
+        return (
+          asset.refs['sceneId'] === loaded.link.target &&
+          ['effect', 'music', 'dialogue'].includes(asset.kind)
+        );
+      }
+      return loaded.link === null;
+    },
+    onDrop: async (asset, point) => {
+      if (loaded === undefined || asset.blobKey === null) return;
+      const box = lanes.current?.getBoundingClientRect();
+      const onLanes =
+        point !== null &&
+        box !== undefined &&
+        point.clientY >= box.top &&
+        point.clientY <= box.bottom &&
+        loaded.tracks.length > 0;
+      let target = onLanes
+        ? loaded.tracks[
+            Math.min(
+              loaded.tracks.length - 1,
+              Math.max(0, Math.floor((point.clientY - box.top) / LANE_PX)),
+            )
+          ]?.id
+        : dropTrack?.id;
+      if (target === undefined) {
+        const added = await edit('audio.track.add', {
+          name: asset.title.slice(0, 80) || 'Track 1',
+        });
+        if (added === undefined) return;
+        target = WithDoc.parse(added).document.tracks.at(-1)?.id;
+        if (target === undefined) return;
+      }
+      const startSeconds =
+        point !== null && box !== undefined
+          ? Math.max(0, (point.clientX - box.left) / zoom)
+          : player.at;
+      await edit('audio.region.insert', {
+        trackId: target,
+        key: asset.blobKey,
+        label: asset.title.slice(0, 120),
+        startSeconds,
+      });
+    },
+  });
   const sweep = useRef<{
     trackIndex: number;
     at: number;
@@ -1242,7 +1303,7 @@ function AudioEditor({
       )}
       <Problem text={error} />
       <div className="audio-body">
-        <div className="audio-timeline">
+        <div className="audio-timeline" ref={timeline}>
           <div className="track-heads">
             <div className="ruler-corner">
               <span className="eyebrow">
@@ -1702,6 +1763,26 @@ export function AudioView({ project }: { project: Project }): ReactElement {
   };
   const documents = listed.data?.documents ?? [];
   const open = documents.find((candidate) => candidate.id === openId) ?? documents[0];
+
+  // The library opens a document here, such as one it just made for a sound.
+  useEffect(() => {
+    const onFocus = (event: Event): void => {
+      const target = (event as CustomEvent<Focus>).detail;
+      const docId = target.focus['docId'];
+      if (target.view !== 'audio' || docId === undefined) return;
+      setMaking(false);
+      setOpenIdState(docId);
+      try {
+        localStorage.setItem(DOC_SETTING(project), docId);
+      } catch {
+        // Remembering the open document is a convenience.
+      }
+    };
+    window.addEventListener(FOCUS_EVENT, onFocus);
+    return () => {
+      window.removeEventListener(FOCUS_EVENT, onFocus);
+    };
+  }, [project]);
 
   return (
     <>
