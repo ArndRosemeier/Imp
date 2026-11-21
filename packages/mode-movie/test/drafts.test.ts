@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { applyChanges, diffCut, mirror, same, type CutParts } from '../src/drafts.js';
-import type { CutItem, CutLine, SoundPlacement, TextItem } from '../src/schema.js';
+import {
+  PLAIN_PIECE,
+  type CutItem,
+  type CutLine,
+  type SoundPlacement,
+  type TextItem,
+} from '../src/schema.js';
 
 const item = (id: string, extra: Partial<CutItem> = {}): CutItem => ({
   id,
@@ -15,6 +21,7 @@ const item = (id: string, extra: Partial<CutItem> = {}): CutItem => ({
   fadeOutSeconds: 0,
   text: '',
   titleSeconds: 3,
+  ...PLAIN_PIECE,
   ...extra,
 });
 

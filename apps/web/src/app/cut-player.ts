@@ -1,5 +1,5 @@
 import type { ImpClient } from '@imp/host';
-import { Shot, Sound, TextView } from '@imp/mode-movie';
+import { placePicture, Shot, Sound, sourceTime, TextView, zoomAt } from '@imp/mode-movie';
 import { z } from 'zod';
 import { runCommand } from './context.js';
 
@@ -59,6 +59,15 @@ export const Item = z.object({
   startsAtSeconds: z.number(),
   durationSeconds: z.number(),
   sourceSeconds: z.number(),
+  speed: z.number().default(1),
+  reverse: z.boolean().default(false),
+  holdSeconds: z.number().default(0),
+  zoom: z.number().default(1),
+  zoomTo: z.number().nullable().default(null),
+  focusX: z.number().default(0.5),
+  focusY: z.number().default(0.5),
+  movingSeconds: z.number().default(0),
+  ownSound: z.boolean().default(true),
 });
 export type Item = z.infer<typeof Item>;
 
@@ -287,6 +296,24 @@ export interface Look {
   title: string;
   /** A title card is on screen (black, with its words if it has any), not a clip. */
   card: boolean;
+  /** The punch-in of the clip on screen: 1 for none, and the point it zooms on. */
+  zoom?: { readonly scale: number; readonly focusX: number; readonly focusY: number };
+}
+
+/**
+ * The CSS that zooms a preview picture as the film renderer does: scaled
+ * about the point that keeps its focus in view without showing its edges.
+ */
+export function zoomStyle(look: Look): { transform?: string; transformOrigin?: string } {
+  const zoom = look.zoom;
+  if (zoom === undefined || zoom.scale <= 1.0001) return {};
+  const at = placePicture(1, 1, 1, 1, zoom.scale, zoom.focusX, zoom.focusY);
+  const origin = (offset: number): string =>
+    `${String(Math.round((offset / (1 - zoom.scale)) * 10000) / 100)}%`;
+  return {
+    transform: `scale(${String(Math.round(zoom.scale * 1000) / 1000)})`,
+    transformOrigin: `${origin(at.x)} ${origin(at.y)}`,
+  };
 }
 
 export interface Media {
@@ -416,23 +443,42 @@ export class CutPlayer {
         this.voice?.pause();
         this.notify.look({ brightness, title: item.text, card: true });
       } else {
-        this.notify.look({ brightness, title: '', card: false });
+        const share = item.durationSeconds > 0 ? since / item.durationSeconds : 0;
+        this.notify.look({
+          brightness,
+          title: '',
+          card: false,
+          zoom: { scale: zoomAt(item, share), focusX: item.focusX, focusY: item.focusY },
+        });
         const shot = source.shots.find((candidate) => candidate.id === item.shotId);
-        const into = since + item.trimStartSeconds;
+        const into = sourceTime(item, since);
+        // Forwards it plays at its speed; backwards or holding its last frame, the frame is set.
+        const moving = since < item.movingSeconds;
+        const runs = play && moving && !item.reverse;
         const fresh = this.#itemId !== item.itemId;
         const file = urls.get(shot?.clip?.blobKey ?? '');
         if (file !== undefined) {
           if (fresh || screen.src !== file) screen.src = file;
-          if (fresh || !play || Math.abs(screen.currentTime - into) > 0.4)
+          const drift = Math.abs(screen.currentTime - into);
+          if (fresh || (runs ? drift > 0.4 * item.speed : drift > 0.02)) {
             screen.currentTime = into;
-          screen.muted = shot?.clip?.silent === true || item.clipAudioVolume === 0;
+          }
+          screen.playbackRate = item.reverse ? 1 : item.speed;
+          screen.muted =
+            !item.ownSound || shot?.clip?.silent === true || item.clipAudioVolume === 0 || !moving;
           screen.volume = item.clipAudioVolume;
-          if (play) void screen.play();
+          if (runs) void screen.play();
           else screen.pause();
         }
         const dialogue = urls.get(shot?.dialogue?.blobKey ?? '');
         const speaker = this.voice;
-        if (speaker !== null && dialogue !== undefined && shot?.clip?.silent === true) {
+        if (
+          speaker !== null &&
+          dialogue !== undefined &&
+          shot?.clip?.silent === true &&
+          item.ownSound &&
+          moving
+        ) {
           if (fresh || speaker.src !== dialogue) speaker.src = dialogue;
           if (fresh || !play) speaker.currentTime = into;
           speaker.volume = item.dialogueVolume;

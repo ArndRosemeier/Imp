@@ -190,6 +190,8 @@ describe('exporting a film', () => {
       itemId: 'a',
       trimStartSeconds: 1,
       fadeInSeconds: 0.5,
+      zoom: 1.2,
+      focusX: 0.25,
     });
     await run('movie.edit.title.add', { projectId, sceneId: first, text: 'The End', seconds: 2 });
     await run('movie.edit.sound.place', {
@@ -214,6 +216,8 @@ describe('exporting a film', () => {
           durationSeconds: 3,
           sourceStartSeconds: 1,
           fadeInSeconds: 0.5,
+          timing: { sourceSeconds: 4, trimStartSeconds: 1, speed: 1, reverse: false },
+          punch: { zoom: 1.2, zoomTo: null, focusX: 0.25, focusY: 0.5 },
         },
         { kind: 'title', text: 'The End', startSeconds: 3, durationSeconds: 2 },
         { kind: 'clip', blobKey: 'clip/b', startSeconds: 5, durationSeconds: 4 },

@@ -4016,3 +4016,79 @@ dialog.modal.wide:has(.style-editor) {
 .take-switcher select {
   min-width: 12em;
 }
+
+/* Rescue tools: speed, reverse, a held frame and a punch-in. */
+.rescue {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.rescue-speed .segmented button {
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.rescue-freeze {
+  align-items: flex-end;
+}
+.rescue-zoom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: var(--space-3);
+  align-items: start;
+}
+.rescue-zoom input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.rescue-push {
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 32px;
+  font-size: 14px;
+}
+.rescue-push input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.focus-pad {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 33.333% 33.333%,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 33.333% 33.333%,
+    #0a0a09;
+  cursor: crosshair;
+  touch-action: none;
+}
+.focus-pad:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.focus-window {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: var(--accent-wash);
+  pointer-events: none;
+}
+.focus-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 0.5);
+  pointer-events: none;
+}
+.preview-screen {
+  transition: transform 120ms linear;
+}
+.rescue-zoom-fields {
+  gap: var(--space-2);
+}
+.rescue-zoom-fields .field {
+  flex: none;
+}

@@ -7,9 +7,11 @@ type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 const seconds = (value: number): string => `${String(Math.round(value * 100) / 100)} s`;
 
 /** Why a split edit of a length cannot be made between two pieces, or null when it can. */
+type Retimed = 'speed' | 'reverse' | 'holdSeconds';
+
 export function splitEditBlock(
-  item: Pick<Item, 'kind' | 'durationSeconds' | 'trimEndSeconds'>,
-  next: Pick<Item, 'kind' | 'durationSeconds' | 'trimStartSeconds'> | undefined,
+  item: Pick<Item, 'kind' | 'durationSeconds' | 'trimEndSeconds' | Retimed>,
+  next: Pick<Item, 'kind' | 'durationSeconds' | 'trimStartSeconds' | Retimed> | undefined,
   type: 'j' | 'l',
   length: number,
 ): string | null {
@@ -17,6 +19,11 @@ export function splitEditBlock(
   if (item.kind !== 'shot' || next.kind !== 'shot') return 'Both pieces must be shots.';
   if (item.durationSeconds <= 0 || next.durationSeconds <= 0) {
     return 'Both pieces need a ready clip.';
+  }
+  const plain = (piece: Pick<Item, Retimed>): boolean =>
+    piece.speed === 1 && !piece.reverse && piece.holdSeconds === 0;
+  if (!plain(item) || !plain(next)) {
+    return 'Both shots must play at their own speed, forwards, without a held frame.';
   }
   if (!(length > 0)) return 'Give a length above 0.';
   if (type === 'l') {

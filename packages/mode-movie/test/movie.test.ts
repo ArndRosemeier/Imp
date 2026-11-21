@@ -1251,6 +1251,89 @@ describe('shots and clips', () => {
     ).rejects.toThrow(/two shots/);
   });
 
+  it('slows, reverses, freezes and zooms a piece, with its own sound silent off speed', async () => {
+    const { run, at, add, ready, cutOf, edit, mara } = await withCuts();
+    const a = await ready({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    const b = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(b.id), durationSeconds: 4, audio: true });
+    await run('movie.shot.clip.check', at(b.id));
+    await run('movie.shot.clip.check', at(b.id));
+    interface View {
+      totalSeconds: number;
+      items: {
+        durationSeconds: number;
+        movingSeconds: number;
+        ownSound: boolean;
+        startsAtSeconds: number;
+      }[];
+      spoken: { id: string }[];
+    }
+    const view = async () => (await cutOf()) as unknown as View;
+    expect((await view()).spoken).toHaveLength(1);
+
+    // Half speed: twice as long, and its line is no longer heard.
+    await edit('item.set', { itemId: a.id, speed: 0.5 });
+    let now = await view();
+    expect(now.items[0]).toMatchObject({ durationSeconds: 8, movingSeconds: 8, ownSound: false });
+    expect(now.totalSeconds).toBe(12);
+    expect(now.spoken).toEqual([]);
+    await expect(edit('audio.detach', { itemId: a.id })).rejects.toThrow(/off speed/);
+
+    // A held last frame adds to the length; a split stays in the moving part.
+    await edit('item.set', { itemId: a.id, speed: 1, holdSeconds: 1.5 });
+    now = await view();
+    expect(now.items[0]).toMatchObject({ durationSeconds: 5.5, movingSeconds: 4, ownSound: true });
+    await expect(edit('item.split', { itemId: a.id, atSeconds: 5 })).rejects.toThrow(/moves for 4/);
+
+    // A punch-in that pushes in is split into two halves that meet on one zoom.
+    await edit('item.set', { itemId: b.id, reverse: true, zoom: 1, zoomTo: 2, focusX: 0.3 });
+    const halves = (await edit('item.split', { itemId: b.id, atSeconds: 2 })) as unknown as {
+      first: Record<string, unknown>;
+      second: Record<string, unknown>;
+    };
+    expect(halves.first).toMatchObject({
+      zoom: 1,
+      zoomTo: 1.5,
+      trimStartSeconds: 2,
+      trimEndSeconds: 0,
+    });
+    expect(halves.second).toMatchObject({
+      zoom: 1.5,
+      zoomTo: 2,
+      trimStartSeconds: 0,
+      trimEndSeconds: 2,
+    });
+
+    // Freezing mid-shot splits it and holds the frame there, then plays on.
+    const frozen = (await edit('item.freeze', {
+      itemId: a.id,
+      atSeconds: 1,
+      holdSeconds: 2,
+    })) as unknown as { frozen: Record<string, unknown>; after: Record<string, unknown> };
+    expect(frozen.frozen).toMatchObject({ trimEndSeconds: 3, holdSeconds: 2 });
+    expect(frozen.after).toMatchObject({ trimStartSeconds: 1, holdSeconds: 1.5 });
+    now = await view();
+    expect(now.items.map((item) => item.durationSeconds)).toEqual([3, 4.5, 2, 2]);
+    await expect(edit('item.roll', { itemId: a.id, type: 'l', seconds: 0.2 })).rejects.toThrow(
+      /own speed/,
+    );
+
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('holds last frame 2.0');
+    expect(edl.text).toContain('reversed');
+    expect(edl.text).toContain('zoom 1.00 to 1.50 on 0.30,0.50');
+
+    const card = (await edit('title.add', { text: 'Later' })) as unknown as {
+      item: { id: string };
+    };
+    await expect(edit('item.set', { itemId: card.item.id, speed: 2 })).rejects.toThrow(
+      /title card/,
+    );
+    await expect(
+      edit('item.freeze', { itemId: card.item.id, atSeconds: 1, holdSeconds: 1 }),
+    ).rejects.toThrow(/Only a shot/);
+  });
+
   it('carries recorded dialogue over a silent clip into a split edit', async () => {
     const { run, registry, at, add, cutOf, edit, mara } = await withCuts();
     await registry.executeById(

@@ -99,6 +99,8 @@ The text lane (titles, lower thirds, captions, subtitles, credits) is part of ea
 
 A shot keeps its earlier ready clips as takes (`Shot.takes`, newest first, at most 20), so a new clip never destroys the one it replaces and the cut can be switched back with `movie.shot.take.use`. Split edits (`movie.edit.item.roll`) first lay the sound an item plays with its picture on the audio lane, at the same time and length, then roll the picture cut between two items; sync and scene length stay as they were, and texts that followed the line follow its placement.
 
+Rescue tools (speed, reverse, a held last frame, a still or moving punch-in) are fields of a cut item. One pure module, `piece-time.ts`, maps a piece's time to its clip's time and places a zoomed picture; the Edit preview, the film renderer, the stills agents look at and the scene's sound all use it, so they agree. Off speed or reversed, a piece's own sound is silent. The renderer reads backwards runs forwards a few frames at a time (`frame-order.ts`), because decoders only move forwards from a key frame.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

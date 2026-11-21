@@ -290,8 +290,32 @@ export const CutItem = z.object({
   /** The words and the length of a title card, for kind "title". */
   text: z.string(),
   titleSeconds: z.number().min(0.5),
+  /** How fast the clip plays: 0.5 is slow motion, 2 double speed. Off speed, its own sound is silent. */
+  speed: z.number().min(0.1).max(8).default(1),
+  /** Plays the stretch backwards, without its own sound. */
+  reverse: z.boolean().default(false),
+  /** Seconds its last frame is held after it has played: a freeze frame. */
+  holdSeconds: z.number().min(0).max(30).default(0),
+  /** A punch-in: 1 shows the whole frame, 2 half its width. */
+  zoom: z.number().min(1).max(4).default(1),
+  /** The zoom it ends on, for a slow push in or pull out; null keeps one zoom. */
+  zoomTo: z.number().min(1).max(4).nullable().default(null),
+  /** The point zoomed on, as shares of the frame's width and height. */
+  focusX: z.number().min(0).max(1).default(0.5),
+  focusY: z.number().min(0).max(1).default(0.5),
 });
 export type CutItem = z.infer<typeof CutItem>;
+
+/** A piece as filmed: at its own speed, forwards, unzoomed, with no frame held. */
+export const PLAIN_PIECE = {
+  speed: 1,
+  reverse: false,
+  holdSeconds: 0,
+  zoom: 1,
+  zoomTo: null,
+  focusX: 0.5,
+  focusY: 0.5,
+} as const satisfies Partial<CutItem>;
 
 /**
  * The cut of a scene: its items in playing order and the sounds that lie under

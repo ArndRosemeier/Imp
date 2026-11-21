@@ -25,6 +25,7 @@ import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
 import { itemsOf, laidOut, readCut, requireScene } from './edit.js';
 import { createSceneAudioLink } from './scene-audio.js';
 import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
+import type { PieceTiming, Punch } from './piece-time.js';
 import { styleOf } from './text-layout.js';
 import { filmTexts, readStyles } from './text.js';
 
@@ -39,6 +40,12 @@ export type FilmPicture =
       readonly sourceStartSeconds: number;
       readonly fadeInSeconds: number;
       readonly fadeOutSeconds: number;
+      /**
+       * How the piece's time maps to the clip's (speed, reverse, a held last
+       * frame; see sourceTime) and its punch-in. Left out, it plays as filmed.
+       */
+      readonly timing?: PieceTiming;
+      readonly punch?: Punch;
     }
   | {
       readonly kind: 'title';
@@ -290,6 +297,15 @@ export async function planFilm(
           blobKey: key,
           sourceStartSeconds: item.trimStartSeconds,
           ...common,
+          timing: {
+            sourceSeconds: item.sourceSeconds,
+            trimStartSeconds: item.trimStartSeconds,
+            trimEndSeconds: item.trimEndSeconds,
+            speed: item.speed,
+            reverse: item.reverse,
+            holdSeconds: item.holdSeconds,
+          },
+          punch: { zoom: item.zoom, zoomTo: item.zoomTo, focusX: item.focusX, focusY: item.focusY },
         });
       }
     }

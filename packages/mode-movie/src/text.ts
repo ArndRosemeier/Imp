@@ -24,6 +24,7 @@ import {
   Character,
   CutItem,
   MODE_ID,
+  PLAIN_PIECE,
   Scene,
   TextAnchor,
   TextFont,
@@ -614,6 +615,7 @@ export function createTextCommands(): readonly Command[] {
         fadeOutSeconds: 1,
         text: '',
         titleSeconds: seconds,
+        ...PLAIN_PIECE,
       });
       const text: TextItem = {
         id: runtime.newId(),
