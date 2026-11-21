@@ -1391,6 +1391,109 @@ describe('shots and clips', () => {
     ).rejects.toThrow();
   });
 
+  it('leaves markers that follow their piece, and reads the whole film as text', async () => {
+    const { run, ready, edit, scene } = await withCuts();
+    const a = await ready({ description: 'The lamp turns.' });
+    const b = await ready({ description: 'Mara at the stairs.' });
+    interface Placed {
+      id: string;
+      atSeconds: number;
+      filmSeconds: number;
+      itemId: string | null;
+      kind: string;
+      done: boolean;
+      by: string;
+      text: string;
+    }
+    const list = async (fields: Record<string, unknown> = {}) =>
+      ((await run('movie.edit.marker.list', fields)) as unknown as { markers: Placed[] }).markers;
+
+    // On the second piece, a second into it.
+    const { marker } = (await edit('marker.add', {
+      atSeconds: 5,
+      text: 'Jump cut: the cup moves',
+      kind: 'problem',
+    })) as unknown as { marker: Placed };
+    expect(marker).toMatchObject({ atSeconds: 5, itemId: b.id, kind: 'problem', by: 'person' });
+    // Past the end of the scene it lands at the end, on no piece.
+    await edit('marker.add', { atSeconds: 99, text: 'End on a held beat' });
+
+    // Trimming the first piece moves the second, and its marker with it.
+    await edit('item.set', { itemId: a.id, trimEndSeconds: 1.5 });
+    let markers = await list({ sceneId: scene.id });
+    expect(markers.map((entry) => [entry.text, entry.atSeconds])).toEqual([
+      ['Jump cut: the cup moves', 3.5],
+      ['End on a held beat', 6.5],
+    ]);
+
+    // A second scene comes after the first in film time; an agent's marker says who left it.
+    const second = await run('movie.scene.create', { heading: 'EXT. ROCKS - NIGHT' });
+    await run('movie.edit.title.add', { sceneId: second.id, text: 'Later', seconds: 3 });
+    await run(
+      'movie.edit.marker.add',
+      { sceneId: second.id, atSeconds: 1, text: 'Needs a wide', kind: 'todo' },
+      writer,
+    );
+    markers = await list();
+    expect(markers.map((entry) => entry.filmSeconds)).toEqual([3.5, 6.5, 7.5]);
+    expect(markers[2]).toMatchObject({ by: 'screenwriter', kind: 'todo' });
+
+    // Done, moved, removed.
+    const changed = (await edit('marker.set', {
+      markerId: marker.id,
+      done: true,
+      text: 'Fixed by trimming',
+      atSeconds: 1,
+    })) as unknown as { marker: Placed };
+    expect(changed.marker).toMatchObject({ done: true, itemId: a.id, atSeconds: 1 });
+    expect((await list({ open: true })).map((entry) => entry.text)).toEqual([
+      'End on a held beat',
+      'Needs a wide',
+    ]);
+    await expect(edit('marker.set', { markerId: 'nope', done: true })).rejects.toThrow(/No marker/);
+
+    // The piece it was on goes: it stays where it was put.
+    await edit('item.remove', { itemId: a.id });
+    expect((await list({ sceneId: scene.id }))[0]).toMatchObject({ atSeconds: 1 });
+
+    const film = (await run('movie.edit.film', {})) as unknown as {
+      openMarkers: number;
+      scenes: { startSeconds: number; openMarkers: number }[];
+    };
+    expect(film.openMarkers).toBe(2);
+    expect(film.scenes.map((entry) => [entry.startSeconds, entry.openMarkers])).toEqual([
+      [0, 1],
+      [4, 1],
+    ]);
+
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('MARKERS');
+    expect(edl.text).toContain('problem (done) by person: Fixed by trimming');
+    const whole = (await run('movie.edit.film.edl', {})) as unknown as {
+      text: string;
+      scenes: number;
+      totalSeconds: number;
+    };
+    expect(whole).toMatchObject({ scenes: 2, totalSeconds: 7 });
+    expect(whole.text).toContain('FILM · 2 scenes · 0:07.00');
+    expect(whole.text).toContain('== Film 0:04.00 to 0:07.00 ==');
+    expect(whole.text).toContain('(film 0:05.00) todo by screenwriter: Needs a wide');
+    const part = (await run('movie.edit.film.edl', { fromScene: 2 })) as unknown as {
+      text: string;
+      scenes: number;
+    };
+    expect(part.scenes).toBe(1);
+    expect(part.text).not.toContain('LAMP ROOM');
+
+    const removed = (await edit('marker.remove', { markerId: marker.id })) as unknown as {
+      remaining: number;
+    };
+    expect(removed.remaining).toBe(1);
+    // Deleting a scene takes its markers with it.
+    await run('movie.scene.delete', { sceneId: second.id });
+    expect((await list()).map((entry) => entry.text)).toEqual(['End on a held beat']);
+  });
+
   it('carries recorded dialogue over a silent clip into a split edit', async () => {
     const { run, registry, at, add, cutOf, edit, mara } = await withCuts();
     await registry.executeById(

@@ -50,6 +50,9 @@ export const subtitleFileKey = (projectId: string, name: string): string =>
   `${base(projectId)}subtitles/${name}`;
 /** Rendered films: a record each, and its file in parts in the blob store. */
 export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
+/** The markers (notes, to-dos, problems) on the timeline of a scene. */
+export const markerKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}markers/${sceneId}`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
@@ -314,6 +317,7 @@ export const sceneDelete = defineCommand({
       { type: 'delete', key: editKey(projectId, sceneId) },
       { type: 'delete', key: editHistoryKey(projectId, sceneId) },
       { type: 'delete', key: editDraftKey(projectId, sceneId) },
+      { type: 'delete', key: markerKey(projectId, sceneId) },
       ...[
         ...(await runtime.store.list(shotPrefix(projectId, sceneId))),
         ...(await runtime.store.list(soundPrefix(projectId, sceneId))),

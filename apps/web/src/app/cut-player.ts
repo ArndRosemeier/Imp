@@ -44,9 +44,12 @@ export const Film = z.object({
       items: z.number(),
       readyItems: z.number(),
       durationSeconds: z.number(),
+      startSeconds: z.number().default(0),
       missing: z.array(z.object({ itemId: z.string(), index: z.number(), state: ItemState })),
+      openMarkers: z.number().default(0),
     }),
   ),
+  openMarkers: z.number().default(0),
 });
 
 export const Item = z.object({

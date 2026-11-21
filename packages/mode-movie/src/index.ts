@@ -54,6 +54,14 @@ export {
 export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine, TextView } from './edit.js';
 export { createTextCommands, filmTexts, readStyles } from './text.js';
 export {
+  createMarkerCommands,
+  Marker,
+  MarkerKind,
+  markerSeconds,
+  PlacedMarker,
+  placedMarkers,
+} from './markers.js';
+export {
   CUE_LETTERS,
   DEFAULT_TEXT_STYLES,
   placeText,
