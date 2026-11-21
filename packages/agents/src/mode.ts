@@ -1,4 +1,4 @@
-import type { Command, KeyValueStore, ProjectSupport } from '@imp/core';
+import type { Command, KeyValueStore, LibrarySource, ProjectSupport } from '@imp/core';
 import type { Role } from './role.js';
 
 /** One step of a mode's workflow, shown in the navigation. Stages can be visited in any order. */
@@ -27,6 +27,8 @@ export interface Mode {
    * for it outside the mode, such as the pictures of its world.
    */
   readonly visualStyle?: (store: KeyValueStore, projectId: string) => Promise<string>;
+  /** What the mode brings to the library: the assets its projects make. */
+  readonly library?: readonly LibrarySource[];
 }
 
 /** Checks a mode's own consistency once, at start-up, instead of failing later in use. */

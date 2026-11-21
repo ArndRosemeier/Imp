@@ -48,6 +48,8 @@ import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
 import { SceneTabs } from './shots.js';
+import { useLibraryDrop } from './library/drag.js';
+import { isPlayableSound, soundForScene } from './library/scene.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -310,6 +312,50 @@ function Timeline({
     const box = inner.current?.getBoundingClientRect();
     return box === undefined ? 0 : Math.max(0, (clientX - box.left) / scale);
   };
+  // From the library: sounds onto the audio lane where they are let go, shot clips into the picture.
+  const audioLane = useRef<HTMLDivElement>(null);
+  const pictureLane = useRef<HTMLDivElement>(null);
+  const done = (output: unknown): unknown => {
+    // act shows what went wrong under the timeline and answers nothing.
+    if (output === undefined) throw new Error('It was not placed; see the message on the stage.');
+    return output;
+  };
+  useLibraryDrop(audioLane, {
+    label: 'Edit stage, audio lane, at the playhead',
+    accepts: (asset) => !readOnly && isPlayableSound(asset),
+    onDrop: async (asset, point) => {
+      const run = async (id: string, input: Record<string, unknown>) => done(await act(id, input));
+      const sound = await soundForScene(run, sceneId, asset);
+      await run('movie.edit.sound.place', {
+        sceneId,
+        ...(sound.source === 'sound'
+          ? { source: 'sound', soundId: sound.soundId }
+          : { source: 'dialogue', shotId: sound.shotId, shotSceneId: sound.shotSceneId }),
+        startSeconds: point === null ? at : secondAt(point.clientX),
+        volume: asset.kind === 'music' ? 0.4 : 1,
+      });
+    },
+  });
+  useLibraryDrop(pictureLane, {
+    label: 'Edit stage, picture, at the end',
+    accepts: (asset) =>
+      !readOnly && asset.id.startsWith('movie:clip:') && asset.refs['shotId'] !== undefined,
+    onDrop: async (asset, point) => {
+      const second = point === null ? null : secondAt(point.clientX);
+      const index =
+        second === null
+          ? undefined
+          : cut.items.findIndex((item) => item.startsAtSeconds + item.durationSeconds / 2 > second);
+      done(
+        await act('movie.edit.item.add', {
+          sceneId,
+          shotId: asset.refs['shotId'],
+          ...(asset.refs['sceneId'] === sceneId ? {} : { shotSceneId: asset.refs['sceneId'] }),
+          ...(index === undefined || index < 0 ? {} : { toIndex: index }),
+        }),
+      );
+    },
+  });
   const audioLength = (placement: Placement): number => {
     if (placement.loop) return Math.max(cut.totalSeconds - placement.startSeconds, 1);
     const item = cut.items.find((candidate) => candidate.shotId === placement.shotId);
@@ -383,7 +429,7 @@ function Timeline({
                 </span>
               ))}
           </div>
-          <div className="lane lane-picture" aria-label="Picture lane">
+          <div className="lane lane-picture" aria-label="Picture lane" ref={pictureLane}>
             <span className="lane-name">Picture</span>
             {playing.map((item) => {
               const drag = edges.dragging?.id === item.itemId ? edges.dragging : null;
@@ -505,7 +551,7 @@ function Timeline({
               ))}
             </div>
           )}
-          <div className="lane lane-audio" aria-label="Audio lane">
+          <div className="lane lane-audio" aria-label="Audio lane" ref={audioLane}>
             <span className="lane-name">Audio</span>
             {cut.sounds.map((placement) => {
               const drag = audioDrag.dragging?.id === placement.id ? audioDrag.dragging : null;

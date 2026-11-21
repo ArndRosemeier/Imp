@@ -7,10 +7,16 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
-import { createAudioCommands, createDefaultAudioCodec, type Mp4AudioDecoder } from '@imp/audio';
+import {
+  audioLibrarySource,
+  createAudioCommands,
+  createDefaultAudioCodec,
+  type Mp4AudioDecoder,
+} from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
+  createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
   createProjectCommands,
@@ -27,7 +33,7 @@ import {
   type FrameGrabber,
   type FrameImageEncoder,
 } from '@imp/mode-movie';
-import { createWorldCommands } from '@imp/world';
+import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -126,6 +132,11 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
+    ...createLibraryCommands([
+      ...modes.flatMap((mode) => mode.library ?? []),
+      worldLibrarySource,
+      audioLibrarySource,
+    ]),
     ...createAudioCommands({
       codec,
       links: [createSceneAudioLink()],

@@ -5,6 +5,7 @@ import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
+  BooksIcon,
   ChatsCircleIcon,
   FilmReelIcon,
   FilmSlateIcon,
@@ -24,7 +25,7 @@ import {
   UsersThreeIcon,
   type Icon,
 } from '@phosphor-icons/react';
-import { useEffect, useState, type CSSProperties, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties, type ReactElement } from 'react';
 import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
@@ -35,6 +36,8 @@ import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
+import { LibraryDragProvider } from './library/drag.js';
+import { LibraryPanel } from './library/LibraryPanel.js';
 
 /**
  * One icon per stage, so the stages stay apart when the navigation shrinks
@@ -96,6 +99,30 @@ function useCrewOpen(): [boolean, () => void] {
   ];
 }
 
+/** A switch remembered in this browser, such as whether the library is open. */
+function useStoredFlag(key: string, initial: () => boolean): [boolean, (next: boolean) => void] {
+  const [value, setValue] = useState(() => {
+    try {
+      const stored = localStorage.getItem(key);
+      return stored === null ? initial() : stored === 'true';
+    } catch {
+      return initial();
+    }
+  });
+  const set = useCallback(
+    (next: boolean) => {
+      try {
+        localStorage.setItem(key, String(next));
+      } catch {
+        // Remembering it is a convenience.
+      }
+      setValue(next);
+    },
+    [key],
+  );
+  return [value, set];
+}
+
 function StageView({ stage, project }: { stage: string; project: Project }): ReactElement | null {
   if (stage === 'development') return <DevelopmentView key={project.id} project={project} />;
   if (stage === 'script') return <ScriptView key={project.id} project={project} />;
@@ -120,6 +147,19 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
   const [crewOpen, toggleCrew] = useCrewOpen();
+  const [libraryOpen, setLibraryOpen] = useStoredFlag('imp.library.open', () => false);
+  const [libraryWide, setLibraryWide] = useStoredFlag('imp.library.wide', () => false);
+  const libraryWidth = usePanelWidth('library', { initial: 340, min: 280, max: 640 });
+  // On a narrow screen, such as a tablet, the library and the crew take turns, so the stage keeps room.
+  const narrow = (): boolean => window.innerWidth < 1280;
+  const openLibrary = (next: boolean): void => {
+    if (next && crewOpen && narrow()) toggleCrew();
+    setLibraryOpen(next);
+  };
+  const switchCrew = (): void => {
+    if (!crewOpen && libraryOpen && narrow()) setLibraryOpen(false);
+    toggleCrew();
+  };
   const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
   const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
@@ -168,6 +208,18 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        openLibrary(!libraryOpen);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen(true);
@@ -197,179 +249,227 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     />
   );
 
+  const showLibrary = libraryOpen && project !== null && view !== 'projects';
   return (
-    <div
-      className="shell"
-      data-crew={crewOpen ? 'open' : 'closed'}
-      style={
-        {
-          '--nav-width': `${String(navWidth.value)}px`,
-          '--crew-width': `${String(crewWidth.value)}px`,
-        } as CSSProperties
-      }
-    >
-      <header className="topbar">
-        <div className="wordmark">Imp</div>
-        {projects.length > 0 && (
-          <div className="row project-switch">
-            <label className="sr-only" htmlFor="project-select">
-              Project
-            </label>
-            <select
-              id="project-select"
-              className="select"
-              value={project?.id ?? ''}
-              onChange={(event) => {
-                openProject(event.target.value);
-              }}
-            >
-              {projects.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
-            <button
-              className="button quiet"
-              aria-label="New project"
-              title="New project"
-              onClick={() => {
-                setView('projects');
-                setCreating(true);
-              }}
-            >
-              <PlusIcon aria-hidden="true" />
-            </button>
-          </div>
-        )}
-        <button
-          className="button palette-trigger"
-          onClick={() => {
-            setPaletteOpen(true);
-          }}
-        >
-          <span className="row">
-            <MagnifyingGlassIcon aria-hidden="true" /> <span className="label">Run a command</span>
-          </span>
-          <kbd>Ctrl K</kbd>
-        </button>
-        <button
-          className="button quiet crew-toggle"
-          aria-label="Crew panel"
-          aria-pressed={crewOpen}
-          aria-controls="crew-panel"
-          title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
-          onClick={toggleCrew}
-        >
-          <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
-        </button>
-        <button
-          className="button quiet"
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          onClick={toggleTheme}
-        >
-          {theme === 'dark' ? <SunIcon aria-hidden="true" /> : <MoonIcon aria-hidden="true" />}
-        </button>
-      </header>
-      <nav className="nav" aria-label="Workspace">
-        <div className="eyebrow">{mode?.name ?? 'Project'}</div>
-        {stages.map((stage) => {
-          const StageIcon = STAGE_ICONS[stage.id] ?? FilmSlateIcon;
-          return (
-            <button
-              key={stage.id}
-              className="nav-item"
-              aria-current={view === stage.id ? 'page' : undefined}
-              onClick={() => {
-                setView(stage.id);
-              }}
-            >
-              <StageIcon aria-hidden="true" size={18} />
-              <span>{stage.name}</span>
-            </button>
-          );
-        })}
-        <div className="eyebrow">Workspace</div>
-        {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
+    <LibraryDragProvider>
+      <div
+        className="shell"
+        data-crew={crewOpen ? 'open' : 'closed'}
+        data-library={showLibrary ? (libraryWide ? 'wide' : 'open') : 'closed'}
+        style={
+          {
+            '--nav-width': `${String(navWidth.value)}px`,
+            '--crew-width': `${String(crewWidth.value)}px`,
+            '--library-width': `${String(libraryWidth.value)}px`,
+          } as CSSProperties
+        }
+      >
+        <header className="topbar">
+          <div className="wordmark">Imp</div>
+          {projects.length > 0 && (
+            <div className="row project-switch">
+              <label className="sr-only" htmlFor="project-select">
+                Project
+              </label>
+              <select
+                id="project-select"
+                className="select"
+                value={project?.id ?? ''}
+                onChange={(event) => {
+                  openProject(event.target.value);
+                }}
+              >
+                {projects.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="button quiet"
+                aria-label="New project"
+                title="New project"
+                onClick={() => {
+                  setView('projects');
+                  setCreating(true);
+                }}
+              >
+                <PlusIcon aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <button
-            key={id}
-            className="nav-item"
-            aria-current={view === id ? 'page' : undefined}
+            className="button palette-trigger"
             onClick={() => {
-              setView(id);
+              setPaletteOpen(true);
             }}
           >
-            <IconComponent aria-hidden="true" size={18} />
-            <span>{label}</span>
+            <span className="row">
+              <MagnifyingGlassIcon aria-hidden="true" />{' '}
+              <span className="label">Run a command</span>
+            </span>
+            <kbd>Ctrl K</kbd>
           </button>
-        ))}
-      </nav>
-      <main className="main">
-        {view === 'crew' && <CrewView />}
-        {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
-        {view === 'projects' && (
-          <ProjectsView
-            creating={creating}
-            onCreatingChange={setCreating}
-            onOpen={(id) => {
-              openProject(id);
-              const opened = projects.find((candidate) => candidate.id === id);
-              const firstStage = imp.modes.find((m) => m.id === (opened?.mode ?? 'movie'))
-                ?.stages[0];
-              setView(firstStage?.id ?? 'crew');
-            }}
-          />
-        )}
-        {isStage &&
-          state.data !== undefined &&
-          (project === null ? startMovie : <StageView stage={view} project={project} />)}
-      </main>
-      <ActivityStrip />
-      <Resizer label="Resize the navigation" side="left" width={navWidth} />
-      {crewOpen && <Resizer label="Resize the crew panel" side="right" width={crewWidth} />}
-      <div className="crew" id="crew-panel">
-        {crew.length > 1 && (
-          <div className="field crew-switch">
-            <label htmlFor="talking-to">Talking to</label>
-            <select
-              id="talking-to"
-              className="select"
-              value={active?.id ?? ''}
-              onChange={(event) => {
-                setTalkingTo(event.target.value);
+          {project !== null && (
+            <button
+              className="button quiet library-toggle"
+              aria-label="Library"
+              aria-pressed={showLibrary}
+              aria-controls="library-panel"
+              title={
+                showLibrary ? 'Hide the library (Ctrl Shift L)' : 'Show the library (Ctrl Shift L)'
+              }
+              onClick={() => {
+                if (view === 'projects') {
+                  const firstStage = stages[0];
+                  if (firstStage !== undefined) setView(firstStage.id);
+                  openLibrary(true);
+                } else {
+                  openLibrary(!showLibrary);
+                }
               }}
             >
-              {crew.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
-                </option>
-              ))}
-            </select>
+              <BooksIcon aria-hidden="true" size={18} /> <span className="label">Library</span>
+            </button>
+          )}
+          <button
+            className="button quiet crew-toggle"
+            aria-label="Crew panel"
+            aria-pressed={crewOpen}
+            aria-controls="crew-panel"
+            title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
+            onClick={switchCrew}
+          >
+            <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
+          </button>
+          <button
+            className="button quiet"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <SunIcon aria-hidden="true" /> : <MoonIcon aria-hidden="true" />}
+          </button>
+        </header>
+        <nav className="nav" aria-label="Workspace">
+          <div className="eyebrow">{mode?.name ?? 'Project'}</div>
+          {stages.map((stage) => {
+            const StageIcon = STAGE_ICONS[stage.id] ?? FilmSlateIcon;
+            return (
+              <button
+                key={stage.id}
+                className="nav-item"
+                aria-current={view === stage.id ? 'page' : undefined}
+                onClick={() => {
+                  setView(stage.id);
+                }}
+              >
+                <StageIcon aria-hidden="true" size={18} />
+                <span>{stage.name}</span>
+              </button>
+            );
+          })}
+          <div className="eyebrow">Workspace</div>
+          {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
+            <button
+              key={id}
+              className="nav-item"
+              aria-current={view === id ? 'page' : undefined}
+              onClick={() => {
+                setView(id);
+              }}
+            >
+              <IconComponent aria-hidden="true" size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <main className="main">
+          {view === 'crew' && <CrewView />}
+          {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
+          {view === 'projects' && (
+            <ProjectsView
+              creating={creating}
+              onCreatingChange={setCreating}
+              onOpen={(id) => {
+                openProject(id);
+                const opened = projects.find((candidate) => candidate.id === id);
+                const firstStage = imp.modes.find((m) => m.id === (opened?.mode ?? 'movie'))
+                  ?.stages[0];
+                setView(firstStage?.id ?? 'crew');
+              }}
+            />
+          )}
+          {isStage &&
+            state.data !== undefined &&
+            (project === null ? startMovie : <StageView stage={view} project={project} />)}
+        </main>
+        {showLibrary && (
+          <div className="library-column" id="library-panel">
+            <LibraryPanel
+              key={project.id}
+              project={project}
+              wide={libraryWide}
+              onToggleWide={() => {
+                setLibraryWide(!libraryWide);
+              }}
+              onClose={() => {
+                setLibraryOpen(false);
+              }}
+            />
           </div>
         )}
-        {crew.map((member) => (
-          <CrewPanel
-            key={member.id}
-            member={member}
-            context={context}
-            hidden={member.id !== active?.id}
-          />
-        ))}
-        {crew.length === 0 && (
-          <div className="crew-head">
-            <p className="muted">
-              {state.error ?? 'Nobody is on the crew. Hire someone from the Crew view.'}
-            </p>
-          </div>
+        {showLibrary && !libraryWide && (
+          <Resizer label="Resize the library" side="right" panel="library" width={libraryWidth} />
         )}
+        <ActivityStrip />
+        <Resizer label="Resize the navigation" side="left" width={navWidth} />
+        {crewOpen && (
+          <Resizer label="Resize the crew panel" side="right" panel="crew" width={crewWidth} />
+        )}
+        <div className="crew" id="crew-panel">
+          {crew.length > 1 && (
+            <div className="field crew-switch">
+              <label htmlFor="talking-to">Talking to</label>
+              <select
+                id="talking-to"
+                className="select"
+                value={active?.id ?? ''}
+                onChange={(event) => {
+                  setTalkingTo(event.target.value);
+                }}
+              >
+                {crew.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {crew.map((member) => (
+            <CrewPanel
+              key={member.id}
+              member={member}
+              context={context}
+              hidden={member.id !== active?.id}
+            />
+          ))}
+          {crew.length === 0 && (
+            <div className="crew-head">
+              <p className="muted">
+                {state.error ?? 'Nobody is on the crew. Hire someone from the Crew view.'}
+              </p>
+            </div>
+          )}
+        </div>
+        <CopyQuestions />
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => {
+            setPaletteOpen(false);
+          }}
+        />
       </div>
-      <CopyQuestions />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => {
-          setPaletteOpen(false);
-        }}
-      />
-    </div>
+    </LibraryDragProvider>
   );
 }

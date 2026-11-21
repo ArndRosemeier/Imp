@@ -212,7 +212,8 @@ describe('effect chains', HEAVY, () => {
       channels: [new Float32Array(10), new Float32Array(10)] as [Float32Array, Float32Array],
     };
     expect(applyEffects(silent, [Effect.parse({ kind: 'loudness' })]).channels[0]).toHaveLength(10);
-  });
+    // Seconds of oversampled true-peak measurement: slow on a shared CI runner with coverage on.
+  }, 30_000);
 
   it('runs every kind in order', () => {
     const effects = [

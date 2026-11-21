@@ -74,7 +74,7 @@ export {
   type FilmRenderer,
   type FilmRenderJob,
 } from './film.js';
-export { LibrarySound, soundLibrary } from './library.js';
+export { LibrarySound, movieLibrarySource, soundLibrary } from './library.js';
 export { createSceneAudioLink } from './scene-audio.js';
 export {
   clipPrompt,
