@@ -323,6 +323,43 @@ export const SceneCut = z.object({
 });
 export type SceneCut = z.infer<typeof SceneCut>;
 
+/**
+ * What a person asked an agent to do to a stretch of a scene: the words, and
+ * the time range or items it is about. Kept on the draft so that the
+ * proposal can be read against what was asked.
+ */
+export const CutRequest = z.object({
+  instruction: z.string(),
+  /** Seconds on the scene timeline, or null for the whole scene. */
+  fromSeconds: z.number().min(0).nullable().default(null),
+  toSeconds: z.number().min(0).nullable().default(null),
+  /** The items picked, when the request is about pieces rather than a time range. */
+  itemIds: z.array(z.string()).default([]),
+  createdAt: z.iso.datetime(),
+});
+export type CutRequest = z.infer<typeof CutRequest>;
+
+/**
+ * Changes agents propose to the cut of a scene, kept apart from it until a
+ * person keeps or discards them. base is the cut as it was when the draft
+ * began, so that what the agent changed can be told from what the person
+ * changed since.
+ */
+export const CutDraft = z.object({
+  sceneId: z.string(),
+  base: SceneCut,
+  cut: SceneCut,
+  /** The draft's own steps, so that an agent can undo its own work. */
+  undo: z.array(SceneCut).default([]),
+  redo: z.array(SceneCut).default([]),
+  /** The crew members who worked on it, by id, with their role. */
+  authors: z.array(z.object({ id: z.string(), role: z.string() })).default([]),
+  request: CutRequest.nullable().default(null),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type CutDraft = z.infer<typeof CutDraft>;
+
 /** The cuts a scene went through, for undo and redo. */
 export const CutHistory = z.object({
   undo: z.array(SceneCut).default([]),

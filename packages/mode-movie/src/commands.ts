@@ -34,6 +34,9 @@ export const editKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}edit/${sceneId}`;
 export const editHistoryKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}edit-history/${sceneId}`;
+/** The changes agents propose to the cut of a scene, before a person keeps them. */
+export const editDraftKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}edit-drafts/${sceneId}`;
 export const movieSceneKey = (projectId: string, sceneId: string): string =>
   `${scenePrefix(projectId)}${sceneId}`;
 /** The recorded lines of a scene's own-lane characters. */
@@ -304,6 +307,7 @@ export const sceneDelete = defineCommand({
       { type: 'delete', key: `${scenePrefix(projectId)}${sceneId}` },
       { type: 'delete', key: editKey(projectId, sceneId) },
       { type: 'delete', key: editHistoryKey(projectId, sceneId) },
+      { type: 'delete', key: editDraftKey(projectId, sceneId) },
       ...[
         ...(await runtime.store.list(shotPrefix(projectId, sceneId))),
         ...(await runtime.store.list(soundPrefix(projectId, sceneId))),

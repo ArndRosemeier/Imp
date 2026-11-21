@@ -630,6 +630,10 @@ export const movieCopier: ResourceCopier = {
             key: `${projectPrefix(spec.toProjectId)}movie/edit-history/${targetId}`,
           });
           writes.push({ type: 'delete', key: editKey(spec.toProjectId, targetId) });
+          writes.push({
+            type: 'delete',
+            key: `${projectPrefix(spec.toProjectId)}movie/edit-drafts/${targetId}`,
+          });
         }
         const position =
           choice === 'overwrite' && existing !== undefined
