@@ -26,10 +26,6 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-<<<<<<< HEAD
-import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
-import { createWorldCommands, worldLibrarySource } from '@imp/world';
-=======
 import {
   createMovieMode,
   createSceneAudioLink,
@@ -37,8 +33,7 @@ import {
   type FrameGrabber,
   type FrameImageEncoder,
 } from '@imp/mode-movie';
-import { createWorldCommands } from '@imp/world';
->>>>>>> origin/main
+import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 

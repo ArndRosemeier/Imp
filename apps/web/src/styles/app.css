@@ -2973,7 +2973,45 @@ dialog.modal::backdrop {
   }
 }
 
-<<<<<<< HEAD
+/* Rendered films on the Edit stage */
+.film-exports {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+.film-export {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+}
+.film-export + .film-export {
+  border-top: 1px solid var(--line);
+}
+.film-export-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.film-export-actions {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  gap: var(--space-2);
+}
+.film-export-note {
+  font-size: 12px;
+}
+.film-export > :not(.film-export-actions) {
+  grid-column: 1;
+}
+
 /* The library: every asset of the project, beside the stage. */
 .resizer[data-panel='library'] {
   grid-column: 3;
@@ -3253,36 +3291,10 @@ dialog.modal::backdrop {
   font-size: 13px;
   font-weight: 500;
   color: var(--ink);
-=======
-/* Rendered films on the Edit stage */
-.film-exports {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  overflow: hidden;
-}
-.film-export {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: var(--space-3);
-  row-gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  background: var(--surface);
-}
-.film-export + .film-export {
-  border-top: 1px solid var(--line);
-}
-.film-export-name {
-  font-weight: 600;
->>>>>>> origin/main
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-<<<<<<< HEAD
 .library-sub {
   font-size: 11.5px;
   color: var(--ink-muted);
@@ -3571,16 +3583,4 @@ body[data-carrying] {
 .ok {
   margin: 0;
   color: var(--ok);
-=======
-.film-export-actions {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  gap: var(--space-2);
-}
-.film-export-note {
-  font-size: 12px;
-}
-.film-export > :not(.film-export-actions) {
-  grid-column: 1;
->>>>>>> origin/main
 }
