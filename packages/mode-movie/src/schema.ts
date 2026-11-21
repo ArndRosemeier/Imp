@@ -144,6 +144,8 @@ export const Clip = z.object({
   durationSeconds: z.number().nullable().default(null),
   /** Whether the shot's dialogue was recorded apart, so the clip itself is silent. */
   silent: z.boolean().default(false),
+  /** The key frame the clip was made to start on, or null when it was made from words and guides. */
+  startFrameId: z.string().nullable().default(null),
   costUsd: z.number().nullable(),
   createdAt: z.iso.datetime(),
 });
@@ -166,6 +168,24 @@ export const DialogueTake = z.object({
   createdAt: z.iso.datetime(),
 });
 export type DialogueTake = z.infer<typeof DialogueTake>;
+
+/**
+ * A still of the first moment of a shot, painted from the pictures of its
+ * place, people and objects. A clip that starts exactly on it shows the same
+ * room and the same faces as every other shot made this way.
+ */
+export const KeyFrame = z.object({
+  id: z.string(),
+  blobKey: z.string(),
+  mediaType: z.string(),
+  prompt: z.string(),
+  model: z.string(),
+  /** What the reference pictures showed, by name, closest first. Empty when the model took none. */
+  guides: z.array(z.string()),
+  costUsd: z.number().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type KeyFrame = z.infer<typeof KeyFrame>;
 
 /** One uninterrupted piece of film within a scene. */
 export const Shot = z.object({
@@ -228,6 +248,9 @@ export const Shot = z.object({
       'How the line is said: emotion, intensity, pace, breath. For example "screaming over the wind, voice cracking".',
     ),
   dialogue: DialogueTake.nullable().default(null),
+  /** Painted first frames of the shot; the chosen one is what the clip starts on. */
+  frames: z.array(KeyFrame).default([]),
+  frameId: z.string().nullable().default(null),
   clip: Clip.nullable().default(null),
 });
 export type Shot = z.infer<typeof Shot>;

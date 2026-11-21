@@ -1932,6 +1932,43 @@ html {
     min-height: 44px;
   }
 }
+.picture-head {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.picture-head .eyebrow {
+  margin: 0;
+}
+.picture-strip {
+  position: relative;
+  height: 34px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+}
+.picture-item {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  overflow: hidden;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  font-size: 11px;
+  line-height: 24px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-soft);
+}
+.picture-item[data-kind='title'] {
+  font-style: italic;
+}
+.linked-note {
+  margin: 0;
+}
 
 /* Projects: the start screen */
 .small {
@@ -2511,4 +2548,15 @@ dialog.modal::backdrop {
 }
 .scene-place .field {
   flex: 1 1 200px;
+}
+.key-frames {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.key-frames h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
 }

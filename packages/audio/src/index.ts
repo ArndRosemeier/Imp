@@ -6,7 +6,7 @@ export {
   type AudioFormat,
 } from './codec.js';
 export { createAudioCommands, type AudioCommandOptions } from './commands.js';
-export { audioRenderKey } from './doc-commands.js';
+export { audioRenderKey, type AudioLink, type LengthOf } from './doc-commands.js';
 export {
   AudioDoc,
   copyRange,

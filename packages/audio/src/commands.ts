@@ -2,7 +2,7 @@ import { CommandError, defineCommand, type BlobStore, type Command } from '@imp/
 import { z } from 'zod';
 import type { AudioCodec } from './codec.js';
 import { UnsupportedAudioError } from './codec.js';
-import { createAudioDocCommands } from './doc-commands.js';
+import { createAudioDocCommands, type AudioLink } from './doc-commands.js';
 import { toDecibels } from './pcm.js';
 import { waveform } from './peaks.js';
 import { AudioSources, MissingSourceError } from './sources.js';
@@ -10,6 +10,8 @@ import { toFrames } from './time.js';
 
 export interface AudioCommandOptions {
   readonly codec: AudioCodec;
+  /** Sound kept elsewhere that audio documents can open, such as a scene's sound lanes. */
+  readonly links?: readonly AudioLink[];
 }
 
 /** Decibels rounded to a tenth, with silence as null (JSON has no infinity). */
@@ -118,6 +120,9 @@ export function createAudioCommands(options: AudioCommandOptions): readonly Comm
   return [
     inspect,
     shape,
-    ...createAudioDocCommands({ sources: (runtime) => sourcesFor(runtime.blobs) }),
+    ...createAudioDocCommands({
+      sources: (runtime) => sourcesFor(runtime.blobs),
+      links: options.links ?? [],
+    }),
   ];
 }

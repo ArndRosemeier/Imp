@@ -76,6 +76,8 @@ export function createFakeProvider(script: {
   readonly videoError?: ProviderError;
   /** When true, `startVideo` refuses requests that carry guiding images, as many models do. */
   readonly videoRefusesReferences?: boolean;
+  /** When true, `startVideo` refuses requests that carry a start picture. */
+  readonly videoRefusesFirstFrame?: boolean;
   /** How many times a video job reports that it is still being made. Defaults to one. */
   readonly videoPendingChecks?: number;
   /** When set, video jobs end as failed with this reason. */
@@ -125,6 +127,11 @@ export function createFakeProvider(script: {
       videoRequests.push(request);
       if (script.videoError !== undefined) {
         return Promise.reject(script.videoError);
+      }
+      if (script.videoRefusesFirstFrame === true && request.firstFrame !== undefined) {
+        return Promise.reject(
+          new ProviderError('bad_request', 'fake', 'This model takes no start picture.'),
+        );
       }
       if (script.videoRefusesReferences === true && request.references !== undefined) {
         return Promise.reject(

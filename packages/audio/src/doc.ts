@@ -30,6 +30,12 @@ export const AudioDoc = z.object({
   name: z.string().min(1).max(120),
   tracks: z.array(Track).default([]),
   markers: z.array(Marker).default([]),
+  /**
+   * When set, the tracks are not the document's own but a view onto sound kept
+   * elsewhere, such as the sound lanes of a scene's cut: they are read from
+   * there and every edit is written back there.
+   */
+  link: z.object({ kind: z.string(), target: z.string() }).nullable().default(null),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

@@ -20,7 +20,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { createMovieMode } from '@imp/mode-movie';
+import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
@@ -60,6 +60,12 @@ export interface ImpOptions {
   /** Where images and other files go. Defaults to memory, which a reload empties. */
   readonly blobs?: BlobStore;
   readonly secrets: SecretStore;
+  /**
+   * Re-encodes a picture as JPEG or PNG, which video models need for a start
+   * frame. The browser host does it with its own decoders; without it, key
+   * frames in other formats are used as guides only.
+   */
+  readonly frameImage?: FrameImageEncoder;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -81,7 +87,12 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
-  const modes: readonly Mode[] = [createMovieMode({ provider })];
+  const modes: readonly Mode[] = [
+    createMovieMode({
+      provider,
+      ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
+    }),
+  ];
   const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
   const registry = new CommandRegistry({ runtime });
   registry.register(
@@ -89,7 +100,10 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
-    ...createAudioCommands({ codec: createDefaultAudioCodec() }),
+    ...createAudioCommands({
+      codec: createDefaultAudioCodec(),
+      links: [createSceneAudioLink()],
+    }),
     ...createWorldCommands({
       provider,
       // The world is drawn in the style the project's mode keeps.
