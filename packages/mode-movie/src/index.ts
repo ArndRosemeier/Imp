@@ -101,6 +101,7 @@ export {
   createShotCommands,
   describeSetting,
   MAX_CLIP_GUIDES,
+  MAX_TAKES,
   readSetting,
   type ShotSetting,
   VIDEO_MODEL_SETTING,

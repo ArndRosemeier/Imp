@@ -3906,3 +3906,113 @@ body[data-carrying] {
 dialog.modal.wide:has(.style-editor) {
   width: min(980px, calc(100vw - 32px));
 }
+
+/* Earlier takes of a shot: stills that play when tapped, and a way back to each. */
+.take-list {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  margin: 0;
+  padding: 2px 2px var(--space-1);
+  list-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.take {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 188px;
+}
+.take-still {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #07080b;
+  cursor: pointer;
+}
+.take-still video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.take-still[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.take-number {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / 0.62);
+  color: #ede6da;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.take-info {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.take-actions {
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Split edits: J and L cuts with the next shot. */
+.split-edit {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.split-length .input {
+  width: 5.5em;
+}
+.split-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+.button.split-choice {
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 52px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-m);
+  white-space: normal;
+  text-align: left;
+}
+.split-choice > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.split-diagram {
+  flex: none;
+  width: 36px;
+  height: 20px;
+}
+.split-diagram .a {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+.split-diagram .b {
+  fill: var(--track-1);
+  opacity: 0.7;
+}
+.split-diagram .sound {
+  opacity: 0.45;
+}
+.take-switcher {
+  gap: var(--space-1);
+}
+.take-switcher select {
+  min-width: 12em;
+}

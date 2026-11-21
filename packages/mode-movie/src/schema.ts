@@ -252,6 +252,11 @@ export const Shot = z.object({
   frames: z.array(KeyFrame).default([]),
   frameId: z.string().nullable().default(null),
   clip: Clip.nullable().default(null),
+  /**
+   * Earlier ready clips of the shot, newest first. Making a new clip keeps the
+   * one it replaces here, so a better earlier take can be put back.
+   */
+  takes: z.array(Clip).default([]),
 });
 export type Shot = z.infer<typeof Shot>;
 

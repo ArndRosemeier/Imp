@@ -608,6 +608,79 @@ export async function commitCut(
   await store.batch([{ type: 'put', key: editDraftKey(projectId, sceneId), value: draft }]);
 }
 
+/** Where an item lies on the scene timeline, as layOut gives it. */
+interface Laid {
+  readonly startsAtSeconds: number;
+  readonly durationSeconds: number;
+}
+
+/**
+ * The sound an item plays with its picture, laid on the audio lane at the same
+ * time and for the same length instead: the clip's own sound, or the recorded
+ * dialogue over a silent clip. The item then plays its picture alone, so that
+ * picture and sound can be cut apart (a J or L cut). Texts that followed the
+ * line as the item spoke it follow it on the lane. Nothing changes for sound
+ * that was already taken apart or is silenced.
+ */
+function takeApart(
+  runtime: CoreRuntime,
+  item: CutItem,
+  laid: Laid,
+  shot: Shot | undefined,
+): { item: CutItem; sounds: SoundPlacement[]; voice: string | null } {
+  if (item.kind !== 'shot' || shot?.clip?.status !== 'ready' || laid.durationSeconds <= 0) {
+    return { item, sounds: [], voice: null };
+  }
+  const speaks = shot.speakerId !== null && shot.line.trim() !== '';
+  const lay = (source: 'clip' | 'dialogue', volume: number, length: number): SoundPlacement =>
+    SoundPlacement.parse({
+      id: runtime.newId(),
+      source,
+      soundId: '',
+      sceneId: item.sceneId,
+      shotId: item.shotId,
+      trimStartSeconds: item.trimStartSeconds,
+      startSeconds: laid.startsAtSeconds,
+      durationSeconds: round(Math.max(0.01, length)),
+      volume,
+      fadeInSeconds: 0,
+      fadeOutSeconds: 0,
+      loop: false,
+    });
+  if (!shot.clip.silent && item.clipAudioVolume > 0) {
+    const sound = lay('clip', item.clipAudioVolume, laid.durationSeconds);
+    return {
+      item: { ...item, clipAudioVolume: 0 },
+      sounds: [sound],
+      voice: speaks ? sound.id : null,
+    };
+  }
+  if (shot.clip.silent && shot.dialogue !== null && item.dialogueVolume > 0) {
+    const heard = Math.min(
+      laid.durationSeconds,
+      (shot.dialogue.durationSeconds ?? laid.durationSeconds) - item.trimStartSeconds,
+    );
+    if (heard <= 0) return { item, sounds: [], voice: null };
+    const sound = lay('dialogue', item.dialogueVolume, heard);
+    return {
+      item: { ...item, dialogueVolume: 0 },
+      sounds: [sound],
+      voice: speaks ? sound.id : null,
+    };
+  }
+  return { item, sounds: [], voice: null };
+}
+
+/** Texts that followed the line an item spoke follow it where it was laid on the lane. */
+function followVoice(texts: readonly TextItem[], itemId: string, voice: string | null): TextItem[] {
+  if (voice === null) return [...texts];
+  return texts.map((text) =>
+    text.anchor?.on === 'shot' && text.anchor.id === itemId
+      ? { ...text, anchor: { ...text.anchor, on: 'placement', id: voice } }
+      : text,
+  );
+}
+
 const InsertAt = z
   .number()
   .int()
@@ -967,7 +1040,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.audio.detach',
     title: 'Take clip sound apart',
     description:
-      "Takes the sound of an item's clip off its picture and puts it in the audio lane at the same time, so that picture and sound can be trimmed, moved, faded and mixed on their own, for example to let a line start before its shot (a J cut) or to keep ambience under the next shot. The picture goes on without that sound. Only clips with a sound of their own have one to take; clips made silent have none.",
+      "Takes the sound of an item's clip off its picture and puts it in the audio lane at the same time and for the same length, so that picture and sound can be trimmed, moved, faded and mixed on their own, for example to keep ambience under the next shot. For a J or L cut, movie.edit.item.roll does this by itself. The picture goes on without that sound. Only clips with a sound of their own have one to take; clips made silent have none.",
     effect: 'write',
     input: z.object({ projectId: ProjectId, sceneId: SceneId, itemId: ItemId }),
     output: SoundPlacement,
@@ -977,34 +1050,126 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       const index = indexOfItem(items, id, itemId);
       const item = itemAt(items, index);
       const laid = (await layOut(runtime.store, projectId, items)).items[index];
-      if (item.kind !== 'shot' || !laid?.hasClipAudio) {
+      const refuse = (): never => {
         throw new CommandError(
           'invalid_input',
           id,
-          'This item has no sound of its own to take apart: it is a title, has no ready clip, or its clip was made silent.',
+          'This item has no sound of its own to take apart: it is a title, has no ready clip, its clip was made silent, or its sound was taken apart already.',
+        );
+      };
+      if (item.kind !== 'shot' || laid?.hasClipAudio !== true) return refuse();
+      const shot = await loadShot(runtime.store, projectId, item.sceneId, item.shotId);
+      const apart = takeApart(runtime, item, laid, shot);
+      const placement = apart.sounds[0];
+      if (placement?.source !== 'clip') return refuse();
+      await commitCut({ runtime, actor }, projectId, cut, {
+        ...cut,
+        items: items.map((candidate, at) => (at === index ? apart.item : candidate)),
+        sounds: [...cut.sounds, placement],
+        texts: followVoice(cut.texts, item.id, apart.voice),
+      });
+      return placement;
+    },
+  });
+
+  const roll = defineCommand({
+    id: 'movie.edit.item.roll',
+    title: 'Split edit',
+    description:
+      "Makes a J or L cut between an item and the next one: the picture changes before or after the sound does. An L cut lets the sound of this item run on under the start of the next picture (a reaction, a look away); a J cut lets the sound of the next item begin under the end of this picture (a line heard before we see who says it). It takes both items' sound apart onto the audio lane where it is not yet, then moves the picture cut by seconds, later for J and earlier for L, keeping picture and sound in sync and the scene as long as it was. The picture that comes into view must have been trimmed off: an L cut needs the next item to have that much trimmed off its start, a J cut needs this item to have that much trimmed off its end (movie.edit.item.set). Use 0.3 to 1.5 seconds for most cuts.",
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      itemId: ItemId.describe('The item before the cut. The next item is the one after it.'),
+      type: z
+        .enum(['j', 'l'])
+        .describe('j: the next sound comes in early. l: this sound runs on late.'),
+      seconds: z.number().positive().max(30).describe('How far apart picture and sound change.'),
+    }),
+    output: z.object({ first: CutItem, second: CutItem, sounds: z.array(SoundPlacement) }),
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId, type, seconds }) => {
+      const id = 'movie.edit.item.roll';
+      const { cut, items } = await openCut({ runtime, actor }, id, projectId, sceneId);
+      const index = indexOfItem(items, id, itemId);
+      const a = itemAt(items, index);
+      const b = items[index + 1];
+      if (b === undefined) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'This is the last item; there is no cut after it.',
         );
       }
-      const placement = SoundPlacement.parse({
-        id: runtime.newId(),
-        source: 'clip',
-        soundId: '',
-        sceneId: item.sceneId,
-        shotId: item.shotId,
-        trimStartSeconds: item.trimStartSeconds,
-        startSeconds: laid.startsAtSeconds,
-        volume: item.clipAudioVolume,
-        fadeInSeconds: item.fadeInSeconds,
-        fadeOutSeconds: item.fadeOutSeconds,
-        loop: false,
-      });
+      if (a.kind !== 'shot' || b.kind !== 'shot') {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'A split edit needs two shots; a title card has no sound to run on.',
+        );
+      }
+      const laid = (await layOut(runtime.store, projectId, items)).items;
+      const laidA = laid[index];
+      const laidB = laid[index + 1];
+      if (
+        laidA === undefined ||
+        laidB === undefined ||
+        laidA.durationSeconds <= 0 ||
+        laidB.durationSeconds <= 0
+      ) {
+        throw new CommandError('invalid_input', id, 'Both items need a ready clip first.');
+      }
+      const d = round(seconds);
+      // The picture that comes into view has to be there: it was trimmed off before.
+      const handle = type === 'l' ? b.trimStartSeconds : a.trimEndSeconds;
+      if (handle + 0.001 < d) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          type === 'l'
+            ? `An L cut of ${String(d)} s shows ${String(d)} s more of the start of the next shot, but only ${String(round(handle))} s of it was trimmed off. Trim more off its start first, or use at most ${String(round(handle))} s.`
+            : `A J cut of ${String(d)} s shows ${String(d)} s more of the end of this shot, but only ${String(round(handle))} s of it was trimmed off. Trim more off its end first, or use at most ${String(round(handle))} s.`,
+        );
+      }
+      const shrinking = type === 'l' ? laidA : laidB;
+      if (shrinking.durationSeconds - d < SHORTEST_SECONDS) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `That leaves ${type === 'l' ? 'this' : 'the next'} picture shorter than ${String(SHORTEST_SECONDS)} s. Use at most ${String(round(shrinking.durationSeconds - SHORTEST_SECONDS))} s.`,
+        );
+      }
+      const apartA = takeApart(
+        runtime,
+        a,
+        laidA,
+        await loadShot(runtime.store, projectId, a.sceneId, a.shotId),
+      );
+      const apartB = takeApart(
+        runtime,
+        b,
+        laidB,
+        await loadShot(runtime.store, projectId, b.sceneId, b.shotId),
+      );
+      const shift = type === 'l' ? d : -d;
+      const first: CutItem = {
+        ...apartA.item,
+        trimEndSeconds: round(Math.max(0, a.trimEndSeconds + shift)),
+      };
+      const second: CutItem = {
+        ...apartB.item,
+        trimStartSeconds: round(Math.max(0, b.trimStartSeconds - shift)),
+      };
+      const sounds = [...apartA.sounds, ...apartB.sounds];
       await commitCut({ runtime, actor }, projectId, cut, {
         ...cut,
         items: items.map((candidate, at) =>
-          at === index ? { ...candidate, clipAudioVolume: 0 } : candidate,
+          at === index ? first : at === index + 1 ? second : candidate,
         ),
-        sounds: [...cut.sounds, placement],
+        sounds: [...cut.sounds, ...sounds],
+        texts: followVoice(followVoice(cut.texts, a.id, apartA.voice), b.id, apartB.voice),
       });
-      return placement;
+      return { first, second, sounds };
     },
   });
 
@@ -1466,6 +1631,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     remove,
     split,
     detach,
+    roll,
     undo,
     redo,
     place,

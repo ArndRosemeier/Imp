@@ -186,14 +186,14 @@ describe('the movie in the library', () => {
       durationSeconds: 4,
     });
     expect(filmed.clip).toMatchObject({ status: 'ready', durationSeconds: 4, model: 'file' });
-    await expect(
-      run('movie.shot.clip.fromFile', {
-        projectId: id,
-        sceneId: scene.id,
-        shotId: shot.id,
-        blobKey: take.blobKey,
-      }),
-    ).rejects.toThrow();
+    // A second video becomes the clip, and the first is kept as a take.
+    const refilmed = await run('movie.shot.clip.fromFile', {
+      projectId: id,
+      sceneId: scene.id,
+      shotId: shot.id,
+      blobKey: take.blobKey,
+    });
+    expect(refilmed.takes).toEqual([expect.objectContaining({ blobKey: filmed.clip?.blobKey })]);
 
     const room = await run('world.location.create', { projectId: id, name: 'Lamp room' });
     const drawn = await run('world.location.image.fromFile', {
@@ -257,6 +257,7 @@ describe('the movie in the library', () => {
     const { assets } = await run('library.list', { projectId: id, limit: 100 });
     expect(assets.map((asset: any) => asset.kind).sort()).toEqual(
       [
+        'clip',
         'clip',
         'effect',
         'imported-image',
