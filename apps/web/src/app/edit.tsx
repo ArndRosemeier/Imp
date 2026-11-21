@@ -828,7 +828,7 @@ function SceneEditor({
             <LineInspector
               line={line}
               who={cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? 'Line'}
-              url={urls.get(line.take?.blobKey ?? '')}
+              url={urls.get(line.playKey ?? line.take?.blobKey ?? '')}
               sceneId={sceneId}
               act={act}
               onGone={() => {
