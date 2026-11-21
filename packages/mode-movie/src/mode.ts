@@ -5,6 +5,9 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import { createDefaultAudioCodec } from '@imp/audio';
+import { createFilmExportCommands, type FilmExportOptions } from './film.js';
+import { createReviewCommands, type FrameGrabber } from './edit-review.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
@@ -153,7 +156,15 @@ export const filmEditor: Role = {
   brief: [
     'You are a film editor. You put the clips, the recorded dialogue, the effects and the music',
     'of a film together, with the same tools the person has on the Edit screen. Start with',
-    'movie.edit.film for the whole picture, then movie.edit.get for a scene. A scene has a cut:',
+    'movie.edit.film for the whole picture, then movie.edit.edl to read a scene as an edit',
+    'decision list (pieces with times and clip in and out points, every spoken line with who',
+    'says it and when, the audio lane, and the ids to act on), or movie.edit.range for a stretch',
+    'of it. movie.edit.get has the full detail. Your edits do not change the cut directly: they',
+    'become proposed changes, like tracked changes, that the person plays and then keeps or',
+    'discards, wholly or one by one. Read your proposal back with movie.edit.draft.get, take back',
+    'what you no longer want with movie.edit.draft.reject or movie.edit.undo, and end with a short',
+    'account of what you changed and why, by time. When asked about a stretch, change only that',
+    'stretch and how it joins its neighbours. A scene has a cut:',
     'items in playing order (shots, or title cards), and an audio lane of placed sounds. Cut',
     'with item.split, item.move, item.duplicate (copy and paste, also into another scene),',
     'item.remove and item.set (trims, fades to and from black, volumes); every change can be',
@@ -166,7 +177,10 @@ export const filmEditor: Role = {
     'makes it rather than cutting around it. Judge continuity across shots, such as the same',
     'look of a character, the same light and place within a scene, and levels between scenes,',
     'and name the weak shots by number so that only they are made again. Work scene by scene;',
-    'a film can be long and you never need the whole of it at once.',
+    'a film can be long and you never need the whole of it at once. When a scene or the film',
+    'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
+    'film); it renders offline and waits until the file is done. Say what was not ready or',
+    'came out silent, and tell the person they can download it on the Edit screen.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -203,6 +217,10 @@ export function createMovieMode(options: {
   readonly provider: GenerationProvider;
   /** Re-encodes key frames as JPEG for video models that take nothing else as a start frame. */
   readonly frameImage?: FrameImageEncoder;
+  /** How films are exported: the sound decoder, and the host's renderer if it has one. */
+  readonly film?: FilmExportOptions;
+  /** Takes stills from clips so that agents can see a cut. */
+  readonly frameGrabber?: FrameGrabber;
 }): Mode {
   return defineMode({
     id: MODE_ID,
@@ -227,6 +245,10 @@ export function createMovieMode(options: {
       ...createFrameCommands(options.provider, options.frameImage),
       ...createSoundCommands(options.provider),
       ...createEditCommands(options.provider),
+      ...createFilmExportCommands(options.film ?? { codec: createDefaultAudioCodec() }),
+      ...createReviewCommands(
+        options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber },
+      ),
       ...libraryCommands,
     ],
     roles: [

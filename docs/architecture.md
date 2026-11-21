@@ -74,6 +74,13 @@ so the screen stays current whoever made the change. The OpenRouter key is held
 in `localStorage` on the page, outside the key-value store, so no command can
 return it; the page hands it to the worker, which keeps it in memory.
 
+Films are exported by a command too (`movie.edit.export`, ADR 7): the core
+lays out the picture and mixes the sound, and the browser host's worker
+renders the MP4 with WebCodecs, offline and faster than real time, so agents
+export as people do.
+
+Agents edit a cut through the same `movie.edit.*` commands, but their changes land in a draft that the Edit screen shows as tracked changes for the person to keep or discard (ADR 8). Agents read a scene as an edit decision list and look at stills taken from the clips.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

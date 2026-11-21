@@ -44,7 +44,15 @@ export {
   SoundTake,
   VoiceSample,
 } from './schema.js';
-export { createEditCommands } from './edit.js';
+export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine } from './edit.js';
+export {
+  createReviewCommands,
+  edlText,
+  stillTimes,
+  timecode,
+  type FrameGrabber,
+} from './edit-review.js';
+export { applyChanges, diffCut, mirror, type CutChange, type CutParts } from './drafts.js';
 export {
   asStartFrame,
   createFrameCommands,
@@ -52,6 +60,20 @@ export {
   MAX_FRAME_REFERENCES,
   type FrameImageEncoder,
 } from './frames.js';
+export {
+  createFilmExportCommands,
+  FilmExport,
+  filmPartKey,
+  PART_BYTES,
+  PartWriter,
+  planFilm,
+  type FilmExportOptions,
+  type FilmPicture,
+  type FilmPlan,
+  type FilmRendered,
+  type FilmRenderer,
+  type FilmRenderJob,
+} from './film.js';
 export { LibrarySound, movieLibrarySource, soundLibrary } from './library.js';
 export { createSceneAudioLink } from './scene-audio.js';
 export {

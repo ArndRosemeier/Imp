@@ -26,8 +26,19 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
+<<<<<<< HEAD
 import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
+=======
+import {
+  createMovieMode,
+  createSceneAudioLink,
+  type FilmRenderer,
+  type FrameGrabber,
+  type FrameImageEncoder,
+} from '@imp/mode-movie';
+import { createWorldCommands } from '@imp/world';
+>>>>>>> origin/main
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -78,9 +89,15 @@ export interface ImpOptions {
    * sound plays as silence and is reported as unheard.
    */
   readonly mp4Audio?: Mp4AudioDecoder;
+  /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
+  readonly filmRenderer?: FilmRenderer;
+  /** Takes stills from clips so that agents can see a cut: mediabunny in the browser, ffmpeg on the server. */
+  readonly frameGrabber?: FrameGrabber;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
+
+export type { FrameGrabber };
 
 /** Assembles the core for the browser host. */
 export function createImp(options: ImpOptions): Imp {
@@ -99,10 +116,18 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
+  const codec = createDefaultAudioCodec(
+    options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
+  );
   const modes: readonly Mode[] = [
     createMovieMode({
       provider,
+      film: {
+        codec,
+        ...(options.filmRenderer === undefined ? {} : { renderer: options.filmRenderer }),
+      },
       ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
+      ...(options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber }),
     }),
   ];
   const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
@@ -118,9 +143,7 @@ export function createImp(options: ImpOptions): Imp {
       audioLibrarySource,
     ]),
     ...createAudioCommands({
-      codec: createDefaultAudioCodec(
-        options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
-      ),
+      codec,
       links: [createSceneAudioLink()],
     }),
     ...createWorldCommands({
