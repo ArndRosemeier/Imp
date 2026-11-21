@@ -5,6 +5,8 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import { createDefaultAudioCodec } from '@imp/audio';
+import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands } from './library.js';
 import { createSoundCommands } from './sounds.js';
@@ -166,7 +168,10 @@ export const filmEditor: Role = {
     'makes it rather than cutting around it. Judge continuity across shots, such as the same',
     'look of a character, the same light and place within a scene, and levels between scenes,',
     'and name the weak shots by number so that only they are made again. Work scene by scene;',
-    'a film can be long and you never need the whole of it at once.',
+    'a film can be long and you never need the whole of it at once. When a scene or the film',
+    'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
+    'film); it renders offline and waits until the file is done. Say what was not ready or',
+    'came out silent, and tell the person they can download it on the Edit screen.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -202,6 +207,8 @@ export function createMovieMode(options: {
   readonly provider: GenerationProvider;
   /** Re-encodes key frames as JPEG for video models that take nothing else as a start frame. */
   readonly frameImage?: FrameImageEncoder;
+  /** How films are exported: the sound decoder, and the host's renderer if it has one. */
+  readonly film?: FilmExportOptions;
 }): Mode {
   return defineMode({
     id: MODE_ID,
@@ -226,6 +233,7 @@ export function createMovieMode(options: {
       ...createFrameCommands(options.provider, options.frameImage),
       ...createSoundCommands(options.provider),
       ...createEditCommands(options.provider),
+      ...createFilmExportCommands(options.film ?? { codec: createDefaultAudioCodec() }),
       ...libraryCommands,
     ],
     roles: [

@@ -39,6 +39,8 @@ export const movieSceneKey = (projectId: string, sceneId: string): string =>
 /** The recorded lines of a scene's own-lane characters. */
 export const linePrefix = (projectId: string, sceneId: string): string =>
   `${base(projectId)}lines/${sceneId}/`;
+/** Rendered films: a record each, and its file in parts in the blob store. */
+export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 

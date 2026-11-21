@@ -14,6 +14,27 @@ export interface AudioCommandOptions {
   readonly links?: readonly AudioLink[];
 }
 
+const caches = new WeakMap<AudioCodec, WeakMap<BlobStore, AudioSources>>();
+
+/**
+ * The decoded-sound cache of a store and codec, one for the whole core, so
+ * the audio commands and anything else that mixes (a film export) share what
+ * was decoded and its memory budget.
+ */
+export function audioSourcesFor(blobs: BlobStore, codec: AudioCodec): AudioSources {
+  let byStore = caches.get(codec);
+  if (byStore === undefined) {
+    byStore = new WeakMap();
+    caches.set(codec, byStore);
+  }
+  let sources = byStore.get(blobs);
+  if (sources === undefined) {
+    sources = new AudioSources(blobs, codec);
+    byStore.set(blobs, sources);
+  }
+  return sources;
+}
+
 /** Decibels rounded to a tenth, with silence as null (JSON has no infinity). */
 function decibels(level: number): number | null {
   const value = toDecibels(level);
@@ -30,16 +51,7 @@ const round = (value: number, places: number): number => {
  * key, whichever mode made it, so they belong to no mode.
  */
 export function createAudioCommands(options: AudioCommandOptions): readonly Command[] {
-  // One decoded-sound cache per store, shared by every command.
-  const caches = new WeakMap<BlobStore, AudioSources>();
-  const sourcesFor = (blobs: BlobStore): AudioSources => {
-    let sources = caches.get(blobs);
-    if (sources === undefined) {
-      sources = new AudioSources(blobs, options.codec);
-      caches.set(blobs, sources);
-    }
-    return sources;
-  };
+  const sourcesFor = (blobs: BlobStore): AudioSources => audioSourcesFor(blobs, options.codec);
   const describe = async (blobs: BlobStore, id: string, key: string) => {
     try {
       return await sourcesFor(blobs).describe(key);
