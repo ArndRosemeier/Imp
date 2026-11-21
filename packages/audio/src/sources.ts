@@ -6,6 +6,8 @@ import { forEngine, frameCount, levels } from './pcm.js';
 import type { Peaks } from './peaks.js';
 import { computePeaks, decodePeaks, encodePeaks } from './peaks.js';
 import { toSeconds } from './time.js';
+import { applyEffects, effectsKey, type Effect } from './effects.js';
+import { encodeWav } from './wav.js';
 
 /** What is known about a stored sound once it was decoded. */
 export interface SourceInfo {
@@ -87,6 +89,26 @@ export class AudioSources {
     return this.#decode(key, bytes, mediaType, hash);
   }
 
+  /**
+   * The key of a stored sound with effects applied. The processed sound is
+   * rendered once and kept beside the source as a float WAV, so every place
+   * that plays the region (the editor, the Edit stage, exports) hears the
+   * same thing without processing it again. Without effects it is the
+   * source's own key.
+   */
+  async processedKey(key: string, effects: readonly Effect[]): Promise<string> {
+    if (effects.length === 0) return key;
+    const { bytes } = await this.#read(key);
+    const processed = `${key}.audio/${fingerprint(bytes)}/fx/${fingerprint(asciiBytes(effectsKey(effects)))}.wav`;
+    if ((await this.blobs.get(processed)) !== undefined) return processed;
+    const pcm = applyEffects(await this.pcm(key), effects);
+    await this.blobs.put(processed, {
+      bytes: encodeWav(pcm, 'float32'),
+      mediaType: 'audio/wav',
+    });
+    return processed;
+  }
+
   /** The samples of a stored sound, stereo at the engine rate. */
   async pcm(key: string): Promise<StereoPcm> {
     const { bytes, mediaType } = await this.#read(key);
@@ -132,10 +154,10 @@ export class AudioSources {
     };
     const peaks = computePeaks(pcm);
     // Drop what was cached for an earlier version of the file.
-    for (const stale of await this.blobs.list(`${key}.audio/`)) {
-      await this.blobs.delete(stale);
-    }
     const base = `${key}.audio/${hash}`;
+    for (const stale of await this.blobs.list(`${key}.audio/`)) {
+      if (!stale.startsWith(`${base}/`)) await this.blobs.delete(stale);
+    }
     const octets = 'application/octet-stream';
     await this.blobs.put(`${base}/peaks`, { bytes: encodePeaks(peaks), mediaType: octets });
     await this.blobs.put(`${base}/info`, {

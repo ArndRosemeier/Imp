@@ -1,6 +1,7 @@
 import {
   AudioDoc,
   audioSourcesFor,
+  EffectError,
   MissingSourceError,
   renderDoc,
   toFrames,
@@ -276,6 +277,12 @@ export async function planFilm(
   return { pictures, scenes, durationSeconds: at, notReady };
 }
 
+/** The same file with other effects is another sound. */
+const soundKey = (region: SoundPlacement): string =>
+  region.effects.length === 0
+    ? region.blobKey
+    : `${region.blobKey}\n${JSON.stringify(region.effects)}`;
+
 /**
  * The film's sound, mixed scene by scene with the audio editor's engine, so
  * the export sounds as the scene sounds there (volumes, gain, fades, pan and
@@ -306,7 +313,7 @@ class FilmMix {
       const { doc, decoded } = await this.#open(index, scene);
       const [sceneLeft, sceneRight] = renderDoc(
         doc,
-        (region: SoundPlacement) => decoded.get(region.blobKey),
+        (region: SoundPlacement) => decoded.get(soundKey(region)),
         from - sceneStart,
         to - from,
       );
@@ -330,16 +337,25 @@ class FilmMix {
       lengthOf,
     );
     const decoded = new Map<string, StereoPcm>();
+    const failed = new Set<string>();
     const regions = tracks.flatMap((track: Track) => track.regions);
     for (const region of regions) {
-      const key = region.blobKey;
-      if (key === '' || decoded.has(key)) continue;
+      const key = soundKey(region);
+      if (region.blobKey === '' || decoded.has(key) || failed.has(key)) continue;
       try {
-        decoded.set(key, await this.sources.pcm(key));
+        decoded.set(
+          key,
+          await this.sources.pcm(await this.sources.processedKey(region.blobKey, region.effects)),
+        );
       } catch (error) {
-        if (!(error instanceof MissingSourceError || error instanceof UnsupportedAudioError)) {
+        if (!(
+          error instanceof MissingSourceError ||
+          error instanceof UnsupportedAudioError ||
+          error instanceof EffectError
+        )) {
           throw error;
         }
+        failed.add(key);
         this.unheard.add(region.label === '' ? region.id : region.label);
       }
     }
@@ -412,7 +428,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
     id: 'movie.edit.export',
     title: 'Export the film',
     description:
-      'Renders the cut of the whole film, or of the scenes you name, into one MP4 video file kept in the project: pictures with their trims and fades, title cards, and the sound mixed as in the audio editor (dialogue, clip sound, effects, music, character lanes, with volume, gain, fades and pan). It renders offline, faster than real time, and waits until the file is done (a few seconds to minutes). Returns the rendered film: its id, length, size, codecs, any items that were not ready, and sounds that could not be decoded. Check movie.edit.film first; items whose clip is missing take no time and are left out. The person downloads the file from the Edit screen. Only one film renders at a time.',
+      'Renders the cut of the whole film, or of the scenes you name, into one MP4 video file kept in the project: pictures with their trims and fades, title cards, and the sound mixed as in the audio editor (dialogue, clip sound, effects, music, character lanes, with volume, gain, fades, pan and region effects). It renders offline, faster than real time, and waits until the file is done (a few seconds to minutes). Returns the rendered film: its id, length, size, codecs, any items that were not ready, and sounds that could not be decoded. Check movie.edit.film first; items whose clip is missing take no time and are left out. The person downloads the file from the Edit screen. Only one film renders at a time.',
     effect: 'write',
     input: z.object({
       projectId: ProjectId,

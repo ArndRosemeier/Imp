@@ -5,12 +5,14 @@ export function NumberField({
   value,
   step,
   max,
+  min = 0,
   onCommit,
 }: {
   label: string;
   value: number;
   step: number;
   max: number;
+  min?: number;
   onCommit: (value: number) => void;
 }): ReactElement {
   // What is typed stays until the field is left; then the stored value shows again.
@@ -22,7 +24,7 @@ export function NumberField({
       <input
         className="input"
         type="number"
-        min={0}
+        min={min}
         max={max}
         step={step}
         value={text}
@@ -32,7 +34,7 @@ export function NumberField({
         onBlur={() => {
           const next = Number(text);
           setTyped(null);
-          if (Number.isFinite(next) && next >= 0 && next <= max && next !== value) onCommit(next);
+          if (Number.isFinite(next) && next >= min && next <= max && next !== value) onCommit(next);
         }}
       />
     </label>

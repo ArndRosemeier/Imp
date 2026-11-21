@@ -7,7 +7,7 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
-import { createAudioCommands, createDefaultAudioCodec, type AudioCodec } from '@imp/audio';
+import { createAudioCommands, createDefaultAudioCodec, type Mp4AudioDecoder } from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
@@ -72,10 +72,11 @@ export interface ImpOptions {
    */
   readonly frameImage?: FrameImageEncoder;
   /**
-   * Decodes stored sound. Defaults to the decoders every host has; the browser
-   * host wraps them to decode the sound of video clips (AAC) with WebCodecs.
+   * Decodes the sound inside video clips (AAC), which needs a native decoder:
+   * WebCodecs in the browser, ffmpeg on the local server. Without it, clip
+   * sound plays as silence and is reported as unheard.
    */
-  readonly audioCodec?: AudioCodec;
+  readonly mp4Audio?: Mp4AudioDecoder;
   /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
   readonly filmRenderer?: FilmRenderer;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
@@ -99,7 +100,9 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
-  const codec = options.audioCodec ?? createDefaultAudioCodec();
+  const codec = createDefaultAudioCodec(
+    options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
+  );
   const modes: readonly Mode[] = [
     createMovieMode({
       provider,

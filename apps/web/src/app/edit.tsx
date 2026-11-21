@@ -828,7 +828,7 @@ function SceneEditor({
             <LineInspector
               line={line}
               who={cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? 'Line'}
-              url={urls.get(line.take?.blobKey ?? '')}
+              url={urls.get(line.playKey ?? line.take?.blobKey ?? '')}
               sceneId={sceneId}
               act={act}
               onGone={() => {
@@ -899,6 +899,29 @@ function SceneEditor({
                     void run('movie.edit.sound.update', {
                       placementId: placement.id,
                       fadeOutSeconds: value,
+                    });
+                  }}
+                />
+                <NumberField
+                  label="Pan (-1 left, 1 right)"
+                  value={placement.pan}
+                  step={0.1}
+                  min={-1}
+                  max={1}
+                  onCommit={(value) => {
+                    void run('movie.edit.sound.update', { placementId: placement.id, pan: value });
+                  }}
+                />
+                <NumberField
+                  label="Gain (dB)"
+                  value={placement.gainDb}
+                  step={1}
+                  min={-60}
+                  max={24}
+                  onCommit={(value) => {
+                    void run('movie.edit.sound.update', {
+                      placementId: placement.id,
+                      gainDb: value,
                     });
                   }}
                 />

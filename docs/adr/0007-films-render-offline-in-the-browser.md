@@ -33,10 +33,9 @@ many clips, so exporting has to be a command like every other ability.
    so no single value or buffer holds a whole film; the MP4 header is filled
    in last by writing into the first part again. The page joins the parts
    into one download.
-5. **The sound of video clips is decoded with WebCodecs** in the browser
-   host (`withClipSound` wraps the default codec), which settles the AAC
-   consequence of ADR 6 there: clip sound is heard in exports, the audio
-   editor and `audio.inspect`.
+5. **Clip sound is heard in exports** through the host's MP4 sound decoder
+   (WebCodecs in the browser), which the film's mix shares with the audio
+   commands, decoded samples included.
 
 ## Consequences
 
@@ -45,7 +44,7 @@ many clips, so exporting has to be a command like every other ability.
 - The local server has no renderer yet, so agents cannot export in server
   mode; one that runs ffmpeg can implement `FilmRenderer` later without
   changing the commands.
-- The renderer and clip decoding need a real browser and are left out of the
+- The renderer needs a real browser and are left out of the
   Node coverage figures; they are checked by rendering in Chromium.
 - A render that a reload interrupts is reported as failed and can be started
   again.

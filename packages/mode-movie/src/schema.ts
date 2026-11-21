@@ -1,4 +1,4 @@
-import { SoundPlacement } from '@imp/audio';
+import { Effect, SoundPlacement } from '@imp/audio';
 import { z } from 'zod';
 
 export const MODE_ID = 'movie';
@@ -310,6 +310,8 @@ export const CutLine = z.object({
   volume: z.number().min(0).max(1).default(1),
   fadeInSeconds: z.number().min(0).default(0),
   fadeOutSeconds: z.number().min(0).default(0),
+  /** Processing of the recording (EQ, noise reduction and the like), set in the audio editor. */
+  effects: z.array(Effect).max(12).default([]),
 });
 export type CutLine = z.infer<typeof CutLine>;
 

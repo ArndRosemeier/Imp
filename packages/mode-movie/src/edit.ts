@@ -262,6 +262,9 @@ const PlacementFields = SoundPlacement.pick({
   fadeOutSeconds: true,
   loop: true,
   trimStartSeconds: true,
+  pan: true,
+  gainDb: true,
+  fadeCurve: true,
 });
 
 const InsertAt = z
@@ -797,7 +800,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.sound.update',
     title: 'Change placed sound',
     description:
-      'Changes where, how loud and from where in the source a placed sound plays. Fields left out stay as they are.',
+      'Changes where, how loud and from where in the source a placed sound plays, and its pan (-1 left to 1 right, 0 is the middle), extra gain in dB and the shape of its fades. Fields left out stay as they are.',
     effect: 'write',
     input: PlacementFields.partial().extend({
       projectId: ProjectId,
@@ -820,6 +823,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         fadeInSeconds: changes.fadeInSeconds ?? before.fadeInSeconds,
         fadeOutSeconds: changes.fadeOutSeconds ?? before.fadeOutSeconds,
         loop: changes.loop ?? before.loop,
+        pan: changes.pan ?? before.pan,
+        gainDb: changes.gainDb ?? before.gainDb,
+        fadeCurve: changes.fadeCurve ?? before.fadeCurve,
       };
       await save(runtime, projectId, cut, {
         ...cut,

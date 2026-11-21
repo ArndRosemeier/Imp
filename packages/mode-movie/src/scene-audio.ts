@@ -190,6 +190,7 @@ async function readScene(
           fadeInSeconds: line.fadeInSeconds,
           fadeOutSeconds: line.fadeOutSeconds,
           loop: false,
+          effects: line.effects,
         }),
       );
     }
@@ -304,6 +305,7 @@ export function createSceneAudioLink(): AudioLink {
             volume: region.volume,
             fadeInSeconds: region.fadeInSeconds,
             fadeOutSeconds: region.fadeOutSeconds,
+            effects: region.effects,
           });
         }
       }

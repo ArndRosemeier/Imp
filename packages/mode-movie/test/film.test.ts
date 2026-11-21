@@ -252,6 +252,36 @@ describe('exporting a film', () => {
     expect(listed.exports.map((entry) => entry.id)).toEqual([film.id]);
   });
 
+  it("plays a sound's effects as the audio editor does", async () => {
+    const fake = fakeRenderer();
+    const { runtime, run, projectId, second } = await setup(fake.renderer);
+    await run('movie.edit.sound.place', {
+      projectId,
+      sceneId: second,
+      soundId: 'wind',
+      startSeconds: 0,
+    });
+    const key = `projects/${projectId}/movie/edit/${second}`;
+    const cut = (await runtime.store.get(key)) as { sounds: Record<string, unknown>[] };
+    await runtime.store.batch([
+      {
+        type: 'put',
+        key,
+        value: {
+          ...cut,
+          sounds: cut.sounds.map((placement) => ({
+            ...placement,
+            effects: [{ kind: 'limiter', ceilingDb: -12, releaseMs: 60 }],
+          })),
+        },
+      },
+    ]);
+    await run('movie.edit.export', { projectId, sceneIds: [second] });
+    // A 0.5 level held under -12 dB (0.25) by the limiter.
+    expect(sample(fake.seen.left, 0.8)).toBeLessThan(0.27);
+    expect(sample(fake.seen.left, 0.8)).toBeGreaterThan(0.2);
+  });
+
   it('exports chosen scenes, at a chosen size and rate', async () => {
     const fake = fakeRenderer();
     const { run, projectId, second } = await setup(fake.renderer);

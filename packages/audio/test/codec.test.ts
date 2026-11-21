@@ -99,7 +99,7 @@ describe('sniffAudioFormat', () => {
 });
 
 describe('default codec', () => {
-  it('says plainly that the sound of video clips cannot be decoded yet', async () => {
+  it('says plainly that the sound of video clips needs a host decoder', async () => {
     const error = await createDefaultAudioCodec()
       .decode(fixture('sine-440-stereo-48k.m4a'), 'video/mp4')
       .catch((caught: unknown) => caught);

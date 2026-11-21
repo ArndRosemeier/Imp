@@ -30,8 +30,11 @@ import {
   type PointerEvent,
   type ReactElement,
 } from 'react';
+import { Effect } from '@imp/audio';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { NumberInput } from './audio-controls.js';
+import { EffectsPanel } from './audio-fx.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
 
@@ -51,6 +54,7 @@ const Region = z.object({
   fadeInSeconds: z.number(),
   fadeOutSeconds: z.number(),
   fadeCurve: FadeCurve,
+  effects: z.array(Effect).default([]),
 });
 type Region = z.infer<typeof Region>;
 const Track = z.object({
@@ -110,7 +114,12 @@ const Library = z.object({
     }),
   ),
 });
-const Outline = z.object({ min: z.array(z.number()), max: z.array(z.number()) });
+const Outline = z.object({
+  fromSeconds: z.number(),
+  toSeconds: z.number(),
+  min: z.array(z.number()),
+  max: z.array(z.number()),
+});
 const Measured = z.object({ durationSeconds: z.number() });
 const Rendered = z.object({ key: z.string(), durationSeconds: z.number() });
 
@@ -265,6 +274,7 @@ function RegionWave({
   const imp = useImp();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [outline, setOutline] = useState<z.infer<typeof Outline> | null>(null);
+  const [unheard, setUnheard] = useState<string | null>(null);
   // Ask for a power of two of slices, so zooming a little does not ask again.
   const buckets = Math.min(4000, 2 ** Math.ceil(Math.log2(Math.max(8, width))));
   const length = region.endSeconds - region.startSeconds;
@@ -277,10 +287,16 @@ function RegionWave({
       buckets,
     }).then(
       (output) => {
-        if (active) setOutline(Outline.parse(output));
+        if (!active) return;
+        setOutline(Outline.parse(output));
+        setUnheard(null);
       },
-      () => {
-        if (active) setOutline(null);
+      (reason: unknown) => {
+        if (!active) return;
+        setOutline(null);
+        // Past the end of its sound a region is silent by design, not unheard.
+        const message = messageOf(reason);
+        setUnheard(message.includes('range inside it') ? null : message);
       },
     );
     return () => {
@@ -303,10 +319,12 @@ function RegionWave({
     const level = region.volume * dbToGain(region.gainDb);
     const middle = height / 2;
     const slices = outline.min.length;
+    // The sound may end before the region does; past its end there is nothing to draw.
+    const drawn = Math.min(w, (w * (outline.toSeconds - outline.fromSeconds)) / length);
     context.fillStyle = color;
     context.beginPath();
-    for (let x = 0; x < w; x++) {
-      const index = Math.min(slices - 1, Math.floor((x / w) * slices));
+    for (let x = 0; x < drawn; x++) {
+      const index = Math.min(slices - 1, Math.floor((x / drawn) * slices));
       const gain = level * fadeAt(region, (x / w) * length);
       const top = Math.min(1, (outline.max[index] ?? 0) * gain);
       const bottom = Math.max(-1, (outline.min[index] ?? 0) * gain);
@@ -317,7 +335,16 @@ function RegionWave({
     context.fill();
   }, [outline, width, height, region, length]);
 
-  return <canvas ref={canvas} className="wave" aria-hidden="true" style={{ width, height }} />;
+  return (
+    <>
+      <canvas ref={canvas} className="wave" aria-hidden="true" style={{ width, height }} />
+      {unheard !== null && (
+        <span className="unheard" title={unheard}>
+          Silent here: {unheard}
+        </span>
+      )}
+    </>
+  );
 }
 
 /** Where in a region a pointer grabbed it. */
@@ -388,58 +415,6 @@ function ToolButton({
   );
 }
 
-function NumberInput({
-  label,
-  value,
-  step,
-  min,
-  max,
-  unit,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  step: number;
-  min: number;
-  max: number;
-  unit?: string;
-  onCommit: (value: number) => void;
-}): ReactElement {
-  const id = useId();
-  const [typed, setTyped] = useState<string | null>(null);
-  const text = typed ?? String(Math.round(value * 1000) / 1000);
-  return (
-    <div className="knob">
-      <label htmlFor={id}>{label}</label>
-      <span className="knob-input">
-        <input
-          id={id}
-          className="input"
-          type="number"
-          step={step}
-          min={min}
-          max={max}
-          value={text}
-          onChange={(event) => {
-            setTyped(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur();
-          }}
-          onBlur={() => {
-            const next = Number(text);
-            setTyped(null);
-            if (Number.isFinite(next) && next !== value) {
-              onCommit(Math.min(max, Math.max(min, next)));
-            }
-          }}
-        />
-        {unit !== undefined && <span className="muted">{unit}</span>}
-      </span>
-    </div>
-  );
-}
-
 /** Who made a step, in words. */
 function byWhom(step: z.infer<typeof Step>): string {
   // The cut of a scene keeps its steps without saying who made them.
@@ -459,11 +434,14 @@ function Inspector({
   history,
   edit,
   onSelectRegion,
+  stretch,
 }: {
   doc: Doc;
   region: Region | undefined;
   track: Track | undefined;
   history: History | undefined;
+  /** A selected stretch inside the region. */
+  stretch: { from: number; to: number } | null;
   edit: (id: string, input?: Record<string, unknown>) => Promise<unknown>;
   onSelectRegion: (region: Region) => void;
 }): ReactElement {
@@ -577,6 +555,12 @@ function Inspector({
               Select its time
             </button>
           </div>
+          <EffectsPanel
+            regionId={region.id}
+            effects={region.effects}
+            stretch={stretch}
+            edit={edit}
+          />
         </section>
       ) : track !== undefined ? (
         <section className="stack">
@@ -762,7 +746,22 @@ function AudioEditor({
 
   const tracks = doc.tracks;
   const allRegions = tracks.flatMap((track) => track.regions.map((region) => ({ track, region })));
-  const picked = allRegions.find((entry) => entry.region.id === regionId);
+  // A stretch selected on one track inside one region shows that region, so
+  // its effects can learn from the stretch (noise reduction).
+  const inside =
+    selection !== null && selection.trackIds.length === 1 && selection.to - selection.from > 0.01
+      ? allRegions.find(
+          (entry) =>
+            entry.track.id === selection.trackIds[0] &&
+            entry.region.startSeconds <= selection.from + 1e-6 &&
+            entry.region.endSeconds >= selection.to - 1e-6,
+        )
+      : undefined;
+  const picked = allRegions.find((entry) => entry.region.id === regionId) ?? inside;
+  const stretch =
+    inside !== undefined && picked === inside && selection !== null
+      ? { from: selection.from, to: selection.to }
+      : null;
   const pickedTrack = tracks.find((track) => track.id === trackId) ?? picked?.track;
   const length = Math.max(doc.durationSeconds, player.at);
   const width = Math.max(length + 10, 30) * zoom;
@@ -1498,6 +1497,7 @@ function AudioEditor({
           track={pickedTrack}
           history={history}
           edit={edit}
+          stretch={stretch}
           onSelectRegion={(region) => {
             const owner = allRegions.find((entry) => entry.region.id === region.id)?.track;
             if (owner === undefined) return;

@@ -44,6 +44,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@imp/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
       '@imp/core':
         specifier: workspace:*
         version: link:../../packages/core
