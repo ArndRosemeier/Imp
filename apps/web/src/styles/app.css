@@ -262,7 +262,7 @@ kbd {
   cursor: pointer;
 }
 @media (hover: hover) {
-  .nav-item:hover:not(:disabled) {
+  .nav-item:hover:not(:disabled, [aria-current='page']) {
     background: var(--surface);
   }
 }

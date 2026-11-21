@@ -427,7 +427,9 @@ describe('delegation', () => {
 });
 
 describe('coordinatorRole', () => {
-  it('may read, write and ask to spend, but not destroy', () => {
-    expect(coordinatorRole.scope).toEqual({ effects: ['read', 'write', 'spend'] });
+  it('may read and write, and ask to spend or delete', () => {
+    expect(coordinatorRole.scope).toEqual({
+      effects: ['read', 'write', 'spend', 'destructive'],
+    });
   });
 });

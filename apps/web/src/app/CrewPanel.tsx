@@ -226,7 +226,7 @@ export function CrewPanel({
         {messages.length === 0 && (
           <p className="muted">
             Tell {member.name} what you want to make or set up. It acts through the same commands
-            you have, and asks before spending.
+            you have, and asks before spending or deleting.
           </p>
         )}
         {messages.map((message, index) => {

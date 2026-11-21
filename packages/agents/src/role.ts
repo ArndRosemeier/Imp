@@ -122,7 +122,8 @@ export const coordinatorRole: Role = {
     'Giving a task costs money, so the user is asked to approve it first. Prefer doing over',
     "asking, and ask only when a choice is truly the user's. Be brief and concrete.",
   ].join(' '),
-  // Spending is in scope so that it can be asked for; the policy still puts it to the user.
-  scope: { effects: ['read', 'write', 'spend'] },
+  // Spending and deleting are in scope so that they can be asked for; the policy still puts
+  // them to the user. Anything the person can do, the coordinator can ask to do.
+  scope: { effects: ['read', 'write', 'spend', 'destructive'] },
   direct: ['crew.', 'project.', 'settings.', 'models.'],
 };

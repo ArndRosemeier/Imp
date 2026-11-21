@@ -472,9 +472,12 @@ describe('App', () => {
       { content: 'Waiting for you.' },
     ]);
     await completeSetup(user);
-    // Deleting is outside what the coordinator may do, so it cannot even ask for it.
+    // Deleting is put to the person first; declining lets the coordinator carry on.
     await user.type(screen.getByLabelText('Message to Coordinator'), 'Delete it.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
+    const deleting = await screen.findByRole('region', { name: 'Needs your approval' });
+    expect(within(deleting).getByText('Delete project')).toBeTruthy();
+    await user.click(within(deleting).getByRole('button', { name: /Decline/ }));
     expect(await screen.findByText('Waiting for you.')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Needs your approval' })).toBeNull();
 
