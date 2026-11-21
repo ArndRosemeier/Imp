@@ -8,7 +8,14 @@ import {
 import { z } from 'zod';
 import { docDuration, regionDuration, type AudioDoc, type Track } from './doc.js';
 import { measureLoudness } from './dsp/loudness.js';
-import { Effect, EffectError, type EffectKind } from './effects.js';
+import {
+  Effect,
+  EffectError,
+  VOICE_PRESETS,
+  voicePreset,
+  type EffectKind,
+  type VoicePreset,
+} from './effects.js';
 import { UnsupportedAudioError } from './codec.js';
 import type { SoundPlacement } from './placement.js';
 import { MissingSourceError, type AudioSources } from './sources.js';
@@ -201,6 +208,52 @@ export function createEffectCommands(helpers: EffectCommandHelpers): readonly Co
     'Raises or lowers regions to an integrated loudness (LUFS), with true peaks kept under a ceiling: -23 LUFS for broadcast (EBU R 128), -16 for online video, -14 for streaming music. Each region is set on its own, so lines recorded at different levels match.',
   );
 
+  const distortion = kindCommand(
+    'distortion',
+    'Distort',
+    'Drives regions into distortion: soft is warm overdrive, hard is harsh clipping, fold is metallic. Use toneHz to soften the fizz and mix to blend with the dry voice. For a ready-made phone, radio or megaphone, use audio.fx.voice.',
+  );
+  const pitch = kindCommand(
+    'pitch',
+    'Shift pitch',
+    'Moves the pitch of regions up or down in semitones (12 is an octave) without changing their length, so lines stay in sync with the picture. Small shifts (1 to 3) age or de-age a voice; large ones make creatures or chipmunks.',
+  );
+  const ringmod = kindCommand(
+    'ringmod',
+    'Ring modulate',
+    'Multiplies regions by a tone: at 30 to 80 Hz the robot voice of old films, higher for bells and metal.',
+  );
+  const crushCommand = kindCommand(
+    'crush',
+    'Bit crush',
+    'Reduces bits and sample rate of regions: the grit of cheap radios, toys and old games.',
+  );
+
+  const presetNames = Object.keys(VOICE_PRESETS) as [VoicePreset, ...VoicePreset[]];
+  const voice = defineCommand({
+    id: 'audio.fx.voice',
+    title: 'Apply a voice',
+    description: `Gives regions a ready-made voice, made of a few effects that replace effects of the same kinds already there: ${presetNames.map((name) => `${name} (${VOICE_PRESETS[name].description})`).join('; ')}. Adjust the parts afterwards with audio.fx.* or remove them with audio.fx.remove.`,
+    effect: 'write',
+    input: z.object({ ...target, preset: z.enum(presetNames) }),
+    output: helpers.outline,
+    handler: async (context, { projectId, docId, regionIds, trackId, preset }) => {
+      const id = 'audio.fx.voice';
+      const doc = await helpers.load(context.runtime, id, projectId, docId);
+      const parts = voicePreset(preset);
+      const chains = new Map(
+        regionsIn(doc, id, regionIds, trackId).map((regionId) => [
+          regionId,
+          parts.reduce(
+            (chain, part) => placeEffect(chain, part),
+            helpers.regionOf(doc, id, regionId).region.effects,
+          ),
+        ]),
+      );
+      return setChains(context, id, projectId, docId, `Voice: ${preset}`, chains);
+    },
+  });
+
   const denoise = defineCommand({
     id: 'audio.fx.denoise',
     title: 'Reduce noise',
@@ -279,7 +332,9 @@ export function createEffectCommands(helpers: EffectCommandHelpers): readonly Co
     input: z.object({
       ...target,
       kind: z
-        .enum(['eq', 'compressor', 'limiter', 'denoise', 'loudness'])
+        .enum(
+          Effect.options.map((option) => option.shape.kind.value) as [EffectKind, ...EffectKind[]],
+        )
         .optional()
         .describe('Leave out to remove every effect.'),
     }),
@@ -381,5 +436,20 @@ export function createEffectCommands(helpers: EffectCommandHelpers): readonly Co
     },
   });
 
-  return [eq, compressor, limiter, denoise, loudness, set, remove, analyze, processed];
+  return [
+    eq,
+    compressor,
+    limiter,
+    denoise,
+    loudness,
+    distortion,
+    pitch,
+    ringmod,
+    crushCommand,
+    voice,
+    set,
+    remove,
+    analyze,
+    processed,
+  ];
 }

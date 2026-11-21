@@ -267,4 +267,41 @@ describe('effect commands', () => {
     };
     expect(heard.unheard).toEqual(['Music']);
   });
+
+  it('gives regions a ready-made voice that replaces effects of the same kinds', async () => {
+    const { run, projectId, docId, voice } = await setup();
+    const base = { projectId, docId, regionIds: [voice.id] };
+    await run('audio.fx.eq', { ...base, bands: [{ type: 'highpass', frequency: 90 }] });
+    await run('audio.fx.limiter', base);
+    const phoned = await run('audio.fx.voice', { ...base, preset: 'telephone' });
+    expect(regionIn(phoned, voice.id)?.effects.map((effect) => effect.kind)).toEqual([
+      'eq',
+      'limiter',
+      'distortion',
+      'crush',
+    ]);
+    expect(regionIn(phoned, voice.id)?.effects[0]).toMatchObject({
+      bands: [{ type: 'highpass', frequency: 400 }, {}, {}],
+    });
+    const robot = await run('audio.fx.voice', { ...base, preset: 'robot' });
+    expect(regionIn(robot, voice.id)?.effects.map((effect) => effect.kind)).toEqual([
+      'eq',
+      'limiter',
+      'distortion',
+      'crush',
+      'ringmod',
+      'pitch',
+    ]);
+    const lower = await run('audio.fx.pitch', { ...base, semitones: -5 });
+    expect(regionIn(lower, voice.id)?.effects.find((effect) => effect.kind === 'pitch')).toEqual({
+      kind: 'pitch',
+      semitones: -5,
+    });
+    await run('audio.fx.distortion', { ...base, shape: 'fold' });
+    await run('audio.fx.ringmod', { ...base, frequency: 30 });
+    const crushed = await run('audio.fx.crush', { ...base, bits: 4 });
+    expect(regionIn(crushed, voice.id)?.effects).toHaveLength(6);
+    const removed = await run('audio.fx.remove', { ...base, kind: 'ringmod' });
+    expect(regionIn(removed, voice.id)?.effects).toHaveLength(5);
+  }, 30_000);
 });

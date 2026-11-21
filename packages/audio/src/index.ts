@@ -19,7 +19,10 @@ export {
   Effect,
   EffectError,
   EqBand,
+  VOICE_PRESETS,
+  voicePreset,
   type EffectKind,
+  type VoicePreset,
 } from './effects.js';
 export { designBiquad, responseDb, type FilterSpec, type FilterType } from './dsp/biquad.js';
 export { measureLoudness, type LoudnessReport } from './dsp/loudness.js';

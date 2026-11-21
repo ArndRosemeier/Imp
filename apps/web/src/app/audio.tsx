@@ -699,6 +699,8 @@ function AudioEditor({
   const [zoom, setZoom] = useState(80);
   const [selection, setSelection] = useState<RangeSelection | null>(null);
   const [regionId, setRegionId] = useState<string | null>(null);
+  /** The picked region as last seen, to follow it when an edit gives it a new id. */
+  const [seen, setSeen] = useState<{ id: string; key: string; startSeconds: number } | null>(null);
   const [trackId, setTrackId] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [lengths, setLengths] = useState<ReadonlyMap<string, number>>(new Map());
@@ -757,7 +759,20 @@ function AudioEditor({
             entry.region.endSeconds >= selection.to - 1e-6,
         )
       : undefined;
-  const picked = allRegions.find((entry) => entry.region.id === regionId) ?? inside;
+  const byId = allRegions.find((entry) => entry.region.id === regionId);
+  if (byId !== undefined && seen?.id !== byId.region.id) {
+    setSeen({ id: byId.region.id, key: byId.region.key, startSeconds: byId.region.startSeconds });
+  }
+  // A shot's own sound becomes a region of its own when changed, under a new id: stay on it.
+  if (byId === undefined && regionId !== null && seen?.id === regionId) {
+    const moved = allRegions.find(
+      (entry) =>
+        entry.region.key === seen.key &&
+        Math.abs(entry.region.startSeconds - seen.startSeconds) < 1e-3,
+    );
+    if (moved !== undefined) setRegionId(moved.region.id);
+  }
+  const picked = byId ?? inside;
   const stretch =
     inside !== undefined && picked === inside && selection !== null
       ? { from: selection.from, to: selection.to }

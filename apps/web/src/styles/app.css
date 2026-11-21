@@ -2785,3 +2785,10 @@ dialog.modal::backdrop {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
+.fx-group {
+  margin: var(--space-2) 0 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
