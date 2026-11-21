@@ -35,6 +35,7 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { NumberInput } from './audio-controls.js';
 import { EffectsPanel } from './audio-fx.js';
+import { RecordControl } from './recorder.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
 
@@ -948,7 +949,13 @@ function AudioEditor({
     else if (mod && key === 'v') run(actions.paste);
     else if (mod && key === 'l') run(actions.silence);
     else if (!mod && key === 's') run(actions.split);
-    else if (key === 'delete' || key === 'backspace') run(actions.remove);
+    else if (!mod && key === 'r') {
+      // The record button starts and stops; it lives in its own component.
+      const editor = event.currentTarget;
+      run(() => {
+        editor.querySelector<HTMLButtonElement>('.tool.record, .recording .button')?.click();
+      });
+    } else if (key === 'delete' || key === 'backspace') run(actions.remove);
     else if (key === '=' || key === '+') run(actions.zoomIn);
     else if (key === '-') run(actions.zoomOut);
     else if (key === 'escape')
@@ -1155,6 +1162,20 @@ function AudioEditor({
           </output>
         </div>
         <div className="tools" role="toolbar" aria-label="Edit">
+          <RecordControl
+            imp={imp}
+            projectId={project.id}
+            docId={docId}
+            trackId={pickedTrack?.id}
+            startSeconds={at}
+            disabledReason={
+              doc.link === null
+                ? null
+                : "A scene's sound holds only sounds of the film. Record into a document of its own (New)."
+            }
+            onError={setError}
+          />
+          <span className="tool-gap" />
           <ToolButton
             icon={ScissorsIcon}
             label="Split at playhead"
@@ -1526,9 +1547,9 @@ function AudioEditor({
         />
       </div>
       <p className="muted small shortcuts">
-        Space plays · S splits at the playhead · drag across a track to select (two fingers pan and
-        zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L
-        silences · Ctrl+Z undoes
+        Space plays · R records · S splits at the playhead · drag across a track to select (two
+        fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap
+        · Ctrl+L silences · Ctrl+Z undoes
       </p>
     </div>
   );

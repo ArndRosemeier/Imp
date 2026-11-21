@@ -29,6 +29,7 @@ import type { StereoPcm } from './pcm.js';
 import { toDecibels } from './pcm.js';
 import { Effect, EffectError, effectsKey } from './effects.js';
 import { createEffectCommands } from './fx-commands.js';
+import { createRecordingCommands } from './record-commands.js';
 import { FadeCurve, SoundPlacement } from './placement.js';
 import { UnsupportedAudioError } from './codec.js';
 import { MissingSourceError, type AudioSources } from './sources.js';
@@ -1395,6 +1396,18 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     },
   });
 
+  const helpers = {
+    sources: options.sources,
+    load,
+    change,
+    regionOf,
+    trackOf,
+    mixRange,
+    checkRange,
+    outline: ok,
+    done,
+  };
+
   return [
     list,
     get,
@@ -1424,17 +1437,8 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     redo,
     listen,
     exportCommand,
-    ...createEffectCommands({
-      sources: options.sources,
-      load,
-      change,
-      regionOf,
-      trackOf,
-      mixRange,
-      checkRange,
-      outline: ok,
-      done,
-    }),
+    ...createEffectCommands(helpers),
+    ...createRecordingCommands(helpers),
   ];
 }
 

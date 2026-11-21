@@ -2792,3 +2792,50 @@ dialog.modal::backdrop {
   text-transform: uppercase;
   color: var(--ink-muted);
 }
+.tool.record {
+  color: var(--danger);
+}
+.recording {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: rec-pulse 1.2s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot {
+    animation: none;
+  }
+}
+.rec-meter {
+  position: relative;
+  width: 80px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.rec-meter span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--ok), var(--accent) 75%, var(--danger));
+}
+@media (pointer: coarse) {
+  .recording .button {
+    min-height: var(--hit);
+  }
+}
