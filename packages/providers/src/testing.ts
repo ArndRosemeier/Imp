@@ -8,6 +8,8 @@ import type {
   ModelInfo,
   SoundRequest,
   SpeechRequest,
+  TranscribedWord,
+  TranscriptionRequest,
   VideoJob,
   VideoRequest,
 } from './types.js';
@@ -70,6 +72,10 @@ export function createFakeProvider(script: {
   readonly imageRefusesReferences?: boolean;
   /** When set, `generateSpeech` rejects with it. */
   readonly speechError?: ProviderError;
+  /** When set, `transcribe` rejects with it. */
+  readonly transcriptionError?: ProviderError;
+  /** What `transcribe` hears, word by word. Defaults to nothing. */
+  readonly transcription?: readonly TranscribedWord[];
   /** When set, `generateSound` rejects with it. */
   readonly soundError?: ProviderError;
   /** When set, `startVideo` rejects with it. */
@@ -87,6 +93,7 @@ export function createFakeProvider(script: {
   readonly imageRequests: ImageRequest[];
   readonly speechRequests: SpeechRequest[];
   readonly soundRequests: SoundRequest[];
+  readonly transcriptionRequests: TranscriptionRequest[];
   readonly videoRequests: VideoRequest[];
   /** Adds replies to the end of the script, for ones that depend on what happened first. */
   script(...replies: ScriptedChatReply[]): void;
@@ -97,6 +104,7 @@ export function createFakeProvider(script: {
   const speechRequests: SpeechRequest[] = [];
   const videoRequests: VideoRequest[] = [];
   const soundRequests: SoundRequest[] = [];
+  const transcriptionRequests: TranscriptionRequest[] = [];
   const checks = new Map<string, number>();
   const job = (id: string, status: VideoJob['status']): VideoJob => ({
     id,
@@ -111,7 +119,22 @@ export function createFakeProvider(script: {
     imageRequests,
     speechRequests,
     soundRequests,
+    transcriptionRequests,
     videoRequests,
+    transcribe: (request) => {
+      transcriptionRequests.push(request);
+      if (script.transcriptionError !== undefined) {
+        return Promise.reject(script.transcriptionError);
+      }
+      const words = script.transcription ?? [];
+      return Promise.resolve({
+        model: request.model,
+        text: words.map((word) => word.text).join(' '),
+        words,
+        language: 'en',
+        costUsd: 0.001,
+      });
+    },
     generateSound: (request) => {
       soundRequests.push(request);
       if (script.soundError !== undefined) {

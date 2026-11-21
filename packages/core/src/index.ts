@@ -59,7 +59,15 @@ export { copyTree, createRewriter, removeTree } from './projects/tree.js';
 export { COPY_REQUEST_PREFIX, CopyRequest } from './commands/project-copy.js';
 export { EXPORT_PREFIX, fileNameFor, UPLOAD_PREFIX } from './commands/project-files.js';
 export { Template, templatePrefix } from './commands/project-templates.js';
-export { ArchiveError, crc32, readArchive, writeArchive, type ArchiveEntry } from './archive.js';
+export {
+  ArchiveError,
+  crc32,
+  decodeUtf8,
+  encodeUtf8,
+  readArchive,
+  writeArchive,
+  type ArchiveEntry,
+} from './archive.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export {
   createReleaseCommands,
@@ -69,6 +77,7 @@ export {
 } from './commands/release.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
+export { patchOf } from './patch.js';
 export type { JsonValue } from './json.js';
 export { defaultPolicy, type ExecutionPolicy, type PolicyDecision } from './policy.js';
 export {
@@ -98,3 +107,23 @@ export {
   type ToolScope,
   inputSchemaOf,
 } from './tools.js';
+export { createLibraryCommands, ListedAsset } from './library/commands.js';
+export {
+  BUILT_IN_MODALITIES,
+  detectModality,
+  LibraryAsset,
+  LibraryMeta,
+  ModalityId,
+  OpenTarget,
+  Origin,
+  SourceAsset,
+  type LibraryKindInfo,
+  type LibraryModalityInfo,
+  type LibrarySource,
+} from './library/model.js';
+export {
+  fileKey as libraryFileKey,
+  LibraryItem,
+  libraryPrefix,
+  OWN_SOURCE as LIBRARY_OWN_SOURCE,
+} from './library/own.js';

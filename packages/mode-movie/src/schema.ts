@@ -1,5 +1,6 @@
 import { Effect, SoundPlacement } from '@imp/audio';
 import { z } from 'zod';
+import { Grade, NEUTRAL_GRADE } from './grade.js';
 
 export const MODE_ID = 'movie';
 
@@ -188,6 +189,22 @@ export const KeyFrame = z.object({
 export type KeyFrame = z.infer<typeof KeyFrame>;
 
 /** One uninterrupted piece of film within a scene. */
+/**
+ * A pickup: a shot the edit asked for after the fact, such as a reaction or a
+ * cutaway that covers a jump. Until its clip is ready it stands in the cut as
+ * a slate of its planned length, so the scene can be timed around it.
+ */
+export const Pickup = z.object({
+  /** What the cut needs it for, in the words of whoever asked. */
+  reason: z.string(),
+  /** How long the slate stands in the cut until the clip arrives. */
+  seconds: z.number().min(0.5).max(30),
+  /** "person", or the role of the agent that asked. */
+  requestedBy: z.string(),
+  requestedAt: z.string(),
+});
+export type Pickup = z.infer<typeof Pickup>;
+
 export const Shot = z.object({
   id: z.string(),
   sceneId: z.string(),
@@ -252,6 +269,13 @@ export const Shot = z.object({
   frames: z.array(KeyFrame).default([]),
   frameId: z.string().nullable().default(null),
   clip: Clip.nullable().default(null),
+  /**
+   * Earlier ready clips of the shot, newest first. Making a new clip keeps the
+   * one it replaces here, so a better earlier take can be put back.
+   */
+  takes: z.array(Clip).default([]),
+  /** Set when the shot was asked for from the edit, to fill a gap in the cut. */
+  pickup: Pickup.nullable().default(null),
 });
 export type Shot = z.infer<typeof Shot>;
 
@@ -260,6 +284,10 @@ export type Shot = z.infer<typeof Shot>;
  * which the audio editor shares, so the Edit stage and the editor edit the same data.
  */
 export { SoundPlacement } from '@imp/audio';
+
+/** How a piece comes in after the one before it. */
+export const TransitionKind = z.enum(['cut', 'dissolve', 'dip-black', 'dip-white', 'wipe']);
+export type TransitionKind = z.infer<typeof TransitionKind>;
 
 /**
  * One piece of a scene's cut: a stretch of a shot's clip, or a title card. The
@@ -285,8 +313,41 @@ export const CutItem = z.object({
   /** The words and the length of a title card, for kind "title". */
   text: z.string(),
   titleSeconds: z.number().min(0.5),
+  /** How fast the clip plays: 0.5 is slow motion, 2 double speed. Off speed, its own sound is silent. */
+  speed: z.number().min(0.1).max(8).default(1),
+  /** Plays the stretch backwards, without its own sound. */
+  reverse: z.boolean().default(false),
+  /** Seconds its last frame is held after it has played: a freeze frame. */
+  holdSeconds: z.number().min(0).max(30).default(0),
+  /** A punch-in: 1 shows the whole frame, 2 half its width. */
+  zoom: z.number().min(1).max(4).default(1),
+  /** The zoom it ends on, for a slow push in or pull out; null keeps one zoom. */
+  zoomTo: z.number().min(1).max(4).nullable().default(null),
+  /** The point zoomed on, as shares of the frame's width and height. */
+  focusX: z.number().min(0).max(1).default(0.5),
+  focusY: z.number().min(0).max(1).default(0.5),
+  /** How the piece comes in after the one before it: a cut, or a dissolve, dip or wipe. */
+  transition: TransitionKind.default('cut'),
+  /** How long the transition takes; a dissolve or wipe never covers more than half of either piece. */
+  transitionSeconds: z.number().min(0.1).max(5).default(1),
+  /** Its colour grade, before the film's look. */
+  grade: Grade.default(NEUTRAL_GRADE),
 });
 export type CutItem = z.infer<typeof CutItem>;
+
+/** A piece as filmed: at its own speed, forwards, unzoomed, with no frame held. */
+export const PLAIN_PIECE = {
+  speed: 1,
+  reverse: false,
+  holdSeconds: 0,
+  zoom: 1,
+  zoomTo: null,
+  focusX: 0.5,
+  focusY: 0.5,
+  transition: 'cut',
+  transitionSeconds: 1,
+  grade: NEUTRAL_GRADE,
+} as const satisfies Partial<CutItem>;
 
 /**
  * The cut of a scene: its items in playing order and the sounds that lie under
@@ -315,13 +376,148 @@ export const CutLine = z.object({
 });
 export type CutLine = z.infer<typeof CutLine>;
 
+/** What a piece of text on screen is for; each kind has a style of its own by default. */
+export const TextKind = z.enum(['title', 'lower-third', 'subtitle', 'caption', 'credits']);
+export type TextKind = z.infer<typeof TextKind>;
+
+/**
+ * What a text follows in time instead of keeping a time of its own: a piece of
+ * the picture, or a line that is heard (from a shot, a placed dialogue
+ * recording or a character lane, as movie.edit.get lists them under spoken).
+ * from and to are the share of that piece or line the text covers, so that a
+ * long line can be shown as several subtitles that keep up when the line is
+ * moved, trimmed or recorded again.
+ */
+export const TextAnchor = z.object({
+  on: z.enum(['item', 'shot', 'placement', 'lane']),
+  id: z.string(),
+  from: z.number().min(0).max(1).default(0),
+  to: z.number().min(0).max(1).default(1),
+});
+export type TextAnchor = z.infer<typeof TextAnchor>;
+
+/**
+ * A piece of text over the picture of a scene, on the text lane: a title, a
+ * lower third, a subtitle, an in-frame caption or end credits. It is drawn by
+ * Imp, not by the video model, so it is always legible and can be changed.
+ */
+export const TextItem = z.object({
+  id: z.string(),
+  kind: TextKind,
+  text: z.string(),
+  /** Seconds on the scene timeline. With an anchor, where the anchor was when last seen. */
+  startSeconds: z.number().min(0),
+  durationSeconds: z.number().min(0.2),
+  /** The text style from movie.edit.text.style.list. */
+  styleId: z.string(),
+  anchor: TextAnchor.nullable().default(null),
+  /** Where in the frame, 0 to 1 from the left and from the top, when not where the style puts it. */
+  x: z.number().min(0).max(1).nullable().default(null),
+  y: z.number().min(0).max(1).nullable().default(null),
+  /** Made by movie.edit.subtitles.generate or movie.edit.credits.generate, and replaced when they run again. */
+  generated: z.boolean().default(false),
+});
+export type TextItem = z.infer<typeof TextItem>;
+
+/** The fonts texts can be set in. They ship with Imp, so a film looks the same everywhere. */
+export const TextFont = z.enum(['sans', 'serif', 'mono']);
+export type TextFont = z.infer<typeof TextFont>;
+
+/**
+ * How a kind of text looks and moves, shared by the whole film so that every
+ * subtitle or lower third matches.
+ */
+export const TextStyle = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(60),
+  font: TextFont,
+  weight: z.number().int().min(300).max(900).default(400),
+  italic: z.boolean().default(false),
+  uppercase: z.boolean().default(false),
+  /** The height of the letters, in percent of the frame height. */
+  size: z.number().min(1).max(25),
+  /** Extra space between letters, in em. */
+  tracking: z.number().min(-0.1).max(0.5).default(0),
+  /** Line height, as a multiple of the size. */
+  leading: z.number().min(0.8).max(2.5).default(1.2),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  /** An outline around the letters: its colour and width in percent of the size (0 for none). */
+  outlineColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#000000'),
+  outline: z.number().min(0).max(30).default(0),
+  /** How dark the soft shadow under the letters is, 0 for none. */
+  shadow: z.number().min(0).max(1).default(0),
+  /** A box behind the text: its colour and how opaque it is (0 for none). */
+  boxColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#000000'),
+  box: z.number().min(0).max(1).default(0),
+  align: z.enum(['left', 'center', 'right']),
+  /** Where the text sits, 0 to 1 from the left and from the top of the frame. */
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  /** Which edge of the text block sits at y. */
+  anchor: z.enum(['top', 'middle', 'bottom']),
+  /** The widest a line may be, in percent of the frame width. */
+  width: z.number().min(10).max(100).default(80),
+  /** How the text comes on and goes off. A roll moves the text up through the frame over its length. */
+  enter: z.enum(['cut', 'fade', 'rise', 'type']).default('fade'),
+  exit: z.enum(['cut', 'fade']).default('fade'),
+  /** Seconds the entrance and the exit take. */
+  ease: z.number().min(0).max(3).default(0.3),
+  roll: z.boolean().default(false),
+});
+export type TextStyle = z.infer<typeof TextStyle>;
+
 export const SceneCut = z.object({
   sceneId: z.string(),
   items: z.array(CutItem).nullable().default(null),
   sounds: z.array(SoundPlacement).default([]),
   lines: z.array(CutLine).default([]),
+  /** The text lane: titles, lower thirds, subtitles, captions and credits over the picture. */
+  texts: z.array(TextItem).default([]),
 });
 export type SceneCut = z.infer<typeof SceneCut>;
+
+/**
+ * What a person asked an agent to do to a stretch of a scene: the words, and
+ * the time range or items it is about. Kept on the draft so that the
+ * proposal can be read against what was asked.
+ */
+export const CutRequest = z.object({
+  instruction: z.string(),
+  /** Seconds on the scene timeline, or null for the whole scene. */
+  fromSeconds: z.number().min(0).nullable().default(null),
+  toSeconds: z.number().min(0).nullable().default(null),
+  /** The items picked, when the request is about pieces rather than a time range. */
+  itemIds: z.array(z.string()).default([]),
+  createdAt: z.iso.datetime(),
+});
+export type CutRequest = z.infer<typeof CutRequest>;
+
+/**
+ * Changes agents propose to the cut of a scene, kept apart from it until a
+ * person keeps or discards them. base is the cut as it was when the draft
+ * began, so that what the agent changed can be told from what the person
+ * changed since.
+ */
+export const CutDraft = z.object({
+  sceneId: z.string(),
+  base: SceneCut,
+  cut: SceneCut,
+  /** The draft's own steps, so that an agent can undo its own work. */
+  undo: z.array(SceneCut).default([]),
+  redo: z.array(SceneCut).default([]),
+  /** The crew members who worked on it, by id, with their role. */
+  authors: z.array(z.object({ id: z.string(), role: z.string() })).default([]),
+  request: CutRequest.nullable().default(null),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type CutDraft = z.infer<typeof CutDraft>;
 
 /** The cuts a scene went through, for undo and redo. */
 export const CutHistory = z.object({

@@ -1,0 +1,1 @@
+- Your microphone recordings now show in the library under Sounds, named after the region they became, so you can find them and drag them onto any track again.

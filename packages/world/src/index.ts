@@ -20,3 +20,4 @@ export {
   WorldKind,
   WorldObject,
 } from './schema.js';
+export { worldLibrarySource } from './library.js';

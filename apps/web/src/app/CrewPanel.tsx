@@ -3,12 +3,14 @@ import { fromToolName } from '@imp/core';
 import {
   BroomIcon,
   CheckIcon,
+  PaperclipIcon,
   PaperPlaneRightIcon,
   WrenchIcon,
   XIcon,
 } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
+import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { RichText } from './RichText.js';
 
@@ -104,6 +106,7 @@ export function CrewPanel({
   const [problem, setProblem] = useState<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const inputId = useId();
+  const attachment = useAttachment();
 
   const conversation = live.data;
   const messages = conversation?.messages ?? [];
@@ -122,10 +125,14 @@ export function CrewPanel({
     end.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, approvals.length, working]);
 
-  const ask = (task?: string): void => {
+  const ask = (task?: string, about?: string): void => {
     setBusy(true);
     setProblem(null);
-    runCommand(imp, 'crew.ask', { memberId: member.id, context, ...(task ? { task } : {}) })
+    runCommand(imp, 'crew.ask', {
+      memberId: member.id,
+      context: about === undefined ? context : `${context}\n${about}`,
+      ...(task ? { task } : {}),
+    })
       .then((output) => AgentRunSchema.parse(output))
       .catch((reason: unknown) => {
         setProblem(messageOf(reason));
@@ -140,7 +147,27 @@ export function CrewPanel({
     const task = draft.trim();
     if (task === '' || working || approvals.length > 0) return;
     setDraft('');
-    ask(task);
+    if (attachment === null) {
+      ask(task);
+      return;
+    }
+    // A marked stretch of a scene makes the message a request about it, kept with the proposal.
+    setBusy(true);
+    runCommand(imp, 'movie.edit.request', {
+      projectId: attachment.projectId,
+      sceneId: attachment.sceneId,
+      fromSeconds: attachment.fromSeconds,
+      toSeconds: attachment.toSeconds,
+      instruction: task,
+    }).then(
+      (output) => {
+        ask(task, z.object({ context: z.string() }).parse(output).context);
+      },
+      (reason: unknown) => {
+        setProblem(messageOf(reason));
+        setBusy(false);
+      },
+    );
   };
 
   const settle = (approvalId: string, approve: boolean): void => {
@@ -269,6 +296,24 @@ export function CrewPanel({
         <div ref={end} />
       </div>
       <form className="composer" onSubmit={send}>
+        {attachment !== null && (
+          <div className="attached">
+            <PaperclipIcon aria-hidden="true" />
+            <span>
+              About <strong>{attachment.label}</strong>
+            </span>
+            <button
+              type="button"
+              className="button quiet icon"
+              aria-label="Do not attach the marked stretch"
+              onClick={() => {
+                setAttachment(null);
+              }}
+            >
+              <XIcon aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <label className="sr-only" htmlFor={inputId}>
           Message to {member.name}
         </label>
@@ -277,7 +322,11 @@ export function CrewPanel({
           className="input"
           rows={3}
           placeholder={
-            approvals.length > 0 ? 'Decide on the request above first' : `Ask ${member.name}`
+            approvals.length > 0
+              ? 'Decide on the request above first'
+              : attachment !== null
+                ? `What should ${member.name} do with this stretch?`
+                : `Ask ${member.name}`
           }
           value={draft}
           onChange={(event) => {

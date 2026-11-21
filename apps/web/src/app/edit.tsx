@@ -4,13 +4,19 @@ import {
   ArrowClockwiseIcon,
   ClipboardIcon,
   CopyIcon,
+  FlagIcon,
   PauseIcon,
   PlayIcon,
   ScissorsIcon,
+  BracketsSquareIcon,
   SpeakerHighIcon,
   TextTIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { IDENTITY_MATRIX } from '@imp/mode-movie';
+import { FilmStrip } from './film-strip.js';
+import { FilmLookPanel, GradeTools, LookView, PRESET_LABELS } from './grade.js';
+import { MarkerInspector, MarkerLane, MarkerList, type MarkerView } from './markers.js';
 import {
   useEffect,
   useMemo,
@@ -20,6 +26,7 @@ import {
   type PointerEvent,
   type ReactElement,
 } from 'react';
+import { setAttachment, useAttachment } from './attachment.js';
 import { runCommand, useImp, useLive } from './context.js';
 import {
   clock,
@@ -29,20 +36,42 @@ import {
   ITEM_STATE_TEXT,
   loadCut,
   placementKey,
+  Proposal,
   Scenes,
+  type Change,
   type Cut,
   type Look,
   type Placement,
   type Source,
+  gradeFilterId,
+  HIDDEN,
+  matrixValues,
+  screenStyle,
+  type ScreenLook,
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
+import { grabs, useDrag } from './drag.js';
 import { useCoarsePointer, usePinchZoom } from './gestures.js';
 import { CharacterLanes, LineInspector } from './lines.js';
 import { NumberField } from './NumberField.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
-import { SceneTabs } from './shots.js';
+import { ChangeList, ProposalBar } from './proposal.js';
+import { PickupNote, PickupRequest } from './pickups.js';
+import { RescueTools } from './rescue.js';
+import { TransitionPicker } from './transition.js';
+import { SplitEdit, TakeSwitcher } from './split-edit.js';
+import { useLibraryDrop } from './library/drag.js';
+import { isPlayableSound, soundForScene } from './library/scene.js';
+import {
+  StyleEditor,
+  TextInspector,
+  TextLane,
+  TextOverlay,
+  TextTools,
+  useTextStyles,
+} from './texts.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -97,8 +126,10 @@ function useAudioLengths(urls: ReadonlyMap<string, string>): ReadonlyMap<string,
 }
 function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>) {
   const [at, setAt] = useState(0);
+  /** How many times the cut has played to its end. */
+  const [endings, setEndings] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [look, setLook] = useState<Look>({ brightness: 1, title: '' });
+  const [look, setLook] = useState<Look>({ brightness: 1, title: '', card: false });
   const [player] = useState(
     () =>
       new CutPlayer(
@@ -107,9 +138,11 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
           at: setAt,
           playing: setPlaying,
           look: (next) => {
-            setLook((before) =>
-              before.brightness === next.brightness && before.title === next.title ? before : next,
-            );
+            // A new look only when something in it changed, so that a still frame draws once.
+            setLook((before) => (JSON.stringify(before) === JSON.stringify(next) ? before : next));
+          },
+          ended: () => {
+            setEndings((count) => count + 1);
           },
         },
       ),
@@ -131,9 +164,18 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
     attachVoice: (element: HTMLAudioElement | null) => {
       player.attach(null, element);
     },
+    attachSecondVideo: (element: HTMLVideoElement | null) => {
+      player.attach(element, null, 1);
+    },
+    attachSecondVoice: (element: HTMLAudioElement | null) => {
+      player.attach(null, element, 1);
+    },
     at,
     playing,
     look,
+    endings,
+    /** The time to the millisecond, for drawing texts smoothly while playing. */
+    now: () => player.now,
     play: () => {
       player.play();
     },
@@ -155,11 +197,27 @@ const EMPTY_CUT: Cut = {
   sounds: [],
   lanes: [],
   lines: [],
+  texts: [],
+  look: { exposure: 0, contrast: 0, temperature: 0, tint: 0, saturation: 0, preset: null },
+  version: 'cut',
+  draft: null,
 };
+
+/** A stretch of the timeline the person marked, to ask the crew about. */
+interface Range {
+  from: number;
+  to: number;
+}
+
+/** How a piece is marked while the proposal is shown, like tracked changes. */
+type Mark = Change['kind'];
 
 /** How many pixels wide a second is on the timeline. */
 const MIN_SCALE = 12;
-const MAX_SCALE = 160;
+/** Close enough to see and step single frames. */
+const MAX_SCALE = 600;
+/** The frame rate the timeline steps and draws its frame grid at. */
+const FRAME_RATE = 30;
 /** A piece without length still gets a handle to grab. */
 const MIN_BLOCK_PX = 18;
 
@@ -167,53 +225,9 @@ type Selection =
   | { kind: 'item'; id: string }
   | { kind: 'sound'; id: string }
   | { kind: 'line'; id: string }
+  | { kind: 'text'; id: string }
+  | { kind: 'marker'; id: string }
   | null;
-
-/**
- * Follows a pointer across the page while a button or finger is held, and
- * reports the distance in the end. A finger must move further than a mouse
- * before it counts as a drag rather than a tap.
- */
-function useDrag() {
-  const [dragging, setDragging] = useState<{
-    id: string;
-    edge: string;
-    dx: number;
-  } | null>(null);
-  const origin = useRef(0);
-  const slop = useRef(2);
-  return {
-    dragging,
-    start: (event: PointerEvent, id: string, edge: string) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      origin.current = event.clientX;
-      slop.current = event.pointerType === 'touch' ? 8 : 2;
-      setDragging({ id, edge, dx: 0 });
-    },
-    move: (event: PointerEvent) => {
-      setDragging((before) =>
-        before === null ? null : { ...before, dx: event.clientX - origin.current },
-      );
-    },
-    end: (event: PointerEvent, done: (id: string, edge: string, distance: number) => void) => {
-      if (dragging === null) return;
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      const { id, edge, dx } = dragging;
-      setDragging(null);
-      if (Math.abs(dx) >= slop.current) done(id, edge, dx);
-    },
-    /** The browser took the pointer, for example to scroll: nothing changes. */
-    cancel: () => {
-      setDragging(null);
-    },
-  };
-}
-
-/** A finger on a piece that is not selected scrolls the timeline; it must be selected to move. */
-const grabs = (event: PointerEvent, selected: boolean): boolean =>
-  event.pointerType !== 'touch' || selected;
 
 function Timeline({
   cut,
@@ -227,6 +241,11 @@ function Timeline({
   onZoom,
   act,
   sceneId,
+  readOnly,
+  marks,
+  removed,
+  range,
+  markers,
 }: {
   cut: Cut;
   scale: number;
@@ -240,8 +259,23 @@ function Timeline({
   onZoom: (scale: number) => void;
   act: Act;
   sceneId: string;
+  /** The proposal is shown: it is looked at and played, not edited. */
+  readOnly: boolean;
+  /** The pieces agents changed, by id, while the proposal is shown. */
+  marks: ReadonlyMap<string, Mark>;
+  /** Pieces the proposal takes out, where they were in the cut. */
+  removed: readonly Change[];
+  range: Range | null;
+  markers: readonly MarkerView[];
 }): ReactElement {
   const edges = useDrag();
+  /** Whether a pointer on a piece may start dragging it. */
+  const may = (event: PointerEvent, selected: boolean): boolean =>
+    !readOnly && grabs(event, selected);
+  const marked = (id: string): string => {
+    const mark = marks.get(id);
+    return mark === undefined ? '' : ` tracked tracked-${mark}`;
+  };
   const audioDrag = useDrag();
   const lineDrag = useDrag();
   const moving = useDrag();
@@ -267,15 +301,68 @@ function Timeline({
   useEffect(() => {
     zooming.current = scale;
     const anchor = pending.current;
-    if (anchor === null || scroller.current === null) return;
+    const view = scroller.current;
+    if (view === null) return;
+    if (anchor === null) {
+      // Zoomed with the slider or Fit: the playhead stays in view, centred if it fell out.
+      const x = at * scale;
+      if (x < view.scrollLeft || x > view.scrollLeft + view.clientWidth) {
+        view.scrollLeft = Math.max(0, x - view.clientWidth / 2);
+      }
+      return;
+    }
     pending.current = null;
-    scroller.current.scrollLeft = anchor.second * scale - anchor.offset;
-  }, [scale]);
+    view.scrollLeft = anchor.second * scale - anchor.offset;
+  }, [scale]); // eslint-disable-line react-hooks/exhaustive-deps
   /** The second of the timeline under a point of the screen. */
   const secondAt = (clientX: number): number => {
     const box = inner.current?.getBoundingClientRect();
     return box === undefined ? 0 : Math.max(0, (clientX - box.left) / scale);
   };
+  // From the library: sounds onto the audio lane where they are let go, shot clips into the picture.
+  const audioLane = useRef<HTMLDivElement>(null);
+  const pictureLane = useRef<HTMLDivElement>(null);
+  const done = (output: unknown): unknown => {
+    // act shows what went wrong under the timeline and answers nothing.
+    if (output === undefined) throw new Error('It was not placed; see the message on the stage.');
+    return output;
+  };
+  useLibraryDrop(audioLane, {
+    label: 'Edit stage, audio lane, at the playhead',
+    accepts: (asset) => !readOnly && isPlayableSound(asset),
+    onDrop: async (asset, point) => {
+      const run = async (id: string, input: Record<string, unknown>) => done(await act(id, input));
+      const sound = await soundForScene(run, sceneId, asset);
+      await run('movie.edit.sound.place', {
+        sceneId,
+        ...(sound.source === 'sound'
+          ? { source: 'sound', soundId: sound.soundId }
+          : { source: 'dialogue', shotId: sound.shotId, shotSceneId: sound.shotSceneId }),
+        startSeconds: point === null ? at : secondAt(point.clientX),
+        volume: asset.kind === 'music' ? 0.4 : 1,
+      });
+    },
+  });
+  useLibraryDrop(pictureLane, {
+    label: 'Edit stage, picture, at the end',
+    accepts: (asset) =>
+      !readOnly && asset.id.startsWith('movie:clip:') && asset.refs['shotId'] !== undefined,
+    onDrop: async (asset, point) => {
+      const second = point === null ? null : secondAt(point.clientX);
+      const index =
+        second === null
+          ? undefined
+          : cut.items.findIndex((item) => item.startsAtSeconds + item.durationSeconds / 2 > second);
+      done(
+        await act('movie.edit.item.add', {
+          sceneId,
+          shotId: asset.refs['shotId'],
+          ...(asset.refs['sceneId'] === sceneId ? {} : { shotSceneId: asset.refs['sceneId'] }),
+          ...(index === undefined || index < 0 ? {} : { toIndex: index }),
+        }),
+      );
+    },
+  });
   const audioLength = (placement: Placement): number => {
     if (placement.loop) return Math.max(cut.totalSeconds - placement.startSeconds, 1);
     const item = cut.items.find((candidate) => candidate.shotId === placement.shotId);
@@ -288,6 +375,7 @@ function Timeline({
     cut.totalSeconds,
     ...cut.sounds.map((placement) => placement.startSeconds + audioLength(placement)),
     ...cut.lines.map((line) => line.startSeconds + Math.max(line.durationSeconds, 0.5)),
+    ...cut.texts.map((text) => text.startSeconds + text.durationSeconds),
     10,
   );
   const width = Math.ceil((widest + 2) * scale);
@@ -310,7 +398,7 @@ function Timeline({
         });
 
   return (
-    <div className="timeline" role="group" aria-label="Timeline">
+    <div className="timeline" role="group" aria-label="Timeline" data-readonly={readOnly}>
       <div className="timeline-scroll" ref={scroller}>
         <div className="timeline-inner" style={{ width }} ref={inner}>
           <div
@@ -333,10 +421,23 @@ function Timeline({
             role="slider"
             tabIndex={0}
             onKeyDown={(event) => {
-              if (event.key === 'ArrowRight') onSeek(at + 1);
-              if (event.key === 'ArrowLeft') onSeek(at - 1);
+              // Shift steps a single frame.
+              const by = event.shiftKey ? 1 / FRAME_RATE : 1;
+              if (event.key === 'ArrowRight') onSeek(at + by);
+              if (event.key === 'ArrowLeft') onSeek(Math.max(0, at - by));
             }}
             aria-label="Playhead"
+            style={
+              scale >= 200
+                ? {
+                    // A line at every frame once frames are wide enough to tell apart.
+                    backgroundImage: `repeating-linear-gradient(to right, var(--line-strong) 0 1px, transparent 1px ${String(scale / FRAME_RATE)}px)`,
+                    backgroundSize: '100% 6px',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'bottom left',
+                  }
+                : undefined
+            }
             aria-valuemin={0}
             aria-valuemax={Math.round(cut.totalSeconds)}
             aria-valuenow={Math.round(at)}
@@ -349,7 +450,28 @@ function Timeline({
                 </span>
               ))}
           </div>
-          <div className="lane lane-picture" aria-label="Picture lane">
+          <MarkerLane
+            markers={markers}
+            scale={scale}
+            selectedId={selection?.kind === 'marker' ? selection.id : null}
+            onSelect={(marker) => {
+              onSelect({ kind: 'marker', id: marker.id });
+              onSeek(marker.atSeconds);
+            }}
+          />
+          <TextLane
+            texts={cut.texts}
+            scale={scale}
+            selectedId={selection?.kind === 'text' ? selection.id : null}
+            onSelect={(id) => {
+              onSelect({ kind: 'text', id });
+            }}
+            act={act}
+            sceneId={sceneId}
+            may={may}
+            marked={marked}
+          />
+          <div className="lane lane-picture" aria-label="Picture lane" ref={pictureLane}>
             <span className="lane-name">Picture</span>
             {playing.map((item) => {
               const drag = edges.dragging?.id === item.itemId ? edges.dragging : null;
@@ -366,12 +488,12 @@ function Timeline({
               return (
                 <div
                   key={item.itemId}
-                  className={`block block-${item.kind}${selected ? ' selected' : ''}${target?.itemId === item.itemId ? ' drop' : ''}${lift === 0 ? '' : ' lifted'}`}
+                  className={`block block-${item.kind}${item.placeholder ? ' block-placeholder' : ''}${selected ? ' selected' : ''}${target?.itemId === item.itemId ? ' drop' : ''}${lift === 0 ? '' : ' lifted'}${marked(item.itemId)}`}
                   style={{ left, width: blockWidth }}
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
-                  aria-label={`${item.kind === 'title' ? 'Title' : 'Shot'} ${String(item.index)}: ${item.label.slice(0, 40)}`}
+                  aria-label={`${item.kind === 'title' ? 'Title' : item.placeholder ? 'Pickup to come' : 'Shot'} ${String(item.index)}: ${item.label.slice(0, 40)}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect({ kind: 'item', id: item.itemId });
@@ -380,7 +502,7 @@ function Timeline({
                     if (event.key === 'Enter') onSelect({ kind: 'item', id: item.itemId });
                   }}
                   onPointerDown={(event) => {
-                    if (!grabs(event, selected)) return;
+                    if (!may(event, selected)) return;
                     setGrabbed(secondAt(event.clientX));
                     moving.start(event, item.itemId, 'move');
                   }}
@@ -400,49 +522,61 @@ function Timeline({
                   }}
                   onPointerCancel={moving.cancel}
                 >
-                  {item.kind === 'shot' && (
+                  {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-start"
                       aria-label={`Trim the start of item ${String(item.index)}`}
                       onPointerDown={(event) => {
-                        if (grabs(event, selected)) edges.start(event, item.itemId, 'start');
+                        if (may(event, selected)) edges.start(event, item.itemId, 'start');
                       }}
                       onPointerMove={edges.move}
                       onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
-                        edges.end(event, (id, edge, distance) => {
+                        edges.end(event, (id, _edge, distance) => {
+                          // The start shows the clip's end when it plays backwards; seconds of the clip go at its speed.
+                          const field = item.reverse ? 'trimEndSeconds' : 'trimStartSeconds';
                           void act('movie.edit.item.set', {
                             sceneId,
                             itemId: id,
-                            trimStartSeconds: Math.max(
+                            [field]: Math.max(
                               0,
-                              Math.round((item.trimStartSeconds + distance / scale) * 10) / 10,
+                              Math.round((item[field] + (distance / scale) * item.speed) * 10) / 10,
                             ),
                           });
                         });
                       }}
                     />
                   )}
+                  {item.transition !== 'cut' && (
+                    <span
+                      className={`transition-mark transition-${item.transition}`}
+                      style={{ width: Math.max(10, item.overlapSeconds * scale) }}
+                      title={`${item.transition.replace('-', ' to ')} in`}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="block-label">
-                    {item.index} · {item.label || 'Untitled'}
+                    {item.index} · {item.placeholder ? 'Pickup · ' : ''}
+                    {item.label || 'Untitled'}
                   </span>
-                  {item.kind === 'shot' && (
+                  {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-end"
                       aria-label={`Trim the end of item ${String(item.index)}`}
                       onPointerDown={(event) => {
-                        if (grabs(event, selected)) edges.start(event, item.itemId, 'end');
+                        if (may(event, selected)) edges.start(event, item.itemId, 'end');
                       }}
                       onPointerMove={edges.move}
                       onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
                         edges.end(event, (id, _edge, distance) => {
+                          const field = item.reverse ? 'trimStartSeconds' : 'trimEndSeconds';
                           void act('movie.edit.item.set', {
                             sceneId,
                             itemId: id,
-                            trimEndSeconds: Math.max(
+                            [field]: Math.max(
                               0,
-                              Math.round((item.trimEndSeconds - distance / scale) * 10) / 10,
+                              Math.round((item[field] - (distance / scale) * item.speed) * 10) / 10,
                             ),
                           });
                         });
@@ -453,7 +587,25 @@ function Timeline({
               );
             })}
           </div>
-          <div className="lane lane-audio" aria-label="Audio lane">
+          {removed.length > 0 && (
+            <div className="lane lane-removed" aria-label="Taken out by the proposal">
+              <span className="lane-name">Taken out</span>
+              {removed.map((change) => (
+                <div
+                  key={change.id}
+                  className="ghost"
+                  style={{
+                    left: change.startsAtSeconds * scale,
+                    width: Math.max(MIN_BLOCK_PX, change.durationSeconds * scale),
+                  }}
+                  title={change.summary}
+                >
+                  <span className="block-label">{change.summary}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="lane lane-audio" aria-label="Audio lane" ref={audioLane}>
             <span className="lane-name">Audio</span>
             {cut.sounds.map((placement) => {
               const drag = audioDrag.dragging?.id === placement.id ? audioDrag.dragging : null;
@@ -465,7 +617,7 @@ function Timeline({
               return (
                 <div
                   key={placement.id}
-                  className={`block block-${placement.kind}${selected ? ' selected' : ''}${placement.recorded ? '' : ' empty'}`}
+                  className={`block block-${placement.kind}${selected ? ' selected' : ''}${placement.recorded ? '' : ' empty'}${marked(placement.id)}`}
                   style={{
                     left: start * scale,
                     width: Math.max(MIN_BLOCK_PX, audioLength(placement) * scale),
@@ -482,7 +634,7 @@ function Timeline({
                     if (event.key === 'Enter') onSelect({ kind: 'sound', id: placement.id });
                   }}
                   onPointerDown={(event) => {
-                    if (!grabs(event, selected)) return;
+                    if (!may(event, selected)) return;
                     audioDrag.start(event, placement.id, 'move');
                     onSelect({ kind: 'sound', id: placement.id });
                   }}
@@ -516,11 +668,12 @@ function Timeline({
               onSelect({ kind: 'line', id });
             }}
             act={act}
+            marks={marks}
             drag={(line, selected) => ({
               dx: lineDrag.dragging?.id === line.id ? lineDrag.dragging.dx / scale : 0,
               props: {
                 onPointerDown: (event) => {
-                  if (!grabs(event, selected)) return;
+                  if (!may(event, selected)) return;
                   lineDrag.start(event, line.id, 'move');
                   onSelect({ kind: 'line', id: line.id });
                 },
@@ -541,6 +694,13 @@ function Timeline({
               },
             })}
           />
+          {range !== null && (
+            <div
+              className="range-band"
+              style={{ left: range.from * scale, width: (range.to - range.from) * scale }}
+              aria-hidden="true"
+            />
+          )}
           <div className="playhead" style={{ left: at * scale }} aria-hidden="true" />
         </div>
       </div>
@@ -551,14 +711,50 @@ function Timeline({
 function SceneEditor({
   project,
   sceneId,
-  act,
+  sceneLabel,
+  act: actOnCut,
+  autoplay = false,
+  canMatch = false,
+  onEnded,
 }: {
   project: Project;
   sceneId: string;
+  /** How the scene is named to the crew: "Scene 2". */
+  sceneLabel: string;
   act: Act;
+  /** Start playing as soon as the scene and its media are loaded. */
+  autoplay?: boolean;
+  /** The scene played to its end. */
+  onEnded?: () => void;
+  /** Whether this host can read clip colours, to match shots. */
+  canMatch?: boolean;
 }): ReactElement {
-  const live = useLive([moviePrefix(project)], (imp) => loadCut(imp, project.id, sceneId));
+  const [version, setVersion] = useState<'cut' | 'draft'>('cut');
+  const live = useLive(
+    // The key changes with the version, so that switching reads again.
+    version === 'draft'
+      ? [moviePrefix(project), `projects/${project.id}/movie/edit-drafts/${sceneId}`]
+      : [moviePrefix(project)],
+    (imp) => loadCut(imp, project.id, sceneId, version),
+  );
+  const proposal = useLive([moviePrefix(project)], async (imp) =>
+    Proposal.parse(
+      await runCommand(imp, 'movie.edit.draft.get', { projectId: project.id, sceneId }),
+    ),
+  );
+  const markerList = useLive([moviePrefix(project)], async (imp) =>
+    MarkerList.parse(
+      await runCommand(imp, 'movie.edit.marker.list', { projectId: project.id, sceneId }),
+    ),
+  );
+  const markers = markerList.data?.markers ?? [];
+  const timelineBox = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Selection>(null);
+  const [marksAt, setMarksAt] = useState<{ in: number | null; out: number | null }>({
+    in: null,
+    out: null,
+  });
+  const attached = useAttachment();
   const [scale, setScale] = useState(48);
   const [clipboard, setClipboard] = useState<{
     itemId: string;
@@ -566,6 +762,9 @@ function SceneEditor({
     cutting: boolean;
   } | null>(null);
   const [placing, setPlacing] = useState('');
+  const styles = useTextStyles(project);
+  /** The style the style editor is open on, or null while it is closed. */
+  const [styling, setStyling] = useState<string | null>(null);
   const coarse = useCoarsePointer();
   const data = live.data;
   const shots = data?.shots;
@@ -577,8 +776,68 @@ function SceneEditor({
   const cut = data?.cut ?? EMPTY_CUT;
   const urls = useBlobUrls(blobKeys(source, cut));
   const lengths = useAudioLengths(urls);
-  const { attachVideo, attachVoice, ...playback } = usePlayback(cut, source, urls);
+  const { attachVideo, attachVoice, attachSecondVideo, attachSecondVoice, ...playback } =
+    usePlayback(cut, source, urls);
+  useEffect(() => {
+    if (playback.endings > 0) onEnded?.();
+  }, [playback.endings]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Playing on from the scene before: start once the media is there.
+  const started = useRef(!autoplay);
+  const mediaReady = data !== undefined && blobKeys(source, cut).every((key) => urls.has(key));
+  useEffect(() => {
+    if (started.current || !mediaReady) return;
+    started.current = true;
+    playback.seek(0);
+    playback.play();
+  }, [mediaReady]); // eslint-disable-line react-hooks/exhaustive-deps
+  const range: Range | null =
+    marksAt.in !== null && marksAt.out !== null && Math.abs(marksAt.out - marksAt.in) >= 0.1
+      ? { from: Math.min(marksAt.in, marksAt.out), to: Math.max(marksAt.in, marksAt.out) }
+      : null;
+  // The marked stretch goes with the next message to the crew.
+  useEffect(() => {
+    setAttachment(
+      range === null
+        ? null
+        : {
+            label: `${sceneLabel} · ${clock(range.from)}–${clock(range.to)}`,
+            projectId: project.id,
+            sceneId,
+            fromSeconds: Math.round(range.from * 100) / 100,
+            toSeconds: Math.round(range.to * 100) / 100,
+          },
+    );
+  }, [range?.from, range?.to, sceneLabel, project.id, sceneId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => () => {
+      setAttachment(null);
+    },
+    [],
+  );
   if (data === undefined) return <Problem text={live.error} />;
+
+  const readOnly = cut.version === 'draft';
+  // The proposal is looked at and played; edits go to the cut.
+  const act: Act = readOnly ? () => Promise.resolve(undefined) : actOnCut;
+  const changes = proposal.data?.changes ?? [];
+  const marks = new Map<string, Mark>();
+  if (readOnly) {
+    for (const change of changes) {
+      if (change.kind !== 'removed' && marks.get(change.elementId) !== 'changed') {
+        marks.set(change.elementId, change.kind);
+      }
+    }
+  }
+  const removed = readOnly
+    ? changes.filter((change) => change.part === 'item' && change.kind === 'removed')
+    : [];
+  const review = (id: string, changeIds?: string[]): void => {
+    void actOnCut(id, { sceneId, ...(changeIds === undefined ? {} : { changeIds }) });
+  };
+  const focus = (change: Change): void => {
+    playback.seek(change.startsAtSeconds);
+    if (change.kind !== 'removed') setSelection({ kind: change.part, id: change.elementId });
+  };
 
   const item =
     selection?.kind === 'item'
@@ -592,8 +851,35 @@ function SceneEditor({
     selection?.kind === 'line'
       ? cut.lines.find((candidate) => candidate.id === selection.id)
       : undefined;
+  const text =
+    selection?.kind === 'text'
+      ? cut.texts.find((candidate) => candidate.id === selection.id)
+      : undefined;
   const run = (id: string, input: Record<string, unknown>): Promise<unknown> =>
     act(id, { sceneId, ...input });
+  // Markers are notes, not edits: they can be left on a proposal too.
+  const runMarker = (id: string, input: Record<string, unknown>): Promise<unknown> =>
+    actOnCut(id, { sceneId, ...input });
+  const marker =
+    selection?.kind === 'marker'
+      ? markers.find((candidate) => candidate.id === selection.id)
+      : undefined;
+  const addMarker = (): void => {
+    void runMarker('movie.edit.marker.add', {
+      atSeconds: Math.round(playback.at * 1000) / 1000,
+      text: 'Note',
+    }).then((output) => {
+      const id = (output as { marker?: { id?: unknown } } | undefined)?.marker?.id;
+      if (typeof id === 'string') setSelection({ kind: 'marker', id });
+    });
+  };
+  const fit = (): void => {
+    const width = timelineBox.current?.clientWidth ?? 0;
+    if (width <= 0) return;
+    setScale(
+      Math.min(MAX_SCALE, Math.max(MIN_SCALE, (width - 24) / Math.max(4, cut.totalSeconds + 1))),
+    );
+  };
   const index = item === undefined ? -1 : cut.items.findIndex((c) => c.itemId === item.itemId);
   const canSplit =
     item?.kind === 'shot' &&
@@ -615,6 +901,9 @@ function SceneEditor({
       setSelection(null);
     } else if (placement !== undefined) {
       void run('movie.edit.sound.remove', { placementId: placement.id });
+      setSelection(null);
+    } else if (text !== undefined) {
+      void run('movie.edit.text.remove', { textIds: [text.id] });
       setSelection(null);
     }
   };
@@ -638,6 +927,36 @@ function SceneEditor({
     const target = event.target as HTMLElement;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
     const mod = event.metaKey || event.ctrlKey;
+    if (!mod && event.key.toLowerCase() === 'i') {
+      setMarksAt((before) => ({ ...before, in: playback.at }));
+      return;
+    }
+    if (!mod && event.key.toLowerCase() === 'o') {
+      setMarksAt((before) => ({ ...before, out: playback.at }));
+      return;
+    }
+    if (event.key === 'Escape') {
+      setMarksAt({ in: null, out: null });
+      return;
+    }
+    // One frame back or on, as in other editors.
+    if (!mod && (event.key === ',' || event.key === '.')) {
+      event.preventDefault();
+      playback.pause();
+      playback.seek(Math.max(0, playback.at + (event.key === '.' ? 1 : -1) / FRAME_RATE));
+      return;
+    }
+    if (!mod && event.key.toLowerCase() === 'm') {
+      addMarker();
+      return;
+    }
+    if (event.key === ' ') {
+      event.preventDefault();
+      if (playback.playing) playback.pause();
+      else playback.play();
+      return;
+    }
+    if (readOnly) return;
     if (mod && event.key.toLowerCase() === 'z') {
       event.preventDefault();
       void run(event.shiftKey ? 'movie.edit.redo' : 'movie.edit.undo', {});
@@ -652,10 +971,6 @@ function SceneEditor({
       remove();
     } else if (event.key.toLowerCase() === 's' && !mod) {
       split();
-    } else if (event.key === ' ') {
-      event.preventDefault();
-      if (playback.playing) playback.pause();
-      else playback.play();
     }
   };
 
@@ -689,33 +1004,86 @@ function SceneEditor({
               className="preview-screen"
               aria-label="Preview of the scene"
               playsInline
-              style={{ opacity: playback.look.title === '' ? playback.look.brightness : 0 }}
+              style={screenStyle(playback.look.screens?.[0] ?? HIDDEN)}
             />
-            {playback.look.title !== '' && (
-              <div className="preview-title" style={{ opacity: playback.look.brightness }}>
-                {playback.look.title}
-              </div>
-            )}
+            {/* The second screen, for the piece that dissolves or wipes in over the first. */}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={attachSecondVideo}
+              className="preview-screen"
+              aria-hidden="true"
+              playsInline
+              style={screenStyle(playback.look.screens?.[1] ?? HIDDEN, 1)}
+            />
+            <GradeFilters screens={playback.look.screens} />
+            <div
+              className="preview-wash"
+              aria-hidden="true"
+              style={{ opacity: playback.look.white ?? 0 }}
+            />
+            <TextOverlay
+              texts={cut.texts}
+              styles={styles}
+              at={playback.at}
+              now={playback.now}
+              playing={playback.playing}
+              look={playback.look}
+            />
           </div>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio ref={attachVoice} aria-label="Dialogue of the preview" />
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio ref={attachSecondVoice} aria-hidden="true" />
         </figure>
-        <div className="stack inspector" aria-label="Selected piece">
-          {item === undefined && placement === undefined && line === undefined && (
-            <p className="muted">
-              {coarse
-                ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead.'
-                : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes.'}
-            </p>
+        <div
+          className="stack inspector"
+          aria-label={readOnly ? 'Proposed changes' : 'Selected piece'}
+        >
+          {readOnly && (
+            <ChangeList
+              proposal={proposal.data}
+              onKeep={(changeId) => {
+                review('movie.edit.draft.keep', [changeId]);
+              }}
+              onReject={(changeId) => {
+                review('movie.edit.draft.reject', [changeId]);
+              }}
+              onFocus={focus}
+            />
           )}
-          {item !== undefined && (
+          {marker !== undefined && (
+            <MarkerInspector
+              key={marker.id}
+              marker={marker}
+              playheadSeconds={playback.at}
+              run={runMarker}
+              onRemoved={() => {
+                setSelection(null);
+              }}
+            />
+          )}
+          {!readOnly &&
+            item === undefined &&
+            placement === undefined &&
+            line === undefined &&
+            marker === undefined &&
+            text === undefined && (
+              <p className="muted">
+                {coarse
+                  ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead. Mark in and out to ask the crew about a stretch.'
+                  : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, comma and full stop step a frame, M leaves a marker, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
+              </p>
+            )}
+          {!readOnly && item !== undefined && (
             <>
               <h3>
                 {item.kind === 'title' ? 'Title card' : `Shot ${String(item.index)}`}{' '}
                 <span className="muted">
-                  {item.state === 'ready'
-                    ? `${clock(item.startsAtSeconds)} · ${item.durationSeconds.toFixed(1)} s`
-                    : ITEM_STATE_TEXT[item.state]}
+                  {item.placeholder
+                    ? `Pickup to come · ${item.durationSeconds.toFixed(1)} s`
+                    : item.state === 'ready'
+                      ? `${clock(item.startsAtSeconds)} · ${item.durationSeconds.toFixed(1)} s`
+                      : ITEM_STATE_TEXT[item.state]}
                 </span>
               </h3>
               {item.kind === 'title' ? (
@@ -740,8 +1108,9 @@ function SceneEditor({
               ) : (
                 <p className="muted">{item.label}</p>
               )}
+              <PickupNote item={item} />
               <div className="row wrap">
-                {item.kind === 'shot' && (
+                {item.kind === 'shot' && !item.placeholder && (
                   <>
                     <NumberField
                       label="Trim start (s)"
@@ -822,9 +1191,38 @@ function SceneEditor({
                   <SpeakerHighIcon aria-hidden="true" /> Take the clip&apos;s sound apart
                 </button>
               )}
+              {item.kind === 'shot' && (
+                <TakeSwitcher
+                  shot={shots?.find(
+                    (candidate) =>
+                      candidate.id === item.shotId && candidate.sceneId === item.sceneId,
+                  )}
+                  run={run}
+                />
+              )}
+              {index > 0 && <TransitionPicker item={item} run={run} />}
+              <RescueTools item={item} playheadSeconds={playback.at} run={run} />
+              <GradeTools item={item} items={cut.items} run={run} canMatch={canMatch} />
+              <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
+              <PickupRequest key={item.itemId} afterIndex={index + 1} run={run} />
             </>
           )}
-          {line !== undefined && (
+          {!readOnly && text !== undefined && (
+            <TextInspector
+              text={text}
+              styles={styles}
+              items={cut.items}
+              sceneId={sceneId}
+              act={act}
+              onGone={() => {
+                setSelection(null);
+              }}
+              onStyles={(styleId) => {
+                setStyling(styleId);
+              }}
+            />
+          )}
+          {!readOnly && line !== undefined && (
             <LineInspector
               line={line}
               who={cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? 'Line'}
@@ -836,7 +1234,7 @@ function SceneEditor({
               }}
             />
           )}
-          {placement !== undefined && (
+          {!readOnly && placement !== undefined && (
             <>
               <h3>
                 {placement.name} <span className="muted">{placement.kind}</span>
@@ -947,6 +1345,30 @@ function SceneEditor({
         </div>
       </div>
 
+      <StyleEditor
+        open={styling !== null}
+        initial={styling ?? 'subtitle'}
+        styles={styles}
+        act={actOnCut}
+        onClose={() => {
+          setStyling(null);
+        }}
+      />
+
+      {cut.draft !== null && (
+        <ProposalBar
+          draft={cut.draft}
+          version={cut.version}
+          onVersion={setVersion}
+          onKeepAll={() => {
+            review('movie.edit.draft.keep');
+          }}
+          onDiscard={() => {
+            review('movie.edit.draft.discard');
+          }}
+        />
+      )}
+
       <div className="row wrap toolbar" role="toolbar" aria-label="Editing">
         <OpenInAudioEditor project={project} sceneId={sceneId} />
         <button
@@ -962,7 +1384,7 @@ function SceneEditor({
         </span>
         <button
           className="button quiet"
-          disabled={!cut.canUndo}
+          disabled={readOnly || !cut.canUndo}
           onClick={() => {
             void run('movie.edit.undo', {});
           }}
@@ -971,7 +1393,7 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={!cut.canRedo}
+          disabled={readOnly || !cut.canRedo}
           onClick={() => {
             void run('movie.edit.redo', {});
           }}
@@ -980,7 +1402,7 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={!canSplit}
+          disabled={readOnly || !canSplit}
           onClick={split}
           title="Cut the selected shot in two at the playhead"
         >
@@ -988,7 +1410,7 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={item === undefined}
+          disabled={readOnly || item === undefined}
           onClick={() => {
             copy(false);
           }}
@@ -997,7 +1419,7 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={item === undefined}
+          disabled={readOnly || item === undefined}
           onClick={() => {
             copy(true);
           }}
@@ -1006,7 +1428,7 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={clipboard === null}
+          disabled={readOnly || clipboard === null}
           onClick={() => {
             void paste();
           }}
@@ -1015,13 +1437,16 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={item === undefined && placement === undefined}
+          disabled={
+            readOnly || (item === undefined && placement === undefined && text === undefined)
+          }
           onClick={remove}
         >
           <TrashIcon aria-hidden="true" /> Delete
         </button>
         <button
           className="button quiet"
+          disabled={readOnly}
           onClick={() => {
             void run('movie.edit.title.add', {
               text: 'Title',
@@ -1029,35 +1454,130 @@ function SceneEditor({
             });
           }}
         >
-          <TextTIcon aria-hidden="true" /> Add title
+          <TextTIcon aria-hidden="true" /> Add title card
         </button>
-        <label className="field compact zoom">
-          <span>Zoom</span>
-          <input
-            type="range"
-            min={MIN_SCALE}
-            max={MAX_SCALE}
-            value={scale}
-            onChange={(event) => {
-              setScale(Number(event.target.value));
+        <TextTools
+          project={project}
+          sceneId={sceneId}
+          at={playback.at}
+          readOnly={readOnly}
+          act={act}
+          onAdded={(id) => {
+            setSelection({ kind: 'text', id });
+          }}
+          onStyles={() => {
+            setStyling(text?.styleId ?? 'subtitle');
+          }}
+        />
+        <span className="mark-range" role="group" aria-label="Mark a stretch to ask the crew about">
+          <button
+            className="button quiet"
+            title="Mark the start of a stretch at the playhead (I)"
+            onClick={() => {
+              setMarksAt((before) => ({ ...before, in: playback.at }));
             }}
-          />
-        </label>
+          >
+            In
+          </button>
+          <button
+            className="button quiet"
+            title="Mark the end of a stretch at the playhead (O)"
+            onClick={() => {
+              setMarksAt((before) => ({ ...before, out: playback.at }));
+            }}
+          >
+            Out
+          </button>
+          {item !== undefined && item.durationSeconds > 0 && (
+            <button
+              className="button quiet"
+              title="Mark the selected piece"
+              onClick={() => {
+                setMarksAt({
+                  in: item.startsAtSeconds,
+                  out: item.startsAtSeconds + item.durationSeconds,
+                });
+              }}
+            >
+              <BracketsSquareIcon aria-hidden="true" /> Mark piece
+            </button>
+          )}
+        </span>
+        <button
+          className="button quiet"
+          title="Leave a note, to-do or problem at the playhead (M)"
+          onClick={addMarker}
+        >
+          <FlagIcon aria-hidden="true" /> Marker
+        </button>
+        <span className="row zoom">
+          <button
+            className="button quiet small"
+            title="Fit the scene to the timeline"
+            onClick={fit}
+          >
+            Fit
+          </button>
+          <label className="field compact">
+            <span>{scale >= 200 ? 'Zoom · frames' : 'Zoom'}</span>
+            <input
+              type="range"
+              // Even steps of the slider zoom by the same factor, from the whole scene to single frames.
+              min={Math.log(MIN_SCALE)}
+              max={Math.log(MAX_SCALE)}
+              step="any"
+              value={Math.log(scale)}
+              onChange={(event) => {
+                setScale(Math.round(Math.exp(Number(event.target.value)) * 100) / 100);
+              }}
+            />
+          </label>
+        </span>
       </div>
 
-      <Timeline
-        cut={cut}
-        scale={scale}
-        at={playback.at}
-        selection={selection}
-        lengths={lengths}
-        source={source}
-        onSelect={setSelection}
-        onSeek={playback.seek}
-        onZoom={setScale}
-        act={act}
-        sceneId={sceneId}
-      />
+      {range !== null && (
+        <div className="range-note row wrap">
+          <span className="chip" aria-label="Marked stretch">
+            {clock(range.from)}–{clock(range.to)} marked
+            <button
+              type="button"
+              className="button quiet icon"
+              aria-label="Clear the marked stretch"
+              onClick={() => {
+                setMarksAt({ in: null, out: null });
+              }}
+            >
+              ×
+            </button>
+          </span>
+          <span className="muted small">
+            {attached === null
+              ? 'Detached from the crew panel.'
+              : 'Goes with your next message to the crew: tell them what to do with it.'}
+          </span>
+        </div>
+      )}
+
+      <div ref={timelineBox}>
+        <Timeline
+          cut={cut}
+          scale={scale}
+          at={playback.at}
+          selection={selection}
+          lengths={lengths}
+          source={source}
+          onSelect={setSelection}
+          onSeek={playback.seek}
+          onZoom={setScale}
+          act={act}
+          sceneId={sceneId}
+          readOnly={readOnly}
+          marks={marks}
+          removed={removed}
+          range={range}
+          markers={markers}
+        />
+      </div>
 
       {(notInFilm.length > 0 || cut.unplaced.length > 0) && (
         <div className="stack">
@@ -1079,6 +1599,7 @@ function SceneEditor({
                 key={entry.shotId}
                 className="chip"
                 title="Add this shot to the cut"
+                disabled={readOnly}
                 onClick={() => {
                   void run('movie.edit.item.add', { shotId: entry.shotId });
                 }}
@@ -1090,7 +1611,7 @@ function SceneEditor({
         </div>
       )}
 
-      <div className="row wrap">
+      <div className="row wrap" hidden={readOnly}>
         <div className="field">
           <label htmlFor="place-sound">Lay on the audio lane at the playhead</label>
           <select
@@ -1131,16 +1652,54 @@ function SceneEditor({
   );
 }
 
+/** The colour-matrix filters the two preview screens are graded with, the film renderer's numbers. */
+function GradeFilters({
+  screens,
+}: {
+  screens: readonly [ScreenLook, ScreenLook] | undefined;
+}): ReactElement {
+  return (
+    <svg className="grade-filters" aria-hidden="true" width="0" height="0">
+      {([0, 1] as const).map((slot) => {
+        const matrix = screens?.[slot].matrix;
+        return (
+          <filter key={slot} id={gradeFilterId(slot)} colorInterpolationFilters="sRGB">
+            <feColorMatrix type="matrix" values={matrixValues(matrix ?? IDENTITY_MATRIX)} />
+          </filter>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Where the choice to play on from scene to scene is remembered, per browser. */
+const PLAY_ON_KEY = 'imp.edit.play-on';
+
 /** The film as a whole, and the cut of one scene at a time. */
 export function EditView({ project }: { project: Project }): ReactElement {
   const live = useLive([moviePrefix(project)], async (imp) => ({
     film: Film.parse(await runCommand(imp, 'movie.edit.film', { projectId: project.id })),
     scenes: Scenes.parse(await runCommand(imp, 'movie.scene.list', { projectId: project.id }))
       .scenes,
+    markers: MarkerList.parse(
+      await runCommand(imp, 'movie.edit.marker.list', { projectId: project.id }),
+    ).markers,
+    look: LookView.parse(await runCommand(imp, 'movie.edit.look.get', { projectId: project.id })),
   }));
+  const [lookOpen, setLookOpen] = useState(false);
+  const look = live.data?.look;
   const { act, error } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [autoplay, setAutoplay] = useState(false);
+  const [playOn, setPlayOn] = useState(() => {
+    try {
+      return localStorage.getItem(PLAY_ON_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const film = live.data?.film;
+  const markers = live.data?.markers ?? [];
   const scenes = live.data?.scenes ?? [];
   const sceneId = (scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0])?.id;
 
@@ -1157,46 +1716,74 @@ export function EditView({ project }: { project: Project }): ReactElement {
       </div>
       <Problem text={live.error ?? error} />
       {film !== undefined && film.scenes.length > 0 && (
-        <table className="film-overview">
-          <thead>
-            <tr>
-              <th>Scene</th>
-              <th>Ready</th>
-              <th>Length</th>
-              <th>Missing</th>
-            </tr>
-          </thead>
-          <tbody>
-            {film.scenes.map((scene) => (
-              <tr key={scene.sceneId}>
-                <td>
-                  {scene.position} · {scene.heading === '' ? 'Untitled' : scene.heading}
-                </td>
-                <td>
-                  {String(scene.readyItems)} / {String(scene.items)}
-                </td>
-                <td>{clock(scene.durationSeconds)}</td>
-                <td>
-                  {scene.missing
-                    .map(
-                      (item) =>
-                        `piece ${String(item.index)}: ${ITEM_STATE_TEXT[item.state].toLowerCase()}`,
-                    )
-                    .join('; ')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <FilmStrip
+          film={film}
+          sceneId={sceneId}
+          markers={markers}
+          playOn={playOn}
+          onOpen={(id) => {
+            setAutoplay(false);
+            setSelectedId(id);
+          }}
+          tools={
+            look !== undefined && (
+              <button
+                className="button small quiet"
+                aria-pressed={lookOpen}
+                aria-expanded={lookOpen}
+                title="The colour look of the whole film"
+                onClick={() => {
+                  setLookOpen(!lookOpen);
+                }}
+              >
+                Look
+                {look.look.preset !== null && look.look.preset !== 'none'
+                  ? ` · ${PRESET_LABELS[look.look.preset] ?? look.look.preset}`
+                  : ''}
+              </button>
+            )
+          }
+          onPlayOn={(on) => {
+            setPlayOn(on);
+            try {
+              localStorage.setItem(PLAY_ON_KEY, on ? '1' : '0');
+            } catch {
+              // Remembering is a convenience; without storage it is on for this visit only.
+            }
+          }}
+        />
+      )}
+      {lookOpen && look !== undefined && (
+        <FilmLookPanel
+          view={look}
+          run={(id, input) => act(id, input)}
+          onClose={() => {
+            setLookOpen(false);
+          }}
+        />
       )}
       <ExportBar project={project} sceneId={sceneId} sceneIds={scenes.map((scene) => scene.id)} />
-      <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         live.data !== undefined && (
           <p className="muted">There are no scenes yet. Write the script first.</p>
         )
       ) : (
-        <SceneEditor key={sceneId} project={project} sceneId={sceneId} act={act} />
+        <SceneEditor
+          key={sceneId}
+          project={project}
+          sceneId={sceneId}
+          sceneLabel={`Scene ${String(scenes.find((scene) => scene.id === sceneId)?.position ?? '')}`}
+          act={act}
+          autoplay={autoplay}
+          canMatch={look?.canMatch ?? false}
+          onEnded={() => {
+            const at = scenes.findIndex((scene) => scene.id === sceneId);
+            const next = scenes[at + 1];
+            if (!playOn || next === undefined) return;
+            setAutoplay(true);
+            setSelectedId(next.id);
+          }}
+        />
       )}
     </>
   );

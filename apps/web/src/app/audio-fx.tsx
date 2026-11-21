@@ -5,6 +5,7 @@ import {
   EqBand,
   responseDb,
   type EffectKind,
+  type VoicePreset,
 } from '@imp/audio';
 import { ArrowUpIcon, PlusIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useId, useState, type ReactElement } from 'react';
@@ -19,12 +20,31 @@ const Report = z.object({
 });
 
 /** What each kind is called, and what it is for, in a few words. */
-const KINDS: readonly { kind: EffectKind; name: string; hint: string }[] = [
-  { kind: 'denoise', name: 'Noise reduction', hint: 'Hiss, hum, room tone' },
-  { kind: 'eq', name: 'EQ', hint: 'Tone: rumble, boxiness, clarity' },
-  { kind: 'compressor', name: 'Compressor', hint: 'Evens out loud and quiet' },
-  { kind: 'loudness', name: 'Loudness', hint: 'To a LUFS target' },
-  { kind: 'limiter', name: 'Limiter', hint: 'Keeps peaks under a ceiling' },
+const KINDS: readonly {
+  kind: EffectKind;
+  name: string;
+  hint: string;
+  group: 'clean' | 'voice';
+}[] = [
+  { kind: 'denoise', name: 'Noise reduction', hint: 'Hiss, hum, room tone', group: 'clean' },
+  { kind: 'eq', name: 'EQ', hint: 'Tone: rumble, boxiness, clarity', group: 'clean' },
+  { kind: 'compressor', name: 'Compressor', hint: 'Evens out loud and quiet', group: 'clean' },
+  { kind: 'loudness', name: 'Loudness', hint: 'To a LUFS target', group: 'clean' },
+  { kind: 'limiter', name: 'Limiter', hint: 'Keeps peaks under a ceiling', group: 'clean' },
+  { kind: 'distortion', name: 'Distortion', hint: 'Overdrive, clipping, folding', group: 'voice' },
+  { kind: 'pitch', name: 'Pitch', hint: 'Higher or lower, same length', group: 'voice' },
+  { kind: 'ringmod', name: 'Ring modulator', hint: 'Robots and metal', group: 'voice' },
+  { kind: 'crush', name: 'Bit crusher', hint: 'Lo-fi grit', group: 'voice' },
+];
+
+/** The ready-made voices, in the order offered. */
+const VOICES: readonly { preset: VoicePreset; name: string }[] = [
+  { preset: 'telephone', name: 'Telephone' },
+  { preset: 'radio', name: 'Radio' },
+  { preset: 'megaphone', name: 'Megaphone' },
+  { preset: 'robot', name: 'Robot' },
+  { preset: 'monster', name: 'Monster' },
+  { preset: 'chipmunk', name: 'Chipmunk' },
 ];
 const nameOf = (kind: EffectKind): string =>
   KINDS.find((entry) => entry.kind === kind)?.name ?? kind;
@@ -308,6 +328,51 @@ function Settings({
           </div>
         </div>
       );
+    case 'distortion':
+      return (
+        <div className="stack tight">
+          <span className="segmented" role="group" aria-label="Distortion shape">
+            {(['soft', 'hard', 'fold'] as const).map((shape) => (
+              <button
+                key={shape}
+                type="button"
+                aria-pressed={effect.shape === shape}
+                onClick={() => {
+                  onChange({ ...effect, shape });
+                }}
+              >
+                {shape === 'soft' ? 'Soft' : shape === 'hard' ? 'Hard' : 'Fold'}
+              </button>
+            ))}
+          </span>
+          <div className="knobs">
+            {knob('Drive', 'driveDb', effect.driveDb, 1, 0, 48, 'dB')}
+            {knob('Tone', 'toneHz', effect.toneHz, 100, 500, 20_000, 'Hz')}
+            {knob('Mix', 'mix', effect.mix, 0.05, 0, 1)}
+            {knob('Output', 'outputDb', effect.outputDb, 0.5, -24, 12, 'dB')}
+          </div>
+        </div>
+      );
+    case 'pitch':
+      return (
+        <div className="knobs">
+          {knob('Semitones', 'semitones', effect.semitones, 0.5, -12, 12)}
+        </div>
+      );
+    case 'ringmod':
+      return (
+        <div className="knobs">
+          {knob('Frequency', 'frequency', effect.frequency, 5, 1, 2000, 'Hz')}
+          {knob('Mix', 'mix', effect.mix, 0.05, 0, 1)}
+        </div>
+      );
+    case 'crush':
+      return (
+        <div className="knobs">
+          {knob('Bits', 'bits', effect.bits, 1, 2, 16)}
+          {knob('Every', 'downsample', effect.downsample, 1, 1, 32, 'samples')}
+        </div>
+      );
   }
 }
 
@@ -455,25 +520,53 @@ export function EffectsPanel({
           </li>
         ))}
       </ol>
-      <div className="fx-add" role="group" aria-label="Add an effect">
-        {KINDS.filter((entry) => !present.has(entry.kind)).map((entry) => (
-          <button
-            key={entry.kind}
-            type="button"
-            className="fx-add-button"
-            disabled={busy || (entry.kind === 'denoise' && stretch === null)}
-            onClick={() => {
-              add(entry.kind);
-            }}
+      {(['clean', 'voice'] as const).map((group) => (
+        <div key={group} className="stack tight">
+          <p className="fx-group">{group === 'clean' ? 'Clean up' : 'Change the voice'}</p>
+          {group === 'voice' && (
+            <div className="row wrap fx-presets" role="group" aria-label="Ready-made voices">
+              {VOICES.map((entry) => (
+                <button
+                  key={entry.preset}
+                  type="button"
+                  className="chip"
+                  disabled={busy}
+                  onClick={() => {
+                    void run('audio.fx.voice', { regionIds: [regionId], preset: entry.preset });
+                  }}
+                >
+                  {entry.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div
+            className="fx-add"
+            role="group"
+            aria-label={group === 'clean' ? 'Add a clean-up effect' : 'Add a voice effect'}
           >
-            <PlusIcon aria-hidden="true" />
-            <span>
-              <strong>{entry.name}</strong>
-              <small>{entry.hint}</small>
-            </span>
-          </button>
-        ))}
-      </div>
+            {KINDS.filter((entry) => entry.group === group && !present.has(entry.kind)).map(
+              (entry) => (
+                <button
+                  key={entry.kind}
+                  type="button"
+                  className="fx-add-button"
+                  disabled={busy || (entry.kind === 'denoise' && stretch === null)}
+                  onClick={() => {
+                    add(entry.kind);
+                  }}
+                >
+                  <PlusIcon aria-hidden="true" />
+                  <span>
+                    <strong>{entry.name}</strong>
+                    <small>{entry.hint}</small>
+                  </span>
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+      ))}
       {denoise === undefined && stretch === null && (
         <p className="muted small">
           For noise reduction, drag across a stretch of this region where only the noise is heard.

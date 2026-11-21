@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
 import release from 'virtual:imp-release';
 import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
+import { createFfmpegColorSampler, createFfmpegFrameGrabber } from './ffmpeg-frames.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
 import { createImpServer } from './server.js';
 
@@ -40,7 +41,13 @@ const server = createImpServer({
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
       release,
-      ...(ffmpeg ? { mp4Audio: createFfmpegMp4Decoder() } : {}),
+      ...(ffmpeg
+        ? {
+            mp4Audio: createFfmpegMp4Decoder(),
+            frameGrabber: createFfmpegFrameGrabber(),
+            colorSampler: createFfmpegColorSampler(),
+          }
+        : {}),
     }),
 });
 server.on('error', (error: Error & { code?: string }) => {
@@ -59,7 +66,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`Your projects are kept in ${dataDir}`);
   if (!ffmpeg) {
     console.log(
-      'ffmpeg was not found, so the sound inside video clips stays silent. Install it to hear it.',
+      'ffmpeg was not found, so the sound inside video clips stays silent and agents see no stills of the cut. Install it for both.',
     );
   }
   console.log('Press Ctrl+C to stop.');

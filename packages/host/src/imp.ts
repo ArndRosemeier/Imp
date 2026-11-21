@@ -7,10 +7,16 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
-import { createAudioCommands, createDefaultAudioCodec, type Mp4AudioDecoder } from '@imp/audio';
+import {
+  audioLibrarySource,
+  createAudioCommands,
+  createDefaultAudioCodec,
+  type Mp4AudioDecoder,
+} from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
+  createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
   createProjectCommands,
@@ -23,8 +29,15 @@ import {
   type ReleaseNotes,
   UNKNOWN_RELEASE,
 } from '@imp/core';
-import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
-import { createWorldCommands } from '@imp/world';
+import {
+  createMovieMode,
+  createSceneAudioLink,
+  type FilmRenderer,
+  type ColorSampler,
+  type FrameGrabber,
+  type FrameImageEncoder,
+} from '@imp/mode-movie';
+import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
 
@@ -80,9 +93,17 @@ export interface ImpOptions {
    * the repository's history when the app was built. Defaults to version 0.000.
    */
   readonly release?: ReleaseNotes;
+  /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
+  readonly filmRenderer?: FilmRenderer;
+  /** Takes stills from clips so that agents can see a cut: mediabunny in the browser, ffmpeg on the server. */
+  readonly frameGrabber?: FrameGrabber;
+  /** Reads the colours of clips to match shots: mediabunny in the browser, ffmpeg on the server. */
+  readonly colorSampler?: ColorSampler;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
+
+export type { ColorSampler, FrameGrabber };
 
 /** Assembles the core for the browser host. */
 export function createImp(options: ImpOptions): Imp {
@@ -101,10 +122,19 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
+  const codec = createDefaultAudioCodec(
+    options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
+  );
   const modes: readonly Mode[] = [
     createMovieMode({
       provider,
+      film: {
+        codec,
+        ...(options.filmRenderer === undefined ? {} : { renderer: options.filmRenderer }),
+      },
       ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
+      ...(options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber }),
+      ...(options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler }),
     }),
   ];
   const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
@@ -115,11 +145,15 @@ export function createImp(options: ImpOptions): Imp {
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
+    ...createLibraryCommands([
+      ...modes.flatMap((mode) => mode.library ?? []),
+      worldLibrarySource,
+      audioLibrarySource,
+    ]),
     ...createAudioCommands({
-      codec: createDefaultAudioCodec(
-        options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
-      ),
+      codec,
       links: [createSceneAudioLink()],
+      transcribe: (request) => provider.transcribe(request),
     }),
     ...createWorldCommands({
       provider,

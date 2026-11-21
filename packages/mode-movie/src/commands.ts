@@ -5,6 +5,7 @@ import {
   requireProject,
   type Command,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { readElement } from '@imp/world';
 import { z } from 'zod';
@@ -34,11 +35,26 @@ export const editKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}edit/${sceneId}`;
 export const editHistoryKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}edit-history/${sceneId}`;
+/** The changes agents propose to the cut of a scene, before a person keeps them. */
+export const editDraftKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}edit-drafts/${sceneId}`;
 export const movieSceneKey = (projectId: string, sceneId: string): string =>
   `${scenePrefix(projectId)}${sceneId}`;
 /** The recorded lines of a scene's own-lane characters. */
 export const linePrefix = (projectId: string, sceneId: string): string =>
   `${base(projectId)}lines/${sceneId}/`;
+/** The text styles of the film, shared by every scene. */
+export const textStylesKey = (projectId: string): string => `${base(projectId)}text-styles`;
+/** Subtitle files written for download, by name. */
+export const subtitleFileKey = (projectId: string, name: string): string =>
+  `${base(projectId)}subtitles/${name}`;
+/** Rendered films: a record each, and its file in parts in the blob store. */
+export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
+/** The film's look: one grade laid over every piece. */
+export const filmLookKey = (projectId: string): string => `${base(projectId)}film-look`;
+/** The markers (notes, to-dos, problems) on the timeline of a scene. */
+export const markerKey = (projectId: string, sceneId: string): string =>
+  `${base(projectId)}markers/${sceneId}`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
@@ -113,7 +129,7 @@ export const developmentUpdate = defineCommand({
   description:
     'Changes the logline, premise, tone or treatment of a movie project. Fields left out stay as they are.',
   effect: 'write',
-  input: Development.partial().extend({ projectId: ProjectId }),
+  input: patchOf(Development).extend({ projectId: ProjectId }),
   output: Development,
   handler: async ({ runtime }, { projectId, ...changes }) => {
     await requireProject(runtime.store, 'movie.development.update', projectId, MODE_ID);
@@ -302,6 +318,8 @@ export const sceneDelete = defineCommand({
       { type: 'delete', key: `${scenePrefix(projectId)}${sceneId}` },
       { type: 'delete', key: editKey(projectId, sceneId) },
       { type: 'delete', key: editHistoryKey(projectId, sceneId) },
+      { type: 'delete', key: editDraftKey(projectId, sceneId) },
+      { type: 'delete', key: markerKey(projectId, sceneId) },
       ...[
         ...(await runtime.store.list(shotPrefix(projectId, sceneId))),
         ...(await runtime.store.list(soundPrefix(projectId, sceneId))),
@@ -426,7 +444,7 @@ export const characterUpdate = defineCommand({
   title: 'Change character',
   description: 'Changes details of a character. Fields left out stay as they are.',
   effect: 'write',
-  input: CharacterFields.partial().extend({ projectId: ProjectId, characterId: z.string() }),
+  input: patchOf(CharacterFields).extend({ projectId: ProjectId, characterId: z.string() }),
   output: Character,
   handler: async ({ runtime }, { projectId, characterId, ...changes }) => {
     await requireProject(runtime.store, 'movie.character.update', projectId, MODE_ID);

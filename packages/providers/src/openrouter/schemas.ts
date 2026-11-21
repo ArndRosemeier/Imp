@@ -81,6 +81,14 @@ export const ErrorResponse = z.object({
   error: z.object({ message: z.string() }),
 });
 
+/** What a transcription model heard. Words come only from some models. */
+export const TranscriptionResult = z.object({
+  text: z.string(),
+  language: z.string().nullish(),
+  words: z.array(z.object({ word: z.string(), start: z.number(), end: z.number() })).nullish(),
+  usage: z.object({ cost: z.number().nullish() }).nullish(),
+});
+
 /** One event of a streamed chat completion that carries audio. */
 export const AudioStreamChunk = z.object({
   choices: z

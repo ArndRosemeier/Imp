@@ -103,7 +103,9 @@ export function readReleaseNotes(options: ReadOptions): ReleaseNotes {
       return undefined;
     }
   };
-  const attributed = new Set(merges.flatMap((merge) => merge.added));
+  // Only entries not committed at all are pending. Committed ones from before
+  // versioning began belong to 0.001, whose summary covers them.
+  const tracked = new Set(git('ls-files', '--', CHANGES_DIR).split('\n'));
   let onDisk: string[];
   try {
     onDisk = readdirSync(join(root, CHANGES_DIR)).map((name) => `${CHANGES_DIR}/${name}`);
@@ -113,7 +115,7 @@ export function readReleaseNotes(options: ReadOptions): ReleaseNotes {
   return buildReleaseNotes({
     merges,
     read,
-    pending: onDisk.filter((path) => isEntry(path) && !attributed.has(path)),
+    pending: onDisk.filter((path) => isEntry(path) && !tracked.has(path)),
     preview: !release,
   });
 }

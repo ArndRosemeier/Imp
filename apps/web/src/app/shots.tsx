@@ -8,6 +8,7 @@ import {
   VIDEO_MODEL_SETTING,
 } from '@imp/mode-movie';
 import {
+  ArrowCounterClockwiseIcon,
   FilmStripIcon,
   MicrophoneIcon,
   PlusIcon,
@@ -15,6 +16,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
@@ -96,6 +98,122 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
   );
 }
 
+/** One earlier clip of a shot: a still that plays when tapped, and what it was made with. */
+function TakeCard({
+  take,
+  number,
+  shotPosition,
+  disabled,
+  onUse,
+  onDelete,
+}: {
+  take: Shot['takes'][number];
+  number: number;
+  shotPosition: number;
+  disabled: boolean;
+  onUse: () => void;
+  onDelete: () => void;
+}): ReactElement {
+  const url = useBlobUrl(take.blobKey ?? undefined);
+  const video = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const label = `Take ${String(number)} of shot ${String(shotPosition)}`;
+  return (
+    <li className="take">
+      <button
+        className="take-still"
+        aria-label={playing ? `Stop ${label}` : `Play ${label}`}
+        aria-pressed={playing}
+        onClick={() => {
+          const element = video.current;
+          if (element === null) return;
+          if (element.paused) {
+            element.currentTime = 0;
+            void element.play();
+          } else {
+            element.pause();
+          }
+        }}
+      >
+        {url !== null && (
+          // A muted preview of a take; its words are the shot's line, shown above.
+          <video
+            ref={video}
+            src={`${url}#t=0.5`}
+            muted
+            playsInline
+            preload="metadata"
+            onPlay={() => {
+              setPlaying(true);
+            }}
+            onPause={() => {
+              setPlaying(false);
+            }}
+            onEnded={() => {
+              setPlaying(false);
+            }}
+          />
+        )}
+        <span className="take-number">{number}</span>
+      </button>
+      <span className="muted small take-info" title={take.prompt}>
+        {take.model === 'file' ? 'From a file' : take.model.split('/').at(-1)}
+        {take.durationSeconds === null ? '' : ` · ${String(take.durationSeconds)} s`}
+      </span>
+      <div className="row take-actions">
+        <button
+          className="button small"
+          disabled={disabled}
+          title="Make this take the clip again; the clip now in use becomes a take."
+          onClick={onUse}
+        >
+          <ArrowCounterClockwiseIcon aria-hidden="true" /> Use
+        </button>
+        <ConfirmButton label="Delete" question="Delete this take for good?" onConfirm={onDelete}>
+          <TrashIcon aria-hidden="true" />
+        </ConfirmButton>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * The earlier clips of a shot. Each new clip keeps the one it replaces, so a
+ * take that played better can be put back; the cut then plays it at once.
+ */
+function Takes({ shot, act }: { shot: Shot; act: Act }): ReactElement | null {
+  if (shot.takes.length === 0) return null;
+  const at = { sceneId: shot.sceneId, shotId: shot.id };
+  const pending = shot.clip?.status === 'pending';
+  return (
+    <section className="stack takes" aria-label={`Earlier takes of shot ${String(shot.position)}`}>
+      <div className="row spread wrap">
+        <h4>Earlier takes</h4>
+        <span className="muted small">
+          {pending ? 'Wait for the new clip before swapping.' : 'Tap one to watch it.'}
+        </span>
+      </div>
+      <ol className="take-list">
+        {shot.takes.map((take, index) => (
+          <TakeCard
+            key={take.blobKey ?? index}
+            take={take}
+            number={index + 1}
+            shotPosition={shot.position}
+            disabled={pending}
+            onUse={() => {
+              void act('movie.shot.take.use', { ...at, blobKey: take.blobKey });
+            }}
+            onDelete={() => {
+              void act('movie.shot.take.delete', { ...at, blobKey: take.blobKey });
+            }}
+          />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function FrameImage({ blobKey, alt }: { blobKey: string; alt: string }): ReactElement | null {
   const url = useBlobUrl(blobKey);
   return url === null ? null : <img src={url} alt={alt} />;
@@ -129,8 +247,21 @@ function KeyFrames({
       setBusy(false);
     });
   };
+  // A picture from the library becomes a key frame, the one the clip starts on.
+  const frameBox = useRef<HTMLElement>(null);
+  useLibraryDrop(frameBox, {
+    label: `Shot ${String(shot.position)}, key frame`,
+    accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
+    onDrop: async (asset) => {
+      await act('movie.shot.frame.fromFile', { ...at, blobKey: asset.blobKey });
+    },
+  });
   return (
-    <section className="stack key-frames" aria-label={`Key frame of shot ${String(shot.position)}`}>
+    <section
+      ref={frameBox}
+      className="stack key-frames"
+      aria-label={`Key frame of shot ${String(shot.position)}`}
+    >
       <div className="row spread wrap">
         <h4>Key frame</h4>
         <span className="muted small">
@@ -408,13 +539,34 @@ function ShotCard({
   const change = (fields: Record<string, unknown>): Promise<unknown> =>
     act('movie.shot.update', { ...at, ...fields });
 
+  // A video from the library becomes the clip of a shot; a clip it had is kept as a take.
+  const card = useRef<HTMLElement>(null);
+  useLibraryDrop(card, {
+    label: `Shot ${String(shot.position)}, clip`,
+    accepts: (asset) =>
+      asset.modality === 'video' && asset.blobKey !== null && shot.clip?.status !== 'pending',
+    onDrop: async (asset) => {
+      await act('movie.shot.clip.fromFile', {
+        ...at,
+        blobKey: asset.blobKey,
+        ...(asset.durationSeconds === null ? {} : { durationSeconds: asset.durationSeconds }),
+      });
+    },
+  });
   return (
-    <article className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
+    <article ref={card} className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
       <div className="row spread">
-        <h3>Shot {shot.position}</h3>
+        <h3>
+          Shot {shot.position}
+          {shot.pickup !== null && (
+            <span className="pickup-badge" title={`Asked for from the edit: ${shot.pickup.reason}`}>
+              Pickup
+            </span>
+          )}
+        </h3>
         <ConfirmButton
           label="Delete shot"
-          question="Delete this shot and its clip for good?"
+          question="Delete this shot and its clips for good?"
           onConfirm={() => {
             void act('movie.shot.delete', at);
           }}
@@ -422,7 +574,20 @@ function ShotCard({
           <TrashIcon aria-hidden="true" />
         </ConfirmButton>
       </div>
+      {shot.pickup !== null && shot.clip?.status !== 'ready' && (
+        <p className="pickup-note">
+          <strong>The edit needs this shot:</strong> {shot.pickup.reason}{' '}
+          <span className="muted">
+            (
+            {shot.pickup.requestedBy === 'person'
+              ? 'asked by you'
+              : `asked by the ${shot.pickup.requestedBy.replace(/-/g, ' ')}`}
+            , {shot.pickup.seconds.toFixed(1)} s)
+          </span>
+        </p>
+      )}
       <ClipPlayer shot={shot} />
+      <Takes shot={shot} act={act} />
       <EditableField
         label="What we see"
         rows={3}
@@ -522,7 +687,11 @@ function ShotCard({
         {shot.clip !== null && !pending && (
           <ConfirmButton
             label="Delete clip"
-            question="Delete this clip for good?"
+            question={
+              shot.takes.length === 0
+                ? 'Delete this clip for good?'
+                : 'Delete this clip for good? Its earlier takes stay.'
+            }
             onConfirm={() => {
               void act('movie.shot.clip.delete', at);
             }}

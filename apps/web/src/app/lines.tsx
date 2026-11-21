@@ -21,6 +21,7 @@ export function CharacterLanes({
   selectedId,
   onSelect,
   act,
+  marks,
   drag,
 }: {
   cut: Cut;
@@ -30,6 +31,8 @@ export function CharacterLanes({
   selectedId: string | null;
   onSelect: (lineId: string) => void;
   act: Act;
+  /** Lines agents changed, by id, while their proposal is shown. */
+  marks?: ReadonlyMap<string, string>;
   /** Pointer handlers that move a line sideways, and how far it is dragged now, in seconds. */
   drag: (
     line: Line,
@@ -77,7 +80,7 @@ export function CharacterLanes({
                 <div
                   {...props}
                   key={line.id}
-                  className={`block block-dialogue${selectedId === line.id ? ' selected' : ''}${line.recorded ? '' : ' empty'}`}
+                  className={`block block-dialogue${selectedId === line.id ? ' selected' : ''}${line.recorded ? '' : ' empty'}${marks?.has(line.id) === true ? ` tracked tracked-${marks.get(line.id) ?? ''}` : ''}`}
                   style={{
                     left: Math.max(0, line.startSeconds + dx) * scale,
                     width: Math.max(

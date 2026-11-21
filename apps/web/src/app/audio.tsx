@@ -16,6 +16,7 @@ import {
   ScissorsIcon,
   SkipBackIcon,
   SpeakerSimpleSlashIcon,
+  TextTIcon,
   TrashIcon,
   WaveformIcon,
   type Icon,
@@ -35,8 +36,13 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { NumberInput } from './audio-controls.js';
 import { EffectsPanel } from './audio-fx.js';
+import { RecordControl } from './recorder.js';
+import { WordsPanel } from './audio-words.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
+import { useLibraryDrop } from './library/drag.js';
+import { soundForScene } from './library/scene.js';
+import { FOCUS_EVENT, type Focus } from './library/model.js';
 
 // What the audio commands return, as far as the screen reads it.
 
@@ -699,15 +705,83 @@ function AudioEditor({
   const [zoom, setZoom] = useState(80);
   const [selection, setSelection] = useState<RangeSelection | null>(null);
   const [regionId, setRegionId] = useState<string | null>(null);
+  /** The picked region as last seen, to follow it when an edit gives it a new id. */
+  const [seen, setSeen] = useState<{ id: string; key: string; startSeconds: number } | null>(null);
   const [trackId, setTrackId] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [lengths, setLengths] = useState<ReadonlyMap<string, number>>(new Map());
+  /** Whether dialogue shows as text; open by default on a scene's sound, which is mostly lines. */
+  const [wordsOpen, setWordsOpen] = useState<boolean | null>(null);
   const lanes = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const fingers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; center: number; zoom: number; scroll: number } | null>(
     null,
   );
+  // Sounds from the library land on the track and at the time they are let go.
+  const timeline = useRef<HTMLDivElement>(null);
+  const loaded = live.data?.doc;
+  const dropTrack = loaded?.tracks.find((track) => track.id === trackId) ?? loaded?.tracks[0];
+  useLibraryDrop(timeline, {
+    label:
+      loaded === undefined
+        ? 'Audio editor'
+        : `${loaded.name}, ${dropTrack?.name ?? 'a new track'}, at the playhead`,
+    accepts: (asset) => {
+      if (loaded === undefined || asset.modality !== 'sound' || asset.blobKey === null) {
+        return false;
+      }
+      // A scene's sound takes any sound: what is not yet the scene's becomes one of its sounds.
+      return loaded.link === null || loaded.link.kind === 'scene';
+    },
+    onDrop: async (asset, point) => {
+      if (loaded === undefined || asset.blobKey === null) return;
+      let key = asset.blobKey;
+      if (loaded.link?.kind === 'scene') {
+        const sceneId = loaded.link.target;
+        key = (
+          await soundForScene(
+            (id, input) => runCommand(imp, id, { projectId: project.id, ...input }),
+            sceneId,
+            asset,
+          )
+        ).blobKey;
+      }
+      const box = lanes.current?.getBoundingClientRect();
+      const onLanes =
+        point !== null &&
+        box !== undefined &&
+        point.clientY >= box.top &&
+        point.clientY <= box.bottom &&
+        loaded.tracks.length > 0;
+      let target = onLanes
+        ? loaded.tracks[
+            Math.min(
+              loaded.tracks.length - 1,
+              Math.max(0, Math.floor((point.clientY - box.top) / LANE_PX)),
+            )
+          ]?.id
+        : dropTrack?.id;
+      if (target === undefined) {
+        const added = await edit('audio.track.add', {
+          name: asset.title.slice(0, 80) || 'Track 1',
+        });
+        if (added === undefined) return;
+        target = WithDoc.parse(added).document.tracks.at(-1)?.id;
+        if (target === undefined) return;
+      }
+      const startSeconds =
+        point !== null && box !== undefined
+          ? Math.max(0, (point.clientX - box.left) / zoom)
+          : player.at;
+      await edit('audio.region.insert', {
+        trackId: target,
+        key,
+        label: asset.title.slice(0, 120),
+        startSeconds,
+      });
+    },
+  });
   const sweep = useRef<{
     trackIndex: number;
     at: number;
@@ -757,7 +831,20 @@ function AudioEditor({
             entry.region.endSeconds >= selection.to - 1e-6,
         )
       : undefined;
-  const picked = allRegions.find((entry) => entry.region.id === regionId) ?? inside;
+  const byId = allRegions.find((entry) => entry.region.id === regionId);
+  if (byId !== undefined && seen?.id !== byId.region.id) {
+    setSeen({ id: byId.region.id, key: byId.region.key, startSeconds: byId.region.startSeconds });
+  }
+  // A shot's own sound becomes a region of its own when changed, under a new id: stay on it.
+  if (byId === undefined && regionId !== null && seen?.id === regionId) {
+    const moved = allRegions.find(
+      (entry) =>
+        entry.region.key === seen.key &&
+        Math.abs(entry.region.startSeconds - seen.startSeconds) < 1e-3,
+    );
+    if (moved !== undefined) setRegionId(moved.region.id);
+  }
+  const picked = byId ?? inside;
   const stretch =
     inside !== undefined && picked === inside && selection !== null
       ? { from: selection.from, to: selection.to }
@@ -767,6 +854,7 @@ function AudioEditor({
   const width = Math.max(length + 10, 30) * zoom;
   const at = player.at;
   const lastStep = history?.undo.at(-1);
+  const showWords = wordsOpen ?? doc.link !== null;
   const agentLast = lastStep?.actor?.kind === 'agent';
 
   /** The time under a pointer on the lanes, snapped to region edges and the playhead nearby. */
@@ -933,7 +1021,13 @@ function AudioEditor({
     else if (mod && key === 'v') run(actions.paste);
     else if (mod && key === 'l') run(actions.silence);
     else if (!mod && key === 's') run(actions.split);
-    else if (key === 'delete' || key === 'backspace') run(actions.remove);
+    else if (!mod && key === 'r') {
+      // The record button starts and stops; it lives in its own component.
+      const editor = event.currentTarget;
+      run(() => {
+        editor.querySelector<HTMLButtonElement>('.tool.record, .recording .button')?.click();
+      });
+    } else if (key === 'delete' || key === 'backspace') run(actions.remove);
     else if (key === '=' || key === '+') run(actions.zoomIn);
     else if (key === '-') run(actions.zoomOut);
     else if (key === 'escape')
@@ -1140,6 +1234,20 @@ function AudioEditor({
           </output>
         </div>
         <div className="tools" role="toolbar" aria-label="Edit">
+          <RecordControl
+            imp={imp}
+            projectId={project.id}
+            docId={docId}
+            trackId={pickedTrack?.id}
+            startSeconds={at}
+            disabledReason={
+              doc.link === null
+                ? null
+                : "A scene's sound holds only sounds of the film. Record into a document of its own (New)."
+            }
+            onError={setError}
+          />
+          <span className="tool-gap" />
           <ToolButton
             icon={ScissorsIcon}
             label="Split at playhead"
@@ -1209,6 +1317,18 @@ function AudioEditor({
           <span className="tool-gap" />
           <button
             type="button"
+            className="tool text"
+            aria-pressed={showWords}
+            title="Dialogue as text: pick words to select, delete or move them"
+            onClick={() => {
+              setWordsOpen(!showWords);
+            }}
+          >
+            <TextTIcon aria-hidden="true" size={18} /> Words
+          </button>
+          <span className="tool-gap" />
+          <button
+            type="button"
             className="button small"
             onClick={actions.exportFile}
             disabled={doc.durationSeconds === 0}
@@ -1242,7 +1362,7 @@ function AudioEditor({
       )}
       <Problem text={error} />
       <div className="audio-body">
-        <div className="audio-timeline">
+        <div className="audio-timeline" ref={timeline}>
           <div className="track-heads">
             <div className="ruler-corner">
               <span className="eyebrow">
@@ -1510,10 +1630,47 @@ function AudioEditor({
           }}
         />
       </div>
+      {showWords && (
+        <WordsPanel
+          imp={imp}
+          project={project}
+          docId={docId}
+          revision={JSON.stringify(
+            tracks.map((track) =>
+              track.regions.map((region) => [
+                region.id,
+                region.key,
+                region.startSeconds,
+                region.endSeconds,
+                region.trimStartSeconds,
+              ]),
+            ),
+          )}
+          regions={allRegions.map(({ region }) => region)}
+          trackNames={new Map(tracks.map((track) => [track.id, track.name]))}
+          at={at}
+          playing={player.playing}
+          act={(id, input) => runCommand(imp, id, input)}
+          onSelect={(chosen) => {
+            setRegionId(null);
+            if (chosen === null) {
+              setSelection(null);
+              return;
+            }
+            setSelection({ trackIds: [chosen.trackId], from: chosen.from, to: chosen.to });
+            player.setAt(chosen.from);
+          }}
+          onPlay={(from, to) => {
+            void player.play(from, to).catch((reason: unknown) => {
+              setError(messageOf(reason));
+            });
+          }}
+        />
+      )}
       <p className="muted small shortcuts">
-        Space plays · S splits at the playhead · drag across a track to select (two fingers pan and
-        zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L
-        silences · Ctrl+Z undoes
+        Space plays · R records · S splits at the playhead · drag across a track to select (two
+        fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap
+        · Ctrl+L silences · Ctrl+Z undoes
       </p>
     </div>
   );
@@ -1702,6 +1859,26 @@ export function AudioView({ project }: { project: Project }): ReactElement {
   };
   const documents = listed.data?.documents ?? [];
   const open = documents.find((candidate) => candidate.id === openId) ?? documents[0];
+
+  // The library opens a document here, such as one it just made for a sound.
+  useEffect(() => {
+    const onFocus = (event: Event): void => {
+      const target = (event as CustomEvent<Focus>).detail;
+      const docId = target.focus['docId'];
+      if (target.view !== 'audio' || docId === undefined) return;
+      setMaking(false);
+      setOpenIdState(docId);
+      try {
+        localStorage.setItem(DOC_SETTING(project), docId);
+      } catch {
+        // Remembering the open document is a convenience.
+      }
+    };
+    window.addEventListener(FOCUS_EVENT, onFocus);
+    return () => {
+      window.removeEventListener(FOCUS_EVENT, onFocus);
+    };
+  }, [project]);
 
   return (
     <>

@@ -5,14 +5,21 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import { createDefaultAudioCodec } from '@imp/audio';
+import { createFilmExportCommands, type FilmExportOptions } from './film.js';
+import { createReviewCommands, type FrameGrabber } from './edit-review.js';
+import { createLookCommands, type ColorSampler } from './look.js';
+import { createMarkerCommands } from './markers.js';
+import { createPickupCommands } from './pickups.js';
+import { createTextCommands } from './text.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
-import { libraryCommands } from './library.js';
+import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
 import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = {
-  prefixes: ['movie.', 'world.', 'project.list', 'project.resources.', 'media.'],
+  prefixes: ['movie.', 'world.', 'library.', 'project.list', 'project.resources.', 'media.'],
 } as const;
 
 export const screenwriter: Role = {
@@ -93,6 +100,10 @@ export const clipDesigner: Role = {
     'media.view, judge the framing, the faces and the room against the other shots of the scene,',
     'and paint again with a direction until it is right; it costs a cent, a clip far more. The',
     'clip then starts exactly on the chosen frame, which is what keeps a long film coherent.',
+    'The edit asks for pickups, shots the cut needs and does not have, such as a reaction or an',
+    'insert: movie.edit.pickup.list with open: true lists them with why each is needed and how',
+    'long it should run. Make them like any shot, matched to the shots around them in the cut,',
+    'and keep to the length asked for; the clip takes the place of its slate in the cut by itself.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -153,22 +164,115 @@ export const filmEditor: Role = {
   brief: [
     'You are a film editor. You put the clips, the recorded dialogue, the effects and the music',
     'of a film together, with the same tools the person has on the Edit screen. Start with',
-    'movie.edit.film for the whole picture, then movie.edit.get for a scene. A scene has a cut:',
+    'movie.edit.film for the whole picture, then movie.edit.edl to read a scene as an edit',
+    'decision list (pieces with times and clip in and out points, every spoken line with who',
+    'says it and when, the audio lane, and the ids to act on), or movie.edit.range for a stretch',
+    'of it. movie.edit.get has the full detail. Your edits do not change the cut directly: they',
+    'become proposed changes, like tracked changes, that the person plays and then keeps or',
+    'discards, wholly or one by one. Read your proposal back with movie.edit.draft.get, take back',
+    'what you no longer want with movie.edit.draft.reject or movie.edit.undo, and end with a short',
+    'account of what you changed and why, by time. When asked about a stretch, change only that',
+    'stretch and how it joins its neighbours. A scene has a cut:',
     'items in playing order (shots, or title cards), and an audio lane of placed sounds. Cut',
     'with item.split, item.move, item.duplicate (copy and paste, also into another scene),',
     'item.remove and item.set (trims, fades to and from black, volumes); every change can be',
-    'undone with movie.edit.undo. Picture and sound are separate: audio.detach takes the sound',
-    'of a clip onto the audio lane so it can start before or run past its picture, and',
-    'sound.place lays effects, music or recorded dialogue anywhere. Lay ambience under a whole',
+    'undone with movie.edit.undo. Picture and sound are separate: item.roll makes a J cut (the',
+    'next line heard before its picture) or an L cut (a line running on under the reaction),',
+    'which is how dialogue scenes flow instead of cutting on every line; it needs picture',
+    'trimmed off where the cut moves to. audio.detach takes the sound of a clip onto the audio',
+    'lane on its own, and sound.place lays effects, music or recorded dialogue anywhere. A shot',
+    'keeps its earlier clips as takes: movie.shot.take.list, then movie.shot.take.use when an',
+    'earlier take plays better than the new one. Rescue a weak shot before asking for a new',
+    'clip: item.set slows or speeds it (speed), plays it backwards (reverse), holds its last',
+    'frame (holdSeconds) or punches in on part of the frame (zoom, focusX, focusY, and zoomTo for',
+    'a slow push), and item.freeze stops the picture at a moment. Off speed a shot loses its own',
+    'sound, so lay sound for it on the audio lane. Most cuts should stay straight cuts; item.set',
+    'transition (dissolve, dip-black, dip-white, wipe) with transitionSeconds sets how a piece',
+    'comes in after the one before, for a passage of time or a change of place. A dissolve or',
+    'wipe overlaps the pieces and shortens the scene. Lay ambience under a whole',
     'scene (looped) and effects where they happen; keep music under the dialogue, around 0.3 to',
     '0.5, with a fade in and out. An item whose clip is missing, pending, or whose dialogue is',
     'not recorded or out of date is not ready: say which, and send that work to the person who',
     'makes it rather than cutting around it. Judge continuity across shots, such as the same',
     'look of a character, the same light and place within a scene, and levels between scenes,',
     'and name the weak shots by number so that only they are made again. Work scene by scene;',
-    'a film can be long and you never need the whole of it at once.',
+    'a film can be long and you never need the whole of it at once: movie.edit.film.edl reads',
+    'the film as one text (with fromScene and toScene for part of it) when you need how scenes',
+    'join. Leave a marker (movie.edit.marker.add: note, todo or problem) where something needs',
+    'the person or another crew member, such as a jump cut or a missing reaction; markers show',
+    'at once, not as proposals. Read open ones with movie.edit.marker.list and mark one done',
+    'with movie.edit.marker.set when it is dealt with. When a scene needs a shot it does not have,',
+    'such as a reaction to cut away to or an insert that covers a jump, and the shots there cannot',
+    'be rescued, ask for a pickup with movie.edit.pickup.request: describe the shot, say what the',
+    'cut needs it for and how long; it stands in the cut as a slate until the Clip Designer makes',
+    'it. movie.edit.pickup.list shows how far each is. Make the colour of the shots of a',
+    'scene agree: movie.edit.grade.match grades a shot to a reference shot (judge the result',
+    'with movie.edit.frames), and item.set grade adjusts it by hand. Give the whole film one',
+    'feel last, with movie.edit.look.set, and keep it subtle unless asked. When a scene or the film',
+    'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
+    'film); it renders offline and waits until the file is done. Say what was not ready or',
+    'came out silent, and tell the person they can download it on the Edit screen. Text goes',
+    'on the text lane, drawn by Imp rather than the video model: movie.edit.text.add for titles,',
+    'lower thirds (name, new line, role), captions pinned in the frame and credits; anchor a',
+    'text to a piece or a spoken line so it follows the cut. movie.edit.subtitles.generate',
+    'subtitles every heard line, movie.edit.credits.generate rolls end credits from the cast and',
+    'crew, and the film-wide looks are text styles (movie.edit.text.style.list and .set). Keep',
+    'texts clear of faces and of each other, and on screen long enough to read: about 15',
+    'letters a second.',
   ].join(' '),
   scope: SCOPE,
+};
+
+export const critic: Role = {
+  id: 'critic',
+  name: 'Critic',
+  summary: 'Watches a scene or the film and leaves notes on the timeline. Changes nothing.',
+  brief: [
+    'You are a critic: a sharp, fair first audience for a film made from generated clips. You',
+    'watch and you write notes; you never change the film. Read the development notes for what',
+    'the film wants to be, then the scene or stretch you are asked about: movie.edit.edl reads a',
+    'scene as text with times, movie.edit.film.edl the whole film, and movie.edit.frames shows',
+    'stills of the pieces, which you look at with media.view. Judge what an audience notices:',
+    'whether the story is clear, whether a moment lands or drags, continuity (a face, a costume,',
+    'an object or the light that changes between shots), jump cuts, a line that does not fit the',
+    'picture, colour that jumps within a scene, text that is hard to read, sound that is missing',
+    'or too loud. Leave each point as a marker at its moment with movie.edit.marker.add: problem',
+    'for something wrong, todo for something to add or change, note for a remark or praise.',
+    'One point per marker, said plainly and specifically, with what would fix it where you can',
+    'tell, such as "jump cut: she is suddenly at the door; a reaction from Tom would cover it".',
+    'Read the open markers first with movie.edit.marker.list and do not repeat what is there.',
+    'Be selective: the few things that matter most beat a long list. Say what works too. End',
+    'with a short verdict on the scene or film and the three changes that would help it most.',
+    'You see stills, not motion, and you cannot hear: say so when a judgement needs either.',
+  ].join(' '),
+  scope: {
+    prefixes: [
+      'movie.development.get',
+      'movie.scene.list',
+      'movie.scene.get',
+      'movie.character.list',
+      'movie.character.get',
+      'movie.shot.list',
+      'movie.shot.get',
+      'movie.edit.get',
+      'movie.edit.film',
+      'movie.edit.edl',
+      'movie.edit.range',
+      'movie.edit.frames',
+      'movie.edit.draft.get',
+      'movie.edit.look.get',
+      'movie.edit.pickup.list',
+      'movie.edit.marker.',
+      'world.location.list',
+      'world.location.get',
+      'world.object.list',
+      'world.object.get',
+      'project.list',
+      'media.view',
+    ],
+    // Reading, and markers, which are the only thing it writes.
+    effects: ['read', 'write'],
+  },
 };
 
 export const soundEditor: Role = {
@@ -178,7 +282,8 @@ export const soundEditor: Role = {
   brief: [
     'You are a sound editor. You work in the audio editor with the same tools the person has',
     'there. A document holds tracks of regions, and each region plays a stretch of a recorded',
-    'sound; movie.sound.library lists every recorded sound of the film with its key. Open',
+    'sound; library.list with modality "sound" lists every sound of the project, imported files',
+    'included, with its blobKey (movie.sound.library lists only the recorded ones). Open',
     'sounds with audio.doc.create or audio.region.insert. You cannot hear while you work, so',
     'measure: audio.inspect gives levels (dialogue around -20 dB average, peaks below -1 dB)',
     'and audio.waveform shows where sound and pauses are. Cut with audio.region.split,',
@@ -187,11 +292,11 @@ export const soundEditor: Role = {
     '(learn the noise from a stretch with nothing else), audio.fx.eq (highpass dialogue at 80 to',
     '100 Hz), audio.fx.compressor, audio.fx.limiter, and audio.fx.loudness to set each line or',
     'cue to a loudness; measure the result with audio.analyze (LUFS and true peak; a film mix',
-    'near -23 LUFS for broadcast or -16 online, peaks at most -1 dBTP). Listen with audio.listen to check a short stretch if you',
+    'near -23 LUFS for broadcast or -16 online, peaks at most -1 dBTP). Change voices with audio.fx.voice (telephone, radio, megaphone, robot, monster, chipmunk) or audio.fx.distortion, audio.fx.pitch, audio.fx.ringmod and audio.fx.crush. To edit dialogue by its words, write it down once with audio.transcribe, read it with audio.transcript.get, and remove words with audio.words.delete (cut in the pauses); move words by cutting their times with audio.edit.cut and pasting. Listen with audio.listen to check a short stretch if you',
     'can. Each change is a step the person can undo, and they can take back your whole pass at',
     'once, so work in clear steps and say what you changed and why, by time.',
   ].join(' '),
-  scope: { prefixes: ['movie.', 'project.list', 'media.', 'audio.'] },
+  scope: { prefixes: ['movie.', 'library.', 'project.list', 'media.', 'audio.'] },
 };
 
 /**
@@ -202,6 +307,12 @@ export function createMovieMode(options: {
   readonly provider: GenerationProvider;
   /** Re-encodes key frames as JPEG for video models that take nothing else as a start frame. */
   readonly frameImage?: FrameImageEncoder;
+  /** How films are exported: the sound decoder, and the host's renderer if it has one. */
+  readonly film?: FilmExportOptions;
+  /** Takes stills from clips so that agents can see a cut. */
+  readonly frameGrabber?: FrameGrabber;
+  /** Reads the colours of clips, to match shots; without it shots are graded by hand only. */
+  readonly colorSampler?: ColorSampler;
 }): Mode {
   return defineMode({
     id: MODE_ID,
@@ -226,6 +337,16 @@ export function createMovieMode(options: {
       ...createFrameCommands(options.provider, options.frameImage),
       ...createSoundCommands(options.provider),
       ...createEditCommands(options.provider),
+      ...createFilmExportCommands(options.film ?? { codec: createDefaultAudioCodec() }),
+      ...createReviewCommands(
+        options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber },
+      ),
+      ...createTextCommands(),
+      ...createMarkerCommands(),
+      ...createPickupCommands(),
+      ...createLookCommands(
+        options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler },
+      ),
       ...libraryCommands,
     ],
     roles: [
@@ -236,8 +357,10 @@ export function createMovieMode(options: {
       soundDesigner,
       filmEditor,
       soundEditor,
+      critic,
     ],
     project: movieProjectSupport,
+    library: [movieLibrarySource],
     // The pictures of the world are drawn in the film's tone.
     visualStyle: async (store, projectId) => {
       const stored = await store.get(movieDevelopmentKey(projectId));

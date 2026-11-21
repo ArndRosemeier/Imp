@@ -29,6 +29,8 @@ import type { StereoPcm } from './pcm.js';
 import { toDecibels } from './pcm.js';
 import { Effect, EffectError, effectsKey } from './effects.js';
 import { createEffectCommands } from './fx-commands.js';
+import { createRecordingCommands } from './record-commands.js';
+import { createTranscriptCommands, type Transcriber } from './transcript-commands.js';
 import { FadeCurve, SoundPlacement } from './placement.js';
 import { UnsupportedAudioError } from './codec.js';
 import { MissingSourceError, type AudioSources } from './sources.js';
@@ -188,6 +190,8 @@ export interface AudioDocCommandOptions {
   readonly sources: (runtime: CoreRuntime) => AudioSources;
   /** Sound kept elsewhere that documents can be opened onto. */
   readonly links?: readonly AudioLink[];
+  /** Writes down what is said, for editing dialogue by its words. */
+  readonly transcribe?: Transcriber;
 }
 
 /** What tracks play, apart from listening switches, to tell whether an edit changed it. */
@@ -1395,6 +1399,19 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     },
   });
 
+  const helpers = {
+    sources: options.sources,
+    load,
+    change,
+    regionOf,
+    trackOf,
+    mixRange,
+    checkRange,
+    outline: ok,
+    done,
+    document: outline,
+  };
+
   return [
     list,
     get,
@@ -1424,17 +1441,9 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     redo,
     listen,
     exportCommand,
-    ...createEffectCommands({
-      sources: options.sources,
-      load,
-      change,
-      regionOf,
-      trackOf,
-      mixRange,
-      checkRange,
-      outline: ok,
-      done,
-    }),
+    ...createEffectCommands(helpers),
+    ...createRecordingCommands(helpers),
+    ...createTranscriptCommands(helpers, options.transcribe),
   ];
 }
 

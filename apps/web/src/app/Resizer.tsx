@@ -51,8 +51,11 @@ export function Resizer({
   label,
   side,
   width,
+  panel,
 }: {
   label: string;
+  /** Which panel's edge it is, for its place in the layout. */
+  panel?: string;
   /** Which side of the window the panel is on; decides the drag direction. */
   side: 'left' | 'right';
   width: PanelWidth;
@@ -81,6 +84,7 @@ export function Resizer({
       tabIndex={0}
       className="resizer"
       data-side={side}
+      data-panel={panel}
       data-dragging={drag !== null}
       title="Drag to resize. Double click to reset."
       onPointerDown={(event) => {

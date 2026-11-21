@@ -193,6 +193,8 @@ describe('readReleaseNotes', () => {
   it('counts merges from the one that added the changes folder', () => {
     const { dir, git, write, commit } = repository();
     write('a.txt', 'before');
+    // An entry from before versioning began is covered by 0.001's summary, never pending.
+    write('changes/old.md', '- Old.');
     commit('Before versioning (#1)');
     write('changes/README.md', '# How');
     write('changes/start.md', '# Imp so far\n- Everything.');
@@ -225,6 +227,7 @@ describe('readReleaseNotes', () => {
     const preview = readReleaseNotes({ cwd: join(dir, 'changes') });
     expect(preview.preview).toBe(true);
     expect(preview.releases[0]).toMatchObject({ version: '0.004', date: null, notes: ['Draft.'] });
+    expect(preview.releases).toHaveLength(4);
   });
 
   it('gives previews 0.000 and refuses releases when there is no history to read', () => {

@@ -20,6 +20,7 @@ import {
   createMovieMode,
   type FrameImageEncoder,
   MAX_CLIP_GUIDES,
+  MAX_TAKES,
   readSetting,
   screenwriter,
   Shot,
@@ -643,6 +644,8 @@ describe('shots and clips', () => {
       frames: [],
       frameId: null,
       clip: null,
+      takes: [],
+      pickup: null,
     });
     expect(await run('movie.shot.list', { sceneId: scene.id })).toEqual({
       shots: [
@@ -769,11 +772,14 @@ describe('shots and clips', () => {
     // Checking a finished clip asks nobody and changes nothing.
     expect(await run('movie.shot.clip.check', at(shot.id))).toEqual(done);
 
-    // A new clip replaces the file of the old one.
+    // A new clip keeps the old one as a take.
     await run('movie.shot.clip.generate', { ...at(shot.id), portraits: false, audio: false });
     expect(provider.videoRequests[1]).toMatchObject({ audio: false });
     expect(provider.videoRequests[1]).not.toHaveProperty('references');
-    expect(await runtime.blobs.list('')).not.toContain(done.clip.blobKey);
+    expect(await runtime.blobs.list('')).toContain(done.clip.blobKey);
+    expect(await run('movie.shot.get', at(shot.id))).toMatchObject({
+      takes: [{ blobKey: done.clip.blobKey }],
+    });
   });
 
   it('makes the clip from the words alone when the model takes no portraits', async () => {
@@ -1144,6 +1150,384 @@ describe('shots and clips', () => {
     ]);
   });
 
+  it('makes J and L cuts, keeping picture and sound in sync and subtitles on their line', async () => {
+    const { run, at, add, ready, cutOf, edit, mara } = await withCuts();
+    const a = await ready({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    const b = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(b.id), durationSeconds: 4, audio: true });
+    await run('movie.shot.clip.check', at(b.id));
+    await run('movie.shot.clip.check', at(b.id));
+    await expect(edit('item.roll', { itemId: a.id, type: 'l', seconds: 0.5 })).rejects.toThrow(
+      /only 0 s of it was trimmed off/,
+    );
+    await expect(edit('item.roll', { itemId: b.id, type: 'l', seconds: 0.5 })).rejects.toThrow(
+      /last item/,
+    );
+    await edit('item.set', { itemId: a.id, trimEndSeconds: 1 });
+    await edit('item.set', { itemId: b.id, trimStartSeconds: 1 });
+    await run('movie.edit.subtitles.generate', {});
+
+    // L: the sound of the first runs on under the start of the second picture.
+    const l = (await edit('item.roll', { itemId: a.id, type: 'l', seconds: 0.5 })) as unknown as {
+      first: { trimEndSeconds: number; clipAudioVolume: number };
+      second: { trimStartSeconds: number; clipAudioVolume: number };
+      sounds: {
+        id: string;
+        source: string;
+        shotId: string;
+        startSeconds: number;
+        durationSeconds: number;
+        trimStartSeconds: number;
+      }[];
+    };
+    expect(l.first).toMatchObject({ trimEndSeconds: 1.5, clipAudioVolume: 0 });
+    expect(l.second).toMatchObject({ trimStartSeconds: 0.5, clipAudioVolume: 0 });
+    expect(l.sounds).toEqual([
+      expect.objectContaining({
+        source: 'clip',
+        shotId: a.id,
+        startSeconds: 0,
+        durationSeconds: 3,
+        trimStartSeconds: 0,
+      }),
+      expect.objectContaining({
+        source: 'clip',
+        shotId: b.id,
+        startSeconds: 3,
+        durationSeconds: 3,
+        trimStartSeconds: 1,
+      }),
+    ]);
+    const after = (await cutOf()) as unknown as {
+      totalSeconds: number;
+      items: { startsAtSeconds: number; durationSeconds: number }[];
+      texts: {
+        anchor: { on: string; id: string } | null;
+        orphaned: boolean;
+        startSeconds: number;
+      }[];
+    };
+    expect(after.totalSeconds).toBe(6);
+    expect(after.items.map((item) => [item.startsAtSeconds, item.durationSeconds])).toEqual([
+      [0, 2.5],
+      [2.5, 3.5],
+    ]);
+    // The subtitle follows the line where it now lies, at the same time.
+    expect(after.texts).toEqual([
+      expect.objectContaining({
+        anchor: expect.objectContaining({ on: 'placement', id: l.sounds[0]?.id }) as unknown,
+        orphaned: false,
+        startSeconds: 0,
+      }),
+    ]);
+
+    // J: the next sound comes in under the end of this picture; sound already apart stays.
+    const j = (await edit('item.roll', { itemId: a.id, type: 'j', seconds: 1 })) as unknown as {
+      first: { trimEndSeconds: number };
+      second: { trimStartSeconds: number };
+      sounds: unknown[];
+    };
+    expect(j).toMatchObject({
+      first: { trimEndSeconds: 0.5 },
+      second: { trimStartSeconds: 1.5 },
+      sounds: [],
+    });
+    expect((await cutOf()).items.map((item) => item.durationSeconds)).toEqual([3.5, 2.5]);
+    await expect(edit('item.roll', { itemId: a.id, type: 'j', seconds: 2 })).rejects.toThrow(
+      /at most 0.5 s/,
+    );
+    await edit('item.set', { itemId: a.id, trimEndSeconds: 3 });
+    await expect(edit('item.roll', { itemId: a.id, type: 'l', seconds: 0.9 })).rejects.toThrow(
+      /shorter than/,
+    );
+    await edit('undo', {});
+    await edit('undo', {});
+    expect((await cutOf()).items.map((item) => item.durationSeconds)).toEqual([2.5, 3.5]);
+
+    const card = (await edit('title.add', { text: 'Later', toIndex: 1 })) as unknown as {
+      item: { id: string };
+    };
+    await expect(
+      edit('item.roll', { itemId: card.item.id, type: 'l', seconds: 0.2 }),
+    ).rejects.toThrow(/two shots/);
+  });
+
+  it('slows, reverses, freezes and zooms a piece, with its own sound silent off speed', async () => {
+    const { run, at, add, ready, cutOf, edit, mara } = await withCuts();
+    const a = await ready({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    const b = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(b.id), durationSeconds: 4, audio: true });
+    await run('movie.shot.clip.check', at(b.id));
+    await run('movie.shot.clip.check', at(b.id));
+    interface View {
+      totalSeconds: number;
+      items: {
+        durationSeconds: number;
+        movingSeconds: number;
+        ownSound: boolean;
+        startsAtSeconds: number;
+      }[];
+      spoken: { id: string }[];
+    }
+    const view = async () => (await cutOf()) as unknown as View;
+    expect((await view()).spoken).toHaveLength(1);
+
+    // Half speed: twice as long, and its line is no longer heard.
+    await edit('item.set', { itemId: a.id, speed: 0.5 });
+    let now = await view();
+    expect(now.items[0]).toMatchObject({ durationSeconds: 8, movingSeconds: 8, ownSound: false });
+    expect(now.totalSeconds).toBe(12);
+    expect(now.spoken).toEqual([]);
+    await expect(edit('audio.detach', { itemId: a.id })).rejects.toThrow(/off speed/);
+
+    // A held last frame adds to the length; a split stays in the moving part.
+    await edit('item.set', { itemId: a.id, speed: 1, holdSeconds: 1.5 });
+    now = await view();
+    expect(now.items[0]).toMatchObject({ durationSeconds: 5.5, movingSeconds: 4, ownSound: true });
+    await expect(edit('item.split', { itemId: a.id, atSeconds: 5 })).rejects.toThrow(/moves for 4/);
+
+    // A punch-in that pushes in is split into two halves that meet on one zoom.
+    await edit('item.set', { itemId: b.id, reverse: true, zoom: 1, zoomTo: 2, focusX: 0.3 });
+    const halves = (await edit('item.split', { itemId: b.id, atSeconds: 2 })) as unknown as {
+      first: Record<string, unknown>;
+      second: Record<string, unknown>;
+    };
+    expect(halves.first).toMatchObject({
+      zoom: 1,
+      zoomTo: 1.5,
+      trimStartSeconds: 2,
+      trimEndSeconds: 0,
+    });
+    expect(halves.second).toMatchObject({
+      zoom: 1.5,
+      zoomTo: 2,
+      trimStartSeconds: 0,
+      trimEndSeconds: 2,
+    });
+
+    // Freezing mid-shot splits it and holds the frame there, then plays on.
+    const frozen = (await edit('item.freeze', {
+      itemId: a.id,
+      atSeconds: 1,
+      holdSeconds: 2,
+    })) as unknown as { frozen: Record<string, unknown>; after: Record<string, unknown> };
+    expect(frozen.frozen).toMatchObject({ trimEndSeconds: 3, holdSeconds: 2 });
+    expect(frozen.after).toMatchObject({ trimStartSeconds: 1, holdSeconds: 1.5 });
+    now = await view();
+    expect(now.items.map((item) => item.durationSeconds)).toEqual([3, 4.5, 2, 2]);
+    await expect(edit('item.roll', { itemId: a.id, type: 'l', seconds: 0.2 })).rejects.toThrow(
+      /own speed/,
+    );
+
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('holds last frame 2.0');
+    expect(edl.text).toContain('reversed');
+    expect(edl.text).toContain('zoom 1.00 to 1.50 on 0.30,0.50');
+
+    const card = (await edit('title.add', { text: 'Later' })) as unknown as {
+      item: { id: string };
+    };
+    await expect(edit('item.set', { itemId: card.item.id, speed: 2 })).rejects.toThrow(
+      /title card/,
+    );
+    await expect(
+      edit('item.freeze', { itemId: card.item.id, atSeconds: 1, holdSeconds: 1 }),
+    ).rejects.toThrow(/Only a shot/);
+  });
+
+  it('lays a dissolve or wipe over the piece before, and dips without overlap', async () => {
+    const { run, at, add, ready, cutOf, edit, mara } = await withCuts();
+    await ready({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    const b = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(b.id), durationSeconds: 4, audio: true });
+    await run('movie.shot.clip.check', at(b.id));
+    await run('movie.shot.clip.check', at(b.id));
+    interface View {
+      totalSeconds: number;
+      items: {
+        startsAtSeconds: number;
+        overlapSeconds: number;
+        transition: string;
+        dipIn: unknown;
+        dipOut: unknown;
+      }[];
+    }
+    const view = async () => (await cutOf()) as unknown as View;
+    expect((await view()).items[1]).toMatchObject({ transition: 'cut', overlapSeconds: 0 });
+
+    // A one-second dissolve starts the door a second early, so the scene is a second shorter.
+    await edit('item.set', { itemId: b.id, transition: 'dissolve', transitionSeconds: 1 });
+    let now = await view();
+    expect(now.items[1]).toMatchObject({ startsAtSeconds: 3, overlapSeconds: 1 });
+    expect(now.totalSeconds).toBe(7);
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('dissolve in 1.0 (overlaps 1.00)');
+
+    // A long wipe overlaps at most half of either piece.
+    await edit('item.set', { itemId: b.id, transition: 'wipe', transitionSeconds: 5 });
+    now = await view();
+    expect(now.items[1]).toMatchObject({ startsAtSeconds: 2, overlapSeconds: 2 });
+    expect(now.totalSeconds).toBe(6);
+
+    // A dip keeps the length and fades each side for half the transition.
+    await edit('item.set', { itemId: b.id, transition: 'dip-black', transitionSeconds: 2 });
+    now = await view();
+    expect(now.totalSeconds).toBe(8);
+    expect(now.items[0]).toMatchObject({ dipIn: null, dipOut: { color: 'black', seconds: 1 } });
+    expect(now.items[1]).toMatchObject({
+      startsAtSeconds: 4,
+      overlapSeconds: 0,
+      dipIn: { color: 'black', seconds: 1 },
+    });
+
+    // Splitting keeps the transition on the first half; the second follows with a cut.
+    const halves = (await edit('item.split', { itemId: b.id, atSeconds: 2 })) as unknown as {
+      first: Record<string, unknown>;
+      second: Record<string, unknown>;
+    };
+    expect(halves.first).toMatchObject({ transition: 'dip-black' });
+    expect(halves.second).toMatchObject({ transition: 'cut' });
+    await expect(
+      edit('item.set', { itemId: b.id, transition: 'dissolve', transitionSeconds: 9 }),
+    ).rejects.toThrow();
+  });
+
+  it('leaves markers that follow their piece, and reads the whole film as text', async () => {
+    const { run, ready, edit, scene } = await withCuts();
+    const a = await ready({ description: 'The lamp turns.' });
+    const b = await ready({ description: 'Mara at the stairs.' });
+    interface Placed {
+      id: string;
+      atSeconds: number;
+      filmSeconds: number;
+      itemId: string | null;
+      kind: string;
+      done: boolean;
+      by: string;
+      text: string;
+    }
+    const list = async (fields: Record<string, unknown> = {}) =>
+      ((await run('movie.edit.marker.list', fields)) as unknown as { markers: Placed[] }).markers;
+
+    // On the second piece, a second into it.
+    const { marker } = (await edit('marker.add', {
+      atSeconds: 5,
+      text: 'Jump cut: the cup moves',
+      kind: 'problem',
+    })) as unknown as { marker: Placed };
+    expect(marker).toMatchObject({ atSeconds: 5, itemId: b.id, kind: 'problem', by: 'person' });
+    // Past the end of the scene it lands at the end, on no piece.
+    await edit('marker.add', { atSeconds: 99, text: 'End on a held beat' });
+
+    // Trimming the first piece moves the second, and its marker with it.
+    await edit('item.set', { itemId: a.id, trimEndSeconds: 1.5 });
+    let markers = await list({ sceneId: scene.id });
+    expect(markers.map((entry) => [entry.text, entry.atSeconds])).toEqual([
+      ['Jump cut: the cup moves', 3.5],
+      ['End on a held beat', 6.5],
+    ]);
+
+    // A second scene comes after the first in film time; an agent's marker says who left it.
+    const second = await run('movie.scene.create', { heading: 'EXT. ROCKS - NIGHT' });
+    await run('movie.edit.title.add', { sceneId: second.id, text: 'Later', seconds: 3 });
+    await run(
+      'movie.edit.marker.add',
+      { sceneId: second.id, atSeconds: 1, text: 'Needs a wide', kind: 'todo' },
+      writer,
+    );
+    markers = await list();
+    expect(markers.map((entry) => entry.filmSeconds)).toEqual([3.5, 6.5, 7.5]);
+    expect(markers[2]).toMatchObject({ by: 'screenwriter', kind: 'todo' });
+
+    // Done, moved, removed.
+    const changed = (await edit('marker.set', {
+      markerId: marker.id,
+      done: true,
+      text: 'Fixed by trimming',
+      atSeconds: 1,
+    })) as unknown as { marker: Placed };
+    expect(changed.marker).toMatchObject({ done: true, itemId: a.id, atSeconds: 1 });
+    expect((await list({ open: true })).map((entry) => entry.text)).toEqual([
+      'End on a held beat',
+      'Needs a wide',
+    ]);
+    await expect(edit('marker.set', { markerId: 'nope', done: true })).rejects.toThrow(/No marker/);
+
+    // The piece it was on goes: it stays where it was put.
+    await edit('item.remove', { itemId: a.id });
+    expect((await list({ sceneId: scene.id }))[0]).toMatchObject({ atSeconds: 1 });
+
+    const film = (await run('movie.edit.film', {})) as unknown as {
+      openMarkers: number;
+      scenes: { startSeconds: number; openMarkers: number }[];
+    };
+    expect(film.openMarkers).toBe(2);
+    expect(film.scenes.map((entry) => [entry.startSeconds, entry.openMarkers])).toEqual([
+      [0, 1],
+      [4, 1],
+    ]);
+
+    const edl = (await edit('edl', {})) as unknown as { text: string };
+    expect(edl.text).toContain('MARKERS');
+    expect(edl.text).toContain('problem (done) by person: Fixed by trimming');
+    const whole = (await run('movie.edit.film.edl', {})) as unknown as {
+      text: string;
+      scenes: number;
+      totalSeconds: number;
+    };
+    expect(whole).toMatchObject({ scenes: 2, totalSeconds: 7 });
+    expect(whole.text).toContain('FILM · 2 scenes · 0:07.00');
+    expect(whole.text).toContain('== Film 0:04.00 to 0:07.00 ==');
+    expect(whole.text).toContain('(film 0:05.00) todo by screenwriter: Needs a wide');
+    const part = (await run('movie.edit.film.edl', { fromScene: 2 })) as unknown as {
+      text: string;
+      scenes: number;
+    };
+    expect(part.scenes).toBe(1);
+    expect(part.text).not.toContain('LAMP ROOM');
+
+    const removed = (await edit('marker.remove', { markerId: marker.id })) as unknown as {
+      remaining: number;
+    };
+    expect(removed.remaining).toBe(1);
+    // Deleting a scene takes its markers with it.
+    await run('movie.scene.delete', { sceneId: second.id });
+    expect((await list()).map((entry) => entry.text)).toEqual(['End on a held beat']);
+  });
+
+  it('carries recorded dialogue over a silent clip into a split edit', async () => {
+    const { run, registry, at, add, cutOf, edit, mara } = await withCuts();
+    await registry.executeById(
+      'settings.set',
+      { key: 'speech.model', value: 'vendor/speaker' },
+      { actor: user },
+    );
+    const talk = await add({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
+    await run('movie.shot.dialogue.generate', at(talk.id));
+    await run('movie.shot.clip.generate', { ...at(talk.id), durationSeconds: 4 });
+    await run('movie.shot.clip.check', at(talk.id));
+    await run('movie.shot.clip.check', at(talk.id));
+    const next = await add({ description: 'The door.' });
+    await run('movie.shot.clip.generate', { ...at(next.id), durationSeconds: 4, audio: false });
+    await run('movie.shot.clip.check', at(next.id));
+    await run('movie.shot.clip.check', at(next.id));
+    await edit('item.set', { itemId: talk.id, trimEndSeconds: 1 });
+    const rolled = (await edit('item.roll', {
+      itemId: talk.id,
+      type: 'j',
+      seconds: 0.5,
+    })) as unknown as {
+      first: { dialogueVolume: number };
+      sounds: { source: string; durationSeconds: number }[];
+    };
+    expect(rolled.first.dialogueVolume).toBe(0);
+    // Only the dialogue is taken apart: the next clip is silent.
+    expect(rolled.sounds).toEqual([expect.objectContaining({ source: 'dialogue' })]);
+    expect((await cutOf()).sounds).toEqual([
+      expect.objectContaining({ kind: 'dialogue', recorded: true }),
+    ]);
+  });
+
   it('places sounds, takes the sound of a clip apart, and drops it all with the scene', async () => {
     const { run, runtime, scene, at, add, mara, cutOf, edit } = await withCuts();
     const wind = await run('movie.sound.create', {
@@ -1211,6 +1595,76 @@ describe('shots and clips', () => {
     expect(
       (await runtime.store.list('projects/')).filter((entry) => entry.key.includes('/edit')),
     ).toEqual([]);
+  });
+
+  it('keeps earlier clips as takes, puts one back, and deletes them with the shot', async () => {
+    const { run, runtime, at, add } = await withScene();
+    const shot = await add({ description: 'The lamp turns.' });
+    const film = async () => {
+      await run('movie.shot.clip.generate', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+      return ((await run('movie.shot.clip.check', at(shot.id))) as unknown as WithClip).clip;
+    };
+    const clips = async () =>
+      (await runtime.blobs.list('')).filter((key) => key.includes('/clip/')).length;
+    const first = await film();
+    expect(await run('movie.shot.take.list', at(shot.id))).toMatchObject({
+      current: { number: 0, blobKey: first.blobKey },
+      takes: [],
+    });
+    const second = await film();
+    const listed = (await run('movie.shot.take.list', at(shot.id))) as unknown as {
+      current: { blobKey: string };
+      takes: { number: number; blobKey: string }[];
+    };
+    expect(listed.current.blobKey).toBe(second.blobKey);
+    expect(listed.takes).toEqual([expect.objectContaining({ number: 1, blobKey: first.blobKey })]);
+    expect(await clips()).toBe(2);
+
+    // Putting the first back keeps the second as a take.
+    expect(
+      await run('movie.shot.take.use', { ...at(shot.id), blobKey: first.blobKey ?? '' }),
+    ).toMatchObject({ clip: { blobKey: first.blobKey }, takes: 1 });
+    expect(await run('movie.shot.get', at(shot.id))).toMatchObject({
+      clip: { blobKey: first.blobKey },
+      takes: [{ blobKey: second.blobKey }],
+    });
+    await expect(
+      run('movie.shot.take.use', { ...at(shot.id), blobKey: 'nothing' }),
+    ).rejects.toThrow(/no take/);
+
+    // A clip being made cannot be swapped for a take; a clip that failed is not kept.
+    await run('movie.shot.clip.generate', at(shot.id));
+    await expect(
+      run('movie.shot.take.use', { ...at(shot.id), blobKey: second.blobKey ?? '' }),
+    ).rejects.toThrow(/still being made/);
+    expect(
+      ((await run('movie.shot.get', at(shot.id))) as unknown as { takes: unknown[] }).takes,
+    ).toHaveLength(2);
+    await run('movie.shot.clip.delete', at(shot.id));
+    expect(
+      await run('movie.shot.take.delete', { ...at(shot.id), blobKey: second.blobKey ?? '' }),
+    ).toEqual({ shotId: shot.id, takes: 1 });
+    expect(await clips()).toBe(1);
+    await run('movie.shot.delete', at(shot.id));
+    expect(await clips()).toBe(0);
+  });
+
+  it('keeps no more than so many takes', async () => {
+    const { run, runtime, at, add } = await withScene();
+    const shot = await add({ description: 'The lamp turns.' });
+    for (let made = 0; made < MAX_TAKES + 2; made += 1) {
+      await run('movie.shot.clip.generate', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+      await run('movie.shot.clip.check', at(shot.id));
+    }
+    const { takes } = (await run('movie.shot.get', at(shot.id))) as unknown as {
+      takes: unknown[];
+    };
+    expect(takes).toHaveLength(MAX_TAKES);
+    expect((await runtime.blobs.list('')).filter((key) => key.includes('/clip/'))).toHaveLength(
+      MAX_TAKES + 1,
+    );
   });
 
   it('deletes clips with what they belong to', async () => {
