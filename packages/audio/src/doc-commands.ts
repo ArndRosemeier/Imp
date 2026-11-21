@@ -27,6 +27,8 @@ import {
 } from './doc.js';
 import type { StereoPcm } from './pcm.js';
 import { toDecibels } from './pcm.js';
+import { Effect, EffectError, effectsKey } from './effects.js';
+import { createEffectCommands } from './fx-commands.js';
 import { FadeCurve, SoundPlacement } from './placement.js';
 import { UnsupportedAudioError } from './codec.js';
 import { MissingSourceError, type AudioSources } from './sources.js';
@@ -93,6 +95,7 @@ function outline(doc: AudioDoc) {
         fadeInSeconds: region.fadeInSeconds,
         fadeOutSeconds: region.fadeOutSeconds,
         fadeCurve: region.fadeCurve,
+        effects: region.effects,
       })),
     })),
   };
@@ -111,6 +114,7 @@ const RegionOutline = z.object({
   fadeInSeconds: z.number(),
   fadeOutSeconds: z.number(),
   fadeCurve: FadeCurve,
+  effects: z.array(Effect).describe('Processing of the source, in order (audio.fx.*).'),
 });
 const DocOutline = z.object({
   id: z.string(),
@@ -332,13 +336,26 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
   async function decodeAll(runtime: CoreRuntime, doc: AudioDoc) {
     const decoded = new Map<string, StereoPcm>();
     const unheard = new Set<string>();
+    // The same file with other effects is another sound.
+    const keyOf = (region: SoundPlacement): string =>
+      region.effects.length === 0
+        ? region.blobKey
+        : `${region.blobKey}\n${effectsKey(region.effects)}`;
+    const sources = options.sources(runtime);
     for (const region of doc.tracks.flatMap((track) => track.regions)) {
-      const key = region.blobKey;
-      if (key === '' || decoded.has(key) || unheard.has(key)) continue;
+      const key = keyOf(region);
+      if (region.blobKey === '' || decoded.has(key) || unheard.has(key)) continue;
       try {
-        decoded.set(key, await options.sources(runtime).pcm(key));
+        decoded.set(
+          key,
+          await sources.pcm(await sources.processedKey(region.blobKey, region.effects)),
+        );
       } catch (error) {
-        if (!(error instanceof MissingSourceError || error instanceof UnsupportedAudioError)) {
+        if (!(
+          error instanceof MissingSourceError ||
+          error instanceof UnsupportedAudioError ||
+          error instanceof EffectError
+        )) {
           throw error;
         }
         unheard.add(key);
@@ -346,18 +363,23 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     }
     const labels = doc.tracks
       .flatMap((track) => track.regions)
-      .filter((region) => unheard.has(region.blobKey))
+      .filter((region) => unheard.has(keyOf(region)))
       .map((region) => (region.label === '' ? region.id : region.label));
     return {
-      source: (region: SoundPlacement) => decoded.get(region.blobKey),
+      source: (region: SoundPlacement) => decoded.get(keyOf(region)),
       unheard: [...new Set(labels)],
     };
   }
 
-  async function renderRange(runtime: CoreRuntime, doc: AudioDoc, from: number, to: number) {
+  /** Mixes a stretch of a document into samples, as it plays and exports. */
+  async function mixRange(runtime: CoreRuntime, doc: AudioDoc, from: number, to: number) {
     const { source, unheard } = await decodeAll(runtime, doc);
     const frames = Math.max(1, toFrames(to) - toFrames(from));
-    const channels = renderDoc(doc, source, toFrames(from), frames);
+    return { channels: renderDoc(doc, source, toFrames(from), frames), unheard };
+  }
+
+  async function renderRange(runtime: CoreRuntime, doc: AudioDoc, from: number, to: number) {
+    const { channels, unheard } = await mixRange(runtime, doc, from, to);
     return { bytes: encodeWav({ sampleRate: SAMPLE_RATE, channels }), unheard };
   }
 
@@ -1402,6 +1424,17 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
     redo,
     listen,
     exportCommand,
+    ...createEffectCommands({
+      sources: options.sources,
+      load,
+      change,
+      regionOf,
+      trackOf,
+      mixRange,
+      checkRange,
+      outline: ok,
+      done,
+    }),
   ];
 }
 

@@ -13,6 +13,16 @@ export {
   type Mp4AudioDecoder,
   type WebCodecsLike,
 } from './webcodecs.js';
+export {
+  applyEffects,
+  describeEffect,
+  Effect,
+  EffectError,
+  EqBand,
+  type EffectKind,
+} from './effects.js';
+export { designBiquad, responseDb, type FilterSpec, type FilterType } from './dsp/biquad.js';
+export { measureLoudness, type LoudnessReport } from './dsp/loudness.js';
 export { createAudioCommands, type AudioCommandOptions } from './commands.js';
 export { audioRenderKey, type AudioLink, type LengthOf } from './doc-commands.js';
 export {

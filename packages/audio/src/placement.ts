@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Effect } from './effects.js';
 
 /** How a fade moves: evenly, or as a soft S that starts and ends gently. */
 export const FadeCurve = z.enum(['linear', 'smooth']);
@@ -47,5 +48,11 @@ export const SoundPlacement = z.object({
   pan: z.number().min(-1).max(1).default(0),
   /** The shape of both fades. */
   fadeCurve: FadeCurve.default('linear'),
+  /**
+   * Processing of the source, in order: EQ, compression, noise reduction and
+   * the like. Played from a processed copy of the source (see
+   * AudioSources.processedKey), so trims and fades stay as they are.
+   */
+  effects: z.array(Effect).max(12).default([]),
 });
 export type SoundPlacement = z.infer<typeof SoundPlacement>;
