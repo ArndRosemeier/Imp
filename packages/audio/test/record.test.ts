@@ -1,7 +1,12 @@
-import { CommandRegistry, projectCommands, type Actor } from '@imp/core';
+import { CommandRegistry, createLibraryCommands, projectCommands, type Actor } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
 import { describe, expect, it } from 'vitest';
-import { createAudioCommands, createDefaultAudioCodec, encodeWav } from '../src/index.js';
+import {
+  audioLibrarySource,
+  createAudioCommands,
+  createDefaultAudioCodec,
+  encodeWav,
+} from '../src/index.js';
 
 const take = (seconds: number) =>
   encodeWav(
@@ -30,6 +35,7 @@ async function setup() {
   const registry = new CommandRegistry({ runtime }).register(
     ...projectCommands,
     ...createAudioCommands({ codec: createDefaultAudioCodec() }),
+    ...createLibraryCommands([audioLibrarySource]),
   );
   const you: Actor = { kind: 'user', id: 'u' };
   const run = async (id: string, input: unknown) =>
@@ -85,10 +91,26 @@ describe('microphone recordings', () => {
       recordings: { key: string; durationSeconds: number }[];
     };
     expect(listed.recordings.map((r) => r.durationSeconds).sort()).toEqual([0.5, 1.5]);
+    // The library shows each recording by the region it became, beside the document.
+    const library = (await run('library.list', { projectId, kind: 'recording' })) as {
+      assets: { title: string; context: string; blobKey: string; durationSeconds: number }[];
+    };
+    expect(
+      library.assets.map((asset) => [asset.title, asset.context, asset.durationSeconds]).sort(),
+    ).toEqual([
+      ['Recording 1', 'Voice over', 1.5],
+      ['Take 2', 'Voice over', 0.5],
+    ]);
     // One step undoes the recording.
     await run('audio.history.undo', { projectId, docId });
     const back = (await run('audio.doc.get', { projectId, docId })) as { document: Outline };
     expect(back.document.tracks.at(-1)?.regions).toHaveLength(1);
+    const unplaced = (await run('library.list', { projectId, kind: 'recording' })) as {
+      assets: { title: string; context: string; open: unknown }[];
+    };
+    expect(unplaced.assets).toContainEqual(
+      expect.objectContaining({ title: 'Recording', context: 'Not placed', open: null }),
+    );
   });
 
   it('refuses what is not an upload, is missing or is not sound', async () => {
