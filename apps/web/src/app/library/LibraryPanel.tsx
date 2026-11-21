@@ -72,6 +72,28 @@ function useSeen(ref: RefObject<HTMLElement | null>): boolean {
   return seen;
 }
 
+/** How long a picked sound or video plays, from the browser's own player; null for anything else. */
+function measure(file: File): Promise<number | null> {
+  const kind = file.type.split('/')[0];
+  if (kind !== 'audio' && kind !== 'video') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const element = document.createElement(kind);
+    const done = (seconds: number | null): void => {
+      URL.revokeObjectURL(url);
+      resolve(seconds);
+    };
+    element.preload = 'metadata';
+    element.onloadedmetadata = () => {
+      done(Number.isFinite(element.duration) && element.duration > 0 ? element.duration : null);
+    };
+    element.onerror = () => {
+      done(null);
+    };
+    element.src = url;
+  });
+}
+
 /** One sound plays at a time in the library; starting another stops the first. */
 function usePreview(): {
   playing: string | null;
@@ -605,6 +627,17 @@ export function LibraryPanel({
   const [fileOver, setFileOver] = useState(false);
   const preview = usePreview();
 
+  // A finished import says so for a moment; errors stay until dismissed.
+  useEffect(() => {
+    if (status === null || status.endsWith('…')) return undefined;
+    const timer = window.setTimeout(() => {
+      setStatus(null);
+    }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [status]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebounced(query);
@@ -658,6 +691,14 @@ export function LibraryPanel({
           );
           done += 1;
           if (files.length === 1) setSelectedId(asset.id);
+          void measure(file).then((seconds) => {
+            if (seconds === null) return;
+            void runCommand(imp, 'library.update', {
+              projectId: project.id,
+              assetId: asset.id,
+              durationSeconds: seconds,
+            }).catch(() => undefined);
+          });
         } catch (reason) {
           setError(`${file.name}: ${messageOf(reason)}`);
         }
@@ -674,7 +715,7 @@ export function LibraryPanel({
 
   return (
     <aside
-      className="library"
+      className="library-panel"
       aria-label="Library"
       data-wide={wide}
       data-file-over={fileOver}
@@ -696,12 +737,14 @@ export function LibraryPanel({
         <div className="row library-head-buttons">
           <button
             type="button"
-            className="button small"
+            className="button quiet small library-import"
+            aria-label="Import files"
+            title="Import pictures, sounds, clips or texts"
             onClick={() => {
               fileInput.current?.click();
             }}
           >
-            <UploadSimpleIcon aria-hidden="true" /> Import
+            <UploadSimpleIcon aria-hidden="true" /> <span className="label">Import</span>
           </button>
           <button
             type="button"
@@ -815,6 +858,8 @@ export function LibraryPanel({
                   type="button"
                   role="tab"
                   aria-selected={modality === facet.id}
+                  aria-label={`${facet.label}, ${String(facet.count)}`}
+                  title={facet.label}
                   className="library-modality"
                   onClick={() => {
                     setModality(facet.id);

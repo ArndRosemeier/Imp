@@ -150,6 +150,16 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [libraryOpen, setLibraryOpen] = useStoredFlag('imp.library.open', () => false);
   const [libraryWide, setLibraryWide] = useStoredFlag('imp.library.wide', () => false);
   const libraryWidth = usePanelWidth('library', { initial: 340, min: 280, max: 640 });
+  // On a narrow screen, such as a tablet, the library and the crew take turns, so the stage keeps room.
+  const narrow = (): boolean => window.innerWidth < 1280;
+  const openLibrary = (next: boolean): void => {
+    if (next && crewOpen && narrow()) toggleCrew();
+    setLibraryOpen(next);
+  };
+  const switchCrew = (): void => {
+    if (!crewOpen && libraryOpen && narrow()) setLibraryOpen(false);
+    toggleCrew();
+  };
   const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
   const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
@@ -200,14 +210,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     const onKey = (event: KeyboardEvent): void => {
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'l') {
         event.preventDefault();
-        setLibraryOpen(!libraryOpen);
+        openLibrary(!libraryOpen);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [libraryOpen, setLibraryOpen]);
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -313,9 +323,9 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                 if (view === 'projects') {
                   const firstStage = stages[0];
                   if (firstStage !== undefined) setView(firstStage.id);
-                  setLibraryOpen(true);
+                  openLibrary(true);
                 } else {
-                  setLibraryOpen(!showLibrary);
+                  openLibrary(!showLibrary);
                 }
               }}
             >
@@ -328,7 +338,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             aria-pressed={crewOpen}
             aria-controls="crew-panel"
             title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
-            onClick={toggleCrew}
+            onClick={switchCrew}
           >
             <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
           </button>

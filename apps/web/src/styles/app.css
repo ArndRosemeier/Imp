@@ -539,6 +539,7 @@ dialog.palette::backdrop {
     display: none;
   }
   .shell {
+    --nav-column: 88px;
     grid-template-columns: 88px minmax(0, 1fr) var(--library-column) var(--crew-column);
   }
   /* A rail: each place is an icon over its name, so it can be told apart and tapped. */
@@ -2798,7 +2799,14 @@ dialog.modal::backdrop {
   --library-column: min(var(--library-width, 340px), 42vw);
 }
 .shell[data-library='wide'] {
-  --library-column: min(64vw, 1040px);
+  /* Most of the stage, but the stage keeps enough room to drop on. */
+  --library-column: max(
+    300px,
+    min(
+      1040px,
+      calc(100vw - var(--nav-column, var(--nav-width, 220px)) - var(--crew-column) - 380px)
+    )
+  );
 }
 .library-column {
   grid-area: library;
@@ -2811,7 +2819,7 @@ dialog.modal::backdrop {
 .library-toggle[aria-pressed='true'] {
   color: var(--accent);
 }
-.library {
+.library-panel {
   position: relative;
   flex: 1;
   min-width: 0;
@@ -2843,8 +2851,18 @@ dialog.modal::backdrop {
   white-space: nowrap;
 }
 .library-head-buttons {
-  gap: 2px;
+  gap: 0;
   flex-wrap: nowrap;
+  margin-right: -8px;
+}
+.library-head-buttons .button {
+  padding: 0 10px;
+}
+.library-head > .stack {
+  min-width: 0;
+}
+.shell[data-library='open'] .library-import .label {
+  display: none;
 }
 .library-search {
   position: relative;
@@ -3157,7 +3175,7 @@ dialog.modal::backdrop {
   box-shadow: var(--shadow-overlay);
   font-size: 13px;
 }
-.library[data-file-over='true'] {
+.library-panel[data-file-over='true'] {
   background: var(--accent-wash);
 }
 .library-drop-files {
