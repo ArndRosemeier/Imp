@@ -2,6 +2,7 @@ import {
   CommandError,
   defineCommand,
   requireProject,
+  type Actor,
   type Command,
   type CoreRuntime,
   type KeyValueStore,
@@ -10,6 +11,7 @@ import { mp3DurationSeconds, ProviderError, type GenerationProvider } from '@imp
 import { z } from 'zod';
 import {
   characterPrefix,
+  editDraftKey,
   editHistoryKey,
   editKey,
   linePrefix,
@@ -17,10 +19,13 @@ import {
   shotPrefix,
   soundPrefix,
 } from './commands.js';
+import { diffCut, type CutParts } from './drafts.js';
 import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
 import {
   Character,
+  CutDraft,
   CutHistory,
+  CutRequest,
   CutItem,
   CutLine,
   MODE_ID,
@@ -226,6 +231,228 @@ async function ownLaneCharacters(store: KeyValueStore, projectId: string) {
     .filter((character) => character.ownLane);
 }
 
+/** One piece of the cut as it is laid out in time. */
+export const LaidItem = z.object({
+  itemId: z.string(),
+  kind: z.enum(['shot', 'title']),
+  index: z.number(),
+  sceneId: z.string(),
+  shotId: z.string(),
+  label: z.string(),
+  state: ItemState,
+  trimStartSeconds: z.number(),
+  trimEndSeconds: z.number(),
+  dialogueVolume: z.number(),
+  clipAudioVolume: z.number(),
+  hasClipAudio: z.boolean(),
+  fadeInSeconds: z.number(),
+  fadeOutSeconds: z.number(),
+  text: z.string(),
+  startsAtSeconds: z.number(),
+  durationSeconds: z.number(),
+  sourceSeconds: z.number(),
+});
+export type LaidItem = z.infer<typeof LaidItem>;
+
+/** A placed sound as the cut shows it: with a name, its kind and whether there is a recording. */
+export const PlacedSound = SoundPlacement.extend({
+  name: z.string(),
+  kind: z.enum(['effect', 'music', 'clip', 'dialogue']),
+  recorded: z.boolean(),
+});
+
+/** A line that is heard in the scene, with who says it and when. */
+export const SpokenLine = z.object({
+  /** Where it comes from: a shot of the cut, a placed dialogue recording, or a character lane. */
+  source: z.enum(['shot', 'placement', 'lane']),
+  /** The item, placement or line id, to act on it. */
+  id: z.string(),
+  who: z.string(),
+  text: z.string(),
+  startsAtSeconds: z.number(),
+  durationSeconds: z.number(),
+  /** False when nothing is recorded yet and the line is only written. */
+  recorded: z.boolean(),
+});
+export type SpokenLine = z.infer<typeof SpokenLine>;
+
+/** Everything about a version of a scene's cut that a person or an agent reads. */
+export const CutView = z.object({
+  sceneId: z.string(),
+  totalSeconds: z.number(),
+  items: z.array(LaidItem),
+  unplaced: z.array(
+    z.object({ shotId: z.string(), position: z.number(), description: z.string() }),
+  ),
+  sounds: z.array(PlacedSound),
+  lanes: z.array(z.object({ characterId: z.string(), name: z.string(), voiceOnly: z.boolean() })),
+  lines: z.array(LineView),
+  spoken: z.array(SpokenLine),
+});
+export type CutView = z.infer<typeof CutView>;
+
+/** How many changes agents propose to a scene, by whom and on what request. */
+export const DraftSummary = z.object({
+  changes: z.number(),
+  authors: z.array(z.object({ id: z.string(), role: z.string() })),
+  request: CutRequest.nullable(),
+  updatedAt: z.string(),
+});
+
+export function summarize(draft: CutDraft): z.infer<typeof DraftSummary> {
+  return {
+    changes: diffCut(partsOf(draft.base), partsOf(draft.cut)).length,
+    authors: draft.authors,
+    request: draft.request,
+    updatedAt: draft.updatedAt,
+  };
+}
+
+/** The tracked parts of a cut whose items are explicit. */
+export const partsOf = (cut: SceneCut): CutParts => ({
+  items: cut.items ?? [],
+  sounds: cut.sounds,
+  lines: cut.lines,
+});
+
+/** Reads a version of a scene's cut the way the Edit screen and agents see it. */
+export async function viewOf(
+  store: KeyValueStore,
+  projectId: string,
+  sceneId: string,
+  cut: SceneCut,
+  items: readonly CutItem[],
+): Promise<CutView> {
+  const laid = await layOut(store, projectId, items);
+  const sounds = (await store.list(soundPrefix(projectId, sceneId))).map((entry) =>
+    Sound.parse(entry.value),
+  );
+  const shots = new Map<string, Shot | undefined>();
+  const shotOf = async (shotSceneId: string, shotId: string) => {
+    const key = `${shotSceneId}/${shotId}`;
+    if (!shots.has(key)) shots.set(key, await loadShot(store, projectId, shotSceneId, shotId));
+    return shots.get(key);
+  };
+  const characters = new Map(
+    (await store.list(characterPrefix(projectId)))
+      .map((entry) => Character.parse(entry.value))
+      .map((character) => [character.id, character] as const),
+  );
+  const nameOf = (characterId: string | null): string =>
+    characterId === null ? 'Someone' : (characters.get(characterId)?.name ?? 'Someone');
+  const used = new Set(items.map((item) => item.shotId));
+  const lane = [];
+  const spoken: SpokenLine[] = [];
+  for (const placement of cut.sounds) {
+    if (placement.source === 'sound') {
+      const sound = sounds.find((candidate) => candidate.id === placement.soundId);
+      // A placement of a sound that was deleted since is not shown.
+      if (sound === undefined) continue;
+      lane.push({
+        ...placement,
+        name: sound.name,
+        kind: sound.kind,
+        recorded: sound.take !== null,
+      });
+      continue;
+    }
+    // Stored files are the audio editor's own sources; a scene's lane does not hold them.
+    if (placement.source === 'file') continue;
+    const shot = await shotOf(placement.sceneId, placement.shotId);
+    if (shot === undefined) continue;
+    const recorded =
+      placement.source === 'clip'
+        ? shot.clip?.status === 'ready' && !shot.clip.silent
+        : shot.dialogue !== null;
+    lane.push({
+      ...placement,
+      name: `${placement.source === 'clip' ? 'Clip sound' : 'Dialogue'} of shot ${String(shot.position)}`,
+      kind: placement.source,
+      recorded,
+    });
+    const speaks = shot.speakerId !== null && shot.line.trim() !== '';
+    if (speaks && placement.volume > 0) {
+      const length =
+        placement.durationSeconds ??
+        (placement.source === 'dialogue'
+          ? (shot.dialogue?.durationSeconds ?? 0)
+          : clipSeconds(shot)) - placement.trimStartSeconds;
+      spoken.push({
+        source: 'placement',
+        id: placement.id,
+        who: nameOf(shot.speakerId),
+        text: shot.line,
+        startsAtSeconds: round(placement.startSeconds),
+        durationSeconds: round(Math.max(0, length)),
+        recorded,
+      });
+    }
+  }
+  // Lines spoken with their picture: recorded dialogue over a silent clip, or the clip's own voice.
+  for (const [index, item] of items.entries()) {
+    const at = laid.items[index];
+    if (item.kind !== 'shot' || at === undefined || at.durationSeconds <= 0) continue;
+    const shot = await shotOf(item.sceneId, item.shotId);
+    if (shot === undefined || shot.speakerId === null || shot.line.trim() === '') continue;
+    const overDialogue = shot.clip?.silent === true;
+    const volume = overDialogue ? item.dialogueVolume : item.clipAudioVolume;
+    if (volume <= 0) continue;
+    const recordedLength = shot.dialogue?.durationSeconds;
+    const available =
+      overDialogue && typeof recordedLength === 'number'
+        ? recordedLength - item.trimStartSeconds
+        : at.durationSeconds;
+    spoken.push({
+      source: 'shot',
+      id: item.id,
+      who: nameOf(shot.speakerId),
+      text: shot.line,
+      startsAtSeconds: at.startsAtSeconds,
+      durationSeconds: round(Math.max(0, Math.min(at.durationSeconds, available))),
+      recorded: overDialogue ? shot.dialogue !== null : true,
+    });
+  }
+  for (const line of cut.lines) {
+    if (line.volume <= 0) continue;
+    spoken.push({
+      source: 'lane',
+      id: line.id,
+      who: nameOf(line.characterId),
+      text: line.text,
+      startsAtSeconds: round(line.startSeconds),
+      durationSeconds: round(
+        Math.max(0, (line.take?.durationSeconds ?? 0) - line.trimStartSeconds),
+      ),
+      recorded: line.take !== null,
+    });
+  }
+  spoken.sort((a, b) => a.startsAtSeconds - b.startsAtSeconds);
+  return {
+    sceneId,
+    totalSeconds: laid.totalSeconds,
+    items: laid.items,
+    // Only once the cut is explicit: before that every shot is in it.
+    unplaced:
+      cut.items === null
+        ? []
+        : (await readShots(store, projectId, sceneId))
+            .filter((shot) => !used.has(shot.id))
+            .map((shot) => ({
+              shotId: shot.id,
+              position: shot.position,
+              description: shot.description,
+            })),
+    sounds: lane,
+    lanes: (await ownLaneCharacters(store, projectId)).map((character) => ({
+      characterId: character.id,
+      name: character.name,
+      voiceOnly: character.voiceOnly,
+    })),
+    lines: cut.lines.map((line) => lineView(line)),
+    spoken,
+  };
+}
+
 /** Writes a cut, and keeps what it was so that the change can be undone. */
 export async function save(
   runtime: CoreRuntime,
@@ -267,6 +494,35 @@ const PlacementFields = SoundPlacement.pick({
   fadeCurve: true,
 });
 
+/**
+ * The setting that decides how agents edit: false lets them change the cut
+ * directly; anything else, the default, makes their changes a draft that a
+ * person keeps or discards.
+ */
+export const AGENT_DRAFTS_SETTING = 'edit.agent-drafts';
+
+/** Who runs a command, and where. */
+export interface Acting {
+  readonly runtime: CoreRuntime;
+  readonly actor: Actor;
+}
+
+/** Whether this actor's edits go into a draft rather than into the cut. */
+export async function drafting(at: Acting): Promise<boolean> {
+  if (at.actor.kind !== 'agent') return false;
+  return (await at.runtime.store.get(`settings/${AGENT_DRAFTS_SETTING}`)) !== false;
+}
+
+/** The changes agents propose to a scene's cut, if there are any. */
+export async function readDraft(
+  store: KeyValueStore,
+  projectId: string,
+  sceneId: string,
+): Promise<CutDraft | undefined> {
+  const stored = await store.get(editDraftKey(projectId, sceneId));
+  return stored === undefined ? undefined : CutDraft.parse(stored);
+}
+
 const InsertAt = z
   .number()
   .int()
@@ -276,10 +532,66 @@ const InsertAt = z
 
 /** The commands that put the pieces of a film together. Nothing here spends money. */
 export function createEditCommands(provider: GenerationProvider): readonly Command[] {
-  async function open(runtime: CoreRuntime, commandId: string, projectId: string, sceneId: string) {
-    await requireScene(runtime.store, commandId, projectId, sceneId);
-    const cut = await readCut(runtime.store, projectId, sceneId);
-    return { cut, items: await itemsOf(runtime.store, projectId, cut) };
+  /**
+   * The cut a command works on: the agent's draft while agents propose their
+   * edits and one exists, the scene's cut otherwise.
+   */
+  async function open(at: Acting, commandId: string, projectId: string, sceneId: string) {
+    await requireScene(at.runtime.store, commandId, projectId, sceneId);
+    const cut = await readCut(at.runtime.store, projectId, sceneId);
+    if (await drafting(at)) {
+      const draft = await readDraft(at.runtime.store, projectId, sceneId);
+      if (draft !== undefined) return { cut: draft.cut, items: draft.cut.items ?? [] };
+    }
+    return { cut, items: await itemsOf(at.runtime.store, projectId, cut) };
+  }
+
+  /**
+   * Writes a change: into the scene's cut, one step of undo, or for an agent
+   * into its draft, which begins as a copy of the cut on its first change.
+   */
+  async function commit(
+    at: Acting,
+    projectId: string,
+    before: SceneCut,
+    after: SceneCut,
+  ): Promise<void> {
+    const { runtime, actor } = at;
+    if (actor.kind !== 'agent' || !(await drafting(at))) {
+      await save(runtime, projectId, before, after);
+      return;
+    }
+    const { store } = runtime;
+    const sceneId = after.sceneId;
+    const explicit = async (cut: SceneCut): Promise<SceneCut> => ({
+      ...cut,
+      items: [...(await itemsOf(store, projectId, cut))],
+    });
+    const existing = await readDraft(store, projectId, sceneId);
+    const now = runtime.now().toISOString();
+    const author = { id: actor.id, role: actor.role };
+    const start = existing ?? {
+      sceneId,
+      base: await explicit(before),
+      cut: await explicit(before),
+      undo: [],
+      redo: [],
+      authors: [],
+      request: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const draft: CutDraft = {
+      ...start,
+      cut: await explicit(after),
+      undo: [...start.undo, await explicit(before)].slice(-HISTORY_LIMIT),
+      redo: [],
+      authors: start.authors.some((known) => known.id === author.id)
+        ? start.authors
+        : [...start.authors, author],
+      updatedAt: now,
+    };
+    await store.batch([{ type: 'put', key: editDraftKey(projectId, sceneId), value: draft }]);
   }
 
   /** A cut is saved with explicit items, so that what was seen is what is kept. */
@@ -312,112 +624,48 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.get',
     title: 'Read cut',
     description:
-      'Returns the cut of a scene. Picture: its items in playing order, each with its start and length on the scene timeline and whether it is ready for the film or what is missing (no clip, clip pending or failed, dialogue missing or out of date), and the shots of the scene that are not in the cut. Sound: the audio lane of placed sounds, clip sounds that were taken apart and dialogue, each with its own start, volume and fades. Also whether undo or redo is possible. The total counts items with a ready clip only.',
+      'Returns the cut of a scene. Picture: its items in playing order, each with its start and length on the scene timeline and whether it is ready for the film or what is missing (no clip, clip pending or failed, dialogue missing or out of date), and the shots of the scene that are not in the cut. Sound: the audio lane of placed sounds, clip sounds that were taken apart and dialogue, each with its own start, volume and fades. spoken lists every line that is heard, who says it and when, in time order. Also whether undo or redo is possible, and whether agents proposed changes that wait for the person (draft). An agent reads its own draft, the person the cut; version picks one.',
     effect: 'read',
-    input: z.object({ projectId: ProjectId, sceneId: SceneId }),
-    output: z.object({
-      sceneId: z.string(),
-      totalSeconds: z.number(),
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      version: z
+        .enum(['cut', 'draft'])
+        .optional()
+        .describe(
+          'Which version to read: the cut as it stands, or the changes agents propose. Defaults to the draft for an agent while one exists, the cut otherwise.',
+        ),
+    }),
+    output: CutView.extend({
       canUndo: z.boolean(),
       canRedo: z.boolean(),
-      items: z.array(
-        z.object({
-          itemId: z.string(),
-          kind: z.enum(['shot', 'title']),
-          index: z.number(),
-          sceneId: z.string(),
-          shotId: z.string(),
-          label: z.string(),
-          state: ItemState,
-          trimStartSeconds: z.number(),
-          trimEndSeconds: z.number(),
-          dialogueVolume: z.number(),
-          clipAudioVolume: z.number(),
-          hasClipAudio: z.boolean(),
-          fadeInSeconds: z.number(),
-          fadeOutSeconds: z.number(),
-          text: z.string(),
-          startsAtSeconds: z.number(),
-          durationSeconds: z.number(),
-          sourceSeconds: z.number(),
-        }),
-      ),
-      unplaced: z.array(
-        z.object({ shotId: z.string(), position: z.number(), description: z.string() }),
-      ),
-      sounds: z.array(
-        SoundPlacement.extend({
-          name: z.string(),
-          kind: z.enum(['effect', 'music', 'clip', 'dialogue']),
-          recorded: z.boolean(),
-        }),
-      ),
-      lanes: z.array(
-        z.object({ characterId: z.string(), name: z.string(), voiceOnly: z.boolean() }),
-      ),
-      lines: z.array(LineView),
+      version: z.enum(['cut', 'draft']),
+      draft: DraftSummary.nullable(),
     }),
-    handler: async ({ runtime }, { projectId, sceneId }) => {
-      const { cut, items } = await open(runtime, 'movie.edit.get', projectId, sceneId);
-      const laid = await layOut(runtime.store, projectId, items);
-      const sounds = (await runtime.store.list(soundPrefix(projectId, sceneId))).map((entry) =>
-        Sound.parse(entry.value),
-      );
-      const used = new Set(items.map((item) => item.shotId));
-      const stored = await runtime.store.get(editHistoryKey(projectId, sceneId));
+    handler: async ({ runtime, actor }, { projectId, sceneId, version }) => {
+      const { store } = runtime;
+      await requireScene(store, 'movie.edit.get', projectId, sceneId);
+      const live = await readCut(store, projectId, sceneId);
+      const draft = await readDraft(store, projectId, sceneId);
+      const agentDraft = await drafting({ runtime, actor });
+      const showDraft =
+        draft !== undefined && (version === 'draft' || (version === undefined && agentDraft));
+      const cut = showDraft ? draft.cut : live;
+      const items = await itemsOf(store, projectId, cut);
+      const stored = await store.get(editHistoryKey(projectId, sceneId));
       const history = stored === undefined ? CutHistory.parse({}) : CutHistory.parse(stored);
-      const lane = [];
-      for (const placement of cut.sounds) {
-        if (placement.source === 'sound') {
-          const sound = sounds.find((candidate) => candidate.id === placement.soundId);
-          // A placement of a sound that was deleted since is not shown.
-          if (sound === undefined) continue;
-          lane.push({
-            ...placement,
-            name: sound.name,
-            kind: sound.kind,
-            recorded: sound.take !== null,
-          });
-          continue;
-        }
-        // Stored files are the audio editor's own sources; a scene's lane does not hold them.
-        if (placement.source === 'file') continue;
-        const shot = await loadShot(runtime.store, projectId, placement.sceneId, placement.shotId);
-        if (shot === undefined) continue;
-        lane.push({
-          ...placement,
-          name: `${placement.source === 'clip' ? 'Clip sound' : 'Dialogue'} of shot ${String(shot.position)}`,
-          kind: placement.source,
-          recorded:
-            placement.source === 'clip'
-              ? shot.clip?.status === 'ready' && !shot.clip.silent
-              : shot.dialogue !== null,
-        });
-      }
+      // The steps an agent can take back are its own; the person's are the cut's.
+      const steps =
+        agentDraft && draft !== undefined
+          ? { canUndo: draft.undo.length > 0, canRedo: draft.redo.length > 0 }
+          : agentDraft
+            ? { canUndo: false, canRedo: false }
+            : { canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
       return {
-        sceneId,
-        totalSeconds: laid.totalSeconds,
-        canUndo: history.undo.length > 0,
-        canRedo: history.redo.length > 0,
-        items: laid.items,
-        // Only once the cut is explicit: before that every shot is in it.
-        unplaced:
-          cut.items === null
-            ? []
-            : (await readShots(runtime.store, projectId, sceneId))
-                .filter((shot) => !used.has(shot.id))
-                .map((shot) => ({
-                  shotId: shot.id,
-                  position: shot.position,
-                  description: shot.description,
-                })),
-        sounds: lane,
-        lanes: (await ownLaneCharacters(runtime.store, projectId)).map((character) => ({
-          characterId: character.id,
-          name: character.name,
-          voiceOnly: character.voiceOnly,
-        })),
-        lines: cut.lines.map((line) => lineView(line)),
+        ...(await viewOf(store, projectId, sceneId, cut, items)),
+        ...steps,
+        version: showDraft ? ('draft' as const) : ('cut' as const),
+        draft: draft === undefined ? null : summarize(draft),
       };
     },
   });
@@ -439,9 +687,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       toIndex: InsertAt,
     }),
     output: z.object({ item: CutItem }),
-    handler: async ({ runtime }, input) => {
+    handler: async ({ runtime, actor }, input) => {
       const id = 'movie.edit.item.add';
-      const { cut, items } = await open(runtime, id, input.projectId, input.sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, input.projectId, input.sceneId);
       const shot = await loadShot(
         runtime.store,
         input.projectId,
@@ -452,8 +700,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         throw new CommandError('invalid_input', id, `No shot "${input.shotId}" in that scene.`);
       }
       const item: CutItem = { ...wholeShot(shot), id: runtime.newId() };
-      await save(
-        runtime,
+      await commit(
+        { runtime, actor },
         input.projectId,
         cut,
         withItems(cut, insertedAt(items, input.toIndex, item)),
@@ -476,9 +724,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       toIndex: InsertAt,
     }),
     output: z.object({ item: CutItem }),
-    handler: async ({ runtime }, input) => {
+    handler: async ({ runtime, actor }, input) => {
       const { cut, items } = await open(
-        runtime,
+        { runtime, actor },
         'movie.edit.title.add',
         input.projectId,
         input.sceneId,
@@ -497,8 +745,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         text: input.text,
         titleSeconds: input.seconds,
       };
-      await save(
-        runtime,
+      await commit(
+        { runtime, actor },
         input.projectId,
         cut,
         withItems(cut, insertedAt(items, input.toIndex, item)),
@@ -522,9 +770,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       titleSeconds: z.number().min(0.5).max(60).optional(),
     }),
     output: z.object({ item: CutItem }),
-    handler: async ({ runtime }, { projectId, sceneId, itemId, ...changes }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId, ...changes }) => {
       const id = 'movie.edit.item.set';
-      const { cut, items } = await open(runtime, id, projectId, sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, projectId, sceneId);
       const index = indexOfItem(items, id, itemId);
       const before = itemAt(items, index);
       const item: CutItem = {
@@ -538,8 +786,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         text: changes.text ?? before.text,
         titleSeconds: changes.titleSeconds ?? before.titleSeconds,
       };
-      await save(
-        runtime,
+      await commit(
+        { runtime, actor },
         projectId,
         cut,
         withItems(
@@ -564,14 +812,14 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       toIndex: z.number().int().min(0),
     }),
     output: z.object({ itemId: z.string(), index: z.number() }),
-    handler: async ({ runtime }, { projectId, sceneId, itemId, toIndex }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId, toIndex }) => {
       const id = 'movie.edit.item.move';
-      const { cut, items } = await open(runtime, id, projectId, sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, projectId, sceneId);
       const index = indexOfItem(items, id, itemId);
       const rest = items.filter((_, at) => at !== index);
       const to = Math.min(toIndex, rest.length);
-      await save(
-        runtime,
+      await commit(
+        { runtime, actor },
         projectId,
         cut,
         withItems(cut, insertedAt(rest, to, itemAt(items, index))),
@@ -594,23 +842,23 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       toSceneId: z.string().optional(),
     }),
     output: z.object({ item: CutItem, sceneId: z.string() }),
-    handler: async ({ runtime }, input) => {
+    handler: async ({ runtime, actor }, input) => {
       const id = 'movie.edit.item.duplicate';
-      const { cut, items } = await open(runtime, id, input.projectId, input.sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, input.projectId, input.sceneId);
       const index = indexOfItem(items, id, input.itemId);
       const copy: CutItem = { ...itemAt(items, index), id: runtime.newId() };
       const target = input.toSceneId ?? input.sceneId;
       if (target === input.sceneId) {
-        await save(
-          runtime,
+        await commit(
+          { runtime, actor },
           input.projectId,
           cut,
           withItems(cut, insertedAt(items, input.toIndex ?? index + 1, copy)),
         );
       } else {
-        const other = await open(runtime, id, input.projectId, target);
-        await save(
-          runtime,
+        const other = await open({ runtime, actor }, id, input.projectId, target);
+        await commit(
+          { runtime, actor },
           input.projectId,
           other.cut,
           withItems(other.cut, insertedAt(other.items, input.toIndex, copy)),
@@ -628,12 +876,12 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'destructive',
     input: z.object({ projectId: ProjectId, sceneId: SceneId, itemId: ItemId }),
     output: z.object({ itemId: z.string(), remaining: z.number() }),
-    handler: async ({ runtime }, { projectId, sceneId, itemId }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId }) => {
       const id = 'movie.edit.item.remove';
-      const { cut, items } = await open(runtime, id, projectId, sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, projectId, sceneId);
       indexOfItem(items, id, itemId);
       const rest = items.filter((item) => item.id !== itemId);
-      await save(runtime, projectId, cut, withItems(cut, rest));
+      await commit({ runtime, actor }, projectId, cut, withItems(cut, rest));
       return { itemId, remaining: rest.length };
     },
   });
@@ -651,9 +899,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       atSeconds: z.number().positive(),
     }),
     output: z.object({ first: CutItem, second: CutItem }),
-    handler: async ({ runtime }, { projectId, sceneId, itemId, atSeconds }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId, atSeconds }) => {
       const id = 'movie.edit.item.split';
-      const { cut, items } = await open(runtime, id, projectId, sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, projectId, sceneId);
       const index = indexOfItem(items, id, itemId);
       const item = itemAt(items, index);
       if (item.kind !== 'shot') {
@@ -682,8 +930,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         trimStartSeconds: round(item.trimStartSeconds + atSeconds),
         fadeInSeconds: 0,
       };
-      await save(
-        runtime,
+      await commit(
+        { runtime, actor },
         projectId,
         cut,
         withItems(cut, [...items.slice(0, index), first, second, ...items.slice(index + 1)]),
@@ -700,9 +948,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'write',
     input: z.object({ projectId: ProjectId, sceneId: SceneId, itemId: ItemId }),
     output: SoundPlacement,
-    handler: async ({ runtime }, { projectId, sceneId, itemId }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId }) => {
       const id = 'movie.edit.audio.detach';
-      const { cut, items } = await open(runtime, id, projectId, sceneId);
+      const { cut, items } = await open({ runtime, actor }, id, projectId, sceneId);
       const index = indexOfItem(items, id, itemId);
       const item = itemAt(items, index);
       const laid = (await layOut(runtime.store, projectId, items)).items[index];
@@ -726,7 +974,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         fadeOutSeconds: item.fadeOutSeconds,
         loop: false,
       });
-      await save(runtime, projectId, cut, {
+      await commit({ runtime, actor }, projectId, cut, {
         ...cut,
         items: items.map((candidate, at) =>
           at === index ? { ...candidate, clipAudioVolume: 0 } : candidate,
@@ -761,10 +1009,10 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       loop: z.boolean().default(false).describe('Repeat until the scene ends.'),
     }),
     output: SoundPlacement,
-    handler: async ({ runtime }, input) => {
+    handler: async ({ runtime, actor }, input) => {
       const id = 'movie.edit.sound.place';
       const { projectId, sceneId, soundId, shotId, shotSceneId, ...fields } = input;
-      const { cut } = await open(runtime, id, projectId, sceneId);
+      const { cut } = await open({ runtime, actor }, id, projectId, sceneId);
       const source = await (async () => {
         if (fields.source === 'sound') {
           if (
@@ -791,7 +1039,10 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         return { soundId: '', sceneId: from, shotId: shot.id };
       })();
       const placement = SoundPlacement.parse({ id: runtime.newId(), ...fields, ...source });
-      await save(runtime, projectId, cut, { ...cut, sounds: [...cut.sounds, placement] });
+      await commit({ runtime, actor }, projectId, cut, {
+        ...cut,
+        sounds: [...cut.sounds, placement],
+      });
       return placement;
     },
   });
@@ -808,9 +1059,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       placementId: z.string().describe('The id of a placement from movie.edit.get.'),
     }),
     output: SoundPlacement,
-    handler: async ({ runtime }, { projectId, sceneId, placementId, ...changes }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, placementId, ...changes }) => {
       const id = 'movie.edit.sound.update';
-      const { cut } = await open(runtime, id, projectId, sceneId);
+      const { cut } = await open({ runtime, actor }, id, projectId, sceneId);
       const before = cut.sounds.find((placement) => placement.id === placementId);
       if (before === undefined) {
         throw new CommandError('invalid_input', id, `No placement "${placementId}".`);
@@ -827,7 +1078,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         gainDb: changes.gainDb ?? before.gainDb,
         fadeCurve: changes.fadeCurve ?? before.fadeCurve,
       };
-      await save(runtime, projectId, cut, {
+      await commit({ runtime, actor }, projectId, cut, {
         ...cut,
         sounds: cut.sounds.map((placement) => (placement.id === placementId ? next : placement)),
       });
@@ -842,11 +1093,11 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'destructive',
     input: z.object({ projectId: ProjectId, sceneId: SceneId, placementId: z.string() }),
     output: z.object({ placementId: z.string(), removed: z.boolean() }),
-    handler: async ({ runtime }, { projectId, sceneId, placementId }) => {
-      const { cut } = await open(runtime, 'movie.edit.sound.remove', projectId, sceneId);
+    handler: async ({ runtime, actor }, { projectId, sceneId, placementId }) => {
+      const { cut } = await open({ runtime, actor }, 'movie.edit.sound.remove', projectId, sceneId);
       const sounds = cut.sounds.filter((placement) => placement.id !== placementId);
       if (sounds.length === cut.sounds.length) return { placementId, removed: false };
-      await save(runtime, projectId, cut, { ...cut, sounds });
+      await commit({ runtime, actor }, projectId, cut, { ...cut, sounds });
       return { placementId, removed: true };
     },
   });
@@ -877,9 +1128,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       volume: z.number().min(0).max(1).default(1),
     }),
     output: CutLine,
-    handler: async ({ runtime }, { projectId, sceneId, characterId, ...fields }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, characterId, ...fields }) => {
       const id = 'movie.edit.line.add';
-      const { cut } = await open(runtime, id, projectId, sceneId);
+      const { cut } = await open({ runtime, actor }, id, projectId, sceneId);
       const lane = (await ownLaneCharacters(runtime.store, projectId)).find(
         (character) => character.id === characterId,
       );
@@ -891,7 +1142,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         );
       }
       const line = CutLine.parse({ id: runtime.newId(), characterId, ...fields });
-      await save(runtime, projectId, cut, { ...cut, lines: [...cut.lines, line] });
+      await commit({ runtime, actor }, projectId, cut, { ...cut, lines: [...cut.lines, line] });
       return line;
     },
   });
@@ -917,8 +1168,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       ...LineFields,
     }),
     output: CutLine,
-    handler: async ({ runtime }, { projectId, sceneId, lineId, ...changes }) => {
-      const { cut } = await open(runtime, 'movie.edit.line.update', projectId, sceneId);
+    handler: async ({ runtime, actor }, { projectId, sceneId, lineId, ...changes }) => {
+      const { cut } = await open({ runtime, actor }, 'movie.edit.line.update', projectId, sceneId);
       const before = lineIn(cut, 'movie.edit.line.update', lineId);
       const next: CutLine = {
         ...before,
@@ -930,7 +1181,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         fadeInSeconds: changes.fadeInSeconds ?? before.fadeInSeconds,
         fadeOutSeconds: changes.fadeOutSeconds ?? before.fadeOutSeconds,
       };
-      await save(runtime, projectId, cut, {
+      await commit({ runtime, actor }, projectId, cut, {
         ...cut,
         lines: cut.lines.map((line) => (line.id === lineId ? next : line)),
       });
@@ -955,9 +1206,9 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         .describe('A speech model from models.list. Defaults to the setting speech.model.'),
     }),
     output: LineView,
-    handler: async ({ runtime }, { projectId, sceneId, lineId, model: chosen }) => {
+    handler: async ({ runtime, actor }, { projectId, sceneId, lineId, model: chosen }) => {
       const id = 'movie.edit.line.record';
-      const { cut } = await open(runtime, id, projectId, sceneId);
+      const { cut } = await open({ runtime, actor }, id, projectId, sceneId);
       const line = lineIn(cut, id, lineId);
       const model = chosen ?? (await runtime.store.get(`settings/${SPEECH_MODEL_SETTING}`));
       if (typeof model !== 'string' || model === '') {
@@ -997,10 +1248,10 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       };
       await runtime.blobs.put(take.blobKey, spoken.audio);
       // The cut may have changed while the voice was made.
-      const latest = (await open(runtime, id, projectId, sceneId)).cut;
+      const latest = (await open({ runtime, actor }, id, projectId, sceneId)).cut;
       const current = lineIn(latest, id, lineId);
       const next: CutLine = { ...current, take };
-      await save(runtime, projectId, latest, {
+      await commit({ runtime, actor }, projectId, latest, {
         ...latest,
         lines: latest.lines.map((candidate) => (candidate.id === lineId ? next : candidate)),
       });
@@ -1015,24 +1266,45 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'destructive',
     input: z.object({ projectId: ProjectId, sceneId: SceneId, lineId: z.string() }),
     output: z.object({ lineId: z.string(), removed: z.boolean() }),
-    handler: async ({ runtime }, { projectId, sceneId, lineId }) => {
-      const { cut } = await open(runtime, 'movie.edit.line.remove', projectId, sceneId);
+    handler: async ({ runtime, actor }, { projectId, sceneId, lineId }) => {
+      const { cut } = await open({ runtime, actor }, 'movie.edit.line.remove', projectId, sceneId);
       const lines = cut.lines.filter((line) => line.id !== lineId);
       if (lines.length === cut.lines.length) return { lineId, removed: false };
-      await save(runtime, projectId, cut, { ...cut, lines });
+      await commit({ runtime, actor }, projectId, cut, { ...cut, lines });
       return { lineId, removed: true };
     },
   });
 
   /** Moves one step along the history of a scene's cut, in either direction. */
   async function step(
-    runtime: CoreRuntime,
+    at: Acting,
     commandId: string,
     projectId: string,
     sceneId: string,
     direction: 'undo' | 'redo',
   ): Promise<boolean> {
+    const { runtime } = at;
     await requireScene(runtime.store, commandId, projectId, sceneId);
+    if (await drafting(at)) {
+      // An agent steps through its own draft and never through the person's edits.
+      const draft = await readDraft(runtime.store, projectId, sceneId);
+      if (draft === undefined) return false;
+      const from = direction === 'undo' ? draft.undo : draft.redo;
+      const target = from.at(-1);
+      if (target === undefined) return false;
+      const rest = from.slice(0, -1);
+      const other = [...(direction === 'undo' ? draft.redo : draft.undo), draft.cut];
+      const next: CutDraft = {
+        ...draft,
+        cut: target,
+        ...(direction === 'undo' ? { undo: rest, redo: other } : { undo: other, redo: rest }),
+        updatedAt: runtime.now().toISOString(),
+      };
+      await runtime.store.batch([
+        { type: 'put', key: editDraftKey(projectId, sceneId), value: next },
+      ]);
+      return true;
+    }
     const cut = await readCut(runtime.store, projectId, sceneId);
     const key = editHistoryKey(projectId, sceneId);
     const stored = await runtime.store.get(key);
@@ -1063,8 +1335,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'write',
     input: stepInput,
     output: stepOutput,
-    handler: async ({ runtime }, { projectId, sceneId }) => ({
-      done: await step(runtime, 'movie.edit.undo', projectId, sceneId, 'undo'),
+    handler: async ({ runtime, actor }, { projectId, sceneId }) => ({
+      done: await step({ runtime, actor }, 'movie.edit.undo', projectId, sceneId, 'undo'),
     }),
   });
   const redo = defineCommand({
@@ -1074,8 +1346,8 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     effect: 'write',
     input: stepInput,
     output: stepOutput,
-    handler: async ({ runtime }, { projectId, sceneId }) => ({
-      done: await step(runtime, 'movie.edit.redo', projectId, sceneId, 'redo'),
+    handler: async ({ runtime, actor }, { projectId, sceneId }) => ({
+      done: await step({ runtime, actor }, 'movie.edit.redo', projectId, sceneId, 'redo'),
     }),
   });
 
