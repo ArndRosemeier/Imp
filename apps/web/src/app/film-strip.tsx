@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import type { z } from 'zod';
 import { ITEM_STATE_TEXT, type Film } from './cut-player.js';
 import { usePinchZoom } from './gestures.js';
@@ -97,6 +104,7 @@ export function FilmStrip({
   playOn,
   onOpen,
   onPlayOn,
+  tools,
 }: {
   film: FilmView;
   sceneId: string | undefined;
@@ -105,6 +113,8 @@ export function FilmStrip({
   playOn: boolean;
   onOpen: (sceneId: string) => void;
   onPlayOn: (on: boolean) => void;
+  /** More controls for the whole film, beside Play on. */
+  tools?: ReactNode;
 }): ReactElement {
   const scroller = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<number | null>(null);
@@ -162,6 +172,7 @@ export function FilmStrip({
             : ''}
         </span>
         <span className="film-strip-tools">
+          {tools}
           <button
             className="button small quiet"
             aria-pressed={playOn}

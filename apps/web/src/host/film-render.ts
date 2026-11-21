@@ -1,4 +1,5 @@
 import {
+  applyMatrix,
   placePicture,
   shadeAt,
   sourceTime,
@@ -161,7 +162,7 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
   };
   /** Each picture is drawn whole here first, then laid on the frame: over the last one in a dissolve or wipe. */
   const scratch = new OffscreenCanvas(width, height);
-  const layer = scratch.getContext('2d', { alpha: false });
+  const layer = scratch.getContext('2d', { alpha: false, willReadFrequently: true });
   if (layer === null) throw new Error('This browser cannot draw the picture of the film.');
 
   /** A picture on screen: the frames of the film it covers and, for a clip, its decoded frames. */
@@ -247,6 +248,12 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
           punch.focusY,
         );
         sample.draw(layer, at.x, at.y, at.width, at.height);
+        if (picture.matrix !== undefined) {
+          // Its grade and the film's look, on the pixels, before fades and dips lie over it.
+          const pixels = layer.getImageData(0, 0, width, height);
+          applyMatrix(pixels.data, picture.matrix);
+          layer.putImageData(pixels, 0, 0);
+        }
       }
     }
     const { black, white } = shadeAt(

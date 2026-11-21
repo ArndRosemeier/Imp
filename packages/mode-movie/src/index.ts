@@ -54,6 +54,25 @@ export {
 export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine, TextView } from './edit.js';
 export { createTextCommands, filmTexts, readStyles } from './text.js';
 export {
+  applyMatrix,
+  colorStats,
+  combine,
+  FilmLook,
+  Grade,
+  gradeMatrix,
+  IDENTITY_MATRIX,
+  isNeutral,
+  LOOK_PRESETS,
+  LookPreset,
+  matchGrade,
+  NEUTRAL_GRADE,
+  NEUTRAL_LOOK,
+  pieceMatrix,
+  type ColorMatrix,
+  type ColorStats,
+} from './grade.js';
+export { createLookCommands, type ColorSampler } from './look.js';
+export {
   createMarkerCommands,
   Marker,
   MarkerKind,

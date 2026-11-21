@@ -8,6 +8,7 @@ import { createEditCommands } from './edit.js';
 import { createDefaultAudioCodec } from '@imp/audio';
 import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
+import { createLookCommands, type ColorSampler } from './look.js';
 import { createMarkerCommands } from './markers.js';
 import { createTextCommands } from './text.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
@@ -195,7 +196,10 @@ export const filmEditor: Role = {
     'join. Leave a marker (movie.edit.marker.add: note, todo or problem) where something needs',
     'the person or another crew member, such as a jump cut or a missing reaction; markers show',
     'at once, not as proposals. Read open ones with movie.edit.marker.list and mark one done',
-    'with movie.edit.marker.set when it is dealt with. When a scene or the film',
+    'with movie.edit.marker.set when it is dealt with. Make the colour of the shots of a',
+    'scene agree: movie.edit.grade.match grades a shot to a reference shot (judge the result',
+    'with movie.edit.frames), and item.set grade adjusts it by hand. Give the whole film one',
+    'feel last, with movie.edit.look.set, and keep it subtle unless asked. When a scene or the film',
     'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
     'film); it renders offline and waits until the file is done. Say what was not ready or',
     'came out silent, and tell the person they can download it on the Edit screen. Text goes',
@@ -246,6 +250,8 @@ export function createMovieMode(options: {
   readonly film?: FilmExportOptions;
   /** Takes stills from clips so that agents can see a cut. */
   readonly frameGrabber?: FrameGrabber;
+  /** Reads the colours of clips, to match shots; without it shots are graded by hand only. */
+  readonly colorSampler?: ColorSampler;
 }): Mode {
   return defineMode({
     id: MODE_ID,
@@ -276,6 +282,9 @@ export function createMovieMode(options: {
       ),
       ...createTextCommands(),
       ...createMarkerCommands(),
+      ...createLookCommands(
+        options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler },
+      ),
       ...libraryCommands,
     ],
     roles: [

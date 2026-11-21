@@ -1,5 +1,6 @@
 import { Effect, SoundPlacement } from '@imp/audio';
 import { z } from 'zod';
+import { Grade, NEUTRAL_GRADE } from './grade.js';
 
 export const MODE_ID = 'movie';
 
@@ -311,6 +312,8 @@ export const CutItem = z.object({
   transition: TransitionKind.default('cut'),
   /** How long the transition takes; a dissolve or wipe never covers more than half of either piece. */
   transitionSeconds: z.number().min(0.1).max(5).default(1),
+  /** Its colour grade, before the film's look. */
+  grade: Grade.default(NEUTRAL_GRADE),
 });
 export type CutItem = z.infer<typeof CutItem>;
 
@@ -325,6 +328,7 @@ export const PLAIN_PIECE = {
   focusY: 0.5,
   transition: 'cut',
   transitionSeconds: 1,
+  grade: NEUTRAL_GRADE,
 } as const satisfies Partial<CutItem>;
 
 /**

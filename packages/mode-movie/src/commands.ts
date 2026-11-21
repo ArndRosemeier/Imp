@@ -50,6 +50,8 @@ export const subtitleFileKey = (projectId: string, name: string): string =>
   `${base(projectId)}subtitles/${name}`;
 /** Rendered films: a record each, and its file in parts in the blob store. */
 export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
+/** The film's look: one grade laid over every piece. */
+export const filmLookKey = (projectId: string): string => `${base(projectId)}film-look`;
 /** The markers (notes, to-dos, problems) on the timeline of a scene. */
 export const markerKey = (projectId: string, sceneId: string): string =>
   `${base(projectId)}markers/${sceneId}`;

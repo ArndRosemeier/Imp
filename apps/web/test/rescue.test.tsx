@@ -51,6 +51,7 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   overlapSeconds: 0,
   dipIn: null,
   dipOut: null,
+  grade: { exposure: 0, contrast: 0, temperature: 0, tint: 0, saturation: 0 },
   ...fields,
 });
 

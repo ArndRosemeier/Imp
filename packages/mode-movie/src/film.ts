@@ -22,7 +22,8 @@ import {
 } from '@imp/core';
 import { z } from 'zod';
 import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
-import { itemsOf, laidOut, readCut, requireScene } from './edit.js';
+import { itemsOf, laidOut, readCut, readFilmLook, requireScene } from './edit.js';
+import { pieceMatrix, type ColorMatrix } from './grade.js';
 import { createSceneAudioLink } from './scene-audio.js';
 import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
 import type { PieceTiming, Punch } from './piece-time.js';
@@ -56,6 +57,8 @@ export type FilmPicture = FilmEdges &
          */
         readonly timing?: PieceTiming;
         readonly punch?: Punch;
+        /** The colour matrix of its grade and the film's look; left out, its colours stay. */
+        readonly matrix?: ColorMatrix;
       }
     | {
         readonly kind: 'title';
@@ -281,6 +284,7 @@ export async function planFilm(
   const pictures: FilmPicture[] = [];
   const scenes: PlannedScene[] = [];
   const notReady: z.infer<typeof NotReady>[] = [];
+  const look = await readFilmLook(store, projectId);
   let at = 0;
   for (const sceneId of sceneIds) {
     await requireScene(store, commandId, projectId, sceneId);
@@ -308,6 +312,7 @@ export async function planFilm(
         continue;
       }
       const key = shots.get(item.shotId)?.clip?.blobKey;
+      const matrix = pieceMatrix(item.grade, look);
       if (typeof key === 'string' && key !== '') {
         pictures.push({
           kind: 'clip',
@@ -323,6 +328,7 @@ export async function planFilm(
             holdSeconds: item.holdSeconds,
           },
           punch: { zoom: item.zoom, zoomTo: item.zoomTo, focusX: item.focusX, focusY: item.focusY },
+          ...(matrix === null ? {} : { matrix }),
         });
       }
     }

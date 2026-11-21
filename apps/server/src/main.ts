@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
 import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
-import { createFfmpegFrameGrabber } from './ffmpeg-frames.js';
+import { createFfmpegColorSampler, createFfmpegFrameGrabber } from './ffmpeg-frames.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
 import { createImpServer } from './server.js';
 
@@ -40,7 +40,11 @@ const server = createImpServer({
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
       ...(ffmpeg
-        ? { mp4Audio: createFfmpegMp4Decoder(), frameGrabber: createFfmpegFrameGrabber() }
+        ? {
+            mp4Audio: createFfmpegMp4Decoder(),
+            frameGrabber: createFfmpegFrameGrabber(),
+            colorSampler: createFfmpegColorSampler(),
+          }
         : {}),
     }),
 });

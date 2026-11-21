@@ -105,6 +105,8 @@ Transitions are fields of a cut item too: how it comes in after the piece before
 
 The Edit stage opens on the whole film: a strip with one block per scene, as long as the scene and coloured by how finished it is, zooming from a feature seen whole to one scene; opening a scene shows its own timeline below, which zooms down to single frames. Playback can run on from one scene into the next. Markers (notes, to-dos and problems) are kept per scene apart from the cut (`movie/markers/<sceneId>`), so an agent's note shows at once instead of waiting in a draft and undo leaves notes be; each follows the piece of picture it was put on. `movie.edit.film.edl` writes the whole film as one text, scene by scene with film times and markers, so an agent can reason about how scenes join without reading media.
 
+Colour is a grade per cut item (exposure, contrast, temperature, tint, saturation) and one look for the whole film (`movie/film-look`, from a preset or by hand). `grade.ts` turns each into an affine colour matrix and combines them, so the film renderer applies one matrix to each frame's pixels and the Edit preview hands the same numbers to an SVG feColorMatrix on its screens. `movie.edit.grade.match` reads a few small frames of two shots through the host's colour sampler (WebCodecs in the browser, ffmpeg on the local server), compares brightness, spread, white balance and colourfulness, and steps a grade until the shot's average colour lands on the reference's; it is a starting point to judge by eye.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

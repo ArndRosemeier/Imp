@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { FrameGrabber } from '@imp/host';
+import { colorStats, type ColorSampler, type FrameGrabber } from '@imp/host';
 
 function run(
   command: string,
@@ -61,6 +61,68 @@ export function createFfmpegFrameGrabber(command = 'ffmpeg'): FrameGrabber {
         );
       }
       return stills;
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  };
+}
+
+/** Runs ffmpeg and gives what it wrote to its output. */
+function capture(command: string, args: readonly string[]): Promise<Buffer | undefined> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'ignore'] });
+    const chunks: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      resolve(code === 0 ? Buffer.concat(chunks) : undefined);
+    });
+  });
+}
+
+/** How small a frame is read to judge its colours. */
+const SAMPLE_WIDTH = 64;
+const SAMPLE_HEIGHT = 36;
+
+/**
+ * Reads how the colours of a clip lie at times within it with ffmpeg, from
+ * small frames as raw RGB, so that one shot can be graded to match another.
+ */
+export function createFfmpegColorSampler(command = 'ffmpeg'): ColorSampler {
+  return async (video, atSeconds) => {
+    const folder = await mkdtemp(join(tmpdir(), 'imp-colours-'));
+    try {
+      const input = join(folder, 'clip');
+      await writeFile(input, video.bytes);
+      const found = [];
+      for (const seconds of atSeconds) {
+        const pixels = await capture(command, [
+          '-nostdin',
+          '-v',
+          'error',
+          '-ss',
+          seconds.toFixed(3),
+          '-i',
+          input,
+          '-frames:v',
+          '1',
+          '-vf',
+          `scale=${String(SAMPLE_WIDTH)}:${String(SAMPLE_HEIGHT)}`,
+          '-f',
+          'rawvideo',
+          '-pix_fmt',
+          'rgb24',
+          'pipe:1',
+        ]).catch(() => undefined);
+        found.push(
+          pixels === undefined || pixels.length < SAMPLE_WIDTH * SAMPLE_HEIGHT * 3
+            ? undefined
+            : colorStats(pixels, 3),
+        );
+      }
+      return found;
     } finally {
       await rm(folder, { recursive: true, force: true });
     }

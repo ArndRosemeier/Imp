@@ -1,5 +1,5 @@
 import type { ImpClient } from '@imp/host';
-import { placePicture, TextStyle } from '@imp/mode-movie';
+import { applyMatrix, placePicture, TextStyle, type ColorMatrix } from '@imp/mode-movie';
 import { z } from 'zod';
 import { drawLane, type LaneText } from '../host/text-draw.js';
 import { loadTextFonts } from '../host/text-fonts.js';
@@ -69,6 +69,9 @@ function drawScreen(
     screen.zoom?.focusX ?? 0.5,
     screen.zoom?.focusY ?? 0.5,
   );
+  // Graded on its own canvas first, as the offline export grades each frame's pixels.
+  const source = screen.matrix === undefined ? video : graded(video, at, screen.matrix);
+  const place = screen.matrix === undefined ? at : { x: 0, y: 0, width: WIDTH, height: HEIGHT };
   g.save();
   if (screen.wipe !== null) {
     g.beginPath();
@@ -76,8 +79,28 @@ function drawScreen(
     g.clip();
   }
   g.globalAlpha = Math.min(1, screen.opacity);
-  g.drawImage(video, at.x, at.y, at.width, at.height);
+  g.drawImage(source, place.x, place.y, place.width, place.height);
   g.restore();
+}
+
+let gradeCanvas: HTMLCanvasElement | undefined;
+
+/** A frame drawn whole and graded with a colour matrix, ready to lay on the picture. */
+function graded(
+  video: HTMLVideoElement,
+  at: { x: number; y: number; width: number; height: number },
+  matrix: ColorMatrix,
+): HTMLCanvasElement {
+  gradeCanvas ??= Object.assign(document.createElement('canvas'), { width: WIDTH, height: HEIGHT });
+  const context = gradeCanvas.getContext('2d', { willReadFrequently: true });
+  if (context === null) return gradeCanvas;
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, WIDTH, HEIGHT);
+  context.drawImage(video, at.x, at.y, at.width, at.height);
+  const pixels = context.getImageData(0, 0, WIDTH, HEIGHT);
+  applyMatrix(pixels.data, matrix);
+  context.putImageData(pixels, 0, 0);
+  return gradeCanvas;
 }
 
 function paint(

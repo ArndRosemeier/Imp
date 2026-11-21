@@ -30,6 +30,7 @@ import {
   createMovieMode,
   createSceneAudioLink,
   type FilmRenderer,
+  type ColorSampler,
   type FrameGrabber,
   type FrameImageEncoder,
 } from '@imp/mode-movie';
@@ -88,11 +89,13 @@ export interface ImpOptions {
   readonly filmRenderer?: FilmRenderer;
   /** Takes stills from clips so that agents can see a cut: mediabunny in the browser, ffmpeg on the server. */
   readonly frameGrabber?: FrameGrabber;
+  /** Reads the colours of clips to match shots: mediabunny in the browser, ffmpeg on the server. */
+  readonly colorSampler?: ColorSampler;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
 
-export type { FrameGrabber };
+export type { ColorSampler, FrameGrabber };
 
 /** Assembles the core for the browser host. */
 export function createImp(options: ImpOptions): Imp {
@@ -123,6 +126,7 @@ export function createImp(options: ImpOptions): Imp {
       },
       ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
       ...(options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber }),
+      ...(options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler }),
     }),
   ];
   const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
