@@ -202,6 +202,58 @@ describe('the movie in the library', () => {
       blobKey: face.blobKey,
     });
     expect(drawn.image).toMatchObject({ model: 'file', stateId: null });
+    const night = await run('world.location.state.add', {
+      projectId: id,
+      locationId: room.id,
+      name: 'Night',
+    });
+    const unchosen = await run('world.location.image.fromFile', {
+      projectId: id,
+      locationId: room.id,
+      blobKey: face.blobKey,
+      stateId: night.id,
+    });
+    await run('world.location.image.fromFile', {
+      projectId: id,
+      locationId: room.id,
+      blobKey: face.blobKey,
+      stateId: night.id,
+      choose: false,
+    });
+    const refused = (command: string, input: Record<string, unknown>) =>
+      expect(run(command, { projectId: id, ...input })).rejects.toThrow();
+    await refused('world.location.image.fromFile', {
+      locationId: room.id,
+      blobKey: 'uploads/none',
+    });
+    await refused('world.location.image.fromFile', { locationId: room.id, blobKey: door.blobKey });
+    await refused('movie.sound.fromFile', { sceneId: 'nope', blobKey: door.blobKey });
+    await refused('movie.sound.fromFile', { sceneId: scene.id, blobKey: 'uploads/none' });
+    await refused('movie.character.image.fromFile', {
+      characterId: mara.id,
+      blobKey: 'uploads/none',
+    });
+    await refused('movie.character.image.fromFile', {
+      characterId: mara.id,
+      blobKey: door.blobKey,
+    });
+    await refused('movie.shot.frame.fromFile', {
+      sceneId: scene.id,
+      shotId: shot.id,
+      blobKey: 'uploads/none',
+    });
+    await refused('movie.shot.frame.fromFile', {
+      sceneId: scene.id,
+      shotId: shot.id,
+      blobKey: door.blobKey,
+    });
+    const views = await run('library.list', { projectId: id, kind: 'location-view' });
+    const nightViews = views.assets.filter((asset: any) => asset.title.endsWith('Night'));
+    expect(nightViews).toHaveLength(2);
+    expect(nightViews.find((asset: any) => asset.refs.imageId === unchosen.image.id)?.context).toBe(
+      'Chosen picture',
+    );
+    expect(await worldLibrarySource.list(runtime, 'no-such-project')).toEqual([]);
     const { assets } = await run('library.list', { projectId: id, limit: 100 });
     expect(assets.map((asset: any) => asset.kind).sort()).toEqual(
       [
@@ -211,6 +263,8 @@ describe('the movie in the library', () => {
         'imported-sound',
         'imported-video',
         'key-frame',
+        'location-view',
+        'location-view',
         'location-view',
         'portrait',
       ].sort(),
