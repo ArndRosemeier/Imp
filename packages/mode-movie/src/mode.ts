@@ -8,6 +8,7 @@ import { createEditCommands } from './edit.js';
 import { createDefaultAudioCodec } from '@imp/audio';
 import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
+import { createMarkerCommands } from './markers.js';
 import { createTextCommands } from './text.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
@@ -189,7 +190,12 @@ export const filmEditor: Role = {
     'makes it rather than cutting around it. Judge continuity across shots, such as the same',
     'look of a character, the same light and place within a scene, and levels between scenes,',
     'and name the weak shots by number so that only they are made again. Work scene by scene;',
-    'a film can be long and you never need the whole of it at once. When a scene or the film',
+    'a film can be long and you never need the whole of it at once: movie.edit.film.edl reads',
+    'the film as one text (with fromScene and toScene for part of it) when you need how scenes',
+    'join. Leave a marker (movie.edit.marker.add: note, todo or problem) where something needs',
+    'the person or another crew member, such as a jump cut or a missing reaction; markers show',
+    'at once, not as proposals. Read open ones with movie.edit.marker.list and mark one done',
+    'with movie.edit.marker.set when it is dealt with. When a scene or the film',
     'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
     'film); it renders offline and waits until the file is done. Say what was not ready or',
     'came out silent, and tell the person they can download it on the Edit screen. Text goes',
@@ -269,6 +275,7 @@ export function createMovieMode(options: {
         options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber },
       ),
       ...createTextCommands(),
+      ...createMarkerCommands(),
       ...libraryCommands,
     ],
     roles: [

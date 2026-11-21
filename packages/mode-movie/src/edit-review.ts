@@ -2,13 +2,14 @@ import {
   CommandError,
   defineCommand,
   MediaAttachment,
+  requireProject,
   type Command,
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
 import type { MediaInput } from '@imp/providers';
 import { z } from 'zod';
-import { editDraftKey, shotPrefix } from './commands.js';
+import { editDraftKey, movieSceneKey, shotPrefix } from './commands.js';
 import {
   applyChanges,
   diffCut,
@@ -29,8 +30,9 @@ import {
   CutView,
   type Acting,
 } from './edit.js';
+import { placedMarkers, type PlacedMarker } from './markers.js';
 import { sourceTime } from './piece-time.js';
-import { CutRequest, Shot, type CutDraft, type SceneCut } from './schema.js';
+import { CutRequest, MODE_ID, Scene, Shot, type CutDraft, type SceneCut } from './schema.js';
 
 /**
  * Reviewing what agents propose for a cut, asking for work on one stretch of
@@ -95,6 +97,16 @@ async function look(at: Acting, projectId: string, sceneId: string, cut: SceneCu
     cut,
     await itemsOf(at.runtime.store, projectId, cut),
   );
+}
+
+/** The markers of a scene as lines of an edit decision list, with their film time if asked. */
+function markersText(markers: readonly PlacedMarker[], film: boolean): string {
+  if (markers.length === 0) return '';
+  const lines = markers.map(
+    (marker) =>
+      `  ${timecode(marker.atSeconds)}${film ? ` (film ${timecode(marker.filmSeconds)})` : ''} ${marker.kind}${marker.done ? ' (done)' : ''} by ${marker.by}: ${marker.text.replace(/\s+/g, ' ')} [marker ${marker.id}]`,
+  );
+  return `\n\nMARKERS\n${lines.join('\n')}`;
 }
 
 const pieceName = (item: { kind: 'shot' | 'title'; label: string }): string => {
@@ -919,10 +931,66 @@ export function createReviewCommands(
       const { cut, version } = await pick(at, 'movie.edit.edl', projectId, sceneId, asked);
       return {
         version,
-        text: edlText(
-          await look(at, projectId, sceneId, cut),
-          await headingOf(runtime.store, projectId, sceneId),
-        ),
+        text:
+          edlText(
+            await look(at, projectId, sceneId, cut),
+            await headingOf(runtime.store, projectId, sceneId),
+          ) + markersText(await placedMarkers(runtime.store, projectId, sceneId), false),
+      };
+    },
+  });
+
+  const filmEdl = defineCommand({
+    id: 'movie.edit.film.edl',
+    title: 'Read whole film as text',
+    description:
+      'Writes the whole film out as text, scene by scene: where each scene starts in the film and how long it lasts, then its edit decision list (times in it are from the start of the scene), then every marker with its film time. Give fromScene and toScene (scene positions) to read part of a long film. The way to reason about the film as one piece; read one scene with movie.edit.edl to work on it.',
+    effect: 'read',
+    input: z.object({
+      projectId: ProjectId,
+      fromScene: z.number().int().min(1).optional().describe('The first scene, by position.'),
+      toScene: z.number().int().min(1).optional().describe('The last scene, by position.'),
+    }),
+    output: z.object({
+      totalSeconds: z.number(),
+      scenes: z.number(),
+      text: z.string(),
+    }),
+    handler: async ({ runtime, actor }, { projectId, fromScene, toScene }) => {
+      const id = 'movie.edit.film.edl';
+      await requireProject(runtime.store, id, projectId, MODE_ID);
+      const at = { runtime, actor };
+      const scenes = (await runtime.store.list(movieSceneKey(projectId, '')))
+        .map((entry) => Scene.parse(entry.value))
+        .sort((a, b) => a.position - b.position);
+      const markers = await placedMarkers(runtime.store, projectId);
+      const parts: string[] = [];
+      let filmAt = 0;
+      let shown = 0;
+      for (const scene of scenes) {
+        const cut = await readCut(runtime.store, projectId, scene.id);
+        const view = await look(at, projectId, scene.id, cut);
+        const wanted =
+          (fromScene === undefined || scene.position >= fromScene) &&
+          (toScene === undefined || scene.position <= toScene);
+        if (wanted) {
+          shown++;
+          parts.push(
+            `== Film ${timecode(filmAt)} to ${timecode(filmAt + view.totalSeconds)} ==\n` +
+              edlText(view, scene) +
+              markersText(
+                markers.filter((marker) => marker.sceneId === scene.id),
+                true,
+              ),
+          );
+        }
+        filmAt += view.totalSeconds;
+      }
+      const head = `FILM · ${String(scenes.length)} scenes · ${timecode(filmAt)}`;
+      return {
+        totalSeconds: Math.round(filmAt * 1000) / 1000,
+        scenes: shown,
+        text: [head, ...parts].join('\n\n'),
       };
     },
   });
@@ -988,5 +1056,5 @@ export function createReviewCommands(
     },
   });
 
-  return [draftGet, keep, reject, discard, request, range, edl, frames];
+  return [draftGet, keep, reject, discard, request, range, edl, filmEdl, frames];
 }

@@ -103,6 +103,8 @@ Rescue tools (speed, reverse, a held last frame, a still or moving punch-in) are
 
 Transitions are fields of a cut item too: how it comes in after the piece before (a cut, a dissolve, a dip to black or white, or a wipe) and for how long. A dissolve or wipe starts the piece before the one before it ends, by at most half of either, so the scene grows shorter; a dip fades out and in at the cut without overlap. One pure module, `transitions.ts`, works out the overlap, the dips and how much black and white lies over a piece at each moment; the cut's layout, the scene's sound (which crossfades over an overlap), the Edit preview (two video screens that take turns) and the film renderer (which composites two clips frame by frame) all take their timing from it.
 
+The Edit stage opens on the whole film: a strip with one block per scene, as long as the scene and coloured by how finished it is, zooming from a feature seen whole to one scene; opening a scene shows its own timeline below, which zooms down to single frames. Playback can run on from one scene into the next. Markers (notes, to-dos and problems) are kept per scene apart from the cut (`movie/markers/<sceneId>`), so an agent's note shows at once instead of waiting in a draft and undo leaves notes be; each follows the piece of picture it was put on. `movie.edit.film.edl` writes the whole film as one text, scene by scene with film times and markers, so an agent can reason about how scenes join without reading media.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

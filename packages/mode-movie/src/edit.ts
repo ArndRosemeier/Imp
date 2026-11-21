@@ -16,6 +16,7 @@ import {
   editHistoryKey,
   editKey,
   linePrefix,
+  markerKey,
   movieSceneKey,
   shotPrefix,
   soundPrefix,
@@ -1737,7 +1738,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.film',
     title: 'Overview of the film',
     description:
-      'Returns the whole film at a glance: per scene how many items are ready, what is missing, and the running time; and the totals with the money spent on clips, dialogue and sounds so far. Use it to decide what to make next. It reads no media, so it stays small however long the film is.',
+      'Returns the whole film at a glance: per scene how many items are ready, what is missing, where it starts in the film, its running time and how many markers are still open; and the totals with the money spent on clips, dialogue and sounds so far. Use it to decide what to make next. It reads no media, so it stays small however long the film is.',
     effect: 'read',
     input: z.object({ projectId: ProjectId }),
     output: z.object({
@@ -1753,9 +1754,14 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
           items: z.number(),
           readyItems: z.number(),
           durationSeconds: z.number(),
+          /** Where the scene starts in the film. */
+          startSeconds: z.number(),
           missing: z.array(z.object({ itemId: z.string(), index: z.number(), state: ItemState })),
+          /** Markers not done yet. */
+          openMarkers: z.number(),
         }),
       ),
+      openMarkers: z.number(),
     }),
     handler: async ({ runtime }, { projectId }) => {
       await requireProject(runtime.store, 'movie.edit.film', projectId, MODE_ID);
@@ -1763,6 +1769,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         .map((entry) => Scene.parse(entry.value))
         .sort((a, b) => a.position - b.position);
       let cost = 0;
+      let startSeconds = 0;
       const summaries = [];
       for (const scene of scenes) {
         const cut = await readCut(runtime.store, projectId, scene.id);
@@ -1778,7 +1785,13 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
           cost += Sound.parse(entry.value).take?.costUsd ?? 0;
         }
         for (const line of cut.lines) cost += line.take?.costUsd ?? 0;
+        const stored = await runtime.store.get(markerKey(projectId, scene.id));
+        const openMarkers = Array.isArray(stored)
+          ? stored.filter((marker) => (marker as { done?: unknown }).done !== true).length
+          : 0;
         summaries.push({
+          startSeconds: round(startSeconds),
+          openMarkers,
           sceneId: scene.id,
           position: scene.position,
           heading: scene.heading,
@@ -1789,12 +1802,14 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
             .filter((entry) => entry.state !== 'ready')
             .map((entry) => ({ itemId: entry.itemId, index: entry.index, state: entry.state })),
         });
+        startSeconds += laid.totalSeconds;
       }
       return {
         totalSeconds: round(summaries.reduce((sum, scene) => sum + scene.durationSeconds, 0)),
         totalCostUsd: Math.round(cost * 1000) / 1000,
         items: summaries.reduce((sum, scene) => sum + scene.items, 0),
         readyItems: summaries.reduce((sum, scene) => sum + scene.readyItems, 0),
+        openMarkers: summaries.reduce((sum, scene) => sum + scene.openMarkers, 0),
         scenes: summaries,
       };
     },

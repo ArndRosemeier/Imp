@@ -4,6 +4,7 @@ import {
   ArrowClockwiseIcon,
   ClipboardIcon,
   CopyIcon,
+  FlagIcon,
   PauseIcon,
   PlayIcon,
   ScissorsIcon,
@@ -12,6 +13,8 @@ import {
   TextTIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
+import { FilmStrip } from './film-strip.js';
+import { MarkerInspector, MarkerLane, MarkerList, type MarkerView } from './markers.js';
 import {
   useEffect,
   useMemo,
@@ -50,7 +53,6 @@ import { NumberField } from './NumberField.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
-import { SceneTabs } from './shots.js';
 import { RescueTools } from './rescue.js';
 import { TransitionPicker } from './transition.js';
 import { SplitEdit, TakeSwitcher } from './split-edit.js';
@@ -118,6 +120,8 @@ function useAudioLengths(urls: ReadonlyMap<string, string>): ReadonlyMap<string,
 }
 function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>) {
   const [at, setAt] = useState(0);
+  /** How many times the cut has played to its end. */
+  const [endings, setEndings] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [look, setLook] = useState<Look>({ brightness: 1, title: '', card: false });
   const [player] = useState(
@@ -130,6 +134,9 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
           look: (next) => {
             // A new look only when something in it changed, so that a still frame draws once.
             setLook((before) => (JSON.stringify(before) === JSON.stringify(next) ? before : next));
+          },
+          ended: () => {
+            setEndings((count) => count + 1);
           },
         },
       ),
@@ -160,6 +167,7 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
     at,
     playing,
     look,
+    endings,
     /** The time to the millisecond, for drawing texts smoothly while playing. */
     now: () => player.now,
     play: () => {
@@ -199,7 +207,10 @@ type Mark = Change['kind'];
 
 /** How many pixels wide a second is on the timeline. */
 const MIN_SCALE = 12;
-const MAX_SCALE = 160;
+/** Close enough to see and step single frames. */
+const MAX_SCALE = 600;
+/** The frame rate the timeline steps and draws its frame grid at. */
+const FRAME_RATE = 30;
 /** A piece without length still gets a handle to grab. */
 const MIN_BLOCK_PX = 18;
 
@@ -208,6 +219,7 @@ type Selection =
   | { kind: 'sound'; id: string }
   | { kind: 'line'; id: string }
   | { kind: 'text'; id: string }
+  | { kind: 'marker'; id: string }
   | null;
 
 function Timeline({
@@ -226,6 +238,7 @@ function Timeline({
   marks,
   removed,
   range,
+  markers,
 }: {
   cut: Cut;
   scale: number;
@@ -246,6 +259,7 @@ function Timeline({
   /** Pieces the proposal takes out, where they were in the cut. */
   removed: readonly Change[];
   range: Range | null;
+  markers: readonly MarkerView[];
 }): ReactElement {
   const edges = useDrag();
   /** Whether a pointer on a piece may start dragging it. */
@@ -280,10 +294,19 @@ function Timeline({
   useEffect(() => {
     zooming.current = scale;
     const anchor = pending.current;
-    if (anchor === null || scroller.current === null) return;
+    const view = scroller.current;
+    if (view === null) return;
+    if (anchor === null) {
+      // Zoomed with the slider or Fit: the playhead stays in view, centred if it fell out.
+      const x = at * scale;
+      if (x < view.scrollLeft || x > view.scrollLeft + view.clientWidth) {
+        view.scrollLeft = Math.max(0, x - view.clientWidth / 2);
+      }
+      return;
+    }
     pending.current = null;
-    scroller.current.scrollLeft = anchor.second * scale - anchor.offset;
-  }, [scale]);
+    view.scrollLeft = anchor.second * scale - anchor.offset;
+  }, [scale]); // eslint-disable-line react-hooks/exhaustive-deps
   /** The second of the timeline under a point of the screen. */
   const secondAt = (clientX: number): number => {
     const box = inner.current?.getBoundingClientRect();
@@ -391,10 +414,23 @@ function Timeline({
             role="slider"
             tabIndex={0}
             onKeyDown={(event) => {
-              if (event.key === 'ArrowRight') onSeek(at + 1);
-              if (event.key === 'ArrowLeft') onSeek(at - 1);
+              // Shift steps a single frame.
+              const by = event.shiftKey ? 1 / FRAME_RATE : 1;
+              if (event.key === 'ArrowRight') onSeek(at + by);
+              if (event.key === 'ArrowLeft') onSeek(Math.max(0, at - by));
             }}
             aria-label="Playhead"
+            style={
+              scale >= 200
+                ? {
+                    // A line at every frame once frames are wide enough to tell apart.
+                    backgroundImage: `repeating-linear-gradient(to right, var(--line-strong) 0 1px, transparent 1px ${String(scale / FRAME_RATE)}px)`,
+                    backgroundSize: '100% 6px',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'bottom left',
+                  }
+                : undefined
+            }
             aria-valuemin={0}
             aria-valuemax={Math.round(cut.totalSeconds)}
             aria-valuenow={Math.round(at)}
@@ -407,6 +443,15 @@ function Timeline({
                 </span>
               ))}
           </div>
+          <MarkerLane
+            markers={markers}
+            scale={scale}
+            selectedId={selection?.kind === 'marker' ? selection.id : null}
+            onSelect={(marker) => {
+              onSelect({ kind: 'marker', id: marker.id });
+              onSeek(marker.atSeconds);
+            }}
+          />
           <TextLane
             texts={cut.texts}
             scale={scale}
@@ -660,12 +705,18 @@ function SceneEditor({
   sceneId,
   sceneLabel,
   act: actOnCut,
+  autoplay = false,
+  onEnded,
 }: {
   project: Project;
   sceneId: string;
   /** How the scene is named to the crew: "Scene 2". */
   sceneLabel: string;
   act: Act;
+  /** Start playing as soon as the scene and its media are loaded. */
+  autoplay?: boolean;
+  /** The scene played to its end. */
+  onEnded?: () => void;
 }): ReactElement {
   const [version, setVersion] = useState<'cut' | 'draft'>('cut');
   const live = useLive(
@@ -680,6 +731,13 @@ function SceneEditor({
       await runCommand(imp, 'movie.edit.draft.get', { projectId: project.id, sceneId }),
     ),
   );
+  const markerList = useLive([moviePrefix(project)], async (imp) =>
+    MarkerList.parse(
+      await runCommand(imp, 'movie.edit.marker.list', { projectId: project.id, sceneId }),
+    ),
+  );
+  const markers = markerList.data?.markers ?? [];
+  const timelineBox = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [marksAt, setMarksAt] = useState<{ in: number | null; out: number | null }>({
     in: null,
@@ -709,6 +767,18 @@ function SceneEditor({
   const lengths = useAudioLengths(urls);
   const { attachVideo, attachVoice, attachSecondVideo, attachSecondVoice, ...playback } =
     usePlayback(cut, source, urls);
+  useEffect(() => {
+    if (playback.endings > 0) onEnded?.();
+  }, [playback.endings]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Playing on from the scene before: start once the media is there.
+  const started = useRef(!autoplay);
+  const mediaReady = data !== undefined && blobKeys(source, cut).every((key) => urls.has(key));
+  useEffect(() => {
+    if (started.current || !mediaReady) return;
+    started.current = true;
+    playback.seek(0);
+    playback.play();
+  }, [mediaReady]); // eslint-disable-line react-hooks/exhaustive-deps
   const range: Range | null =
     marksAt.in !== null && marksAt.out !== null && Math.abs(marksAt.out - marksAt.in) >= 0.1
       ? { from: Math.min(marksAt.in, marksAt.out), to: Math.max(marksAt.in, marksAt.out) }
@@ -776,6 +846,29 @@ function SceneEditor({
       : undefined;
   const run = (id: string, input: Record<string, unknown>): Promise<unknown> =>
     act(id, { sceneId, ...input });
+  // Markers are notes, not edits: they can be left on a proposal too.
+  const runMarker = (id: string, input: Record<string, unknown>): Promise<unknown> =>
+    actOnCut(id, { sceneId, ...input });
+  const marker =
+    selection?.kind === 'marker'
+      ? markers.find((candidate) => candidate.id === selection.id)
+      : undefined;
+  const addMarker = (): void => {
+    void runMarker('movie.edit.marker.add', {
+      atSeconds: Math.round(playback.at * 1000) / 1000,
+      text: 'Note',
+    }).then((output) => {
+      const id = (output as { marker?: { id?: unknown } } | undefined)?.marker?.id;
+      if (typeof id === 'string') setSelection({ kind: 'marker', id });
+    });
+  };
+  const fit = (): void => {
+    const width = timelineBox.current?.clientWidth ?? 0;
+    if (width <= 0) return;
+    setScale(
+      Math.min(MAX_SCALE, Math.max(MIN_SCALE, (width - 24) / Math.max(4, cut.totalSeconds + 1))),
+    );
+  };
   const index = item === undefined ? -1 : cut.items.findIndex((c) => c.itemId === item.itemId);
   const canSplit =
     item?.kind === 'shot' &&
@@ -833,6 +926,17 @@ function SceneEditor({
     }
     if (event.key === 'Escape') {
       setMarksAt({ in: null, out: null });
+      return;
+    }
+    // One frame back or on, as in other editors.
+    if (!mod && (event.key === ',' || event.key === '.')) {
+      event.preventDefault();
+      playback.pause();
+      playback.seek(Math.max(0, playback.at + (event.key === '.' ? 1 : -1) / FRAME_RATE));
+      return;
+    }
+    if (!mod && event.key.toLowerCase() === 'm') {
+      addMarker();
       return;
     }
     if (event.key === ' ') {
@@ -935,15 +1039,27 @@ function SceneEditor({
               onFocus={focus}
             />
           )}
+          {marker !== undefined && (
+            <MarkerInspector
+              key={marker.id}
+              marker={marker}
+              playheadSeconds={playback.at}
+              run={runMarker}
+              onRemoved={() => {
+                setSelection(null);
+              }}
+            />
+          )}
           {!readOnly &&
             item === undefined &&
             placement === undefined &&
             line === undefined &&
+            marker === undefined &&
             text === undefined && (
               <p className="muted">
                 {coarse
                   ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead. Mark in and out to ask the crew about a stretch.'
-                  : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
+                  : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, comma and full stop step a frame, M leaves a marker, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
               </p>
             )}
           {!readOnly && item !== undefined && (
@@ -1370,18 +1486,36 @@ function SceneEditor({
             </button>
           )}
         </span>
-        <label className="field compact zoom">
-          <span>Zoom</span>
-          <input
-            type="range"
-            min={MIN_SCALE}
-            max={MAX_SCALE}
-            value={scale}
-            onChange={(event) => {
-              setScale(Number(event.target.value));
-            }}
-          />
-        </label>
+        <button
+          className="button quiet"
+          title="Leave a note, to-do or problem at the playhead (M)"
+          onClick={addMarker}
+        >
+          <FlagIcon aria-hidden="true" /> Marker
+        </button>
+        <span className="row zoom">
+          <button
+            className="button quiet small"
+            title="Fit the scene to the timeline"
+            onClick={fit}
+          >
+            Fit
+          </button>
+          <label className="field compact">
+            <span>{scale >= 200 ? 'Zoom · frames' : 'Zoom'}</span>
+            <input
+              type="range"
+              // Even steps of the slider zoom by the same factor, from the whole scene to single frames.
+              min={Math.log(MIN_SCALE)}
+              max={Math.log(MAX_SCALE)}
+              step="any"
+              value={Math.log(scale)}
+              onChange={(event) => {
+                setScale(Math.round(Math.exp(Number(event.target.value)) * 100) / 100);
+              }}
+            />
+          </label>
+        </span>
       </div>
 
       {range !== null && (
@@ -1407,23 +1541,26 @@ function SceneEditor({
         </div>
       )}
 
-      <Timeline
-        cut={cut}
-        scale={scale}
-        at={playback.at}
-        selection={selection}
-        lengths={lengths}
-        source={source}
-        onSelect={setSelection}
-        onSeek={playback.seek}
-        onZoom={setScale}
-        act={act}
-        sceneId={sceneId}
-        readOnly={readOnly}
-        marks={marks}
-        removed={removed}
-        range={range}
-      />
+      <div ref={timelineBox}>
+        <Timeline
+          cut={cut}
+          scale={scale}
+          at={playback.at}
+          selection={selection}
+          lengths={lengths}
+          source={source}
+          onSelect={setSelection}
+          onSeek={playback.seek}
+          onZoom={setScale}
+          act={act}
+          sceneId={sceneId}
+          readOnly={readOnly}
+          marks={marks}
+          removed={removed}
+          range={range}
+          markers={markers}
+        />
+      </div>
 
       {(notInFilm.length > 0 || cut.unplaced.length > 0) && (
         <div className="stack">
@@ -1498,16 +1635,31 @@ function SceneEditor({
   );
 }
 
+/** Where the choice to play on from scene to scene is remembered, per browser. */
+const PLAY_ON_KEY = 'imp.edit.play-on';
+
 /** The film as a whole, and the cut of one scene at a time. */
 export function EditView({ project }: { project: Project }): ReactElement {
   const live = useLive([moviePrefix(project)], async (imp) => ({
     film: Film.parse(await runCommand(imp, 'movie.edit.film', { projectId: project.id })),
     scenes: Scenes.parse(await runCommand(imp, 'movie.scene.list', { projectId: project.id }))
       .scenes,
+    markers: MarkerList.parse(
+      await runCommand(imp, 'movie.edit.marker.list', { projectId: project.id }),
+    ).markers,
   }));
   const { act, error } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [autoplay, setAutoplay] = useState(false);
+  const [playOn, setPlayOn] = useState(() => {
+    try {
+      return localStorage.getItem(PLAY_ON_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const film = live.data?.film;
+  const markers = live.data?.markers ?? [];
   const scenes = live.data?.scenes ?? [];
   const sceneId = (scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0])?.id;
 
@@ -1524,40 +1676,26 @@ export function EditView({ project }: { project: Project }): ReactElement {
       </div>
       <Problem text={live.error ?? error} />
       {film !== undefined && film.scenes.length > 0 && (
-        <table className="film-overview">
-          <thead>
-            <tr>
-              <th>Scene</th>
-              <th>Ready</th>
-              <th>Length</th>
-              <th>Missing</th>
-            </tr>
-          </thead>
-          <tbody>
-            {film.scenes.map((scene) => (
-              <tr key={scene.sceneId}>
-                <td>
-                  {scene.position} · {scene.heading === '' ? 'Untitled' : scene.heading}
-                </td>
-                <td>
-                  {String(scene.readyItems)} / {String(scene.items)}
-                </td>
-                <td>{clock(scene.durationSeconds)}</td>
-                <td>
-                  {scene.missing
-                    .map(
-                      (item) =>
-                        `piece ${String(item.index)}: ${ITEM_STATE_TEXT[item.state].toLowerCase()}`,
-                    )
-                    .join('; ')}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <FilmStrip
+          film={film}
+          sceneId={sceneId}
+          markers={markers}
+          playOn={playOn}
+          onOpen={(id) => {
+            setAutoplay(false);
+            setSelectedId(id);
+          }}
+          onPlayOn={(on) => {
+            setPlayOn(on);
+            try {
+              localStorage.setItem(PLAY_ON_KEY, on ? '1' : '0');
+            } catch {
+              // Remembering is a convenience; without storage it is on for this visit only.
+            }
+          }}
+        />
       )}
       <ExportBar project={project} sceneId={sceneId} sceneIds={scenes.map((scene) => scene.id)} />
-      <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         live.data !== undefined && (
           <p className="muted">There are no scenes yet. Write the script first.</p>
@@ -1569,6 +1707,14 @@ export function EditView({ project }: { project: Project }): ReactElement {
           sceneId={sceneId}
           sceneLabel={`Scene ${String(scenes.find((scene) => scene.id === sceneId)?.position ?? '')}`}
           act={act}
+          autoplay={autoplay}
+          onEnded={() => {
+            const at = scenes.findIndex((scene) => scene.id === sceneId);
+            const next = scenes[at + 1];
+            if (!playOn || next === undefined) return;
+            setAutoplay(true);
+            setSelectedId(next.id);
+          }}
         />
       )}
     </>
