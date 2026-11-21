@@ -12,7 +12,7 @@ type Patched<T extends z.ZodRawShape> = {
 export function patchOf<T extends z.ZodRawShape>(schema: z.ZodObject<T>): z.ZodObject<Patched<T>> {
   return z.object(
     Object.fromEntries(
-      Object.entries(schema.shape as Record<string, z.ZodType>).map(([name, field]) => {
+      Object.entries(schema.shape as unknown as Record<string, z.ZodType>).map(([name, field]) => {
         const bare: z.ZodType =
           field instanceof z.ZodDefault ? (field.unwrap() as z.ZodType) : field;
         return [name, bare.optional()];
