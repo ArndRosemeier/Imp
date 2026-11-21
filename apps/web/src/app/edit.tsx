@@ -38,7 +38,8 @@ import {
   type Look,
   type Placement,
   type Source,
-  zoomStyle,
+  HIDDEN,
+  screenStyle,
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
@@ -51,6 +52,7 @@ import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
 import { SceneTabs } from './shots.js';
 import { RescueTools } from './rescue.js';
+import { TransitionPicker } from './transition.js';
 import { SplitEdit, TakeSwitcher } from './split-edit.js';
 import { useLibraryDrop } from './library/drag.js';
 import { isPlayableSound, soundForScene } from './library/scene.js';
@@ -126,13 +128,8 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
           at: setAt,
           playing: setPlaying,
           look: (next) => {
-            setLook((before) =>
-              before.brightness === next.brightness &&
-              before.title === next.title &&
-              before.card === next.card
-                ? before
-                : next,
-            );
+            // A new look only when something in it changed, so that a still frame draws once.
+            setLook((before) => (JSON.stringify(before) === JSON.stringify(next) ? before : next));
           },
         },
       ),
@@ -153,6 +150,12 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
     },
     attachVoice: (element: HTMLAudioElement | null) => {
       player.attach(null, element);
+    },
+    attachSecondVideo: (element: HTMLVideoElement | null) => {
+      player.attach(element, null, 1);
+    },
+    attachSecondVoice: (element: HTMLAudioElement | null) => {
+      player.attach(null, element, 1);
     },
     at,
     playing,
@@ -492,6 +495,14 @@ function Timeline({
                       }}
                     />
                   )}
+                  {item.transition !== 'cut' && (
+                    <span
+                      className={`transition-mark transition-${item.transition}`}
+                      style={{ width: Math.max(10, item.overlapSeconds * scale) }}
+                      title={`${item.transition.replace('-', ' to ')} in`}
+                      aria-hidden="true"
+                    />
+                  )}
                   <span className="block-label">
                     {item.index} · {item.label || 'Untitled'}
                   </span>
@@ -696,7 +707,8 @@ function SceneEditor({
   const cut = data?.cut ?? EMPTY_CUT;
   const urls = useBlobUrls(blobKeys(source, cut));
   const lengths = useAudioLengths(urls);
-  const { attachVideo, attachVoice, ...playback } = usePlayback(cut, source, urls);
+  const { attachVideo, attachVoice, attachSecondVideo, attachSecondVoice, ...playback } =
+    usePlayback(cut, source, urls);
   const range: Range | null =
     marksAt.in !== null && marksAt.out !== null && Math.abs(marksAt.out - marksAt.in) >= 0.1
       ? { from: Math.min(marksAt.in, marksAt.out), to: Math.max(marksAt.in, marksAt.out) }
@@ -877,10 +889,21 @@ function SceneEditor({
               className="preview-screen"
               aria-label="Preview of the scene"
               playsInline
-              style={{
-                opacity: playback.look.card ? 0 : playback.look.brightness,
-                ...zoomStyle(playback.look),
-              }}
+              style={screenStyle(playback.look.screens?.[0] ?? HIDDEN)}
+            />
+            {/* The second screen, for the piece that dissolves or wipes in over the first. */}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={attachSecondVideo}
+              className="preview-screen"
+              aria-hidden="true"
+              playsInline
+              style={screenStyle(playback.look.screens?.[1] ?? HIDDEN)}
+            />
+            <div
+              className="preview-wash"
+              aria-hidden="true"
+              style={{ opacity: playback.look.white ?? 0 }}
             />
             <TextOverlay
               texts={cut.texts}
@@ -893,6 +916,8 @@ function SceneEditor({
           </div>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio ref={attachVoice} aria-label="Dialogue of the preview" />
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio ref={attachSecondVoice} aria-hidden="true" />
         </figure>
         <div
           className="stack inspector"
@@ -1044,6 +1069,7 @@ function SceneEditor({
                   run={run}
                 />
               )}
+              {index > 0 && <TransitionPicker item={item} run={run} />}
               <RescueTools item={item} playheadSeconds={playback.at} run={run} />
               <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
             </>

@@ -1,5 +1,14 @@
 import type { ImpClient } from '@imp/host';
-import { placePicture, Shot, Sound, sourceTime, TextView, zoomAt } from '@imp/mode-movie';
+import {
+  placePicture,
+  shadeAt,
+  Shot,
+  Sound,
+  sourceTime,
+  TextView,
+  transitionShare,
+  zoomAt,
+} from '@imp/mode-movie';
 import { z } from 'zod';
 import { runCommand } from './context.js';
 
@@ -68,6 +77,17 @@ export const Item = z.object({
   focusY: z.number().default(0.5),
   movingSeconds: z.number().default(0),
   ownSound: z.boolean().default(true),
+  transition: z.enum(['cut', 'dissolve', 'dip-black', 'dip-white', 'wipe']).default('cut'),
+  transitionSeconds: z.number().default(1),
+  overlapSeconds: z.number().default(0),
+  dipIn: z
+    .object({ color: z.enum(['black', 'white']), seconds: z.number() })
+    .nullable()
+    .default(null),
+  dipOut: z
+    .object({ color: z.enum(['black', 'white']), seconds: z.number() })
+    .nullable()
+    .default(null),
 });
 export type Item = z.infer<typeof Item>;
 
@@ -297,7 +317,36 @@ export interface Look {
   /** A title card is on screen (black, with its words if it has any), not a clip. */
   card: boolean;
   /** The punch-in of the clip on screen: 1 for none, and the point it zooms on. */
-  zoom?: { readonly scale: number; readonly focusX: number; readonly focusY: number };
+  zoom?: { readonly scale: number; readonly focusX: number; readonly focusY: number } | undefined;
+  /** How each of the two screens shows, for a dissolve or wipe between pieces. */
+  screens?: readonly [ScreenLook, ScreenLook];
+  /** White laid over the picture in a dip to white, 0 to 1. */
+  white?: number;
+}
+
+/** How one of the two preview screens shows. */
+export interface ScreenLook {
+  readonly opacity: number;
+  /** For a wipe, the share of the frame from the left it covers; null when it is whole. */
+  readonly wipe: number | null;
+  /** It lies over the other screen. */
+  readonly front: boolean;
+  readonly zoom?: { readonly scale: number; readonly focusX: number; readonly focusY: number };
+}
+
+/** A screen with nothing on it. */
+export const HIDDEN: ScreenLook = { opacity: 0, wipe: null, front: false };
+
+/** The CSS of one preview screen: shown or hidden, over or under, wiped on, and zoomed. */
+export function screenStyle(screen: ScreenLook): Record<string, string | number> {
+  return {
+    opacity: screen.opacity,
+    zIndex: screen.front ? 2 : 1,
+    ...(screen.wipe === null
+      ? {}
+      : { clipPath: `inset(0 ${String(Math.round((1 - screen.wipe) * 10000) / 100)}% 0 0)` }),
+    ...zoomStyle({ brightness: 1, title: '', card: false, zoom: screen.zoom }),
+  };
 }
 
 /**
@@ -329,13 +378,18 @@ export interface Media {
  * as it is edited. It owns the media elements; the page only shows its state.
  */
 export class CutPlayer {
-  video: HTMLVideoElement | null = null;
-  voice: HTMLAudioElement | null = null;
+  /**
+   * Two screens and two voices, taken in turn by the pieces of the cut (an A
+   * and a B roll), so that a piece dissolving into the next plays beside it
+   * and a cut never reloads the screen that is showing.
+   */
+  screens: [HTMLVideoElement | null, HTMLVideoElement | null] = [null, null];
+  voices: [HTMLAudioElement | null, HTMLAudioElement | null] = [null, null];
   media: Media;
   #players = new Map<string, HTMLAudioElement>();
   #startedAt = 0;
   #offset = 0;
-  #itemId = '';
+  #itemIds: [string, string] = ['', ''];
   #timer: ReturnType<typeof setInterval> | undefined;
   #routes = new Map<HTMLAudioElement, Route>();
   #own: AudioOutput | undefined;
@@ -399,9 +453,14 @@ export class CutPlayer {
     return route;
   }
 
-  attach(video: HTMLVideoElement | null, voice: HTMLAudioElement | null): void {
-    if (video !== null) this.video = video;
-    if (voice !== null) this.voice = voice;
+  /** The first screen and voice; the second is for pieces that come in over another. */
+  get video(): HTMLVideoElement | null {
+    return this.screens[0];
+  }
+
+  attach(video: HTMLVideoElement | null, voice: HTMLAudioElement | null, slot: 0 | 1 = 0): void {
+    if (video !== null) this.screens[slot] = video;
+    if (voice !== null) this.voices[slot] = voice;
   }
 
   get isPlaying(): boolean {
@@ -416,80 +475,126 @@ export class CutPlayer {
     return Math.min(t, this.media.cut.totalSeconds);
   }
 
+  /** Plays a piece on one screen at a time into it, its own sound at a share of its level. */
+  #show(slot: 0 | 1, item: Item, since: number, play: boolean, level: number): void {
+    const { source, urls } = this.media;
+    const screen = this.screens[slot];
+    const shot = source.shots.find((candidate) => candidate.id === item.shotId);
+    const into = sourceTime(item, since);
+    // Forwards it plays at its speed; backwards or holding its last frame, the frame is set.
+    const moving = since < item.movingSeconds;
+    const runs = play && moving && !item.reverse;
+    const fresh = this.#itemIds[slot] !== item.itemId;
+    const file = urls.get(shot?.clip?.blobKey ?? '');
+    if (screen !== null && file !== undefined) {
+      if (fresh || screen.src !== file) screen.src = file;
+      const drift = Math.abs(screen.currentTime - into);
+      if (fresh || (runs ? drift > 0.4 * item.speed : drift > 0.02)) screen.currentTime = into;
+      screen.playbackRate = item.reverse ? 1 : item.speed;
+      screen.muted =
+        !item.ownSound || shot?.clip?.silent === true || item.clipAudioVolume === 0 || !moving;
+      screen.volume = Math.max(0, Math.min(1, item.clipAudioVolume * level));
+      if (runs) void screen.play();
+      else screen.pause();
+    }
+    const dialogue = urls.get(shot?.dialogue?.blobKey ?? '');
+    const speaker = this.voices[slot];
+    if (
+      speaker !== null &&
+      dialogue !== undefined &&
+      shot?.clip?.silent === true &&
+      item.ownSound &&
+      moving
+    ) {
+      if (fresh || speaker.src !== dialogue) speaker.src = dialogue;
+      if (fresh || !play) speaker.currentTime = into;
+      speaker.volume = Math.max(0, Math.min(1, item.dialogueVolume * level));
+      if (play) void speaker.play();
+      else speaker.pause();
+    } else {
+      speaker?.pause();
+    }
+    this.#itemIds[slot] = item.itemId;
+  }
+
   /** What is at a time in the cut: the frame, the dialogue and the audio lane. */
   #apply(t: number, play: boolean): void {
     const { cut, source, urls } = this.media;
-    const item = cut.items.find(
-      (candidate) =>
-        candidate.durationSeconds > 0 &&
-        t >= candidate.startsAtSeconds &&
-        t < candidate.startsAtSeconds + candidate.durationSeconds,
-    );
-    const screen = this.video;
-    if (item === undefined || screen === null) {
-      screen?.pause();
-      this.voice?.pause();
-      this.notify.look({ brightness: 0, title: '', card: false });
-    } else {
-      const since = t - item.startsAtSeconds;
-      const brightness = fadeLevel(
-        item.fadeInSeconds,
-        item.fadeOutSeconds,
-        since,
-        item.durationSeconds - since,
+    // The pieces on screen: one, or two while one dissolves or wipes into the next.
+    const showing = cut.items
+      .map((item, index) => ({ item, slot: (index % 2) as 0 | 1 }))
+      .filter(
+        ({ item }) =>
+          item.durationSeconds > 0 &&
+          t >= item.startsAtSeconds &&
+          t < item.startsAtSeconds + item.durationSeconds,
       );
-      if (item.kind === 'title') {
-        screen.pause();
-        this.voice?.pause();
-        this.notify.look({ brightness, title: item.text, card: true });
-      } else {
-        const share = item.durationSeconds > 0 ? since / item.durationSeconds : 0;
-        this.notify.look({
-          brightness,
-          title: '',
-          card: false,
-          zoom: { scale: zoomAt(item, share), focusX: item.focusX, focusY: item.focusY },
-        });
-        const shot = source.shots.find((candidate) => candidate.id === item.shotId);
-        const into = sourceTime(item, since);
-        // Forwards it plays at its speed; backwards or holding its last frame, the frame is set.
-        const moving = since < item.movingSeconds;
-        const runs = play && moving && !item.reverse;
-        const fresh = this.#itemId !== item.itemId;
-        const file = urls.get(shot?.clip?.blobKey ?? '');
-        if (file !== undefined) {
-          if (fresh || screen.src !== file) screen.src = file;
-          const drift = Math.abs(screen.currentTime - into);
-          if (fresh || (runs ? drift > 0.4 * item.speed : drift > 0.02)) {
-            screen.currentTime = into;
-          }
-          screen.playbackRate = item.reverse ? 1 : item.speed;
-          screen.muted =
-            !item.ownSound || shot?.clip?.silent === true || item.clipAudioVolume === 0 || !moving;
-          screen.volume = item.clipAudioVolume;
-          if (runs) void screen.play();
-          else screen.pause();
-        }
-        const dialogue = urls.get(shot?.dialogue?.blobKey ?? '');
-        const speaker = this.voice;
-        if (
-          speaker !== null &&
-          dialogue !== undefined &&
-          shot?.clip?.silent === true &&
-          item.ownSound &&
-          moving
-        ) {
-          if (fresh || speaker.src !== dialogue) speaker.src = dialogue;
-          if (fresh || !play) speaker.currentTime = into;
-          speaker.volume = item.dialogueVolume;
-          if (play) void speaker.play();
-          else speaker.pause();
-        } else {
-          speaker?.pause();
-        }
-        this.#itemId = item.itemId;
+    const front = showing.at(-1);
+    const incoming =
+      front !== undefined && showing.length > 1
+        ? transitionShare(front.item.overlapSeconds, t - front.item.startsAtSeconds)
+        : 1;
+    const screens: [ScreenLook, ScreenLook] = [HIDDEN, HIDDEN];
+    let card: Item | undefined;
+    let cardLevel = 0;
+    let white = 0;
+    for (const slot of [0, 1] as const) {
+      const shown = showing.find((candidate) => candidate.slot === slot);
+      if (shown === undefined) {
+        this.screens[slot]?.pause();
+        this.voices[slot]?.pause();
+        this.#itemIds[slot] = '';
+        continue;
       }
+      const { item } = shown;
+      const since = t - item.startsAtSeconds;
+      const isFront = shown === front;
+      // The piece coming in fades up (or is wiped on) over the one going out; their sound crossfades.
+      const share = isFront ? incoming : 1;
+      const mix = isFront ? incoming : 1 - incoming;
+      const shade = shadeAt(
+        {
+          fadeInSeconds: item.fadeInSeconds,
+          fadeOutSeconds: item.fadeOutSeconds,
+          dipIn: item.dipIn,
+          dipOut: item.dipOut,
+        },
+        since,
+        item.durationSeconds,
+      );
+      white = Math.max(white, shade.white * share);
+      const wiping = isFront && share < 1 && item.transition === 'wipe';
+      if (item.kind === 'title') {
+        this.screens[slot]?.pause();
+        this.voices[slot]?.pause();
+        this.#itemIds[slot] = item.itemId;
+        if (isFront || card === undefined) {
+          card = item;
+          cardLevel = (1 - shade.black) * share;
+        }
+        continue;
+      }
+      screens[slot] = {
+        opacity: (wiping ? 1 : share) * (1 - shade.black),
+        wipe: wiping ? share : null,
+        front: isFront,
+        zoom: {
+          scale: zoomAt(item, item.durationSeconds > 0 ? since / item.durationSeconds : 0),
+          focusX: item.focusX,
+          focusY: item.focusY,
+        },
+      };
+      this.#show(slot, item, since, play, mix);
     }
+    const top = screens.find((screen) => screen.front && screen.opacity > 0);
+    this.notify.look({
+      brightness: card !== undefined ? cardLevel : (top ?? screens[0]).opacity,
+      title: card?.text ?? '',
+      card: card !== undefined && (front?.item === card || showing.length === 1),
+      zoom: top?.zoom ?? screens[0].zoom,
+      screens,
+      white,
+    });
     const lane = [
       ...cut.sounds.map((placement) => ({ placement, key: placementKey(placement, source) })),
       ...cut.lines.map((line) => ({
@@ -580,8 +685,8 @@ export class CutPlayer {
     clearInterval(this.#timer);
     this.#timer = undefined;
     this.#offset += (performance.now() - this.#startedAt) / 1000;
-    this.video?.pause();
-    this.voice?.pause();
+    for (const screen of this.screens) screen?.pause();
+    for (const voice of this.voices) voice?.pause();
     for (const player of this.#players.values()) player.pause();
     this.notify.playing(false);
   }
@@ -590,7 +695,7 @@ export class CutPlayer {
     const target = Math.max(0, Math.min(seconds, this.media.cut.totalSeconds));
     this.#offset = target;
     this.#startedAt = performance.now();
-    this.#itemId = '';
+    this.#itemIds = ['', ''];
     for (const player of this.#players.values()) player.pause();
     this.notify.at(target);
     this.#apply(target, this.isPlaying);
@@ -598,8 +703,8 @@ export class CutPlayer {
 
   dispose(): void {
     this.pause();
-    this.video = null;
-    this.voice = null;
+    this.screens = [null, null];
+    this.voices = [null, null];
     this.#players.clear();
     this.#routes.clear();
     void this.#own?.context.close();

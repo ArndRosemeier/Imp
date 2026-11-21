@@ -266,6 +266,10 @@ export type Shot = z.infer<typeof Shot>;
  */
 export { SoundPlacement } from '@imp/audio';
 
+/** How a piece comes in after the one before it. */
+export const TransitionKind = z.enum(['cut', 'dissolve', 'dip-black', 'dip-white', 'wipe']);
+export type TransitionKind = z.infer<typeof TransitionKind>;
+
 /**
  * One piece of a scene's cut: a stretch of a shot's clip, or a title card. The
  * same shot can be cut into several items (a split) or used twice (a paste),
@@ -303,6 +307,10 @@ export const CutItem = z.object({
   /** The point zoomed on, as shares of the frame's width and height. */
   focusX: z.number().min(0).max(1).default(0.5),
   focusY: z.number().min(0).max(1).default(0.5),
+  /** How the piece comes in after the one before it: a cut, or a dissolve, dip or wipe. */
+  transition: TransitionKind.default('cut'),
+  /** How long the transition takes; a dissolve or wipe never covers more than half of either piece. */
+  transitionSeconds: z.number().min(0.1).max(5).default(1),
 });
 export type CutItem = z.infer<typeof CutItem>;
 
@@ -315,6 +323,8 @@ export const PLAIN_PIECE = {
   zoomTo: null,
   focusX: 0.5,
   focusY: 0.5,
+  transition: 'cut',
+  transitionSeconds: 1,
 } as const satisfies Partial<CutItem>;
 
 /**

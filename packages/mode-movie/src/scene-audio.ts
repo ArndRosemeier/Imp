@@ -102,6 +102,8 @@ async function readScene(
     ) {
       continue;
     }
+    const overlapAfter =
+      laid.items.slice(index + 1).find((next) => next.durationSeconds > 0)?.overlapSeconds ?? 0;
     const attached = (
       track: 'dialogue' | 'clip',
       key: string,
@@ -128,8 +130,9 @@ async function readScene(
           startSeconds: at.startsAtSeconds,
           durationSeconds: snapSeconds(duration),
           volume,
-          fadeInSeconds: 0,
-          fadeOutSeconds: 0,
+          // Across a dissolve or wipe, the sound of the two pieces crossfades with their pictures.
+          fadeInSeconds: at.overlapSeconds,
+          fadeOutSeconds: Math.min(duration, overlapAfter),
           loop: false,
         }),
       );

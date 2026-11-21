@@ -101,6 +101,8 @@ A shot keeps its earlier ready clips as takes (`Shot.takes`, newest first, at mo
 
 Rescue tools (speed, reverse, a held last frame, a still or moving punch-in) are fields of a cut item. One pure module, `piece-time.ts`, maps a piece's time to its clip's time and places a zoomed picture; the Edit preview, the film renderer, the stills agents look at and the scene's sound all use it, so they agree. Off speed or reversed, a piece's own sound is silent. The renderer reads backwards runs forwards a few frames at a time (`frame-order.ts`), because decoders only move forwards from a key frame.
 
+Transitions are fields of a cut item too: how it comes in after the piece before (a cut, a dissolve, a dip to black or white, or a wipe) and for how long. A dissolve or wipe starts the piece before the one before it ends, by at most half of either, so the scene grows shorter; a dip fades out and in at the cut without overlap. One pure module, `transitions.ts`, works out the overlap, the dips and how much black and white lies over a piece at each moment; the cut's layout, the scene's sound (which crossfades over an overlap), the Edit preview (two video screens that take turns) and the film renderer (which composites two clips frame by frame) all take their timing from it.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

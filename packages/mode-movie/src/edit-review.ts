@@ -145,6 +145,11 @@ export function edlText(
         if (item.hasClipAudio) notes.push(`clip sound ${item.clipAudioVolume.toFixed(2)}`);
       }
     }
+    if (item.transition !== 'cut' && item.index > 1) {
+      notes.push(
+        `${item.transition} in ${item.transitionSeconds.toFixed(1)}${item.overlapSeconds > 0 ? ` (overlaps ${item.overlapSeconds.toFixed(2)})` : ''}`,
+      );
+    }
     if (item.fadeInSeconds > 0) notes.push(`fade in ${item.fadeInSeconds.toFixed(1)}`);
     if (item.fadeOutSeconds > 0) notes.push(`fade out ${item.fadeOutSeconds.toFixed(1)}`);
     lines.push(
@@ -219,6 +224,8 @@ const FIELD_NAMES: Record<string, string> = {
   zoomTo: 'zoom at the end',
   focusX: 'zoom across',
   focusY: 'zoom down',
+  transition: 'transition',
+  transitionSeconds: 'transition length',
   startSeconds: 'start',
   gainDb: 'gain (dB)',
   fadeCurve: 'fade shape',
