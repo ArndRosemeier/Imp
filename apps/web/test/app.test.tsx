@@ -10,6 +10,7 @@ import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
 import { connectImp, createImp, createLocalPorts, serveImp, type Imp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
+import { encodeWav } from '@imp/audio';
 
 const model = (id: string, extra: Partial<ModelInfo> = {}): ModelInfo => ({
   id,
@@ -916,6 +917,82 @@ describe('App', () => {
       );
     });
     expect(screen.getByRole('button', { name: 'Play' })).toHaveProperty('disabled', true);
+  });
+
+  it('keeps every asset in one library: import, search, tag, and place a sound in the audio editor', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await user.type(await screen.findByLabelText('Logline'), 'A keeper and a storm.');
+    await user.tab();
+
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    expect(
+      await within(library).findByRole('button', { name: /Logline, Development/ }),
+    ).toBeTruthy();
+
+    // A second of silence, as a WAV file the person picks.
+    const wav = encodeWav({ sampleRate: 8000, channels: [new Float32Array(8000)] });
+    const file = new File([wav.slice()], 'Door slam.wav', { type: 'audio/wav' });
+    await user.upload(within(library).getByLabelText('Files to import'), file);
+    // A single import opens the new asset.
+    const detail = await within(library).findByRole('region', { name: 'Door slam, details' });
+    await user.type(within(detail).getByLabelText('Tags'), 'foley{Enter}');
+    expect(await within(detail).findByText('foley')).toBeTruthy();
+    await user.click(within(detail).getByRole('button', { name: /All assets/ }));
+
+    await user.type(within(library).getByLabelText('Search the library'), 'foley');
+    await vi.waitFor(() => {
+      expect(within(library).queryByRole('button', { name: /Logline/ })).toBeNull();
+    });
+    expect(within(library).getByRole('button', { name: /Door slam, Imported sound/ })).toBeTruthy();
+
+    // Nothing on the Development stage takes a sound.
+    await user.click(within(library).getByRole('button', { name: /Door slam, Imported sound/ }));
+    await user.click(await within(library).findByRole('button', { name: /Use in/ }));
+    expect(within(library).getByText(/Nothing on this screen takes a sound/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Audio' }));
+    await user.type(await within(screen.getByRole('main')).findByLabelText('Name'), 'Lamp room');
+    await user.click(screen.getByRole('button', { name: /Start empty/ }));
+    expect(await screen.findByText('1 track')).toBeTruthy();
+    // Closed and opened again, the menu offers the editor that is open now.
+    await user.click(within(library).getByRole('button', { name: /Use in/ }));
+    await user.click(within(library).getByRole('button', { name: /Use in/ }));
+    await user.click(
+      await within(library).findByRole('button', { name: 'Lamp room, Track 1, at the playhead' }),
+    );
+    expect((await screen.findAllByText('Place sound')).length).toBeGreaterThan(0);
+
+    const projectId = (
+      (await imp.registry.executeById(
+        'settings.get',
+        { key: 'project.current' },
+        { actor: { kind: 'user', id: 't' } },
+      )) as { output: { value: string } }
+    ).output.value;
+    const listed = (await imp.registry.executeById(
+      'library.list',
+      { projectId, modality: 'sound', kind: 'imported-sound' },
+      { actor: { kind: 'user', id: 't' } },
+    )) as { output: { assets: { tags: string[] }[] } };
+    expect(listed.output.assets.map((asset) => asset.tags)).toEqual([['foley']]);
+    const docs = (await imp.registry.executeById(
+      'audio.doc.list',
+      { projectId },
+      { actor: { kind: 'user', id: 't' } },
+    )) as { output: { documents: { id: string }[] } };
+    const doc = (await imp.registry.executeById(
+      'audio.doc.get',
+      { projectId, docId: docs.output.documents[0]?.id },
+      { actor: { kind: 'user', id: 't' } },
+    )) as { output: { document: { tracks: { regions: { label: string }[] }[] } } };
+    expect(doc.output.document.tracks[0]?.regions.map((region) => region.label)).toEqual([
+      'Door slam',
+    ]);
   });
 
   it('says where it runs, and offers the download only when it runs in the browser', async () => {

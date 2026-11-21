@@ -335,7 +335,9 @@ function Detail({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [copyTo, setCopyTo] = useState('');
-  const [targets, setTargets] = useState<{ id: number; label: string }[] | null>(null);
+  const [using, setUsing] = useState(false);
+  // Read on every render, so a stage that opened meanwhile is offered too.
+  const targets = using ? drag.targetsFor(asset) : null;
   const notesId = useId();
   const nameId = useId();
   const textId = useId();
@@ -451,9 +453,9 @@ function Detail({
         <button
           type="button"
           className="button small"
-          aria-expanded={targets !== null}
+          aria-expanded={using}
           onClick={() => {
-            setTargets(targets === null ? drag.targetsFor(asset) : null);
+            setUsing(!using);
           }}
         >
           <HandGrabbingIcon aria-hidden="true" /> Use in…
@@ -474,7 +476,7 @@ function Detail({
                 type="button"
                 className="button small primary"
                 onClick={() => {
-                  setTargets(null);
+                  setUsing(false);
                   void drag.place(asset, target.id);
                 }}
               >
