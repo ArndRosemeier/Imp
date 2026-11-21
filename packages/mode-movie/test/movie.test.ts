@@ -645,6 +645,7 @@ describe('shots and clips', () => {
       frameId: null,
       clip: null,
       takes: [],
+      pickup: null,
     });
     expect(await run('movie.shot.list', { sceneId: scene.id })).toEqual({
       shots: [

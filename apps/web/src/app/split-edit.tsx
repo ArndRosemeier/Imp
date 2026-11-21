@@ -8,16 +8,27 @@ const seconds = (value: number): string => `${String(Math.round(value * 100) / 1
 
 /** Why a split edit of a length cannot be made between two pieces, or null when it can. */
 type Retimed = 'speed' | 'reverse' | 'holdSeconds';
+/** A pickup still to come has no clip to cut into. */
+interface Placeholder {
+  placeholder?: boolean;
+}
 
 export function splitEditBlock(
-  item: Pick<Item, 'kind' | 'durationSeconds' | 'trimEndSeconds' | Retimed>,
-  next: Pick<Item, 'kind' | 'durationSeconds' | 'trimStartSeconds' | Retimed> | undefined,
+  item: Pick<Item, 'kind' | 'durationSeconds' | 'trimEndSeconds' | Retimed> & Placeholder,
+  next:
+    | (Pick<Item, 'kind' | 'durationSeconds' | 'trimStartSeconds' | Retimed> & Placeholder)
+    | undefined,
   type: 'j' | 'l',
   length: number,
 ): string | null {
   if (next === undefined) return 'This is the last piece of the scene.';
   if (item.kind !== 'shot' || next.kind !== 'shot') return 'Both pieces must be shots.';
-  if (item.durationSeconds <= 0 || next.durationSeconds <= 0) {
+  if (
+    item.durationSeconds <= 0 ||
+    next.durationSeconds <= 0 ||
+    item.placeholder === true ||
+    next.placeholder === true
+  ) {
     return 'Both pieces need a ready clip.';
   }
   const plain = (piece: Pick<Item, Retimed>): boolean =>

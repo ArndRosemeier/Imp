@@ -8,6 +8,7 @@ import {
   placePicture,
   shadeAt,
   Shot,
+  slateText,
   Sound,
   sourceTime,
   TextView,
@@ -66,6 +67,9 @@ export const Item = z.object({
   shotId: z.string(),
   label: z.string(),
   state: ItemState,
+  /** A pickup waiting for its clip, standing in the cut as a slate. */
+  placeholder: z.boolean().default(false),
+  pickupReason: z.string().nullable().default(null),
   trimStartSeconds: z.number(),
   trimEndSeconds: z.number(),
   dialogueVolume: z.number(),
@@ -100,6 +104,10 @@ export const Item = z.object({
     .default(null),
 });
 export type Item = z.infer<typeof Item>;
+
+/** The words a card shows: a title's own, or the slate of a pickup still to come. */
+export const cardText = (item: Item): string =>
+  item.kind === 'title' ? item.text : slateText(item.label);
 
 export const Placement = z.object({
   id: z.string(),
@@ -586,7 +594,7 @@ export class CutPlayer {
       );
       white = Math.max(white, shade.white * share);
       const wiping = isFront && share < 1 && item.transition === 'wipe';
-      if (item.kind === 'title') {
+      if (item.kind === 'title' || item.placeholder) {
         this.screens[slot]?.pause();
         this.voices[slot]?.pause();
         this.#itemIds[slot] = item.itemId;
@@ -613,7 +621,7 @@ export class CutPlayer {
     const top = screens.find((screen) => screen.front && screen.opacity > 0);
     this.notify.look({
       brightness: card !== undefined ? cardLevel : (top ?? screens[0]).opacity,
-      title: card?.text ?? '',
+      title: card === undefined ? '' : cardText(card),
       card: card !== undefined && (front?.item === card || showing.length === 1),
       zoom: top?.zoom ?? screens[0].zoom,
       screens,

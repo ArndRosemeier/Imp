@@ -58,6 +58,7 @@ import { NumberField } from './NumberField.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
+import { PickupNote, PickupRequest } from './pickups.js';
 import { RescueTools } from './rescue.js';
 import { TransitionPicker } from './transition.js';
 import { SplitEdit, TakeSwitcher } from './split-edit.js';
@@ -487,12 +488,12 @@ function Timeline({
               return (
                 <div
                   key={item.itemId}
-                  className={`block block-${item.kind}${selected ? ' selected' : ''}${target?.itemId === item.itemId ? ' drop' : ''}${lift === 0 ? '' : ' lifted'}${marked(item.itemId)}`}
+                  className={`block block-${item.kind}${item.placeholder ? ' block-placeholder' : ''}${selected ? ' selected' : ''}${target?.itemId === item.itemId ? ' drop' : ''}${lift === 0 ? '' : ' lifted'}${marked(item.itemId)}`}
                   style={{ left, width: blockWidth }}
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
-                  aria-label={`${item.kind === 'title' ? 'Title' : 'Shot'} ${String(item.index)}: ${item.label.slice(0, 40)}`}
+                  aria-label={`${item.kind === 'title' ? 'Title' : item.placeholder ? 'Pickup to come' : 'Shot'} ${String(item.index)}: ${item.label.slice(0, 40)}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect({ kind: 'item', id: item.itemId });
@@ -521,7 +522,7 @@ function Timeline({
                   }}
                   onPointerCancel={moving.cancel}
                 >
-                  {item.kind === 'shot' && (
+                  {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-start"
                       aria-label={`Trim the start of item ${String(item.index)}`}
@@ -555,9 +556,10 @@ function Timeline({
                     />
                   )}
                   <span className="block-label">
-                    {item.index} · {item.label || 'Untitled'}
+                    {item.index} · {item.placeholder ? 'Pickup · ' : ''}
+                    {item.label || 'Untitled'}
                   </span>
-                  {item.kind === 'shot' && (
+                  {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-end"
                       aria-label={`Trim the end of item ${String(item.index)}`}
@@ -1077,9 +1079,11 @@ function SceneEditor({
               <h3>
                 {item.kind === 'title' ? 'Title card' : `Shot ${String(item.index)}`}{' '}
                 <span className="muted">
-                  {item.state === 'ready'
-                    ? `${clock(item.startsAtSeconds)} · ${item.durationSeconds.toFixed(1)} s`
-                    : ITEM_STATE_TEXT[item.state]}
+                  {item.placeholder
+                    ? `Pickup to come · ${item.durationSeconds.toFixed(1)} s`
+                    : item.state === 'ready'
+                      ? `${clock(item.startsAtSeconds)} · ${item.durationSeconds.toFixed(1)} s`
+                      : ITEM_STATE_TEXT[item.state]}
                 </span>
               </h3>
               {item.kind === 'title' ? (
@@ -1104,8 +1108,9 @@ function SceneEditor({
               ) : (
                 <p className="muted">{item.label}</p>
               )}
+              <PickupNote item={item} />
               <div className="row wrap">
-                {item.kind === 'shot' && (
+                {item.kind === 'shot' && !item.placeholder && (
                   <>
                     <NumberField
                       label="Trim start (s)"
@@ -1199,6 +1204,7 @@ function SceneEditor({
               <RescueTools item={item} playheadSeconds={playback.at} run={run} />
               <GradeTools item={item} items={cut.items} run={run} canMatch={canMatch} />
               <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
+              <PickupRequest key={item.itemId} afterIndex={index + 1} run={run} />
             </>
           )}
           {!readOnly && text !== undefined && (

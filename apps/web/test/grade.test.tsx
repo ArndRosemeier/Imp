@@ -17,6 +17,8 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   shotId: 'a',
   label: 'Wide on the sea',
   state: 'ready',
+  placeholder: false,
+  pickupReason: null,
   trimStartSeconds: 0,
   trimEndSeconds: 0,
   dialogueVolume: 1,

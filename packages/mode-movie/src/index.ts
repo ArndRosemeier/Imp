@@ -22,6 +22,7 @@ export {
   filmEditor,
   productionDesigner,
   soundEditor,
+  critic,
   screenwriter,
   soundDesigner,
 } from './mode.js';
@@ -80,6 +81,14 @@ export {
   PlacedMarker,
   placedMarkers,
 } from './markers.js';
+export {
+  createPickupCommands,
+  listPickups,
+  PickupStatus,
+  pickupStatus,
+  PickupView,
+  slateText,
+} from './pickups.js';
 export {
   CUE_LETTERS,
   DEFAULT_TEXT_STYLES,

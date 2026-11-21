@@ -107,6 +107,8 @@ The Edit stage opens on the whole film: a strip with one block per scene, as lon
 
 Colour is a grade per cut item (exposure, contrast, temperature, tint, saturation) and one look for the whole film (`movie/film-look`, from a preset or by hand). `grade.ts` turns each into an affine colour matrix and combines them, so the film renderer applies one matrix to each frame's pixels and the Edit preview hands the same numbers to an SVG feColorMatrix on its screens. `movie.edit.grade.match` reads a few small frames of two shots through the host's colour sampler (WebCodecs in the browser, ffmpeg on the local server), compares brightness, spread, white balance and colourfulness, and steps a grade until the shot's average colour lands on the reference's; it is a starting point to judge by eye.
 
+A pickup is a shot the edit asks for after the fact (`movie.edit.pickup.request`): it is written into the scene as an ordinary shot with a `pickup` record (why, how long, who asked) and put into the cut at once. Until its clip is ready, the layout gives it its planned length and marks it `placeholder`, so the preview, the film renderer and the EDL show a slate in its place and the scene keeps its timing; when the clip arrives the same item simply plays it. The Clip Designer finds open requests with `movie.edit.pickup.list`. The Critic role reads the film (EDLs, stills through `media.view`) and can write only markers.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

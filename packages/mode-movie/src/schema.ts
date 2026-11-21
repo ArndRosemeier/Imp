@@ -189,6 +189,22 @@ export const KeyFrame = z.object({
 export type KeyFrame = z.infer<typeof KeyFrame>;
 
 /** One uninterrupted piece of film within a scene. */
+/**
+ * A pickup: a shot the edit asked for after the fact, such as a reaction or a
+ * cutaway that covers a jump. Until its clip is ready it stands in the cut as
+ * a slate of its planned length, so the scene can be timed around it.
+ */
+export const Pickup = z.object({
+  /** What the cut needs it for, in the words of whoever asked. */
+  reason: z.string(),
+  /** How long the slate stands in the cut until the clip arrives. */
+  seconds: z.number().min(0.5).max(30),
+  /** "person", or the role of the agent that asked. */
+  requestedBy: z.string(),
+  requestedAt: z.string(),
+});
+export type Pickup = z.infer<typeof Pickup>;
+
 export const Shot = z.object({
   id: z.string(),
   sceneId: z.string(),
@@ -258,6 +274,8 @@ export const Shot = z.object({
    * one it replaces here, so a better earlier take can be put back.
    */
   takes: z.array(Clip).default([]),
+  /** Set when the shot was asked for from the edit, to fill a gap in the cut. */
+  pickup: Pickup.nullable().default(null),
 });
 export type Shot = z.infer<typeof Shot>;
 

@@ -1113,6 +1113,32 @@ input.input.script {
   background: var(--surface);
   font-style: italic;
 }
+/* A pickup still to come: a slate, hatched, until its clip takes its place. */
+.lane .block-placeholder {
+  border-style: dashed;
+  border-color: var(--track-1);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--surface),
+    var(--surface) 6px,
+    color-mix(in srgb, var(--track-1) 14%, var(--surface)) 6px,
+    color-mix(in srgb, var(--track-1) 14%, var(--surface)) 12px
+  );
+}
+.pickup-note {
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--track-1);
+  background: color-mix(in srgb, var(--track-1) 8%, var(--surface));
+}
+.pickup-note p {
+  margin: 0;
+}
+.pickup-request {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
 .lane .block-music {
   background: color-mix(in srgb, var(--accent) 18%, var(--surface));
 }
@@ -4387,4 +4413,18 @@ dialog.modal.wide:has(.style-editor) {
 }
 input[type='range'] {
   accent-color: var(--accent);
+}
+
+.pickup-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--track-1);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
 }
