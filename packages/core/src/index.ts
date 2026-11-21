@@ -69,6 +69,12 @@ export {
   type ArchiveEntry,
 } from './archive.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
+export {
+  createReleaseCommands,
+  ReleaseEntry,
+  ReleaseNotes,
+  UNKNOWN_RELEASE,
+} from './commands/release.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
 export { patchOf } from './patch.js';

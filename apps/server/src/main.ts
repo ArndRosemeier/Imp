@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
+import release from 'virtual:imp-release';
 import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
 import { createFfmpegColorSampler, createFfmpegFrameGrabber } from './ffmpeg-frames.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
@@ -15,7 +16,7 @@ function option(name: string): string | undefined {
 if (process.argv.includes('--help')) {
   console.log(
     [
-      'Imp, running on this computer.',
+      `Imp ${release.version}, running on this computer.`,
       '',
       '  node imp.mjs [--port 4747] [--data <folder>]',
       '',
@@ -39,6 +40,7 @@ const server = createImpServer({
       store: await FileKeyValueStore.open(join(dataDir, 'data.jsonl')),
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
+      release,
       ...(ffmpeg
         ? {
             mp4Audio: createFfmpegMp4Decoder(),
@@ -58,7 +60,9 @@ server.on('error', (error: Error & { code?: string }) => {
 });
 // This computer only: the server is never reachable from the network.
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Imp is running. Open http://localhost:${String(port)}/ in your browser.`);
+  console.log(
+    `Imp ${release.version} is running. Open http://localhost:${String(port)}/ in your browser.`,
+  );
   console.log(`Your projects are kept in ${dataDir}`);
   if (!ffmpeg) {
     console.log(

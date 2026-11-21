@@ -14,7 +14,7 @@
     "@imp/host": "workspace:*"
   },
   "devDependencies": {
-    "vite": "^8.3.8",
-    "@imp/providers": "workspace:*"
+    "@imp/providers": "workspace:*",
+    "vite": "^8.3.8"
   }
 }

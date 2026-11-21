@@ -1,5 +1,6 @@
 import { createWebCodecsMp4Decoder, webCodecs } from '@imp/audio';
 import { createImp, serveImp, type Port } from '@imp/host';
+import release from 'virtual:imp-release';
 import { createFilmRenderer } from './film-render.js';
 import { createColorSampler, createFrameGrabber } from './frame-grab.js';
 import { toJpeg } from './frame-image.js';
@@ -17,6 +18,7 @@ serveImp(
       blobs: await IndexedDbBlobStore.open('imp-blobs'),
       secrets,
       frameImage: toJpeg,
+      release,
       filmRenderer: createFilmRenderer(),
       ...(frameGrabber === undefined ? {} : { frameGrabber }),
       ...(colorSampler === undefined ? {} : { colorSampler }),
