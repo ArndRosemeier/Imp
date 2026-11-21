@@ -7,7 +7,7 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
-import { createAudioCommands, createDefaultAudioCodec } from '@imp/audio';
+import { createAudioCommands, createDefaultAudioCodec, type AudioCodec } from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
@@ -20,7 +20,12 @@ import {
   type CoreRuntime,
   type KeyValueStore,
 } from '@imp/core';
-import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
+import {
+  createMovieMode,
+  createSceneAudioLink,
+  type FilmRenderer,
+  type FrameImageEncoder,
+} from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import type { SecretStore } from './secrets.js';
@@ -66,6 +71,13 @@ export interface ImpOptions {
    * frames in other formats are used as guides only.
    */
   readonly frameImage?: FrameImageEncoder;
+  /**
+   * Decodes stored sound. Defaults to the decoders every host has; the browser
+   * host wraps them to decode the sound of video clips (AAC) with WebCodecs.
+   */
+  readonly audioCodec?: AudioCodec;
+  /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
+  readonly filmRenderer?: FilmRenderer;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -87,9 +99,14 @@ export function createImp(options: ImpOptions): Imp {
       apiKey: () => options.secrets.getKey() ?? '',
     });
   // Adding a working mode to the app is adding it to this list.
+  const codec = options.audioCodec ?? createDefaultAudioCodec();
   const modes: readonly Mode[] = [
     createMovieMode({
       provider,
+      film: {
+        codec,
+        ...(options.filmRenderer === undefined ? {} : { renderer: options.filmRenderer }),
+      },
       ...(options.frameImage === undefined ? {} : { frameImage: options.frameImage }),
     }),
   ];
@@ -101,7 +118,7 @@ export function createImp(options: ImpOptions): Imp {
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createAudioCommands({
-      codec: createDefaultAudioCodec(),
+      codec,
       links: [createSceneAudioLink()],
     }),
     ...createWorldCommands({

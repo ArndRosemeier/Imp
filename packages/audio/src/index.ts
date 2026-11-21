@@ -5,7 +5,7 @@ export {
   type AudioCodec,
   type AudioFormat,
 } from './codec.js';
-export { createAudioCommands, type AudioCommandOptions } from './commands.js';
+export { audioSourcesFor, createAudioCommands, type AudioCommandOptions } from './commands.js';
 export { audioRenderKey, type AudioLink, type LengthOf } from './doc-commands.js';
 export {
   AudioDoc,

@@ -1,4 +1,5 @@
 import type { ImpClient } from '@imp/host';
+import { wrapLines } from '../host/title-lines.js';
 import { blobKeys, CutPlayer, loadCut, type Look } from './cut-player.js';
 
 const WIDTH = 1280;
@@ -30,29 +31,12 @@ export interface Progress {
   totalSeconds: number;
 }
 
+export { wrapLines };
+
 export interface Recording {
   blob: Blob;
   extension: 'mp4' | 'webm';
   seconds: number;
-}
-
-/** A title broken into lines that fit the width. */
-export function wrapLines(text: string, fits: (line: string) => boolean): string[] {
-  const lines: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    let line = '';
-    for (const word of paragraph.split(/\s+/).filter((part) => part !== '')) {
-      const next = line === '' ? word : `${line} ${word}`;
-      if (line !== '' && !fits(next)) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = next;
-      }
-    }
-    lines.push(line);
-  }
-  return lines;
 }
 
 function paint(g: CanvasRenderingContext2D, video: HTMLVideoElement, look: Look): void {

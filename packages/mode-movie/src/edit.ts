@@ -181,6 +181,15 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
   return { items: laid, totalSeconds: round(at) };
 }
 
+/** The items of a cut laid out in time, with what each needs, for a film export. */
+export async function laidOut(
+  store: KeyValueStore,
+  projectId: string,
+  items: readonly CutItem[],
+): Promise<Awaited<ReturnType<typeof layOut>>> {
+  return layOut(store, projectId, items);
+}
+
 /** Where each item starts and how long it plays, for the audio editor. */
 export async function itemTimes(
   store: KeyValueStore,

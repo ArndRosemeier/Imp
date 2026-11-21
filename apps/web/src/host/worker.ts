@@ -1,4 +1,7 @@
 import { createImp, serveImp, type Port } from '@imp/host';
+import { createDefaultAudioCodec } from '@imp/audio';
+import { withClipSound } from './clip-sound.js';
+import { createFilmRenderer } from './film-render.js';
 import { toJpeg } from './frame-image.js';
 import { IndexedDbBlobStore, IndexedDbKeyValueStore } from './indexeddb-store.js';
 
@@ -11,6 +14,8 @@ serveImp(
       blobs: await IndexedDbBlobStore.open('imp-blobs'),
       secrets,
       frameImage: toJpeg,
+      audioCodec: withClipSound(createDefaultAudioCodec()),
+      filmRenderer: createFilmRenderer(),
     }),
   self as unknown as Port,
 );

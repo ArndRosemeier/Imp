@@ -52,6 +52,20 @@ export {
   MAX_FRAME_REFERENCES,
   type FrameImageEncoder,
 } from './frames.js';
+export {
+  createFilmExportCommands,
+  FilmExport,
+  filmPartKey,
+  PART_BYTES,
+  PartWriter,
+  planFilm,
+  type FilmExportOptions,
+  type FilmPicture,
+  type FilmPlan,
+  type FilmRendered,
+  type FilmRenderer,
+  type FilmRenderJob,
+} from './film.js';
 export { LibrarySound, soundLibrary } from './library.js';
 export { createSceneAudioLink } from './scene-audio.js';
 export {
