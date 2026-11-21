@@ -181,6 +181,20 @@ describe('effect commands', () => {
       noiseToSeconds: 2.4,
     });
     expect(regionIn(moved, voice.id)?.effects).toHaveLength(1);
+    // Added to a chain, noise reduction goes first, to hear the noise as recorded.
+    await run('audio.fx.remove', { projectId, docId, regionIds: [voice.id] });
+    await run('audio.fx.limiter', { projectId, docId, regionIds: [voice.id] });
+    const first = await run('audio.fx.denoise', {
+      projectId,
+      docId,
+      regionId: voice.id,
+      noiseFromSeconds: 2.1,
+      noiseToSeconds: 2.4,
+    });
+    expect(regionIn(first, voice.id)?.effects.map((effect) => effect.kind)).toEqual([
+      'denoise',
+      'limiter',
+    ]);
     const [stretch] = regionIn(moved, voice.id)?.effects ?? [];
     expect(stretch?.kind === 'denoise' ? stretch.noiseFromSeconds : 0).toBeCloseTo(0.1, 6);
     await expect(

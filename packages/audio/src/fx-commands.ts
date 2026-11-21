@@ -58,12 +58,15 @@ const settingsOf = (kind: EffectKind): z.ZodRawShape => {
   return Object.fromEntries(Object.entries(option.shape).filter(([key]) => key !== 'kind'));
 };
 
-/** Adds an effect at the end of a chain, or puts it in place of the one of its kind. */
+/**
+ * Puts an effect in place of the one of its kind, or adds it: noise
+ * reduction first, since it must hear the noise as it was recorded, and
+ * everything else at the end.
+ */
 function placeEffect(chain: readonly Effect[], effect: Effect): Effect[] {
   const at = chain.findIndex((existing) => existing.kind === effect.kind);
-  return at === -1
-    ? [...chain, effect]
-    : chain.map((existing, i) => (i === at ? effect : existing));
+  if (at !== -1) return chain.map((existing, i) => (i === at ? effect : existing));
+  return effect.kind === 'denoise' ? [effect, ...chain] : [...chain, effect];
 }
 
 export function createEffectCommands(helpers: EffectCommandHelpers): readonly Command[] {

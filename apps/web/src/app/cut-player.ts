@@ -78,6 +78,10 @@ export const Placement = z.object({
   pan: z.number().default(0),
   gainDb: z.number().default(0),
   fadeCurve: z.enum(['linear', 'smooth']).default('linear'),
+  /** Processing set in the audio editor; played from a processed copy (playKey). */
+  effects: z.array(z.unknown()).default([]),
+  /** The processed copy of the sound, when it has effects; filled in by loadCut. */
+  playKey: z.string().nullable().default(null),
   name: z.string(),
   kind: z.enum(['effect', 'music', 'clip', 'dialogue']),
   recorded: z.boolean(),
@@ -98,6 +102,8 @@ export const Line = z.object({
   outdated: z.boolean(),
   durationSeconds: z.number(),
   take: z.object({ blobKey: z.string() }).nullable(),
+  effects: z.array(z.unknown()).default([]),
+  playKey: z.string().nullable().default(null),
 });
 export type Line = z.infer<typeof Line>;
 
@@ -147,6 +153,7 @@ export interface Source {
 
 /** Where the media of a placement is stored, if there is any. */
 export function placementKey(placement: Placement, source: Source): string | undefined {
+  if (placement.playKey !== null) return placement.playKey;
   if (placement.source === 'sound') {
     return source.sounds.find((sound) => sound.id === placement.soundId)?.take?.blobKey;
   }
@@ -206,6 +213,8 @@ function linePlacement(line: Line): Placement {
     pan: 0,
     gainDb: 0,
     fadeCurve: 'linear',
+    effects: line.effects,
+    playKey: line.playKey,
     name: '',
     kind: 'dialogue',
     recorded: line.recorded,
@@ -218,6 +227,8 @@ export function blobKeys(source: Source, cut: Cut): string[] {
     ...source.shots.flatMap((shot) => [shot.clip?.blobKey, shot.dialogue?.blobKey]),
     ...source.sounds.map((sound) => sound.take?.blobKey),
     ...cut.lines.map((line) => line.take?.blobKey),
+    ...cut.sounds.map((placement) => placement.playKey),
+    ...cut.lines.map((line) => line.playKey),
   ].filter((key): key is string => typeof key === 'string');
 }
 
@@ -375,7 +386,10 @@ export class CutPlayer {
     }
     const lane = [
       ...cut.sounds.map((placement) => ({ placement, key: placementKey(placement, source) })),
-      ...cut.lines.map((line) => ({ placement: linePlacement(line), key: line.take?.blobKey })),
+      ...cut.lines.map((line) => ({
+        placement: linePlacement(line),
+        key: line.playKey ?? line.take?.blobKey,
+      })),
     ];
     for (const { placement, key } of lane) {
       let player = this.#players.get(placement.id);
@@ -513,5 +527,45 @@ export async function loadCut(
   const sounds = Sounds.parse(
     await runCommand(imp, 'movie.sound.list', { projectId, sceneId, full: true }),
   ).sounds;
-  return { cut, shots, sounds };
+  return { cut: await withProcessedSound(imp, cut, { shots, sounds }), shots, sounds };
+}
+
+/** The processed copy of a sound with effects, or null to play it as recorded. */
+async function processedKey(
+  imp: ImpClient,
+  key: string | undefined,
+  effects: readonly unknown[],
+): Promise<string | null> {
+  if (key === undefined || effects.length === 0) return null;
+  try {
+    const output = await runCommand(imp, 'audio.fx.processed', { key, effects });
+    return z.object({ key: z.string() }).parse(output).key;
+  } catch {
+    // A sound that cannot be processed here (such as clip sound without a decoder) plays as recorded.
+    return null;
+  }
+}
+
+/**
+ * Points sounds with effects at their processed copies, so the Edit stage and
+ * the film export hear what the audio editor plays. Each copy is rendered once.
+ */
+export async function withProcessedSound(imp: ImpClient, cut: Cut, source: Source): Promise<Cut> {
+  const sounds = await Promise.all(
+    cut.sounds.map(async (placement) => ({
+      ...placement,
+      playKey: await processedKey(
+        imp,
+        placementKey({ ...placement, playKey: null }, source),
+        placement.effects,
+      ),
+    })),
+  );
+  const lines = await Promise.all(
+    cut.lines.map(async (line) => ({
+      ...line,
+      playKey: await processedKey(imp, line.take?.blobKey, line.effects),
+    })),
+  );
+  return { ...cut, sounds, lines };
 }

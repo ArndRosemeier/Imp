@@ -30,8 +30,11 @@ import {
   type PointerEvent,
   type ReactElement,
 } from 'react';
+import { Effect } from '@imp/audio';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { NumberInput } from './audio-controls.js';
+import { EffectsPanel } from './audio-fx.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
 
@@ -51,6 +54,7 @@ const Region = z.object({
   fadeInSeconds: z.number(),
   fadeOutSeconds: z.number(),
   fadeCurve: FadeCurve,
+  effects: z.array(Effect).default([]),
 });
 type Region = z.infer<typeof Region>;
 const Track = z.object({
@@ -411,58 +415,6 @@ function ToolButton({
   );
 }
 
-function NumberInput({
-  label,
-  value,
-  step,
-  min,
-  max,
-  unit,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  step: number;
-  min: number;
-  max: number;
-  unit?: string;
-  onCommit: (value: number) => void;
-}): ReactElement {
-  const id = useId();
-  const [typed, setTyped] = useState<string | null>(null);
-  const text = typed ?? String(Math.round(value * 1000) / 1000);
-  return (
-    <div className="knob">
-      <label htmlFor={id}>{label}</label>
-      <span className="knob-input">
-        <input
-          id={id}
-          className="input"
-          type="number"
-          step={step}
-          min={min}
-          max={max}
-          value={text}
-          onChange={(event) => {
-            setTyped(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur();
-          }}
-          onBlur={() => {
-            const next = Number(text);
-            setTyped(null);
-            if (Number.isFinite(next) && next !== value) {
-              onCommit(Math.min(max, Math.max(min, next)));
-            }
-          }}
-        />
-        {unit !== undefined && <span className="muted">{unit}</span>}
-      </span>
-    </div>
-  );
-}
-
 /** Who made a step, in words. */
 function byWhom(step: z.infer<typeof Step>): string {
   // The cut of a scene keeps its steps without saying who made them.
@@ -482,11 +434,14 @@ function Inspector({
   history,
   edit,
   onSelectRegion,
+  stretch,
 }: {
   doc: Doc;
   region: Region | undefined;
   track: Track | undefined;
   history: History | undefined;
+  /** A selected stretch inside the region. */
+  stretch: { from: number; to: number } | null;
   edit: (id: string, input?: Record<string, unknown>) => Promise<unknown>;
   onSelectRegion: (region: Region) => void;
 }): ReactElement {
@@ -600,6 +555,12 @@ function Inspector({
               Select its time
             </button>
           </div>
+          <EffectsPanel
+            regionId={region.id}
+            effects={region.effects}
+            stretch={stretch}
+            edit={edit}
+          />
         </section>
       ) : track !== undefined ? (
         <section className="stack">
@@ -785,7 +746,22 @@ function AudioEditor({
 
   const tracks = doc.tracks;
   const allRegions = tracks.flatMap((track) => track.regions.map((region) => ({ track, region })));
-  const picked = allRegions.find((entry) => entry.region.id === regionId);
+  // A stretch selected on one track inside one region shows that region, so
+  // its effects can learn from the stretch (noise reduction).
+  const inside =
+    selection !== null && selection.trackIds.length === 1 && selection.to - selection.from > 0.01
+      ? allRegions.find(
+          (entry) =>
+            entry.track.id === selection.trackIds[0] &&
+            entry.region.startSeconds <= selection.from + 1e-6 &&
+            entry.region.endSeconds >= selection.to - 1e-6,
+        )
+      : undefined;
+  const picked = allRegions.find((entry) => entry.region.id === regionId) ?? inside;
+  const stretch =
+    inside !== undefined && picked === inside && selection !== null
+      ? { from: selection.from, to: selection.to }
+      : null;
   const pickedTrack = tracks.find((track) => track.id === trackId) ?? picked?.track;
   const length = Math.max(doc.durationSeconds, player.at);
   const width = Math.max(length + 10, 30) * zoom;
@@ -1521,6 +1497,7 @@ function AudioEditor({
           track={pickedTrack}
           history={history}
           edit={edit}
+          stretch={stretch}
           onSelectRegion={(region) => {
             const owner = allRegions.find((entry) => entry.region.id === region.id)?.track;
             if (owner === undefined) return;
