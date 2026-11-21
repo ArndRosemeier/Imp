@@ -8,6 +8,7 @@ import { createEditCommands } from './edit.js';
 import { createDefaultAudioCodec } from '@imp/audio';
 import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
+import { createTextCommands } from './text.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
@@ -180,7 +181,14 @@ export const filmEditor: Role = {
     'a film can be long and you never need the whole of it at once. When a scene or the film',
     'is ready to watch, render it with movie.edit.export (scene ids, or none for the whole',
     'film); it renders offline and waits until the file is done. Say what was not ready or',
-    'came out silent, and tell the person they can download it on the Edit screen.',
+    'came out silent, and tell the person they can download it on the Edit screen. Text goes',
+    'on the text lane, drawn by Imp rather than the video model: movie.edit.text.add for titles,',
+    'lower thirds (name, new line, role), captions pinned in the frame and credits; anchor a',
+    'text to a piece or a spoken line so it follows the cut. movie.edit.subtitles.generate',
+    'subtitles every heard line, movie.edit.credits.generate rolls end credits from the cast and',
+    'crew, and the film-wide looks are text styles (movie.edit.text.style.list and .set). Keep',
+    'texts clear of faces and of each other, and on screen long enough to read: about 15',
+    'letters a second.',
   ].join(' '),
   scope: SCOPE,
 };
@@ -249,6 +257,7 @@ export function createMovieMode(options: {
       ...createReviewCommands(
         options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber },
       ),
+      ...createTextCommands(),
       ...libraryCommands,
     ],
     roles: [

@@ -17,7 +17,8 @@ import {
   type VideoCodec,
 } from 'mediabunny';
 import { chooseFormat, fadeLevel } from './film-format.js';
-import { wrapLines } from './title-lines.js';
+import { drawText, drawTexts } from './text-draw.js';
+import { loadTextFonts } from './text-fonts.js';
 
 /** The engine's sound: 48 kHz stereo, as @imp/audio mixes it. */
 const RATE = 48_000;
@@ -33,25 +34,6 @@ class Cancelled extends Error {
   constructor() {
     super('The render was cancelled.');
   }
-}
-
-function drawTitle(
-  g: OffscreenCanvasRenderingContext2D,
-  text: string,
-  width: number,
-  height: number,
-): void {
-  const size = Math.round((height * 56) / 720);
-  const step = Math.round((height * 70) / 720);
-  g.fillStyle = '#fff';
-  g.font = `600 ${String(size)}px system-ui, sans-serif`;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  const lines = wrapLines(text, (line) => g.measureText(line).width < width * 0.8);
-  const top = height / 2 - ((lines.length - 1) * step) / 2;
-  lines.forEach((line, index) => {
-    g.fillText(line, width / 2, top + index * step);
-  });
 }
 
 async function render(job: FilmRenderJob): Promise<FilmRendered> {
@@ -150,7 +132,10 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
       samplesDone += count;
     }
   };
+  const texts = plan.texts ?? [];
   const emit = async (): Promise<void> => {
+    // The text lane lies over everything, fades to black included.
+    drawTexts(g, texts, frame / fps, width, height);
     await video.add(frame / fps, 1 / fps);
     frame += 1;
     await soundUntil(frame / fps + 0.5);
@@ -184,6 +169,7 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
     return Math.max(0, end - frame);
   };
 
+  await loadTextFonts();
   try {
     await output.start();
     for (const picture of pictures) {
@@ -197,7 +183,22 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
       if (picture.kind === 'title') {
         for (let i = 0; i < count; i++) {
           black();
-          drawTitle(g, picture.text, width, height);
+          // The card's own words, set in the title style; they fade with the card.
+          drawText(
+            g,
+            {
+              kind: 'title',
+              text: picture.text,
+              style: { ...picture.style, enter: 'cut', exit: 'cut', roll: false },
+              startSeconds: 0,
+              durationSeconds: picture.durationSeconds,
+              x: null,
+              y: null,
+            },
+            0,
+            width,
+            height,
+          );
           shade(picture, frame / fps);
           await emit();
         }

@@ -24,7 +24,9 @@ import { z } from 'zod';
 import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
 import { itemsOf, laidOut, readCut, requireScene } from './edit.js';
 import { createSceneAudioLink } from './scene-audio.js';
-import { MODE_ID, Scene, Shot } from './schema.js';
+import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
+import { styleOf } from './text-layout.js';
+import { filmTexts, readStyles } from './text.js';
 
 /** What is on screen for a stretch of the film: a clip, or a title card on black. */
 export type FilmPicture =
@@ -43,9 +45,23 @@ export type FilmPicture =
       readonly startSeconds: number;
       readonly durationSeconds: number;
       readonly text: string;
+      /** The film's title style, which the card's words are set in. */
+      readonly style: TextStyle;
       readonly fadeInSeconds: number;
       readonly fadeOutSeconds: number;
     };
+
+/** A text over the picture for a stretch of the film, with the style it is drawn in. */
+export interface FilmText {
+  readonly startSeconds: number;
+  readonly durationSeconds: number;
+  readonly kind: TextKind;
+  readonly text: string;
+  readonly style: TextStyle;
+  /** Where in the frame, when not where the style puts it. */
+  readonly x: number | null;
+  readonly y: number | null;
+}
 
 /** The picture of a film, laid out in time, for a renderer to draw frame by frame. */
 export interface FilmPlan {
@@ -55,6 +71,8 @@ export interface FilmPlan {
   /** Frames per second; null takes the rate most of the clips have. */
   readonly fps: number | null;
   readonly pictures: readonly FilmPicture[];
+  /** The text lane, burned into the picture, drawn over it in this order. */
+  readonly texts?: readonly FilmText[];
 }
 
 /** One render: the plan, and how the renderer reaches clips, sound and the file it writes. */
@@ -238,6 +256,10 @@ export async function planFilm(
       return [shot.id, shot] as const;
     }),
   );
+  const titleStyle = styleOf(await readStyles(store, projectId), {
+    styleId: 'title',
+    kind: 'title',
+  });
   const pictures: FilmPicture[] = [];
   const scenes: PlannedScene[] = [];
   const notReady: z.infer<typeof NotReady>[] = [];
@@ -258,7 +280,7 @@ export async function planFilm(
         fadeOutSeconds: item.fadeOutSeconds,
       };
       if (item.kind === 'title') {
-        pictures.push({ kind: 'title', text: item.text, ...common });
+        pictures.push({ kind: 'title', text: item.text, style: titleStyle, ...common });
         continue;
       }
       const key = shots.get(item.shotId)?.clip?.blobKey;
@@ -451,6 +473,12 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         .describe(
           'A short name for the file, like "rough-cut-2". Defaults to "film" or the scene.',
         ),
+      subtitles: z
+        .boolean()
+        .default(true)
+        .describe(
+          'Burn the subtitles into the picture (the default). Leave them out for a film that gets a subtitle file instead (movie.edit.subtitles.export). Other texts are always in the picture.',
+        ),
     }),
     output: FilmExport,
     handler: async ({ runtime, actor }, input) => {
@@ -476,6 +504,20 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         throw new CommandError('invalid_input', id, 'The film has no scenes to export yet.');
       }
       const plan = await planFilm(runtime, id, input.projectId, sceneIds);
+      const styles = await readStyles(runtime.store, input.projectId);
+      const texts: FilmText[] = (
+        await filmTexts({ runtime, actor }, id, input.projectId, sceneIds)
+      ).texts
+        .filter((text) => input.subtitles || text.kind !== 'subtitle')
+        .map((text) => ({
+          startSeconds: text.filmStartSeconds,
+          durationSeconds: text.durationSeconds,
+          kind: text.kind,
+          text: text.text,
+          style: styleOf(styles, text),
+          x: text.x,
+          y: text.y,
+        }));
       if (plan.durationSeconds <= 0) {
         throw new CommandError(
           'invalid_input',
@@ -533,6 +575,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
             height: RESOLUTIONS[input.resolution],
             fps: input.fps ?? null,
             pictures: plan.pictures,
+            texts,
           },
           clip: async (blobKey) => (await runtime.blobs.get(blobKey))?.bytes,
           mix: (startFrame, frames) => mix.mix(startFrame, frames),

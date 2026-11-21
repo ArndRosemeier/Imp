@@ -5,6 +5,7 @@ import {
   requireProject,
   type Command,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { readElement } from '@imp/world';
 import { z } from 'zod';
@@ -42,6 +43,11 @@ export const movieSceneKey = (projectId: string, sceneId: string): string =>
 /** The recorded lines of a scene's own-lane characters. */
 export const linePrefix = (projectId: string, sceneId: string): string =>
   `${base(projectId)}lines/${sceneId}/`;
+/** The text styles of the film, shared by every scene. */
+export const textStylesKey = (projectId: string): string => `${base(projectId)}text-styles`;
+/** Subtitle files written for download, by name. */
+export const subtitleFileKey = (projectId: string, name: string): string =>
+  `${base(projectId)}subtitles/${name}`;
 /** Rendered films: a record each, and its file in parts in the blob store. */
 export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
@@ -118,7 +124,7 @@ export const developmentUpdate = defineCommand({
   description:
     'Changes the logline, premise, tone or treatment of a movie project. Fields left out stay as they are.',
   effect: 'write',
-  input: Development.partial().extend({ projectId: ProjectId }),
+  input: patchOf(Development).extend({ projectId: ProjectId }),
   output: Development,
   handler: async ({ runtime }, { projectId, ...changes }) => {
     await requireProject(runtime.store, 'movie.development.update', projectId, MODE_ID);
@@ -432,7 +438,7 @@ export const characterUpdate = defineCommand({
   title: 'Change character',
   description: 'Changes details of a character. Fields left out stay as they are.',
   effect: 'write',
-  input: CharacterFields.partial().extend({ projectId: ProjectId, characterId: z.string() }),
+  input: patchOf(CharacterFields).extend({ projectId: ProjectId, characterId: z.string() }),
   output: Character,
   handler: async ({ runtime }, { projectId, characterId, ...changes }) => {
     await requireProject(runtime.store, 'movie.character.update', projectId, MODE_ID);

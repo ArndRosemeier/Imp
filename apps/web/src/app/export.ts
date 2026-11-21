@@ -1,5 +1,10 @@
 import type { ImpClient } from '@imp/host';
+import { TextStyle } from '@imp/mode-movie';
+import { z } from 'zod';
+import { drawLane, type LaneText } from '../host/text-draw.js';
+import { loadTextFonts } from '../host/text-fonts.js';
 import { wrapLines } from '../host/title-lines.js';
+import { runCommand } from './context.js';
 import { blobKeys, CutPlayer, loadCut, type Look } from './cut-player.js';
 
 const WIDTH = 1280;
@@ -39,34 +44,39 @@ export interface Recording {
   seconds: number;
 }
 
-function paint(g: CanvasRenderingContext2D, video: HTMLVideoElement, look: Look): void {
+/** What lies over the picture: the texts of the scene being recorded, and the time in it. */
+interface Overlay {
+  texts: readonly LaneText[];
+  styles: readonly TextStyle[];
+  seconds: number;
+}
+
+function paint(
+  g: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  look: Look,
+  overlay: Overlay,
+): void {
   g.globalAlpha = 1;
   g.fillStyle = '#000';
   g.fillRect(0, 0, WIDTH, HEIGHT);
-  if (look.title !== '') {
-    g.globalAlpha = look.brightness;
-    g.fillStyle = '#fff';
-    g.font = '600 56px system-ui, sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    const lines = wrapLines(look.title, (line) => g.measureText(line).width < WIDTH * 0.8);
-    const top = HEIGHT / 2 - ((lines.length - 1) * 70) / 2;
-    lines.forEach((line, index) => {
-      g.fillText(line, WIDTH / 2, top + index * 70);
-    });
-    g.globalAlpha = 1;
-    return;
-  }
-  if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+  if (!look.card && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
     const scale = Math.min(WIDTH / video.videoWidth, HEIGHT / video.videoHeight);
     const w = video.videoWidth * scale;
     const h = video.videoHeight * scale;
     g.drawImage(video, (WIDTH - w) / 2, (HEIGHT - h) / 2, w, h);
+    if (look.brightness < 1) {
+      g.fillStyle = `rgba(0, 0, 0, ${String(1 - look.brightness)})`;
+      g.fillRect(0, 0, WIDTH, HEIGHT);
+    }
   }
-  if (look.brightness < 1) {
-    g.fillStyle = `rgba(0, 0, 0, ${String(1 - look.brightness)})`;
-    g.fillRect(0, 0, WIDTH, HEIGHT);
-  }
+  // The same drawing as the preview and the offline export.
+  drawLane(g, {
+    ...overlay,
+    width: WIDTH,
+    height: HEIGHT,
+    card: look.card ? { title: look.title, brightness: look.brightness } : null,
+  });
 }
 
 /**
@@ -139,9 +149,14 @@ export async function recordScenes(
     };
   });
 
-  let look: Look = { brightness: 0, title: '' };
+  await loadTextFonts();
+  const { styles } = z
+    .object({ styles: z.array(TextStyle) })
+    .parse(await runCommand(imp, 'movie.edit.text.style.list', { projectId }));
+  let look: Look = { brightness: 0, title: '', card: false };
+  let overlay: Overlay = { texts: [], styles, seconds: 0 };
   const drawing = setInterval(() => {
-    paint(g, video, look);
+    paint(g, video, look, { ...overlay, seconds: player?.now ?? overlay.seconds });
   }, 1000 / FPS);
   let player: CutPlayer | undefined;
   try {
@@ -150,6 +165,7 @@ export async function recordScenes(
     for (const [index, scene] of loaded.entries()) {
       if (signal.aborted) break;
       const offset = before;
+      overlay = { texts: scene.cut.texts, styles, seconds: 0 };
       await new Promise<void>((resolve) => {
         const current = new CutPlayer(
           {

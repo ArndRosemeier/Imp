@@ -37,6 +37,11 @@ export {
   CutItem,
   SceneCut,
   SoundPlacement,
+  TextAnchor,
+  TextFont,
+  TextItem,
+  TextKind,
+  TextStyle,
   MODE_ID,
   Scene,
   Shot,
@@ -44,7 +49,21 @@ export {
   SoundTake,
   VoiceSample,
 } from './schema.js';
-export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine } from './edit.js';
+export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine, TextView } from './edit.js';
+export { createTextCommands, filmTexts, readStyles } from './text.js';
+export {
+  CUE_LETTERS,
+  DEFAULT_TEXT_STYLES,
+  placeText,
+  styleOf,
+  subtitleCues,
+  textMotion,
+  toSrt,
+  toVtt,
+  type Cue,
+  type TextMotion,
+  type TimedCue,
+} from './text-layout.js';
 export {
   createReviewCommands,
   edlText,
@@ -70,6 +89,7 @@ export {
   type FilmExportOptions,
   type FilmPicture,
   type FilmPlan,
+  type FilmText,
   type FilmRendered,
   type FilmRenderer,
   type FilmRenderJob,

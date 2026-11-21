@@ -1,5 +1,5 @@
 import type { ImpClient } from '@imp/host';
-import { Shot, Sound } from '@imp/mode-movie';
+import { Shot, Sound, TextView } from '@imp/mode-movie';
 import { z } from 'zod';
 import { runCommand } from './context.js';
 
@@ -120,6 +120,8 @@ export const Cut = z.object({
   sounds: z.array(Placement),
   lanes: z.array(Lane),
   lines: z.array(Line),
+  /** The text lane, each text at the time it shows. */
+  texts: z.array(TextView).default([]),
   /** Which version this is: the cut itself, or what agents propose. */
   version: z.enum(['cut', 'draft']).default('cut'),
   /** What agents propose for the scene, when they proposed anything. */
@@ -144,7 +146,7 @@ export type Cut = z.infer<typeof Cut>;
 /** One change agents propose, as movie.edit.draft.get lists it. */
 export const Change = z.object({
   id: z.string(),
-  part: z.enum(['item', 'sound', 'line']),
+  part: z.enum(['item', 'sound', 'line', 'text']),
   kind: z.enum(['added', 'removed', 'changed', 'moved']),
   elementId: z.string(),
   summary: z.string(),
@@ -281,7 +283,10 @@ export function blobKeys(source: Source, cut: Cut): string[] {
 
 export interface Look {
   brightness: number;
+  /** The words of the title card on screen, if one is. */
   title: string;
+  /** A title card is on screen (black, with its words if it has any), not a clip. */
+  card: boolean;
 }
 
 export interface Media {
@@ -376,6 +381,14 @@ export class CutPlayer {
     return this.#timer !== undefined;
   }
 
+  /** Where the cut is now, to the millisecond, for drawing between the player's ticks. */
+  get now(): number {
+    const t = this.isPlaying
+      ? this.#offset + (performance.now() - this.#startedAt) / 1000
+      : this.#offset;
+    return Math.min(t, this.media.cut.totalSeconds);
+  }
+
   /** What is at a time in the cut: the frame, the dialogue and the audio lane. */
   #apply(t: number, play: boolean): void {
     const { cut, source, urls } = this.media;
@@ -389,7 +402,7 @@ export class CutPlayer {
     if (item === undefined || screen === null) {
       screen?.pause();
       this.voice?.pause();
-      this.notify.look({ brightness: 0, title: '' });
+      this.notify.look({ brightness: 0, title: '', card: false });
     } else {
       const since = t - item.startsAtSeconds;
       const brightness = fadeLevel(
@@ -401,9 +414,9 @@ export class CutPlayer {
       if (item.kind === 'title') {
         screen.pause();
         this.voice?.pause();
-        this.notify.look({ brightness, title: item.text });
+        this.notify.look({ brightness, title: item.text, card: true });
       } else {
-        this.notify.look({ brightness, title: '' });
+        this.notify.look({ brightness, title: '', card: false });
         const shot = source.shots.find((candidate) => candidate.id === item.shotId);
         const into = since + item.trimStartSeconds;
         const fresh = this.#itemId !== item.itemId;
