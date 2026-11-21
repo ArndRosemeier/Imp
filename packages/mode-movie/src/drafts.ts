@@ -1,4 +1,4 @@
-import type { CutItem, CutLine, SoundPlacement } from './schema.js';
+import type { CutItem, CutLine, SoundPlacement, TextItem } from './schema.js';
 
 /**
  * Tracked changes for a scene's cut. An agent's proposal is a second version
@@ -13,9 +13,10 @@ export interface CutParts {
   readonly items: readonly CutItem[];
   readonly sounds: readonly SoundPlacement[];
   readonly lines: readonly CutLine[];
+  readonly texts: readonly TextItem[];
 }
 
-export type ChangePart = 'item' | 'sound' | 'line';
+export type ChangePart = 'item' | 'sound' | 'line' | 'text';
 export type ChangeKind = 'added' | 'removed' | 'changed' | 'moved';
 
 export interface FieldChange {
@@ -154,7 +155,7 @@ function diffUnordered<T extends Element>(
 /**
  * What changed from one version of a cut to another: items in the order they
  * play in the new version (added, changed, moved), then removed items, then
- * the audio lane and the character lanes.
+ * the audio lane, the character lanes and the text lane.
  */
 export function diffCut(before: CutParts, after: CutParts): CutChange[] {
   const old = new Map(before.items.map((item) => [item.id, item]));
@@ -210,6 +211,7 @@ export function diffCut(before: CutParts, after: CutParts): CutChange[] {
     ...changes,
     ...diffUnordered('sound', before.sounds, after.sounds),
     ...diffUnordered('line', before.lines, after.lines),
+    ...diffUnordered('text', before.texts, after.texts),
   ];
 }
 
@@ -277,7 +279,12 @@ export function applyChanges(
   let items = [...target.items];
   let sounds = [...target.sounds];
   let lines = [...target.lines];
+  let texts = [...target.texts];
   for (const change of changes) {
+    if (change.part === 'text') {
+      texts = applyUnordered(texts, source.texts, change);
+      continue;
+    }
     if (change.part === 'sound') {
       sounds = applyUnordered(sounds, source.sounds, change);
       continue;
@@ -306,5 +313,5 @@ export function applyChanges(
       );
     }
   }
-  return { items, sounds, lines };
+  return { items, sounds, lines, texts };
 }

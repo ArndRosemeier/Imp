@@ -42,6 +42,11 @@ export const movieSceneKey = (projectId: string, sceneId: string): string =>
 /** The recorded lines of a scene's own-lane characters. */
 export const linePrefix = (projectId: string, sceneId: string): string =>
   `${base(projectId)}lines/${sceneId}/`;
+/** The text styles of the film, shared by every scene. */
+export const textStylesKey = (projectId: string): string => `${base(projectId)}text-styles`;
+/** Subtitle files written for download, by name. */
+export const subtitleFileKey = (projectId: string, name: string): string =>
+  `${base(projectId)}subtitles/${name}`;
 /** Rendered films: a record each, and its file in parts in the blob store. */
 export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;

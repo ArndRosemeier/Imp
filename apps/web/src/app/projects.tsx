@@ -58,7 +58,7 @@ const CHOICE_LABELS: Record<CollisionChoice, string> = {
 };
 
 /** A dialog that opens and closes with `open`. Escape and the backdrop close it through `onClose`. */
-function Modal({
+export function Modal({
   open,
   onClose,
   label,
@@ -113,7 +113,7 @@ function sizeOf(bytes: number): string {
 }
 
 /** Saves bytes as a file on the person's computer. */
-function saveFile(bytes: Uint8Array, mediaType: string, fileName: string): void {
+export function saveFile(bytes: Uint8Array, mediaType: string, fileName: string): void {
   const url = URL.createObjectURL(new Blob([bytes.slice()], { type: mediaType }));
   const link = document.createElement('a');
   link.href = url;

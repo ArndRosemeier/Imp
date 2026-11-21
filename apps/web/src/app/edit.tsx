@@ -41,6 +41,7 @@ import {
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
+import { grabs, useDrag } from './drag.js';
 import { useCoarsePointer, usePinchZoom } from './gestures.js';
 import { CharacterLanes, LineInspector } from './lines.js';
 import { NumberField } from './NumberField.js';
@@ -50,6 +51,14 @@ import { ChangeList, ProposalBar } from './proposal.js';
 import { SceneTabs } from './shots.js';
 import { useLibraryDrop } from './library/drag.js';
 import { isPlayableSound, soundForScene } from './library/scene.js';
+import {
+  StyleEditor,
+  TextInspector,
+  TextLane,
+  TextOverlay,
+  TextTools,
+  useTextStyles,
+} from './texts.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -105,7 +114,7 @@ function useAudioLengths(urls: ReadonlyMap<string, string>): ReadonlyMap<string,
 function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>) {
   const [at, setAt] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [look, setLook] = useState<Look>({ brightness: 1, title: '' });
+  const [look, setLook] = useState<Look>({ brightness: 1, title: '', card: false });
   const [player] = useState(
     () =>
       new CutPlayer(
@@ -115,7 +124,11 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
           playing: setPlaying,
           look: (next) => {
             setLook((before) =>
-              before.brightness === next.brightness && before.title === next.title ? before : next,
+              before.brightness === next.brightness &&
+              before.title === next.title &&
+              before.card === next.card
+                ? before
+                : next,
             );
           },
         },
@@ -141,6 +154,8 @@ function usePlayback(cut: Cut, source: Source, urls: ReadonlyMap<string, string>
     at,
     playing,
     look,
+    /** The time to the millisecond, for drawing texts smoothly while playing. */
+    now: () => player.now,
     play: () => {
       player.play();
     },
@@ -162,6 +177,7 @@ const EMPTY_CUT: Cut = {
   sounds: [],
   lanes: [],
   lines: [],
+  texts: [],
   version: 'cut',
   draft: null,
 };
@@ -185,53 +201,8 @@ type Selection =
   | { kind: 'item'; id: string }
   | { kind: 'sound'; id: string }
   | { kind: 'line'; id: string }
+  | { kind: 'text'; id: string }
   | null;
-
-/**
- * Follows a pointer across the page while a button or finger is held, and
- * reports the distance in the end. A finger must move further than a mouse
- * before it counts as a drag rather than a tap.
- */
-function useDrag() {
-  const [dragging, setDragging] = useState<{
-    id: string;
-    edge: string;
-    dx: number;
-  } | null>(null);
-  const origin = useRef(0);
-  const slop = useRef(2);
-  return {
-    dragging,
-    start: (event: PointerEvent, id: string, edge: string) => {
-      event.preventDefault();
-      event.stopPropagation();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      origin.current = event.clientX;
-      slop.current = event.pointerType === 'touch' ? 8 : 2;
-      setDragging({ id, edge, dx: 0 });
-    },
-    move: (event: PointerEvent) => {
-      setDragging((before) =>
-        before === null ? null : { ...before, dx: event.clientX - origin.current },
-      );
-    },
-    end: (event: PointerEvent, done: (id: string, edge: string, distance: number) => void) => {
-      if (dragging === null) return;
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      const { id, edge, dx } = dragging;
-      setDragging(null);
-      if (Math.abs(dx) >= slop.current) done(id, edge, dx);
-    },
-    /** The browser took the pointer, for example to scroll: nothing changes. */
-    cancel: () => {
-      setDragging(null);
-    },
-  };
-}
-
-/** A finger on a piece that is not selected scrolls the timeline; it must be selected to move. */
-const grabs = (event: PointerEvent, selected: boolean): boolean =>
-  event.pointerType !== 'touch' || selected;
 
 function Timeline({
   cut,
@@ -368,6 +339,7 @@ function Timeline({
     cut.totalSeconds,
     ...cut.sounds.map((placement) => placement.startSeconds + audioLength(placement)),
     ...cut.lines.map((line) => line.startSeconds + Math.max(line.durationSeconds, 0.5)),
+    ...cut.texts.map((text) => text.startSeconds + text.durationSeconds),
     10,
   );
   const width = Math.ceil((widest + 2) * scale);
@@ -429,6 +401,18 @@ function Timeline({
                 </span>
               ))}
           </div>
+          <TextLane
+            texts={cut.texts}
+            scale={scale}
+            selectedId={selection?.kind === 'text' ? selection.id : null}
+            onSelect={(id) => {
+              onSelect({ kind: 'text', id });
+            }}
+            act={act}
+            sceneId={sceneId}
+            may={may}
+            marked={marked}
+          />
           <div className="lane lane-picture" aria-label="Picture lane" ref={pictureLane}>
             <span className="lane-name">Picture</span>
             {playing.map((item) => {
@@ -692,6 +676,9 @@ function SceneEditor({
     cutting: boolean;
   } | null>(null);
   const [placing, setPlacing] = useState('');
+  const styles = useTextStyles(project);
+  /** The style the style editor is open on, or null while it is closed. */
+  const [styling, setStyling] = useState<string | null>(null);
   const coarse = useCoarsePointer();
   const data = live.data;
   const shots = data?.shots;
@@ -765,6 +752,10 @@ function SceneEditor({
     selection?.kind === 'line'
       ? cut.lines.find((candidate) => candidate.id === selection.id)
       : undefined;
+  const text =
+    selection?.kind === 'text'
+      ? cut.texts.find((candidate) => candidate.id === selection.id)
+      : undefined;
   const run = (id: string, input: Record<string, unknown>): Promise<unknown> =>
     act(id, { sceneId, ...input });
   const index = item === undefined ? -1 : cut.items.findIndex((c) => c.itemId === item.itemId);
@@ -788,6 +779,9 @@ function SceneEditor({
       setSelection(null);
     } else if (placement !== undefined) {
       void run('movie.edit.sound.remove', { placementId: placement.id });
+      setSelection(null);
+    } else if (text !== undefined) {
+      void run('movie.edit.text.remove', { textIds: [text.id] });
       setSelection(null);
     }
   };
@@ -877,13 +871,16 @@ function SceneEditor({
               className="preview-screen"
               aria-label="Preview of the scene"
               playsInline
-              style={{ opacity: playback.look.title === '' ? playback.look.brightness : 0 }}
+              style={{ opacity: playback.look.card ? 0 : playback.look.brightness }}
             />
-            {playback.look.title !== '' && (
-              <div className="preview-title" style={{ opacity: playback.look.brightness }}>
-                {playback.look.title}
-              </div>
-            )}
+            <TextOverlay
+              texts={cut.texts}
+              styles={styles}
+              at={playback.at}
+              now={playback.now}
+              playing={playback.playing}
+              look={playback.look}
+            />
           </div>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio ref={attachVoice} aria-label="Dialogue of the preview" />
@@ -904,13 +901,17 @@ function SceneEditor({
               onFocus={focus}
             />
           )}
-          {!readOnly && item === undefined && placement === undefined && line === undefined && (
-            <p className="muted">
-              {coarse
-                ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead. Mark in and out to ask the crew about a stretch.'
-                : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
-            </p>
-          )}
+          {!readOnly &&
+            item === undefined &&
+            placement === undefined &&
+            line === undefined &&
+            text === undefined && (
+              <p className="muted">
+                {coarse
+                  ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead. Mark in and out to ask the crew about a stretch.'
+                  : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
+              </p>
+            )}
           {!readOnly && item !== undefined && (
             <>
               <h3>
@@ -1026,6 +1027,21 @@ function SceneEditor({
                 </button>
               )}
             </>
+          )}
+          {!readOnly && text !== undefined && (
+            <TextInspector
+              text={text}
+              styles={styles}
+              items={cut.items}
+              sceneId={sceneId}
+              act={act}
+              onGone={() => {
+                setSelection(null);
+              }}
+              onStyles={(styleId) => {
+                setStyling(styleId);
+              }}
+            />
           )}
           {!readOnly && line !== undefined && (
             <LineInspector
@@ -1150,6 +1166,16 @@ function SceneEditor({
         </div>
       </div>
 
+      <StyleEditor
+        open={styling !== null}
+        initial={styling ?? 'subtitle'}
+        styles={styles}
+        act={actOnCut}
+        onClose={() => {
+          setStyling(null);
+        }}
+      />
+
       {cut.draft !== null && (
         <ProposalBar
           draft={cut.draft}
@@ -1232,7 +1258,9 @@ function SceneEditor({
         </button>
         <button
           className="button quiet"
-          disabled={readOnly || (item === undefined && placement === undefined)}
+          disabled={
+            readOnly || (item === undefined && placement === undefined && text === undefined)
+          }
           onClick={remove}
         >
           <TrashIcon aria-hidden="true" /> Delete
@@ -1247,8 +1275,21 @@ function SceneEditor({
             });
           }}
         >
-          <TextTIcon aria-hidden="true" /> Add title
+          <TextTIcon aria-hidden="true" /> Add title card
         </button>
+        <TextTools
+          project={project}
+          sceneId={sceneId}
+          at={playback.at}
+          readOnly={readOnly}
+          act={act}
+          onAdded={(id) => {
+            setSelection({ kind: 'text', id });
+          }}
+          onStyles={() => {
+            setStyling(text?.styleId ?? 'subtitle');
+          }}
+        />
         <span className="mark-range" role="group" aria-label="Mark a stretch to ask the crew about">
           <button
             className="button quiet"

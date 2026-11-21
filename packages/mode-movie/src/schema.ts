@@ -315,11 +315,109 @@ export const CutLine = z.object({
 });
 export type CutLine = z.infer<typeof CutLine>;
 
+/** What a piece of text on screen is for; each kind has a style of its own by default. */
+export const TextKind = z.enum(['title', 'lower-third', 'subtitle', 'caption', 'credits']);
+export type TextKind = z.infer<typeof TextKind>;
+
+/**
+ * What a text follows in time instead of keeping a time of its own: a piece of
+ * the picture, or a line that is heard (from a shot, a placed dialogue
+ * recording or a character lane, as movie.edit.get lists them under spoken).
+ * from and to are the share of that piece or line the text covers, so that a
+ * long line can be shown as several subtitles that keep up when the line is
+ * moved, trimmed or recorded again.
+ */
+export const TextAnchor = z.object({
+  on: z.enum(['item', 'shot', 'placement', 'lane']),
+  id: z.string(),
+  from: z.number().min(0).max(1).default(0),
+  to: z.number().min(0).max(1).default(1),
+});
+export type TextAnchor = z.infer<typeof TextAnchor>;
+
+/**
+ * A piece of text over the picture of a scene, on the text lane: a title, a
+ * lower third, a subtitle, an in-frame caption or end credits. It is drawn by
+ * Imp, not by the video model, so it is always legible and can be changed.
+ */
+export const TextItem = z.object({
+  id: z.string(),
+  kind: TextKind,
+  text: z.string(),
+  /** Seconds on the scene timeline. With an anchor, where the anchor was when last seen. */
+  startSeconds: z.number().min(0),
+  durationSeconds: z.number().min(0.2),
+  /** The text style from movie.edit.text.style.list. */
+  styleId: z.string(),
+  anchor: TextAnchor.nullable().default(null),
+  /** Where in the frame, 0 to 1 from the left and from the top, when not where the style puts it. */
+  x: z.number().min(0).max(1).nullable().default(null),
+  y: z.number().min(0).max(1).nullable().default(null),
+  /** Made by movie.edit.subtitles.generate or movie.edit.credits.generate, and replaced when they run again. */
+  generated: z.boolean().default(false),
+});
+export type TextItem = z.infer<typeof TextItem>;
+
+/** The fonts texts can be set in. They ship with Imp, so a film looks the same everywhere. */
+export const TextFont = z.enum(['sans', 'serif', 'mono']);
+export type TextFont = z.infer<typeof TextFont>;
+
+/**
+ * How a kind of text looks and moves, shared by the whole film so that every
+ * subtitle or lower third matches.
+ */
+export const TextStyle = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(60),
+  font: TextFont,
+  weight: z.number().int().min(300).max(900).default(400),
+  italic: z.boolean().default(false),
+  uppercase: z.boolean().default(false),
+  /** The height of the letters, in percent of the frame height. */
+  size: z.number().min(1).max(25),
+  /** Extra space between letters, in em. */
+  tracking: z.number().min(-0.1).max(0.5).default(0),
+  /** Line height, as a multiple of the size. */
+  leading: z.number().min(0.8).max(2.5).default(1.2),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  /** An outline around the letters: its colour and width in percent of the size (0 for none). */
+  outlineColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#000000'),
+  outline: z.number().min(0).max(30).default(0),
+  /** How dark the soft shadow under the letters is, 0 for none. */
+  shadow: z.number().min(0).max(1).default(0),
+  /** A box behind the text: its colour and how opaque it is (0 for none). */
+  boxColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default('#000000'),
+  box: z.number().min(0).max(1).default(0),
+  align: z.enum(['left', 'center', 'right']),
+  /** Where the text sits, 0 to 1 from the left and from the top of the frame. */
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  /** Which edge of the text block sits at y. */
+  anchor: z.enum(['top', 'middle', 'bottom']),
+  /** The widest a line may be, in percent of the frame width. */
+  width: z.number().min(10).max(100).default(80),
+  /** How the text comes on and goes off. A roll moves the text up through the frame over its length. */
+  enter: z.enum(['cut', 'fade', 'rise', 'type']).default('fade'),
+  exit: z.enum(['cut', 'fade']).default('fade'),
+  /** Seconds the entrance and the exit take. */
+  ease: z.number().min(0).max(3).default(0.3),
+  roll: z.boolean().default(false),
+});
+export type TextStyle = z.infer<typeof TextStyle>;
+
 export const SceneCut = z.object({
   sceneId: z.string(),
   items: z.array(CutItem).nullable().default(null),
   sounds: z.array(SoundPlacement).default([]),
   lines: z.array(CutLine).default([]),
+  /** The text lane: titles, lower thirds, subtitles, captions and credits over the picture. */
+  texts: z.array(TextItem).default([]),
 });
 export type SceneCut = z.infer<typeof SceneCut>;
 

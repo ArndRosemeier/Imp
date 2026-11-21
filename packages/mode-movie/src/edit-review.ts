@@ -167,6 +167,18 @@ export function edlText(
       );
     }
   }
+  const texts = view.texts.filter((text) => within(text.startSeconds, text.durationSeconds));
+  if (texts.length > 0) {
+    lines.push('', 'TEXT LANE (start-end, kind, style, words) [text id]');
+    for (const text of texts) {
+      const notes: string[] = [];
+      if (text.follows !== null) notes.push(`follows ${text.follows}`);
+      if (text.orphaned) notes.push('NOT SHOWN: what it follows is gone');
+      lines.push(
+        `${timecode(text.startSeconds)}-${timecode(text.startSeconds + text.durationSeconds)}  ${text.kind} (${text.styleId})  "${text.text.replace(/\n/g, ' / ')}"${notes.length > 0 ? `  ${notes.join(', ')}` : ''} [${text.id}]`,
+      );
+    }
+  }
   const waiting = view.items.filter((item) => item.durationSeconds <= 0);
   if (waiting.length > 0 && range === undefined) {
     lines.push('', 'NOT IN THE FILM YET');
@@ -193,6 +205,10 @@ const FIELD_NAMES: Record<string, string> = {
   fadeCurve: 'fade shape',
   take: 'recording',
   text: 'words',
+  styleId: 'style',
+  anchor: 'timing',
+  x: 'place across',
+  y: 'place down',
 };
 
 function valueText(value: unknown): string {
@@ -211,7 +227,7 @@ const fieldText = (field: FieldChange): string => {
 
 const ChangeView = z.object({
   id: z.string().describe('Pass to movie.edit.draft.keep or movie.edit.draft.reject.'),
-  part: z.enum(['item', 'sound', 'line']),
+  part: z.enum(['item', 'sound', 'line', 'text']),
   kind: z.enum(['added', 'removed', 'changed', 'moved']),
   elementId: z.string(),
   summary: z.string(),
@@ -313,6 +329,40 @@ function placeLine(change: CutChange, view: CutView, sides: Sides, details: stri
   };
 }
 
+const TEXT_KINDS: Record<string, string> = {
+  title: 'title',
+  'lower-third': 'lower third',
+  subtitle: 'subtitle',
+  caption: 'caption',
+  credits: 'credits',
+};
+
+function placeTextChange(change: CutChange, view: CutView, sides: Sides, details: string): Placed {
+  const text = view.texts.find((candidate) => candidate.id === change.elementId);
+  const kind = text === undefined ? 'text' : (TEXT_KINDS[text.kind] ?? 'text');
+  const words = text === undefined ? '' : ` "${text.text.replace(/\s+/g, ' ').slice(0, 40)}"`;
+  const start = text?.startSeconds ?? 0;
+  const summary =
+    change.kind === 'added'
+      ? `Added the ${kind}${words} at ${timecode(start)}`
+      : change.kind === 'removed'
+        ? `Removed the ${kind}${words}`
+        : `Changed the ${kind}${words}: ${details}`;
+  return {
+    summary,
+    start,
+    length: text?.durationSeconds ?? 0,
+    conflict: changedMeanwhile(sides.parts.base.texts, sides.parts.live.texts, change.elementId),
+  };
+}
+
+const PLACERS = {
+  item: placeItem,
+  sound: placeSound,
+  line: placeLine,
+  text: placeTextChange,
+} as const;
+
 /** Explains each change in words and places it on the timeline. */
 function describeChanges(
   changes: readonly CutChange[],
@@ -322,8 +372,7 @@ function describeChanges(
   return changes.map((change) => {
     const view = change.kind === 'removed' ? sides.views.base : sides.views.draft;
     const details = change.fields.map(fieldText).join(', ');
-    const place =
-      change.part === 'item' ? placeItem : change.part === 'sound' ? placeSound : placeLine;
+    const place = PLACERS[change.part];
     const { summary, start, length, conflict } = place(change, view, sides, details);
     const from = request?.fromSeconds ?? null;
     const to = request?.toSeconds ?? null;
@@ -366,6 +415,7 @@ const withParts = (cut: SceneCut, parts: CutParts): SceneCut => ({
   items: [...parts.items],
   sounds: [...parts.sounds],
   lines: [...parts.lines],
+  texts: [...parts.texts],
 });
 
 /**

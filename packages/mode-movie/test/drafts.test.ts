@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyChanges, diffCut, mirror, same, type CutParts } from '../src/drafts.js';
-import type { CutItem, CutLine, SoundPlacement } from '../src/schema.js';
+import type { CutItem, CutLine, SoundPlacement, TextItem } from '../src/schema.js';
 
 const item = (id: string, extra: Partial<CutItem> = {}): CutItem => ({
   id,
@@ -27,10 +27,12 @@ const parts = (
   items: CutItem[],
   sounds: SoundPlacement[] = [],
   lines: CutLine[] = [],
+  texts: TextItem[] = [],
 ): CutParts => ({
   items,
   sounds,
   lines,
+  texts,
 });
 const ids = (cut: CutParts): string[] => cut.items.map((entry) => entry.id);
 
