@@ -79,6 +79,8 @@ lays out the picture and mixes the sound, and the browser host's worker
 renders the MP4 with WebCodecs, offline and faster than real time, so agents
 export as people do.
 
+Agents edit a cut through the same `movie.edit.*` commands, but their changes land in a draft that the Edit screen shows as tracked changes for the person to keep or discard (ADR 8). Agents read a scene as an edit decision list and look at stills taken from the clips.
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

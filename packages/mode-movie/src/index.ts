@@ -44,7 +44,15 @@ export {
   SoundTake,
   VoiceSample,
 } from './schema.js';
-export { createEditCommands } from './edit.js';
+export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine } from './edit.js';
+export {
+  createReviewCommands,
+  edlText,
+  stillTimes,
+  timecode,
+  type FrameGrabber,
+} from './edit-review.js';
+export { applyChanges, diffCut, mirror, type CutChange, type CutParts } from './drafts.js';
 export {
   asStartFrame,
   createFrameCommands,

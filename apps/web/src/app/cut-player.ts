@@ -120,8 +120,55 @@ export const Cut = z.object({
   sounds: z.array(Placement),
   lanes: z.array(Lane),
   lines: z.array(Line),
+  /** Which version this is: the cut itself, or what agents propose. */
+  version: z.enum(['cut', 'draft']).default('cut'),
+  /** What agents propose for the scene, when they proposed anything. */
+  draft: z
+    .object({
+      changes: z.number(),
+      authors: z.array(z.object({ id: z.string(), role: z.string() })),
+      request: z
+        .object({
+          instruction: z.string(),
+          fromSeconds: z.number().nullable(),
+          toSeconds: z.number().nullable(),
+        })
+        .nullable(),
+      updatedAt: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 export type Cut = z.infer<typeof Cut>;
+
+/** One change agents propose, as movie.edit.draft.get lists it. */
+export const Change = z.object({
+  id: z.string(),
+  part: z.enum(['item', 'sound', 'line']),
+  kind: z.enum(['added', 'removed', 'changed', 'moved']),
+  elementId: z.string(),
+  summary: z.string(),
+  startsAtSeconds: z.number(),
+  durationSeconds: z.number(),
+  conflict: z.boolean(),
+  outside: z.boolean(),
+});
+export type Change = z.infer<typeof Change>;
+
+export const Proposal = z.object({
+  exists: z.boolean(),
+  authors: z.array(z.object({ id: z.string(), role: z.string() })),
+  request: z
+    .object({
+      instruction: z.string(),
+      fromSeconds: z.number().nullable(),
+      toSeconds: z.number().nullable(),
+    })
+    .nullable(),
+  cutChanged: z.boolean(),
+  changes: z.array(Change),
+});
+export type Proposal = z.infer<typeof Proposal>;
 
 export const Shots = z.object({ shots: z.array(Shot) });
 export const Sounds = z.object({ sounds: z.array(Sound) });
@@ -506,8 +553,9 @@ export async function loadCut(
   imp: ImpClient,
   projectId: string,
   sceneId: string,
+  version: 'cut' | 'draft' = 'cut',
 ): Promise<{ cut: Cut; shots: Shot[]; sounds: Sound[] }> {
-  const cut = Cut.parse(await runCommand(imp, 'movie.edit.get', { projectId, sceneId }));
+  const cut = Cut.parse(await runCommand(imp, 'movie.edit.get', { projectId, sceneId, version }));
   const sceneIds = [
     ...new Set([
       sceneId,

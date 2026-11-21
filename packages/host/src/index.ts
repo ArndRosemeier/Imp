@@ -1,6 +1,6 @@
 export { connectImp, type ImpClient } from './client.js';
 export { createHttpPort, type EventStream, type HttpPortOptions } from './http-port.js';
-export { createImp, type Imp, type ImpOptions } from './imp.js';
+export { createImp, type FrameGrabber, type Imp, type ImpOptions } from './imp.js';
 export { createLocalPorts, type Port } from './port.js';
 export {
   fromWireError,
