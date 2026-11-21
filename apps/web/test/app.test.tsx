@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { MemoryKeyValueStore, settingsGet } from '@imp/core';
+import { MemoryKeyValueStore, settingsGet, type ReleaseNotes } from '@imp/core';
 import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -8,6 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
+import { unseenVersions } from '../src/app/WhatsNew.js';
 import { connectImp, createImp, createLocalPorts, serveImp, type Imp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
 
@@ -29,7 +30,7 @@ function connect(imp: Imp) {
   return connectImp(page, imp.secrets);
 }
 
-function start(replies: readonly ScriptedChatReply[] = []) {
+function start(replies: readonly ScriptedChatReply[] = [], release?: ReleaseNotes) {
   const provider = createFakeProvider({
     replies,
     models: [
@@ -46,6 +47,7 @@ function start(replies: readonly ScriptedChatReply[] = []) {
     store: new MemoryKeyValueStore(),
     secrets: createLocalSecretStore(),
     provider,
+    ...(release === undefined ? {} : { release }),
   });
   render(<App imp={connect(imp)} />);
   return { imp, provider, user: userEvent.setup() };
@@ -119,6 +121,70 @@ describe('helpers', () => {
     expect(
       toInput(fields, { roleId: 'coordinator', model: 'm', name: ' ', budgetUsdPerRun: '0.5' }),
     ).toEqual({ roleId: 'coordinator', model: 'm', budgetUsdPerRun: 0.5 });
+  });
+});
+
+const RELEASE: ReleaseNotes = {
+  version: '0.003',
+  date: '2026-11-23',
+  preview: false,
+  releases: [
+    {
+      version: '0.003',
+      date: '2026-11-23',
+      title: 'Ripple delete',
+      pr: 41,
+      notes: ['Gaps close.'],
+    },
+    { version: '0.002', date: '2026-11-22', title: 'Faster timeline', notes: [] },
+    { version: '0.001', date: '2026-11-21', title: 'Imp so far', notes: ['Everything.'] },
+  ],
+};
+
+describe("What's new", () => {
+  it('marks only the latest version for someone new, and what came since for everyone else', () => {
+    const pending = {
+      ...RELEASE,
+      preview: true,
+      releases: [{ version: '0.004', date: null, title: 'Draft', notes: [] }, ...RELEASE.releases],
+    };
+    expect([...unseenVersions(pending, null)]).toEqual(['0.003']);
+    expect([...unseenVersions(pending, '0.001')]).toEqual(['0.003', '0.002']);
+    expect([...unseenVersions(pending, '0.003')]).toEqual([]);
+  });
+
+  it('shows the version in the top bar and what changed, and remembers it was seen', async () => {
+    localStorage.setItem('imp.whatsNew.seen', '0.001');
+    const { user } = start([], RELEASE);
+    await completeSetup(user);
+    const button = await screen.findByRole('button', {
+      name: /What's new in Imp 0\.003, with changes/,
+    });
+    expect(button.textContent).toContain('0.003');
+    await user.click(button);
+    const panel = screen.getByRole('dialog', { name: 'Imp 0.003' });
+    expect(within(panel).getByText(/Every change that lands adds 0\.001/)).toBeTruthy();
+    const items = within(panel)
+      .getAllByRole('listitem')
+      .filter((item) => item.classList.contains('release'));
+    expect(items.map((item) => item.dataset['new'] ?? '')).toEqual(['true', 'true', '']);
+    expect(within(panel).getByText('Gaps close.')).toBeTruthy();
+    expect(
+      within(panel)
+        .getByRole('link', { name: /Change #41/ })
+        .getAttribute('href'),
+    ).toMatch(/\/pull\/41$/);
+    expect(localStorage.getItem('imp.whatsNew.seen')).toBe('0.003');
+    await user.click(within(panel).getByRole('button', { name: 'Close' }));
+    expect(screen.getByRole('button', { name: "What's new in Imp 0.003" })).toBeTruthy();
+  });
+
+  it('says so when a build knows no history', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(await screen.findByRole('button', { name: /What's new in Imp 0\.000/ }));
+    expect(screen.getByText(/made without its history/)).toBeTruthy();
+    expect(screen.getByText(/A preview build/)).toBeTruthy();
   });
 });
 

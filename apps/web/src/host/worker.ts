@@ -1,5 +1,6 @@
 import { createWebCodecsMp4Decoder, webCodecs } from '@imp/audio';
 import { createImp, serveImp, type Port } from '@imp/host';
+import release from 'virtual:imp-release';
 import { toJpeg } from './frame-image.js';
 import { IndexedDbBlobStore, IndexedDbKeyValueStore } from './indexeddb-store.js';
 
@@ -13,6 +14,7 @@ serveImp(
       blobs: await IndexedDbBlobStore.open('imp-blobs'),
       secrets,
       frameImage: toJpeg,
+      release,
       ...(codecs === undefined ? {} : { mp4Audio: createWebCodecsMp4Decoder(codecs) }),
     }),
   self as unknown as Port,

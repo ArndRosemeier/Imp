@@ -33,6 +33,7 @@ import { isCoarsePointer } from './gestures.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
 import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
+import { WhatsNew } from './WhatsNew.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 
@@ -263,6 +264,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
         >
           <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
         </button>
+        <WhatsNew />
         <button
           className="button quiet"
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}

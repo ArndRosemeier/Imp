@@ -14,11 +14,14 @@ import {
   mediaCommands,
   MemoryBlobStore,
   createProjectCommands,
+  createReleaseCommands,
   readProject,
   settingsCommands,
   type BlobStore,
   type CoreRuntime,
   type KeyValueStore,
+  type ReleaseNotes,
+  UNKNOWN_RELEASE,
 } from '@imp/core';
 import { createMovieMode, createSceneAudioLink, type FrameImageEncoder } from '@imp/mode-movie';
 import { createWorldCommands } from '@imp/world';
@@ -72,6 +75,11 @@ export interface ImpOptions {
    * sound plays as silence and is reported as unheard.
    */
   readonly mp4Audio?: Mp4AudioDecoder;
+  /**
+   * This build's version and what changed in each version, worked out from
+   * the repository's history when the app was built. Defaults to version 0.000.
+   */
+  readonly release?: ReleaseNotes;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -103,6 +111,7 @@ export function createImp(options: ImpOptions): Imp {
   const registry = new CommandRegistry({ runtime });
   registry.register(
     ...settingsCommands,
+    ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
     ...activityCommands,
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
