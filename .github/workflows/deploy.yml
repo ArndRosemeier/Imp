@@ -19,6 +19,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The version is the number of merges to main since versioning began (see changes/README.md).
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -27,8 +30,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Nothing is published unless the same checks that guard a pull request pass.
       - run: pnpm check
+      # A release build: it fails rather than publish a wrong version number.
       - run: pnpm --filter @imp/web build
+        env:
+          IMP_RELEASE: '1'
       - run: pnpm --filter @imp/server build
+        env:
+          IMP_RELEASE: '1'
       # The download for people's own computers is one more static file of the site.
       - run: cd apps/server/dist && zip -qr ../../web/dist/imp-server.zip imp-server
       - uses: actions/upload-pages-artifact@v3
