@@ -38,6 +38,7 @@ import { EffectsPanel } from './audio-fx.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
 import { useLibraryDrop } from './library/drag.js';
+import { soundForScene } from './library/scene.js';
 import { FOCUS_EVENT, type Focus } from './library/model.js';
 
 // What the audio commands return, as far as the screen reads it.
@@ -723,17 +724,22 @@ function AudioEditor({
       if (loaded === undefined || asset.modality !== 'sound' || asset.blobKey === null) {
         return false;
       }
-      // A scene's sound takes only that scene's sounds and recorded dialogue.
-      if (loaded.link?.kind === 'scene') {
-        return (
-          asset.refs['sceneId'] === loaded.link.target &&
-          ['effect', 'music', 'dialogue'].includes(asset.kind)
-        );
-      }
-      return loaded.link === null;
+      // A scene's sound takes any sound: what is not yet the scene's becomes one of its sounds.
+      return loaded.link === null || loaded.link.kind === 'scene';
     },
     onDrop: async (asset, point) => {
       if (loaded === undefined || asset.blobKey === null) return;
+      let key = asset.blobKey;
+      if (loaded.link?.kind === 'scene') {
+        const sceneId = loaded.link.target;
+        key = (
+          await soundForScene(
+            (id, input) => runCommand(imp, id, { projectId: project.id, ...input }),
+            sceneId,
+            asset,
+          )
+        ).blobKey;
+      }
       const box = lanes.current?.getBoundingClientRect();
       const onLanes =
         point !== null &&
@@ -763,7 +769,7 @@ function AudioEditor({
           : player.at;
       await edit('audio.region.insert', {
         trackId: target,
-        key: asset.blobKey,
+        key,
         label: asset.title.slice(0, 120),
         startSeconds,
       });

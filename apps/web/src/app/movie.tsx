@@ -15,11 +15,12 @@ import {
   SparkleIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { useEffect, useId, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { ScenePlace, useWorld } from './place.js';
+import { useLibraryDrop } from './library/drag.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const CharacterList = z.object({ characters: z.array(Character) });
@@ -403,9 +404,18 @@ function CharacterImages({
     });
   };
 
+  // A picture from the library becomes an image of the character, and its portrait.
+  const portraitBox = useRef<HTMLDivElement>(null);
+  useLibraryDrop(portraitBox, {
+    label: `${character.name}, portrait`,
+    accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
+    onDrop: async (asset) => {
+      await act('movie.character.image.fromFile', { ...at, blobKey: asset.blobKey });
+    },
+  });
   return (
     <div className="stack">
-      <div className="portrait" aria-busy={busy}>
+      <div className="portrait" aria-busy={busy} ref={portraitBox}>
         {portrait === undefined ? (
           <span className="portrait-empty" aria-hidden="true">
             {character.name.slice(0, 1).toUpperCase()}

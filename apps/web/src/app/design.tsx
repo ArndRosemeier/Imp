@@ -9,7 +9,8 @@ import {
   type WorldKind,
 } from '@imp/world';
 import { CubeIcon, MapPinIcon, PlusIcon, SparkleIcon, TrashIcon } from '@phosphor-icons/react';
-import { useId, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
@@ -102,9 +103,23 @@ function Stage({
     });
   };
 
+  // A picture from the library becomes a picture of this view in this state, and its key picture.
+  const plate = useRef<HTMLDivElement>(null);
+  useLibraryDrop(plate, {
+    label: where,
+    accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
+    onDrop: async (asset) => {
+      await act(`world.${element.kind}.image.fromFile`, {
+        ...at,
+        blobKey: asset.blobKey,
+        viewId: view.id,
+        stateId: state?.id ?? null,
+      });
+    },
+  });
   return (
     <div className="stack">
-      <div className={`plate ${element.kind}`} aria-busy={busy}>
+      <div className={`plate ${element.kind}`} aria-busy={busy} ref={plate}>
         {fallback === undefined ? (
           <span className="plate-empty">
             {isMaster

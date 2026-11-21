@@ -212,5 +212,68 @@ export function createSoundCommands(provider: GenerationProvider): readonly Comm
     },
   });
 
-  return [list, create, update, remove, generate];
+  const fromFile = defineCommand({
+    id: 'movie.sound.fromFile',
+    title: 'Add sound from a file',
+    description:
+      "Makes a stored sound file a sound of a scene, as if it had been generated there: an imported file from the library, a sound of another scene or another project. It can then be placed on the scene's audio lane with movie.edit.sound.place and opened in the scene's sound in the audio editor. A file that already is a sound of the scene is not added twice. Costs nothing.",
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      blobKey: z
+        .string()
+        .min(1)
+        .describe('The stored file, for example the blobKey of a library asset.'),
+      kind: Sound.shape.kind.default('effect'),
+      name: z.string().max(80).default(''),
+    }),
+    output: z.object({ sound: Sound, added: z.boolean() }),
+    handler: async ({ runtime }, { projectId, sceneId, blobKey, kind, name }) => {
+      const id = 'movie.sound.fromFile';
+      await requireProject(runtime.store, id, projectId, MODE_ID);
+      if ((await runtime.store.get(movieSceneKey(projectId, sceneId))) === undefined) {
+        throw new CommandError('invalid_input', id, `No scene "${sceneId}".`);
+      }
+      const existing = (await readSounds(runtime.store, projectId, sceneId)).find(
+        (sound) => sound.take?.blobKey === blobKey,
+      );
+      if (existing !== undefined) return { sound: existing, added: false };
+      const blob = await runtime.blobs.get(blobKey);
+      if (blob === undefined) {
+        throw new CommandError('invalid_input', id, `Nothing is stored under "${blobKey}".`);
+      }
+      if (!/^(audio|video)\//.test(blob.mediaType)) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `That file is ${blob.mediaType || 'not a sound'}, not a sound.`,
+        );
+      }
+      const soundId = runtime.newId();
+      const key = soundKey(projectId, sceneId, soundId);
+      const take: SoundTake = {
+        blobKey: `${key}/take/${runtime.newId()}`,
+        mediaType: blob.mediaType,
+        prompt: '',
+        model: 'file',
+        costUsd: null,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(take.blobKey, blob);
+      const sound: Sound = {
+        id: soundId,
+        sceneId,
+        kind,
+        name: name.trim().slice(0, 80),
+        description: '',
+        take,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.store.batch([{ type: 'put', key, value: sound }]);
+      return { sound, added: true };
+    },
+  });
+
+  return [list, create, update, remove, generate, fromFile];
 }

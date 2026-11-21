@@ -125,4 +125,95 @@ describe('the movie in the library', () => {
     const sounds = await run('library.list', { projectId: id, modality: 'sound' });
     expect(sounds.assets.map((asset: any) => asset.title)).toEqual(['Wind']);
   });
+
+  it('turns files from the library into sounds, portraits, key frames, clips and world pictures', async () => {
+    const { runtime, run } = setup();
+    const { id } = await run('project.create', { name: 'Lighthouse', mode: 'movie' });
+    const scene = await run('movie.scene.create', { projectId: id, heading: 'INT. LAMP ROOM' });
+    const mara = await run('movie.character.create', { projectId: id, name: 'Mara' });
+    const shot = await run('movie.shot.create', {
+      projectId: id,
+      sceneId: scene.id,
+      description: 'Lamp',
+    });
+    const put = async (name: string, mediaType: string) => {
+      await runtime.blobs.put(`uploads/${name}`, { bytes: new Uint8Array([1, 2]), mediaType });
+      return run('library.import', { projectId: id, fileKey: `uploads/${name}`, fileName: name });
+    };
+    const door = await put('door.wav', 'audio/wav');
+    const face = await put('face.png', 'image/png');
+    const take = await put('take.mp4', 'video/mp4');
+
+    const first = await run('movie.sound.fromFile', {
+      projectId: id,
+      sceneId: scene.id,
+      blobKey: door.blobKey,
+      name: 'Door',
+    });
+    expect(first).toMatchObject({ added: true, sound: { name: 'Door', kind: 'effect' } });
+    expect((await runtime.blobs.get(first.sound.take.blobKey))?.bytes).toEqual(
+      new Uint8Array([1, 2]),
+    );
+    // The same file given again, by its scene key, is the same sound.
+    const again = await run('movie.sound.fromFile', {
+      projectId: id,
+      sceneId: scene.id,
+      blobKey: first.sound.take.blobKey,
+    });
+    expect(again).toMatchObject({ added: false, sound: { id: first.sound.id } });
+    await expect(
+      run('movie.sound.fromFile', { projectId: id, sceneId: scene.id, blobKey: face.blobKey }),
+    ).rejects.toThrow();
+
+    const portrait = await run('movie.character.image.fromFile', {
+      projectId: id,
+      characterId: mara.id,
+      blobKey: face.blobKey,
+    });
+    expect(portrait.portraitId).toBe(portrait.image.id);
+    const frame = await run('movie.shot.frame.fromFile', {
+      projectId: id,
+      sceneId: scene.id,
+      shotId: shot.id,
+      blobKey: face.blobKey,
+    });
+    expect(frame.frame).toMatchObject({ model: 'file', mediaType: 'image/png' });
+    const filmed = await run('movie.shot.clip.fromFile', {
+      projectId: id,
+      sceneId: scene.id,
+      shotId: shot.id,
+      blobKey: take.blobKey,
+      durationSeconds: 4,
+    });
+    expect(filmed.clip).toMatchObject({ status: 'ready', durationSeconds: 4, model: 'file' });
+    await expect(
+      run('movie.shot.clip.fromFile', {
+        projectId: id,
+        sceneId: scene.id,
+        shotId: shot.id,
+        blobKey: take.blobKey,
+      }),
+    ).rejects.toThrow();
+
+    const room = await run('world.location.create', { projectId: id, name: 'Lamp room' });
+    const drawn = await run('world.location.image.fromFile', {
+      projectId: id,
+      locationId: room.id,
+      blobKey: face.blobKey,
+    });
+    expect(drawn.image).toMatchObject({ model: 'file', stateId: null });
+    const { assets } = await run('library.list', { projectId: id, limit: 100 });
+    expect(assets.map((asset: any) => asset.kind).sort()).toEqual(
+      [
+        'clip',
+        'effect',
+        'imported-image',
+        'imported-sound',
+        'imported-video',
+        'key-frame',
+        'location-view',
+        'portrait',
+      ].sort(),
+    );
+  });
 });

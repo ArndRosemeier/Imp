@@ -272,5 +272,59 @@ export function createFrameCommands(
     },
   });
 
-  return [generate, select, remove];
+  const fromFile = defineCommand({
+    id: 'movie.shot.frame.fromFile',
+    title: 'Use a picture as key frame',
+    description:
+      "Makes a stored picture a key frame of a shot, so its clip can start on it: an imported picture from the library, a portrait, a view of a place, another shot's frame. With choose true (the default) it becomes the frame the clip starts on. Costs nothing.",
+    effect: 'write',
+    input: z.object({
+      ...At,
+      blobKey: z
+        .string()
+        .min(1)
+        .describe('The stored picture, for example the blobKey of a library asset.'),
+      choose: z.boolean().default(true),
+    }),
+    output: z.object({ frame: KeyFrame }),
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.shot.frame.fromFile';
+      const { key } = await loadShot(runtime.store, id, input);
+      const blob = await runtime.blobs.get(input.blobKey);
+      if (blob === undefined) {
+        throw new CommandError('invalid_input', id, `Nothing is stored under "${input.blobKey}".`);
+      }
+      if (!blob.mediaType.startsWith('image/')) {
+        throw new CommandError('invalid_input', id, 'That file is not a picture.');
+      }
+      const stored = (await asStartFrame(blob, frameImage)) ?? blob;
+      const frameId = runtime.newId();
+      const frame: KeyFrame = {
+        id: frameId,
+        blobKey: `${key}/frames/${frameId}`,
+        mediaType: stored.mediaType,
+        prompt: '',
+        model: 'file',
+        guides: [],
+        costUsd: null,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(frame.blobKey, { bytes: stored.bytes, mediaType: stored.mediaType });
+      const latest = (await loadShot(runtime.store, id, input)).shot;
+      await runtime.store.batch([
+        {
+          type: 'put',
+          key,
+          value: {
+            ...latest,
+            frames: [...latest.frames, frame],
+            frameId: input.choose ? frameId : (latest.frameId ?? frameId),
+          },
+        },
+      ]);
+      return { frame };
+    },
+  });
+
+  return [generate, select, remove, fromFile];
 }

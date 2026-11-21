@@ -15,6 +15,7 @@ import {
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
@@ -129,8 +130,21 @@ function KeyFrames({
       setBusy(false);
     });
   };
+  // A picture from the library becomes a key frame, the one the clip starts on.
+  const frameBox = useRef<HTMLElement>(null);
+  useLibraryDrop(frameBox, {
+    label: `Shot ${String(shot.position)}, key frame`,
+    accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
+    onDrop: async (asset) => {
+      await act('movie.shot.frame.fromFile', { ...at, blobKey: asset.blobKey });
+    },
+  });
   return (
-    <section className="stack key-frames" aria-label={`Key frame of shot ${String(shot.position)}`}>
+    <section
+      ref={frameBox}
+      className="stack key-frames"
+      aria-label={`Key frame of shot ${String(shot.position)}`}
+    >
       <div className="row spread wrap">
         <h4>Key frame</h4>
         <span className="muted small">
@@ -408,8 +422,21 @@ function ShotCard({
   const change = (fields: Record<string, unknown>): Promise<unknown> =>
     act('movie.shot.update', { ...at, ...fields });
 
+  // A video from the library becomes the clip of a shot that has none.
+  const card = useRef<HTMLElement>(null);
+  useLibraryDrop(card, {
+    label: `Shot ${String(shot.position)}, clip`,
+    accepts: (asset) => asset.modality === 'video' && asset.blobKey !== null && shot.clip === null,
+    onDrop: async (asset) => {
+      await act('movie.shot.clip.fromFile', {
+        ...at,
+        blobKey: asset.blobKey,
+        ...(asset.durationSeconds === null ? {} : { durationSeconds: asset.durationSeconds }),
+      });
+    },
+  });
   return (
-    <article className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
+    <article ref={card} className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
       <div className="row spread">
         <h3>Shot {shot.position}</h3>
         <ConfirmButton

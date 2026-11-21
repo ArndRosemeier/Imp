@@ -748,6 +748,65 @@ export function createShotCommands(
     },
   });
 
+  const clipFromFile = defineCommand({
+    id: 'movie.shot.clip.fromFile',
+    title: 'Use a video as clip',
+    description:
+      "Makes a stored video the clip of a shot, as if it had been generated: an imported video from the library, or another shot's clip. The shot then plays it on the Edit stage. A shot that has a clip must have it deleted first (movie.shot.clip.delete). Costs nothing.",
+    effect: 'write',
+    input: z.object({
+      ...At,
+      blobKey: z
+        .string()
+        .min(1)
+        .describe('The stored video, for example the blobKey of a library asset.'),
+      durationSeconds: z.number().positive().optional().describe('Its length, when known.'),
+    }),
+    output: Shot,
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.shot.clip.fromFile';
+      const { key, shot } = await loadShot(runtime.store, id, input);
+      if (shot.clip !== null) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'This shot already has a clip. Delete it first, or use another shot.',
+        );
+      }
+      const blob = await runtime.blobs.get(input.blobKey);
+      if (blob === undefined) {
+        throw new CommandError('invalid_input', id, `Nothing is stored under "${input.blobKey}".`);
+      }
+      if (!blob.mediaType.startsWith('video/')) {
+        throw new CommandError('invalid_input', id, 'That file is not a video.');
+      }
+      const blobKey = `${key}/clip/${runtime.newId()}`;
+      await runtime.blobs.put(blobKey, blob);
+      const next: Shot = {
+        ...shot,
+        clip: {
+          status: 'ready',
+          jobId: '',
+          blobKey,
+          mediaType: blob.mediaType,
+          prompt: '',
+          model: 'file',
+          portraits: 0,
+          guides: [],
+          progress: null,
+          error: null,
+          durationSeconds: input.durationSeconds ?? null,
+          silent: false,
+          startFrameId: null,
+          costUsd: null,
+          createdAt: runtime.now().toISOString(),
+        },
+      };
+      await runtime.store.batch([{ type: 'put', key, value: next }]);
+      return next;
+    },
+  });
+
   const dialogueGenerate = defineCommand({
     id: 'movie.shot.dialogue.generate',
     title: 'Record dialogue',
@@ -854,5 +913,6 @@ export function createShotCommands(
     clipGenerate,
     clipCheck,
     clipDelete,
+    clipFromFile,
   ];
 }

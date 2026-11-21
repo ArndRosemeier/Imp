@@ -995,6 +995,61 @@ describe('App', () => {
     ]);
   });
 
+  it('places a sound from the library on the Edit stage, making it a sound of the scene', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    await user.click(await screen.findByRole('button', { name: /Add scene/ }));
+    await screen.findByLabelText('Scene heading');
+
+    await user.click(screen.getByRole('button', { name: 'Edit', exact: true }));
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    const wav = encodeWav({ sampleRate: 8000, channels: [new Float32Array(8000)] });
+    await user.upload(
+      within(library).getByLabelText('Files to import'),
+      new File([wav.slice()], 'Gull.wav', { type: 'audio/wav' }),
+    );
+    const detail = await within(library).findByRole('region', { name: 'Gull, details' });
+    await user.click(within(detail).getByRole('button', { name: /Use in/ }));
+    await user.click(
+      await within(detail).findByRole('button', {
+        name: 'Edit stage, audio lane, at the playhead',
+      }),
+    );
+
+    const actor = { actor: { kind: 'user', id: 't' } } as const;
+    const projectId = (
+      (await imp.registry.executeById('settings.get', { key: 'project.current' }, actor)) as {
+        output: { value: string };
+      }
+    ).output.value;
+    const scenes = (await imp.registry.executeById('movie.scene.list', { projectId }, actor)) as {
+      output: { scenes: { id: string }[] };
+    };
+    const sceneId = scenes.output.scenes[0]?.id;
+    await vi.waitFor(async () => {
+      const sounds = (await imp.registry.executeById(
+        'movie.sound.list',
+        { projectId, sceneId },
+        actor,
+      )) as { output: { sounds: { name: string }[] } };
+      expect(sounds.output.sounds.map((sound) => sound.name)).toEqual(['Gull']);
+      const cut = (await imp.registry.executeById(
+        'movie.edit.get',
+        { projectId, sceneId },
+        actor,
+      )) as {
+        output: { sounds: unknown[] };
+      };
+      expect(cut.output.sounds).toHaveLength(1);
+    });
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);

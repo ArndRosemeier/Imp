@@ -702,6 +702,69 @@ function kindCommands(
     },
   });
 
+  const imageFromFile = defineCommand({
+    id: `${prefix}.image.fromFile`,
+    title: 'Use a picture',
+    description: `Adds a stored picture as a picture of one view of a ${kind} in one state: a photo or drawing imported into the library, or a picture from another project. With choose true (the default) it becomes the key picture of that view and state, which guides clips and the pictures of other views. Costs nothing.`,
+    effect: 'write',
+    input: At.extend({
+      blobKey: z
+        .string()
+        .min(1)
+        .describe('The stored picture, for example the blobKey of a library asset.'),
+      viewId: z.string().optional().describe('The view it shows. Defaults to the first view.'),
+      stateId: z
+        .string()
+        .nullable()
+        .default(null)
+        .describe('The state it shows, or null for the usual look.'),
+      choose: z.boolean().default(true),
+    }),
+    output: z.object({ image: WorldImage }),
+    handler: async ({ runtime }, input) => {
+      const id = `${prefix}.image.fromFile`;
+      const elementId = idOf(input);
+      const { key, element } = await load(runtime.store, id, input.projectId, kind, elementId);
+      const view = findView(element, id, input.viewId ?? element.views[0]?.id ?? '');
+      const state = input.stateId === null ? null : findState(element, id, input.stateId);
+      const blob = await runtime.blobs.get(input.blobKey);
+      if (blob === undefined) {
+        throw new CommandError('invalid_input', id, `Nothing is stored under "${input.blobKey}".`);
+      }
+      if (!blob.mediaType.startsWith('image/')) {
+        throw new CommandError('invalid_input', id, 'That file is not a picture.');
+      }
+      const imageId = runtime.newId();
+      const image: WorldImage = {
+        id: imageId,
+        blobKey: `${key}/images/${imageId}`,
+        mediaType: blob.mediaType,
+        viewId: view.id,
+        stateId: state?.id ?? null,
+        prompt: '',
+        model: 'file',
+        references: 0,
+        costUsd: null,
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(image.blobKey, blob);
+      const latest = (await load(runtime.store, id, input.projectId, kind, elementId)).element;
+      const others = latest.keyImages.filter(
+        (candidate) => candidate.viewId !== image.viewId || candidate.stateId !== image.stateId,
+      );
+      const hasKey = others.length !== latest.keyImages.length;
+      await save(runtime, key, {
+        ...latest,
+        images: [...latest.images, image],
+        keyImages:
+          input.choose || !hasKey
+            ? [...others, { viewId: image.viewId, stateId: image.stateId, imageId }]
+            : latest.keyImages,
+      });
+      return { image };
+    },
+  });
+
   return [
     list,
     get,
@@ -715,6 +778,7 @@ function kindCommands(
     imageGenerate,
     imageSelect,
     imageDelete,
+    imageFromFile,
   ];
 }
 

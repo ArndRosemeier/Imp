@@ -184,5 +184,50 @@ export function createCharacterImageCommands(provider: GenerationProvider): read
     },
   });
 
-  return [generate, select, remove];
+  const fromFile = defineCommand({
+    id: 'movie.character.image.fromFile',
+    title: 'Use a picture of a character',
+    description:
+      'Adds a stored picture to the images of a character, for example a photo or drawing imported into the library, or a picture from another project. With portrait true it becomes the portrait that guides every clip and frame of the character. Costs nothing.',
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      characterId: z.string(),
+      blobKey: z
+        .string()
+        .min(1)
+        .describe('The stored picture, for example the blobKey of a library asset.'),
+      portrait: z.boolean().default(true),
+    }),
+    output: z.object({ image: CharacterImage, portraitId: z.string().nullable() }),
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.character.image.fromFile';
+      const { key } = await load(runtime.store, id, input.projectId, input.characterId);
+      const blob = await runtime.blobs.get(input.blobKey);
+      if (blob === undefined) {
+        throw new CommandError('invalid_input', id, `Nothing is stored under "${input.blobKey}".`);
+      }
+      if (!blob.mediaType.startsWith('image/')) {
+        throw new CommandError('invalid_input', id, 'That file is not a picture.');
+      }
+      const imageId = runtime.newId();
+      const image: CharacterImage = {
+        id: imageId,
+        blobKey: `${key}/images/${imageId}`,
+        mediaType: blob.mediaType,
+        prompt: '',
+        model: 'file',
+        createdAt: runtime.now().toISOString(),
+      };
+      await runtime.blobs.put(image.blobKey, blob);
+      const latest = (await load(runtime.store, id, input.projectId, input.characterId)).character;
+      const portraitId = input.portrait ? imageId : (latest.portraitId ?? imageId);
+      await runtime.store.batch([
+        { type: 'put', key, value: { ...latest, images: [...latest.images, image], portraitId } },
+      ]);
+      return { image, portraitId };
+    },
+  });
+
+  return [generate, select, remove, fromFile];
 }
