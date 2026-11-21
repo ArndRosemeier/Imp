@@ -358,6 +358,20 @@ describe("a scene's sound in the audio editor", () => {
     await expect(
       run('audio.region.split', { projectId, docId, regionId: 'line-l1', atSeconds: 6 }),
     ).rejects.toThrow(/plays to its end/);
+    // Effects on a line are kept on the line, and a sound's on its placement.
+    await run('audio.fx.eq', {
+      projectId,
+      docId,
+      regionIds: ['line-l1'],
+      bands: [{ type: 'highpass', frequency: 100 }],
+    });
+    expect((await cut()).lines[0]?.effects).toMatchObject([{ kind: 'eq' }]);
+    const wind = (await open()).tracks[2]?.regions[0]?.id ?? '';
+    await run('audio.fx.limiter', { projectId, docId, regionIds: [wind] });
+    expect((await cut()).sounds.find((s) => s.soundId === 'wind')?.effects).toMatchObject([
+      { kind: 'limiter', ceilingDb: -1 },
+    ]);
+    expect((await open()).tracks.at(-1)?.regions[0]).toMatchObject({ effects: [{ kind: 'eq' }] });
     await run('audio.region.remove', { projectId, docId, regionId: 'line-l1' });
     expect((await cut()).lines.map((line) => line.id)).toEqual(['l2']);
   });
