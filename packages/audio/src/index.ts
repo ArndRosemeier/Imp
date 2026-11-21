@@ -75,3 +75,4 @@ export {
 export { AudioSources, MissingSourceError, type SourceInfo } from './sources.js';
 export { SAMPLE_RATE, snapSeconds, toFrames, toSeconds } from './time.js';
 export { decodeWav, encodeWav, isWav } from './wav.js';
+export { audioLibrarySource } from './library.js';

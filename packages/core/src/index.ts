@@ -92,3 +92,23 @@ export {
   type ToolScope,
   inputSchemaOf,
 } from './tools.js';
+export { createLibraryCommands, ListedAsset } from './library/commands.js';
+export {
+  BUILT_IN_MODALITIES,
+  detectModality,
+  LibraryAsset,
+  LibraryMeta,
+  ModalityId,
+  OpenTarget,
+  Origin,
+  SourceAsset,
+  type LibraryKindInfo,
+  type LibraryModalityInfo,
+  type LibrarySource,
+} from './library/model.js';
+export {
+  fileKey as libraryFileKey,
+  LibraryItem,
+  libraryPrefix,
+  OWN_SOURCE as LIBRARY_OWN_SOURCE,
+} from './library/own.js';
