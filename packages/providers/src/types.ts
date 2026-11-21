@@ -189,6 +189,33 @@ export interface SpeechResponse {
   readonly costUsd: number | null;
 }
 
+export interface TranscriptionRequest {
+  /** An id from the catalog whose output modalities include `transcription`. */
+  readonly model: string;
+  /** The sound to write down. WAV is understood by every transcription model. */
+  readonly audio: { readonly bytes: Uint8Array; readonly mediaType: string };
+  /** An ISO 639-1 code such as `en`. Detected when left out. */
+  readonly language?: string;
+}
+
+/** One word as heard, with when it was said, in seconds from the start of the sound. */
+export interface TranscribedWord {
+  readonly text: string;
+  readonly startSeconds: number;
+  readonly endSeconds: number;
+}
+
+export interface TranscriptionResponse {
+  readonly model: string;
+  readonly text: string;
+  /** Empty when the model gives no word timings. */
+  readonly words: readonly TranscribedWord[];
+  /** The language heard, or null when the model did not say. */
+  readonly language: string | null;
+  /** What the call cost in US dollars, or null when the provider did not say. */
+  readonly costUsd: number | null;
+}
+
 export interface SoundRequest {
   /**
    * For an effect, an id whose output modalities include `speech`: the models
@@ -267,6 +294,8 @@ export interface GenerationProvider {
   chat(request: ChatRequest, options?: CallOptions): Promise<ChatResponse>;
   generateImage(request: ImageRequest, options?: CallOptions): Promise<ImageResponse>;
   generateSpeech(request: SpeechRequest, options?: CallOptions): Promise<SpeechResponse>;
+  /** What is said in a sound, word by word with timings where the model gives them. */
+  transcribe(request: TranscriptionRequest, options?: CallOptions): Promise<TranscriptionResponse>;
   /** A sound effect or a piece of music, without words. */
   generateSound(request: SoundRequest, options?: CallOptions): Promise<SoundResponse>;
   /** Starts a clip and returns at once. Money is spent from here on. */

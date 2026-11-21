@@ -16,6 +16,7 @@ import {
   ScissorsIcon,
   SkipBackIcon,
   SpeakerSimpleSlashIcon,
+  TextTIcon,
   TrashIcon,
   WaveformIcon,
   type Icon,
@@ -36,6 +37,7 @@ import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { NumberInput } from './audio-controls.js';
 import { EffectsPanel } from './audio-fx.js';
 import { RecordControl } from './recorder.js';
+import { WordsPanel } from './audio-words.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
 
@@ -705,6 +707,8 @@ function AudioEditor({
   const [trackId, setTrackId] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [lengths, setLengths] = useState<ReadonlyMap<string, number>>(new Map());
+  /** Whether dialogue shows as text; open by default on a scene's sound, which is mostly lines. */
+  const [wordsOpen, setWordsOpen] = useState<boolean | null>(null);
   const lanes = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const fingers = useRef(new Map<number, { x: number; y: number }>());
@@ -783,6 +787,7 @@ function AudioEditor({
   const width = Math.max(length + 10, 30) * zoom;
   const at = player.at;
   const lastStep = history?.undo.at(-1);
+  const showWords = wordsOpen ?? doc.link !== null;
   const agentLast = lastStep?.actor?.kind === 'agent';
 
   /** The time under a pointer on the lanes, snapped to region edges and the playhead nearby. */
@@ -1245,6 +1250,18 @@ function AudioEditor({
           <span className="tool-gap" />
           <button
             type="button"
+            className="tool text"
+            aria-pressed={showWords}
+            title="Dialogue as text: pick words to select, delete or move them"
+            onClick={() => {
+              setWordsOpen(!showWords);
+            }}
+          >
+            <TextTIcon aria-hidden="true" size={18} /> Words
+          </button>
+          <span className="tool-gap" />
+          <button
+            type="button"
             className="button small"
             onClick={actions.exportFile}
             disabled={doc.durationSeconds === 0}
@@ -1546,6 +1563,43 @@ function AudioEditor({
           }}
         />
       </div>
+      {showWords && (
+        <WordsPanel
+          imp={imp}
+          project={project}
+          docId={docId}
+          revision={JSON.stringify(
+            tracks.map((track) =>
+              track.regions.map((region) => [
+                region.id,
+                region.key,
+                region.startSeconds,
+                region.endSeconds,
+                region.trimStartSeconds,
+              ]),
+            ),
+          )}
+          regions={allRegions.map(({ region }) => region)}
+          trackNames={new Map(tracks.map((track) => [track.id, track.name]))}
+          at={at}
+          playing={player.playing}
+          act={(id, input) => runCommand(imp, id, input)}
+          onSelect={(chosen) => {
+            setRegionId(null);
+            if (chosen === null) {
+              setSelection(null);
+              return;
+            }
+            setSelection({ trackIds: [chosen.trackId], from: chosen.from, to: chosen.to });
+            player.setAt(chosen.from);
+          }}
+          onPlay={(from, to) => {
+            void player.play(from, to).catch((reason: unknown) => {
+              setError(messageOf(reason));
+            });
+          }}
+        />
+      )}
       <p className="muted small shortcuts">
         Space plays · R records · S splits at the playhead · drag across a track to select (two
         fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap

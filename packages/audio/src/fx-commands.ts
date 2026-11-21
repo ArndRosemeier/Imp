@@ -41,8 +41,10 @@ export interface EffectCommandHelpers {
     to: number,
   ): Promise<{ channels: Float32Array[]; unheard: string[] }>;
   checkRange(id: string, from: number, to: number): void;
-  readonly outline: z.ZodType;
-  done(doc: AudioDoc): unknown;
+  readonly outline: z.ZodObject<{ document: z.ZodType }>;
+  done(doc: AudioDoc): { document: unknown };
+  /** The outline agents read of a document. */
+  document(doc: AudioDoc): unknown;
 }
 
 const ProjectId = z.string().min(1).describe('The id of a project from project.list.');

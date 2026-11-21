@@ -123,6 +123,7 @@ export function createImp(options: ImpOptions): Imp {
     ...createAudioCommands({
       codec,
       links: [createSceneAudioLink()],
+      transcribe: (request) => provider.transcribe(request),
     }),
     ...createWorldCommands({
       provider,

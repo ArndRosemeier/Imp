@@ -31,6 +31,9 @@ export {
   type SoundResponse,
   type SpeechRequest,
   type SpeechResponse,
+  type TranscribedWord,
+  type TranscriptionRequest,
+  type TranscriptionResponse,
   type ToolCall,
   type Usage,
 } from './types.js';
