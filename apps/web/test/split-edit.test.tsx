@@ -26,6 +26,15 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   startsAtSeconds: 0,
   durationSeconds: 4,
   sourceSeconds: 4,
+  speed: 1,
+  reverse: false,
+  holdSeconds: 0,
+  zoom: 1,
+  zoomTo: null,
+  focusX: 0.5,
+  focusY: 0.5,
+  movingSeconds: 4,
+  ownSound: true,
   ...fields,
 });
 
@@ -59,6 +68,7 @@ describe('when a split edit can be made', () => {
     expect(splitEditBlock(a, piece({ kind: 'title' }), 'j', 0.5)).toMatch(/shots/);
     expect(splitEditBlock(a, piece({ durationSeconds: 0 }), 'j', 0.5)).toMatch(/ready clip/);
     expect(splitEditBlock(a, b, 'j', 0)).toMatch(/above 0/);
+    expect(splitEditBlock(a, piece({ speed: 2 }), 'j', 0.5)).toMatch(/own speed/);
     expect(
       splitEditBlock(piece({ durationSeconds: 0.5 }), piece({ trimStartSeconds: 1 }), 'l', 0.4),
     ).toMatch(/this picture too short/);

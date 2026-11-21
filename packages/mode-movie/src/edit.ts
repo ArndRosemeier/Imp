@@ -30,6 +30,7 @@ import {
   CutItem,
   CutLine,
   MODE_ID,
+  PLAIN_PIECE,
   Scene,
   SceneCut,
   Shot,
@@ -38,6 +39,7 @@ import {
   TextItem,
 } from './schema.js';
 import { placeText } from './text-layout.js';
+import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
 const SceneId = z
@@ -121,6 +123,7 @@ const wholeShot = (shot: Shot): CutItem => ({
   fadeOutSeconds: 0,
   text: '',
   titleSeconds: 3,
+  ...PLAIN_PIECE,
 });
 
 /** The items of a cut: as stored, or the scene's shots in order, whole. */
@@ -156,12 +159,16 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
         ? await loadShot(store, projectId, item.sceneId, item.shotId)
         : undefined;
     const state: ItemState = item.kind === 'title' ? 'ready' : stateOf(shot);
-    const duration =
-      item.kind === 'title'
-        ? item.titleSeconds
-        : shot?.clip?.status === 'ready'
-          ? Math.max(0, clipSeconds(shot) - item.trimStartSeconds - item.trimEndSeconds)
-          : 0;
+    const timing = {
+      sourceSeconds: shot === undefined ? 0 : clipSeconds(shot),
+      trimStartSeconds: item.trimStartSeconds,
+      trimEndSeconds: item.trimEndSeconds,
+      speed: item.speed,
+      reverse: item.reverse,
+      holdSeconds: item.holdSeconds,
+    };
+    const ready = item.kind === 'shot' && shot?.clip?.status === 'ready';
+    const duration = item.kind === 'title' ? item.titleSeconds : ready ? pieceSeconds(timing) : 0;
     laid.push({
       itemId: item.id,
       kind: item.kind,
@@ -183,6 +190,15 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       durationSeconds: round(duration),
       /** How long the clip is before trims, for a split point to be chosen within. */
       sourceSeconds: shot === undefined ? 0 : round(clipSeconds(shot)),
+      speed: item.speed,
+      reverse: item.reverse,
+      holdSeconds: item.holdSeconds,
+      zoom: item.zoom,
+      zoomTo: item.zoomTo,
+      focusX: item.focusX,
+      focusY: item.focusY,
+      movingSeconds: ready ? round(movingSeconds(timing)) : 0,
+      ownSound: item.kind === 'shot' && playsOwnSound(item),
     });
     at += duration;
   }
@@ -204,7 +220,12 @@ export async function itemTimes(
   projectId: string,
   items: readonly CutItem[],
 ): Promise<{
-  items: { startsAtSeconds: number; durationSeconds: number }[];
+  items: {
+    startsAtSeconds: number;
+    durationSeconds: number;
+    movingSeconds: number;
+    ownSound: boolean;
+  }[];
   totalSeconds: number;
 }> {
   return layOut(store, projectId, items);
@@ -254,6 +275,17 @@ export const LaidItem = z.object({
   startsAtSeconds: z.number(),
   durationSeconds: z.number(),
   sourceSeconds: z.number(),
+  speed: z.number(),
+  reverse: z.boolean(),
+  holdSeconds: z.number(),
+  zoom: z.number(),
+  zoomTo: z.number().nullable(),
+  focusX: z.number(),
+  focusY: z.number(),
+  /** How long it moves before its last frame is held. */
+  movingSeconds: z.number(),
+  /** Whether its own sound (clip sound or recorded dialogue) plays: only at its own speed, forwards. */
+  ownSound: z.boolean(),
 });
 export type LaidItem = z.infer<typeof LaidItem>;
 
@@ -406,7 +438,9 @@ export async function viewOf(
   // Lines spoken with their picture: recorded dialogue over a silent clip, or the clip's own voice.
   for (const [index, item] of items.entries()) {
     const at = laid.items[index];
-    if (item.kind !== 'shot' || at === undefined || at.durationSeconds <= 0) continue;
+    if (item.kind !== 'shot' || at === undefined || at.durationSeconds <= 0 || !at.ownSound) {
+      continue;
+    }
     const shot = await shotOf(item.sceneId, item.shotId);
     if (shot === undefined || shot.speakerId === null || shot.line.trim() === '') continue;
     const overDialogue = shot.clip?.silent === true;
@@ -416,14 +450,14 @@ export async function viewOf(
     const available =
       overDialogue && typeof recordedLength === 'number'
         ? recordedLength - item.trimStartSeconds
-        : at.durationSeconds;
+        : at.movingSeconds;
     spoken.push({
       source: 'shot',
       id: item.id,
       who: nameOf(shot.speakerId),
       text: shot.line,
       startsAtSeconds: at.startsAtSeconds,
-      durationSeconds: round(Math.max(0, Math.min(at.durationSeconds, available))),
+      durationSeconds: round(Math.max(0, Math.min(at.movingSeconds, available))),
       recorded: overDialogue ? shot.dialogue !== null : true,
     });
   }
@@ -612,6 +646,8 @@ export async function commitCut(
 interface Laid {
   readonly startsAtSeconds: number;
   readonly durationSeconds: number;
+  readonly movingSeconds: number;
+  readonly ownSound: boolean;
 }
 
 /**
@@ -628,7 +664,12 @@ function takeApart(
   laid: Laid,
   shot: Shot | undefined,
 ): { item: CutItem; sounds: SoundPlacement[]; voice: string | null } {
-  if (item.kind !== 'shot' || shot?.clip?.status !== 'ready' || laid.durationSeconds <= 0) {
+  if (
+    item.kind !== 'shot' ||
+    shot?.clip?.status !== 'ready' ||
+    laid.movingSeconds <= 0 ||
+    !laid.ownSound
+  ) {
     return { item, sounds: [], voice: null };
   }
   const speaks = shot.speakerId !== null && shot.line.trim() !== '';
@@ -648,7 +689,7 @@ function takeApart(
       loop: false,
     });
   if (!shot.clip.silent && item.clipAudioVolume > 0) {
-    const sound = lay('clip', item.clipAudioVolume, laid.durationSeconds);
+    const sound = lay('clip', item.clipAudioVolume, laid.movingSeconds);
     return {
       item: { ...item, clipAudioVolume: 0 },
       sounds: [sound],
@@ -657,8 +698,8 @@ function takeApart(
   }
   if (shot.clip.silent && shot.dialogue !== null && item.dialogueVolume > 0) {
     const heard = Math.min(
-      laid.durationSeconds,
-      (shot.dialogue.durationSeconds ?? laid.durationSeconds) - item.trimStartSeconds,
+      laid.movingSeconds,
+      (shot.dialogue.durationSeconds ?? laid.movingSeconds) - item.trimStartSeconds,
     );
     if (heard <= 0) return { item, sounds: [], voice: null };
     const sound = lay('dialogue', item.dialogueVolume, heard);
@@ -679,6 +720,48 @@ function followVoice(texts: readonly TextItem[], itemId: string, voice: string |
       ? { ...text, anchor: { ...text.anchor, on: 'placement', id: voice } }
       : text,
   );
+}
+
+/** Where an item is split: two pieces that play on as the one did, the first ending where the second begins. */
+function splitPiece(
+  commandId: string,
+  item: CutItem,
+  sourceSeconds: number,
+  atSeconds: number,
+  newId: string,
+): { first: CutItem; second: CutItem } {
+  const timing = { ...item, sourceSeconds };
+  const moving = movingSeconds(timing);
+  if (atSeconds < SHORTEST_SECONDS || atSeconds > moving - SHORTEST_SECONDS) {
+    throw new CommandError(
+      'invalid_input',
+      commandId,
+      `Split between ${String(SHORTEST_SECONDS)} and ${String(round(moving - SHORTEST_SECONDS))} seconds; the item moves for ${String(round(moving))}${item.holdSeconds > 0 ? ' before its last frame is held' : ''}.`,
+    );
+  }
+  const trims = splitTrims(timing, atSeconds);
+  // A moving punch-in goes on across the split: the first half ends on the zoom the second starts on.
+  const whole = pieceSeconds(timing);
+  const middle =
+    item.zoomTo === null
+      ? null
+      : round(zoomAt(item, whole > 0 ? atSeconds / whole : 0) * 1000) / 1000;
+  return {
+    first: {
+      ...item,
+      ...trims.first,
+      holdSeconds: 0,
+      fadeOutSeconds: 0,
+      ...(middle === null ? {} : { zoomTo: middle }),
+    },
+    second: {
+      ...item,
+      ...trims.second,
+      id: newId,
+      fadeInSeconds: 0,
+      ...(middle === null ? {} : { zoom: middle }),
+    },
+  };
 }
 
 const InsertAt = z
@@ -840,6 +923,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         fadeOutSeconds: 0.5,
         text: input.text,
         titleSeconds: input.seconds,
+        ...PLAIN_PIECE,
       };
       await commitCut(
         { runtime, actor },
@@ -855,7 +939,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.item.set',
     title: 'Change item',
     description:
-      "Changes an item of the cut: seconds trimmed off its start and end, the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Fields left out stay as they are.",
+      "Changes an item of the cut: seconds trimmed off its start and end (in seconds of the clip), the volume of its dialogue and of the clip's own sound (0 silences either), fades from and to black at its edges, and for a title card its words and length. Rescue tools for a shot: speed (0.5 slow motion, 2 double; off speed or reversed, its own sound and dialogue are silent, so lay sound on the audio lane), reverse, holdSeconds (freeze its last frame), and a punch-in: zoom (1 to 4) on focusX and focusY (shares of the frame), with zoomTo for a slow push in or pull out over the piece (null for none). A punch-in turns a wide into a closer shot or hides a flaw at the edge; keep it under about 1.5 or the picture softens. Fields left out stay as they are.",
     effect: 'write',
     input: z.object({
       projectId: ProjectId,
@@ -864,6 +948,13 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       ...TrimFields,
       text: z.string().min(1).max(500).optional(),
       titleSeconds: z.number().min(0.5).max(60).optional(),
+      speed: z.number().min(0.1).max(8).optional(),
+      reverse: z.boolean().optional(),
+      holdSeconds: z.number().min(0).max(30).optional(),
+      zoom: z.number().min(1).max(4).optional(),
+      zoomTo: z.number().min(1).max(4).nullable().optional(),
+      focusX: z.number().min(0).max(1).optional(),
+      focusY: z.number().min(0).max(1).optional(),
     }),
     output: z.object({ item: CutItem }),
     handler: async ({ runtime, actor }, { projectId, sceneId, itemId, ...changes }) => {
@@ -881,7 +972,28 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         fadeOutSeconds: changes.fadeOutSeconds ?? before.fadeOutSeconds,
         text: changes.text ?? before.text,
         titleSeconds: changes.titleSeconds ?? before.titleSeconds,
+        speed: changes.speed ?? before.speed,
+        reverse: changes.reverse ?? before.reverse,
+        holdSeconds: changes.holdSeconds ?? before.holdSeconds,
+        zoom: changes.zoom ?? before.zoom,
+        zoomTo: changes.zoomTo === undefined ? before.zoomTo : changes.zoomTo,
+        focusX: changes.focusX ?? before.focusX,
+        focusY: changes.focusY ?? before.focusY,
       };
+      if (
+        before.kind === 'title' &&
+        (changes.speed !== undefined ||
+          changes.reverse !== undefined ||
+          changes.holdSeconds !== undefined ||
+          changes.zoom !== undefined ||
+          changes.zoomTo !== undefined)
+      ) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'A title card has no clip to slow, reverse, freeze or zoom; change its length instead.',
+        );
+      }
       await commitCut(
         { runtime, actor },
         projectId,
@@ -1007,25 +1119,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       if (shot === undefined || clipSeconds(shot) === 0) {
         throw new CommandError('invalid_input', id, 'This item has no clip to split yet.');
       }
-      const length = clipSeconds(shot) - item.trimStartSeconds - item.trimEndSeconds;
-      if (atSeconds < SHORTEST_SECONDS || atSeconds > length - SHORTEST_SECONDS) {
-        throw new CommandError(
-          'invalid_input',
-          id,
-          `Split between ${String(SHORTEST_SECONDS)} and ${String(round(length - SHORTEST_SECONDS))} seconds; the item plays ${String(round(length))}.`,
-        );
-      }
-      const first: CutItem = {
-        ...item,
-        trimEndSeconds: round(item.trimEndSeconds + length - atSeconds),
-        fadeOutSeconds: 0,
-      };
-      const second: CutItem = {
-        ...item,
-        id: runtime.newId(),
-        trimStartSeconds: round(item.trimStartSeconds + atSeconds),
-        fadeInSeconds: 0,
-      };
+      const { first, second } = splitPiece(id, item, clipSeconds(shot), atSeconds, runtime.newId());
       await commitCut(
         { runtime, actor },
         projectId,
@@ -1033,6 +1127,44 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         withItems(cut, [...items.slice(0, index), first, second, ...items.slice(index + 1)]),
       );
       return { first, second };
+    },
+  });
+
+  const freeze = defineCommand({
+    id: 'movie.edit.item.freeze',
+    title: 'Freeze frame',
+    description:
+      'Freezes the picture of an item at a moment for some seconds, then lets it play on: it splits the item at atSeconds (from the start of the item as it plays) and holds the last frame of the first half. The scene grows by the held seconds. To freeze on the very last frame instead, set holdSeconds with movie.edit.item.set. The held frame is silent; its own sound stops while it holds.',
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      itemId: ItemId,
+      atSeconds: z.number().positive(),
+      holdSeconds: z.number().min(0.2).max(30).describe('How long the frame stands still.'),
+    }),
+    output: z.object({ frozen: CutItem, after: CutItem }),
+    handler: async ({ runtime, actor }, { projectId, sceneId, itemId, atSeconds, holdSeconds }) => {
+      const id = 'movie.edit.item.freeze';
+      const { cut, items } = await openCut({ runtime, actor }, id, projectId, sceneId);
+      const index = indexOfItem(items, id, itemId);
+      const item = itemAt(items, index);
+      const shot =
+        item.kind === 'shot'
+          ? await loadShot(runtime.store, projectId, item.sceneId, item.shotId)
+          : undefined;
+      if (shot === undefined || clipSeconds(shot) === 0) {
+        throw new CommandError('invalid_input', id, 'Only a shot with a clip can be frozen.');
+      }
+      const { first, second } = splitPiece(id, item, clipSeconds(shot), atSeconds, runtime.newId());
+      const frozen: CutItem = { ...first, holdSeconds };
+      await commitCut(
+        { runtime, actor },
+        projectId,
+        cut,
+        withItems(cut, [...items.slice(0, index), frozen, second, ...items.slice(index + 1)]),
+      );
+      return { frozen, after: second };
     },
   });
 
@@ -1054,7 +1186,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         throw new CommandError(
           'invalid_input',
           id,
-          'This item has no sound of its own to take apart: it is a title, has no ready clip, its clip was made silent, or its sound was taken apart already.',
+          'This item has no sound of its own to take apart: it is a title, has no ready clip, its clip was made silent, it plays off speed or backwards, or its sound was taken apart already.',
         );
       };
       if (item.kind !== 'shot' || laid?.hasClipAudio !== true) return refuse();
@@ -1118,6 +1250,14 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         laidB.durationSeconds <= 0
       ) {
         throw new CommandError('invalid_input', id, 'Both items need a ready clip first.');
+      }
+      const retimed = (item: CutItem): boolean => !playsOwnSound(item) || item.holdSeconds > 0;
+      if (retimed(a) || retimed(b)) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'A split edit needs both shots at their own speed, forwards and without a held frame, so that their sound can follow the picture.',
+        );
       }
       const d = round(seconds);
       // The picture that comes into view has to be there: it was trimmed off before.
@@ -1632,6 +1772,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     split,
     detach,
     roll,
+    freeze,
     undo,
     redo,
     place,

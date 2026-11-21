@@ -1,4 +1,12 @@
-import type { FilmPicture, FilmRenderer, FilmRenderJob, FilmRendered } from '@imp/mode-movie';
+import {
+  placePicture,
+  sourceTime,
+  zoomAt,
+  type FilmPicture,
+  type FilmRenderer,
+  type FilmRenderJob,
+  type FilmRendered,
+} from '@imp/mode-movie';
 import {
   ALL_FORMATS,
   AudioSample,
@@ -14,9 +22,11 @@ import {
   StreamTarget,
   VideoSampleSink,
   type StreamTargetChunk,
+  type VideoSample,
   type VideoCodec,
 } from 'mediabunny';
 import { chooseFormat, fadeLevel } from './film-format.js';
+import { inOrder } from './frame-order.js';
 import { drawText, drawTexts } from './text-draw.js';
 import { loadTextFonts } from './text-fonts.js';
 
@@ -209,29 +219,54 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
       try {
         const track = await input?.getPrimaryVideoTrack();
         const first = frame;
-        const times = Array.from(
-          { length: count },
-          (_, i) => picture.sourceStartSeconds + (first + i) / fps - picture.startSeconds,
+        const timing = picture.timing ?? {
+          sourceSeconds: picture.sourceStartSeconds + picture.durationSeconds,
+          trimStartSeconds: picture.sourceStartSeconds,
+          trimEndSeconds: 0,
+          speed: 1,
+          reverse: false,
+          holdSeconds: 0,
+        };
+        const punch = picture.punch ?? { zoom: 1, zoomTo: null, focusX: 0.5, focusY: 0.5 };
+        // The time of the clip on screen at each frame: speed, reverse and a held frame applied.
+        const times = Array.from({ length: count }, (_, i) =>
+          sourceTime(timing, (first + i) / fps - picture.startSeconds),
         );
-        const samples =
-          track === null || track === undefined
-            ? undefined
-            : new VideoSampleSink(track).samplesAtTimestamps(times);
-        for (let i = 0; i < count; i++) {
-          const next = samples === undefined ? undefined : await samples.next();
-          const sample = next === undefined || next.done === true ? null : next.value;
+        const draw = async (sample: VideoSample | null): Promise<void> => {
           black();
           if (sample !== null) {
-            const scale = Math.min(width / sample.displayWidth, height / sample.displayHeight);
-            const w = sample.displayWidth * scale;
-            const h = sample.displayHeight * scale;
-            sample.draw(g, (width - w) / 2, (height - h) / 2, w, h);
-            sample.close();
+            const since = frame / fps - picture.startSeconds;
+            const zoom = zoomAt(
+              punch,
+              picture.durationSeconds > 0 ? since / picture.durationSeconds : 0,
+            );
+            const at = placePicture(
+              width,
+              height,
+              sample.displayWidth,
+              sample.displayHeight,
+              zoom,
+              punch.focusX,
+              punch.focusY,
+            );
+            sample.draw(g, at.x, at.y, at.width, at.height);
           }
           shade(picture, frame / fps);
           await emit();
+        };
+        if (track === null || track === undefined) {
+          for (let i = 0; i < count; i++) await draw(null);
+        } else {
+          const sink = new VideoSampleSink(track);
+          await inOrder(
+            times,
+            (rising) => sink.samplesAtTimestamps(rising),
+            (sample) => {
+              sample.close();
+            },
+            draw,
+          );
         }
-        await samples?.return();
       } finally {
         input?.dispose();
       }

@@ -38,6 +38,7 @@ import {
   type Look,
   type Placement,
   type Source,
+  zoomStyle,
 } from './cut-player.js';
 import { OpenInAudioEditor } from './audio.js';
 import { ExportBar } from './ExportBar.js';
@@ -49,6 +50,7 @@ import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
 import { SceneTabs } from './shots.js';
+import { RescueTools } from './rescue.js';
 import { SplitEdit, TakeSwitcher } from './split-edit.js';
 import { useLibraryDrop } from './library/drag.js';
 import { isPlayableSound, soundForScene } from './library/scene.js';
@@ -475,13 +477,15 @@ function Timeline({
                       onPointerMove={edges.move}
                       onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
-                        edges.end(event, (id, edge, distance) => {
+                        edges.end(event, (id, _edge, distance) => {
+                          // The start shows the clip's end when it plays backwards; seconds of the clip go at its speed.
+                          const field = item.reverse ? 'trimEndSeconds' : 'trimStartSeconds';
                           void act('movie.edit.item.set', {
                             sceneId,
                             itemId: id,
-                            trimStartSeconds: Math.max(
+                            [field]: Math.max(
                               0,
-                              Math.round((item.trimStartSeconds + distance / scale) * 10) / 10,
+                              Math.round((item[field] + (distance / scale) * item.speed) * 10) / 10,
                             ),
                           });
                         });
@@ -502,12 +506,13 @@ function Timeline({
                       onPointerCancel={edges.cancel}
                       onPointerUp={(event) => {
                         edges.end(event, (id, _edge, distance) => {
+                          const field = item.reverse ? 'trimStartSeconds' : 'trimEndSeconds';
                           void act('movie.edit.item.set', {
                             sceneId,
                             itemId: id,
-                            trimEndSeconds: Math.max(
+                            [field]: Math.max(
                               0,
-                              Math.round((item.trimEndSeconds - distance / scale) * 10) / 10,
+                              Math.round((item[field] - (distance / scale) * item.speed) * 10) / 10,
                             ),
                           });
                         });
@@ -872,7 +877,10 @@ function SceneEditor({
               className="preview-screen"
               aria-label="Preview of the scene"
               playsInline
-              style={{ opacity: playback.look.card ? 0 : playback.look.brightness }}
+              style={{
+                opacity: playback.look.card ? 0 : playback.look.brightness,
+                ...zoomStyle(playback.look),
+              }}
             />
             <TextOverlay
               texts={cut.texts}
@@ -1036,6 +1044,7 @@ function SceneEditor({
                   run={run}
                 />
               )}
+              <RescueTools item={item} playheadSeconds={playback.at} run={run} />
               <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
             </>
           )}

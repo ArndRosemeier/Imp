@@ -1,5 +1,5 @@
 import type { ImpClient } from '@imp/host';
-import { TextStyle } from '@imp/mode-movie';
+import { placePicture, TextStyle } from '@imp/mode-movie';
 import { z } from 'zod';
 import { drawLane, type LaneText } from '../host/text-draw.js';
 import { loadTextFonts } from '../host/text-fonts.js';
@@ -61,10 +61,17 @@ function paint(
   g.fillStyle = '#000';
   g.fillRect(0, 0, WIDTH, HEIGHT);
   if (!look.card && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-    const scale = Math.min(WIDTH / video.videoWidth, HEIGHT / video.videoHeight);
-    const w = video.videoWidth * scale;
-    const h = video.videoHeight * scale;
-    g.drawImage(video, (WIDTH - w) / 2, (HEIGHT - h) / 2, w, h);
+    // Fitted whole and zoomed on its focus, as the offline export draws it.
+    const at = placePicture(
+      WIDTH,
+      HEIGHT,
+      video.videoWidth,
+      video.videoHeight,
+      look.zoom?.scale ?? 1,
+      look.zoom?.focusX ?? 0.5,
+      look.zoom?.focusY ?? 0.5,
+    );
+    g.drawImage(video, at.x, at.y, at.width, at.height);
     if (look.brightness < 1) {
       g.fillStyle = `rgba(0, 0, 0, ${String(1 - look.brightness)})`;
       g.fillRect(0, 0, WIDTH, HEIGHT);

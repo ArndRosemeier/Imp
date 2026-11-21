@@ -115,3 +115,16 @@ export {
 export { createCharacterVoiceCommands, SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
 export { movieCopier, movieProjectSupport, summarizeMovie } from './project.js';
 export { movieTemplates } from './templates.js';
+export {
+  movingSeconds,
+  pieceSeconds,
+  placePicture,
+  playsOwnSound,
+  sourceTime,
+  splitTrims,
+  usedSeconds,
+  zoomAt,
+  type PieceTiming,
+  type Placed,
+  type Punch,
+} from './piece-time.js';

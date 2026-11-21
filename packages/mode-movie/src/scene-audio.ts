@@ -92,7 +92,14 @@ async function readScene(
   for (const [index, item] of items.entries()) {
     const at = laid.items[index];
     const shot = pieces.shots.get(item.shotId);
-    if (item.kind !== 'shot' || at === undefined || at.durationSeconds <= 0 || shot === undefined) {
+    // Off speed or backwards, a piece plays without its own sound; a held frame is silent.
+    if (
+      item.kind !== 'shot' ||
+      at === undefined ||
+      at.movingSeconds <= 0 ||
+      !at.ownSound ||
+      shot === undefined
+    ) {
       continue;
     }
     const attached = (
@@ -102,8 +109,8 @@ async function readScene(
       volume: number,
     ) => {
       if (key === '' || volume <= 0) return;
-      const available = length === null ? at.durationSeconds : length - item.trimStartSeconds;
-      const duration = Math.min(at.durationSeconds, available);
+      const available = length === null ? at.movingSeconds : length - item.trimStartSeconds;
+      const duration = Math.min(at.movingSeconds, available);
       if (duration <= 0) return;
       regions.get(track)?.push(
         SoundPlacement.parse({

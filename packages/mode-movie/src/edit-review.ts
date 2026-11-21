@@ -29,6 +29,7 @@ import {
   CutView,
   type Acting,
 } from './edit.js';
+import { sourceTime } from './piece-time.js';
 import { CutRequest, Shot, type CutDraft, type SceneCut } from './schema.js';
 
 /**
@@ -130,8 +131,19 @@ export function edlText(
       notes.push(
         `clip ${item.trimStartSeconds.toFixed(2)}-${(item.sourceSeconds - item.trimEndSeconds).toFixed(2)} of ${item.sourceSeconds.toFixed(2)}`,
       );
-      if (item.dialogueVolume < 1) notes.push(`dialogue ${item.dialogueVolume.toFixed(2)}`);
-      if (item.hasClipAudio) notes.push(`clip sound ${item.clipAudioVolume.toFixed(2)}`);
+      if (item.speed !== 1) notes.push(`speed ${String(item.speed)}x`);
+      if (item.reverse) notes.push('reversed');
+      if (item.holdSeconds > 0) notes.push(`holds last frame ${item.holdSeconds.toFixed(1)}`);
+      if (item.zoom !== 1 || item.zoomTo !== null) {
+        notes.push(
+          `zoom ${item.zoom.toFixed(2)}${item.zoomTo === null ? '' : ` to ${item.zoomTo.toFixed(2)}`} on ${item.focusX.toFixed(2)},${item.focusY.toFixed(2)}`,
+        );
+      }
+      if (!item.ownSound) notes.push('own sound silent');
+      else {
+        if (item.dialogueVolume < 1) notes.push(`dialogue ${item.dialogueVolume.toFixed(2)}`);
+        if (item.hasClipAudio) notes.push(`clip sound ${item.clipAudioVolume.toFixed(2)}`);
+      }
     }
     if (item.fadeInSeconds > 0) notes.push(`fade in ${item.fadeInSeconds.toFixed(1)}`);
     if (item.fadeOutSeconds > 0) notes.push(`fade out ${item.fadeOutSeconds.toFixed(1)}`);
@@ -200,6 +212,13 @@ const FIELD_NAMES: Record<string, string> = {
   fadeOutSeconds: 'fade out',
   titleSeconds: 'length',
   durationSeconds: 'length',
+  speed: 'speed',
+  reverse: 'reversed',
+  holdSeconds: 'held frame',
+  zoom: 'zoom',
+  zoomTo: 'zoom at the end',
+  focusX: 'zoom across',
+  focusY: 'zoom down',
   startSeconds: 'start',
   gainDb: 'gain (dB)',
   fadeCurve: 'fade shape',
@@ -474,11 +493,10 @@ async function stillsOf(
     const stored = await runtime.store.get(`${shotPrefix(projectId, item.sceneId)}${item.shotId}`);
     const clip = stored === undefined ? null : Shot.parse(stored).clip;
     if (clip?.status !== 'ready' || clip.blobKey === null) continue;
-    const times = stillTimes(
-      item.trimStartSeconds,
-      item.trimStartSeconds + item.durationSeconds,
-      each,
-    );
+    // Moments of the piece as it plays, read at the times of the clip they show.
+    const moments = stillTimes(0, item.durationSeconds, each);
+    const clipAt = new Map(moments.map((moment) => [moment, round(sourceTime(item, moment))]));
+    const times = [...new Set(clipAt.values())];
     const keyAt = (seconds: number): string =>
       `${clip.blobKey ?? ''}.stills/${String(STILL_WIDTH)}/${seconds.toFixed(2)}`;
     const missing = [];
@@ -494,7 +512,7 @@ async function stillsOf(
         if (picture !== undefined) await runtime.blobs.put(keyAt(seconds), picture);
       }
     }
-    for (const seconds of times) {
+    for (const [moment, seconds] of clipAt) {
       if ((await runtime.blobs.list(keyAt(seconds))).length === 0) {
         failed++;
         continue;
@@ -502,7 +520,7 @@ async function stillsOf(
       stills.push({
         itemId: item.itemId,
         index: item.index,
-        sceneSeconds: round(item.startsAtSeconds + seconds - item.trimStartSeconds),
+        sceneSeconds: round(item.startsAtSeconds + moment),
         clipSeconds: seconds,
         key: keyAt(seconds),
       });
