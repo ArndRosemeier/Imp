@@ -171,6 +171,23 @@ export function fadeGain(
   return shape(Math.max(0, rise)) * shape(Math.max(0, fall));
 }
 
+/** Left and right gains of a pan from -1 to 1: a balance, so 0 leaves both sides as they are (panGains in @imp/audio). */
+export function panGains(pan: number): readonly [number, number] {
+  return [pan > 0 ? 1 - pan : 1, pan < 0 ? 1 + pan : 1];
+}
+
+/** A graph sounds are routed through: a recording's, or the page's own. */
+export interface AudioOutput {
+  context: AudioContext;
+  destination: AudioNode;
+}
+
+interface Route {
+  level: GainNode;
+  left: GainNode;
+  right: GainNode;
+}
+
 /** A line of a character lane plays like a placed sound. */
 function linePlacement(line: Line): Placement {
   return {
@@ -230,6 +247,8 @@ export class CutPlayer {
   #offset = 0;
   #itemId = '';
   #timer: ReturnType<typeof setInterval> | undefined;
+  #routes = new Map<HTMLAudioElement, Route>();
+  #own: AudioOutput | undefined;
 
   constructor(
     media: Media,
@@ -240,10 +259,54 @@ export class CutPlayer {
       /** The cut played to its end (it then rewinds). */
       ended?: () => void;
     },
-    /** Called with each sound element the player makes, so a recording can route it. */
-    private readonly tap?: (element: HTMLAudioElement) => void,
+    /**
+     * Where every sound of the audio lane is sent through an audio graph, as a
+     * recording needs. Without it a sound is routed only when it is panned, to
+     * the page's own output.
+     */
+    private readonly output?: AudioOutput,
   ) {
     this.media = media;
+  }
+
+  /**
+   * The graph of a sound: its level, then a balance of left and right. The
+   * sound is first made stereo, so a mono file is panned too.
+   */
+  #route(player: HTMLAudioElement, pan: number): Route | undefined {
+    const known = this.#routes.get(player);
+    if (known !== undefined) return known;
+    if (this.output === undefined && pan === 0) return undefined;
+    if (
+      this.output === undefined &&
+      this.#own === undefined &&
+      typeof AudioContext !== 'undefined'
+    ) {
+      const context = new AudioContext();
+      this.#own = { context, destination: context.destination };
+    }
+    const target = this.output ?? this.#own;
+    if (target === undefined) return undefined;
+    const { context, destination } = target;
+    const level = context.createGain();
+    level.channelCount = 2;
+    level.channelCountMode = 'explicit';
+    level.channelInterpretation = 'speakers';
+    const split = context.createChannelSplitter(2);
+    const merge = context.createChannelMerger(2);
+    const left = context.createGain();
+    const right = context.createGain();
+    context.createMediaElementSource(player).connect(level);
+    level.connect(split);
+    split.connect(left, 0);
+    split.connect(right, 1);
+    left.connect(merge, 0, 0);
+    right.connect(merge, 0, 1);
+    merge.connect(destination);
+    if (context.state === 'suspended') void context.resume();
+    const route = { level, left, right };
+    this.#routes.set(player, route);
+    return route;
   }
 
   attach(video: HTMLVideoElement | null, voice: HTMLAudioElement | null): void {
@@ -324,7 +387,7 @@ export class CutPlayer {
       if (file === undefined) continue;
       if (player === undefined) {
         player = new Audio(file);
-        this.tap?.(player);
+        this.#route(player, placement.pan);
         this.#players.set(placement.id, player);
       }
       player.loop = placement.loop;
@@ -342,8 +405,7 @@ export class CutPlayer {
         player.pause();
         continue;
       }
-      // Fades and gain as the audio editor mixes them. Pan needs a Web Audio graph per
-      // element and is not applied here or in the export yet.
+      // Fades, gain and pan as the audio editor mixes them.
       const fades = fadeGain(
         since,
         length,
@@ -351,10 +413,17 @@ export class CutPlayer {
         placement.fadeOutSeconds,
         placement.fadeCurve,
       );
-      player.volume = Math.max(
-        0,
-        Math.min(1, placement.volume * dbToGain(placement.gainDb) * fades),
-      );
+      const level = Math.max(0, Math.min(1, placement.volume * dbToGain(placement.gainDb) * fades));
+      const route = this.#route(player, placement.pan);
+      if (route === undefined) {
+        player.volume = level;
+      } else {
+        const [toLeft, toRight] = panGains(placement.pan);
+        player.volume = 1;
+        route.level.gain.value = level;
+        route.left.gain.value = toLeft;
+        route.right.gain.value = toRight;
+      }
       if (player.paused) {
         const into = since + placement.trimStartSeconds;
         player.currentTime = placement.loop && player.duration > 0 ? into % player.duration : into;
@@ -412,6 +481,9 @@ export class CutPlayer {
     this.video = null;
     this.voice = null;
     this.#players.clear();
+    this.#routes.clear();
+    void this.#own?.context.close();
+    this.#own = undefined;
   }
 }
 

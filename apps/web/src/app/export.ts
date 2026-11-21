@@ -188,7 +188,7 @@ export async function recordScenes(
             },
             ended: resolve,
           },
-          tap,
+          { context: audio, destination },
         );
         player = current;
         current.attach(video, voice);

@@ -1335,6 +1335,27 @@ describe('sounds', () => {
     await expect(run('movie.sound.delete', at(wind.id))).rejects.toThrow(/No sound/);
   });
 
+  it('places a sound and changes its pan, gain and fade curve', async () => {
+    const { run, scene, add } = await withScene();
+    const wind = await add({ kind: 'effect', name: 'Wind', description: 'A gale at sea.' });
+    const placed = (await run('movie.edit.sound.place', {
+      sceneId: scene.id,
+      soundId: wind.id,
+    })) as unknown as { id: string };
+    expect(
+      await run('movie.edit.sound.update', {
+        sceneId: scene.id,
+        placementId: placed.id,
+        pan: -0.5,
+        gainDb: -6,
+        fadeCurve: 'smooth',
+      }),
+    ).toMatchObject({ pan: -0.5, gainDb: -6, fadeCurve: 'smooth' });
+    await expect(
+      run('movie.edit.sound.update', { sceneId: scene.id, placementId: placed.id, pan: 2 }),
+    ).rejects.toThrow();
+  });
+
   it('makes effects and music with their own models, and replaces what was made', async () => {
     const { run, runtime, provider, at, add, takes } = await withScene();
     const wind = await add({ kind: 'effect', description: 'A gale at sea.' });
