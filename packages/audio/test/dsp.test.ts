@@ -40,6 +40,9 @@ function measuredDb(type: Parameters<typeof designBiquad>[0], frequency: number)
   return db(rms(output, RATE / 4) / rms(input, RATE / 4));
 }
 
+// Seconds of sound at 48 kHz, oversampled for true peaks: slow on a busy CI runner under coverage.
+const HEAVY = { timeout: 30_000 };
+
 describe('filters', () => {
   it('cut below and above their corners and pass the rest', () => {
     const highpass = { type: 'highpass', frequency: 100, gainDb: 0, q: 0.707 } as const;
@@ -129,7 +132,7 @@ describe('FFT', () => {
   });
 });
 
-describe('noise reduction', () => {
+describe('noise reduction', HEAVY, () => {
   it('turns down noise and keeps what stands above it', () => {
     const hiss = noise(0.02, 2);
     const voice = sine(440, 0.3, 1);
@@ -156,7 +159,7 @@ describe('noise reduction', () => {
   });
 });
 
-describe('loudness', () => {
+describe('loudness', HEAVY, () => {
   it('measures the EBU reference tone at -23 LUFS', () => {
     const tone = sine(1000, 10 ** (-23 / 20), 20);
     const report = measureLoudness([tone, tone]);
@@ -188,7 +191,7 @@ describe('loudness', () => {
   });
 });
 
-describe('effect chains', () => {
+describe('effect chains', HEAVY, () => {
   const tone = (amplitude: number) => {
     const samples = sine(1000, amplitude, 6);
     return {
@@ -249,5 +252,74 @@ describe('effect chains', () => {
         Effect.parse({ kind: 'denoise', noiseFromSeconds: 0, noiseToSeconds: 0.01 }),
       ]),
     ).toThrow(/at least/);
+  });
+});
+
+describe('voice effects', HEAVY, () => {
+  it('shifts pitch and keeps the length', async () => {
+    const { shiftPitch } = await import('../src/dsp/voice.js');
+    const { measureFrequency } = await import('../src/testing.js');
+    const tone = sine(220, 0.3, 1);
+    for (const [semitones, expected] of [
+      [12, 440],
+      [-12, 110],
+      [7, 220 * 2 ** (7 / 12)],
+    ] as const) {
+      const [out = new Float32Array(0)] = shiftPitch([tone], semitones);
+      expect(out).toHaveLength(tone.length);
+      const settled = { sampleRate: RATE, channels: [out.subarray(RATE / 10)] };
+      expect(measureFrequency(settled) / expected).toBeCloseTo(1, 1);
+    }
+    expect(shiftPitch([tone], 0)[0]).toEqual(tone);
+  });
+
+  it('distorts into harmonics while keeping peaks in bounds', async () => {
+    const { distort } = await import('../src/dsp/voice.js');
+    const tone = sine(200, 0.5, 0.5);
+    for (const shape of ['soft', 'hard', 'fold'] as const) {
+      const [out = new Float32Array(0)] = distort([tone], RATE, {
+        driveDb: 24,
+        shape,
+        toneHz: 20_000,
+        mix: 1,
+        outputDb: 0,
+      });
+      expect(peak(out)).toBeLessThanOrEqual(1.05);
+      // A third harmonic appears: the wave is no longer a pure sine.
+      const third = Math.abs(
+        out.reduce((sum, v, i) => sum + v * Math.sin((2 * Math.PI * 600 * i) / RATE), 0),
+      );
+      expect(third / out.length).toBeGreaterThan(0.01);
+    }
+    const [dry = new Float32Array(0)] = distort([tone], RATE, {
+      driveDb: 24,
+      shape: 'hard',
+      toneHz: 20_000,
+      mix: 0,
+      outputDb: -6,
+    });
+    expect(peak(dry)).toBeCloseTo(0.25, 2);
+  });
+
+  it('ring-modulates and crushes', async () => {
+    const { crush, ringModulate } = await import('../src/dsp/voice.js');
+    const ones = new Float32Array(RATE).fill(0.5);
+    const [ring = new Float32Array(0)] = ringModulate([ones], RATE, 50, 1);
+    expect(peak(ring)).toBeCloseTo(0.5, 3);
+    expect(ring[RATE / 100]).toBeCloseTo(0, 3);
+    const [crushed = new Float32Array(0)] = crush([sine(100, 0.3, 0.1)], 3, 4);
+    expect(new Set(crushed).size).toBeLessThanOrEqual(9);
+    expect(crushed[1]).toBe(crushed[0]);
+  });
+
+  it('builds every voice preset and describes each part', async () => {
+    const { VOICE_PRESETS, voicePreset } = await import('../src/effects.js');
+    const tone = sine(300, 0.4, 0.5);
+    for (const name of Object.keys(VOICE_PRESETS) as (keyof typeof VOICE_PRESETS)[]) {
+      const effects = voicePreset(name);
+      const out = applyEffects({ sampleRate: RATE, channels: [tone, tone] }, effects);
+      expect(out.channels[0]).toHaveLength(tone.length);
+      expect(effects.map(describeEffect).every((text) => text.length > 0)).toBe(true);
+    }
   });
 });

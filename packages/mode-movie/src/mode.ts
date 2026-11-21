@@ -202,7 +202,7 @@ export const soundEditor: Role = {
     '(learn the noise from a stretch with nothing else), audio.fx.eq (highpass dialogue at 80 to',
     '100 Hz), audio.fx.compressor, audio.fx.limiter, and audio.fx.loudness to set each line or',
     'cue to a loudness; measure the result with audio.analyze (LUFS and true peak; a film mix',
-    'near -23 LUFS for broadcast or -16 online, peaks at most -1 dBTP). Listen with audio.listen to check a short stretch if you',
+    'near -23 LUFS for broadcast or -16 online, peaks at most -1 dBTP). Change voices with audio.fx.voice (telephone, radio, megaphone, robot, monster, chipmunk) or audio.fx.distortion, audio.fx.pitch, audio.fx.ringmod and audio.fx.crush. To edit dialogue by its words, write it down once with audio.transcribe, read it with audio.transcript.get, and remove words with audio.words.delete (cut in the pauses); move words by cutting their times with audio.edit.cut and pasting. Listen with audio.listen to check a short stretch if you',
     'can. Each change is a step the person can undo, and they can take back your whole pass at',
     'once, so work in clear steps and say what you changed and why, by time.',
   ].join(' '),

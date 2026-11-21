@@ -59,7 +59,15 @@ export { copyTree, createRewriter, removeTree } from './projects/tree.js';
 export { COPY_REQUEST_PREFIX, CopyRequest } from './commands/project-copy.js';
 export { EXPORT_PREFIX, fileNameFor, UPLOAD_PREFIX } from './commands/project-files.js';
 export { Template, templatePrefix } from './commands/project-templates.js';
-export { ArchiveError, crc32, readArchive, writeArchive, type ArchiveEntry } from './archive.js';
+export {
+  ArchiveError,
+  crc32,
+  decodeUtf8,
+  encodeUtf8,
+  readArchive,
+  writeArchive,
+  type ArchiveEntry,
+} from './archive.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
