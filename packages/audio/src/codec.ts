@@ -1,5 +1,7 @@
 import type { Pcm } from './pcm.js';
+import { Mp4Error } from './mp4.js';
 import { decodeWav, isWav } from './wav.js';
+import type { Mp4AudioDecoder } from './webcodecs.js';
 
 /** The containers and codecs Imp can meet: what generation models return, and video clips. */
 export type AudioFormat = 'wav' | 'mp3' | 'flac' | 'vorbis' | 'opus' | 'mp4';
@@ -63,13 +65,32 @@ function fromLibrary(result: DecodedByLibrary, format: AudioFormat): Pcm {
   return { sampleRate: result.sampleRate, channels: result.channelData };
 }
 
+async function decodeMp4(bytes: Uint8Array, decoder: Mp4AudioDecoder | undefined): Promise<Pcm> {
+  if (decoder === undefined) {
+    throw new UnsupportedAudioError(
+      'mp4',
+      'The sound inside video clips (AAC) needs a browser with WebCodecs, or ffmpeg next to the local server.',
+    );
+  }
+  try {
+    return await decoder(bytes);
+  } catch (error) {
+    if (error instanceof UnsupportedAudioError) throw error;
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new UnsupportedAudioError(
+      'mp4',
+      error instanceof Mp4Error ? reason : `The clip's sound could not be decoded: ${reason}`,
+    );
+  }
+}
+
 /**
  * The decoders that work in every host: WAV in TypeScript, MP3, FLAC, Vorbis
  * and Opus in WebAssembly, each loaded only when first needed. All are under
  * permissive licences. AAC is left out on purpose: the only WebAssembly AAC
- * decoder is under the GPL.
+ * decoder is under the GPL. A host that can decode it natively passes `mp4`.
  */
-export function createDefaultAudioCodec(): AudioCodec {
+export function createDefaultAudioCodec(options: { mp4?: Mp4AudioDecoder } = {}): AudioCodec {
   return {
     async decode(bytes) {
       const format = sniffAudioFormat(bytes);
@@ -85,10 +106,7 @@ export function createDefaultAudioCodec(): AudioCodec {
         case 'opus':
           return fromLibrary(await (await import('@audio/decode-opus')).default(bytes), format);
         case 'mp4':
-          throw new UnsupportedAudioError(
-            'mp4',
-            'The sound inside video clips (AAC) cannot be decoded here yet.',
-          );
+          return decodeMp4(bytes, options.mp4);
         case undefined:
           throw new UnsupportedAudioError('unknown', 'This file is not a sound format Imp knows.');
       }

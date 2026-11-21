@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
+import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
 import { createImpServer } from './server.js';
 
@@ -27,6 +28,8 @@ if (process.argv.includes('--help')) {
 const port = Number(option('port') ?? 4747);
 const dataDir = resolve(option('data') ?? join(homedir(), 'Imp'));
 const here = dirname(fileURLToPath(import.meta.url));
+// The sound inside video clips is AAC, which only a native decoder reads.
+const ffmpeg = await hasFfmpeg();
 
 const server = createImpServer({
   webDir: join(here, 'web'),
@@ -35,6 +38,7 @@ const server = createImpServer({
       store: await FileKeyValueStore.open(join(dataDir, 'data.jsonl')),
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
+      ...(ffmpeg ? { mp4Audio: createFfmpegMp4Decoder() } : {}),
     }),
 });
 server.on('error', (error: Error & { code?: string }) => {
@@ -49,5 +53,10 @@ server.on('error', (error: Error & { code?: string }) => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`Imp is running. Open http://localhost:${String(port)}/ in your browser.`);
   console.log(`Your projects are kept in ${dataDir}`);
+  if (!ffmpeg) {
+    console.log(
+      'ffmpeg was not found, so the sound inside video clips stays silent. Install it to hear it.',
+    );
+  }
   console.log('Press Ctrl+C to stop.');
 });

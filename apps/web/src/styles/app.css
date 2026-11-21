@@ -1706,6 +1706,20 @@ html {
   color: var(--track);
   pointer-events: none;
 }
+.region .unheard {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 2;
+}
 .region .fades {
   position: absolute;
   left: 0;
