@@ -5,6 +5,7 @@ import {
   type Command,
   type CoreRuntime,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import {
   describeVideoModel,
@@ -391,7 +392,7 @@ export function createShotCommands(
     description:
       'Adds a shot to the end of a scene. A shot is one uninterrupted piece of film of a few seconds: what is seen, what the bodies do, and at most one spoken line.',
     effect: 'write',
-    input: ShotFields.partial().extend({ projectId: ProjectId, sceneId: SceneId }),
+    input: patchOf(ShotFields).extend({ projectId: ProjectId, sceneId: SceneId }),
     output: Shot,
     handler: async ({ runtime }, { projectId, sceneId, ...fields }) => {
       await requireScene(runtime.store, 'movie.shot.create', projectId, sceneId);
@@ -428,7 +429,7 @@ export function createShotCommands(
     description:
       'Changes a shot. Fields left out stay as they are. An existing clip and dialogue are kept; generate again to see the change.',
     effect: 'write',
-    input: ShotFields.partial().extend(At),
+    input: patchOf(ShotFields).extend(At),
     output: Shot,
     handler: async ({ runtime }, { projectId, sceneId, shotId, ...changes }) => {
       const { key, shot } = await loadShot(runtime.store, 'movie.shot.update', {

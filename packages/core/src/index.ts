@@ -71,6 +71,7 @@ export {
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
+export { patchOf } from './patch.js';
 export type { JsonValue } from './json.js';
 export { defaultPolicy, type ExecutionPolicy, type PolicyDecision } from './policy.js';
 export {

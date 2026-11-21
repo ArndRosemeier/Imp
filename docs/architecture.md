@@ -95,6 +95,8 @@ export as people do.
 
 Agents edit a cut through the same `movie.edit.*` commands, but their changes land in a draft that the Edit screen shows as tracked changes for the person to keep or discard (ADR 8). Agents read a scene as an edit decision list and look at stills taken from the clips.
 
+The text lane (titles, lower thirds, captions, subtitles, credits) is part of each scene's cut. Texts keep their own time or follow a piece or a spoken line, film-wide text styles set their look, and one drawing function in the browser host draws them for the preview and the exported film (ADR 9).
+
 `apps/server` is the local server: the same core on files (`file-store.ts`: a
 journal for the data, one file per medium), reached over the same protocol by
 HTTP, with messages posted and answers on one event stream (`server.ts`). It

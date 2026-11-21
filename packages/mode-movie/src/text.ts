@@ -5,6 +5,7 @@ import {
   type Command,
   type CoreRuntime,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { z } from 'zod';
 import { characterPrefix, movieSceneKey, subtitleFileKey, textStylesKey } from './commands.js';
@@ -182,7 +183,8 @@ async function credits(runtime: CoreRuntime, projectId: string, title: string): 
     .filter((character) => character.name.trim() !== '');
   const crew = (await runtime.store.list('crew/')).flatMap((entry) => {
     const parsed = Crew.safeParse(entry.value);
-    return parsed.success ? [parsed.data] : [];
+    // The coordinator runs the crew; it is not one of the people who made the film.
+    return parsed.success && parsed.data.roleId !== 'coordinator' ? [parsed.data] : [];
   });
   const blocks: string[] = [title];
   if (characters.length > 0) {
@@ -197,7 +199,13 @@ async function credits(runtime: CoreRuntime, projectId: string, title: string): 
   }
   if (crew.length > 0) {
     blocks.push(
-      ['Crew', ...crew.map((member) => `${roleName(member.roleId)} · ${member.name}`)].join('\n'),
+      [
+        'Crew',
+        ...crew.map((member) => {
+          const role = roleName(member.roleId);
+          return member.name === role ? role : `${role} · ${member.name}`;
+        }),
+      ].join('\n'),
     );
   }
   blocks.push('Made with Imp');
@@ -366,7 +374,7 @@ export function createTextCommands(): readonly Command[] {
     },
   });
 
-  const StyleFields = TextStyle.omit({ id: true }).partial();
+  const StyleFields = patchOf(TextStyle.omit({ id: true }));
   const styleSet = defineCommand({
     id: 'movie.edit.text.style.set',
     title: 'Change or add a text style',

@@ -4,6 +4,7 @@ import {
   requireProject,
   type Command,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
@@ -112,7 +113,7 @@ export function createSoundCommands(provider: GenerationProvider): readonly Comm
     description:
       'Changes the name or description of a sound. Fields left out stay as they are. What was already made is kept; generate again to hear the change.',
     effect: 'write',
-    input: SoundFields.omit({ kind: true }).partial().extend(At),
+    input: patchOf(SoundFields.omit({ kind: true })).extend(At),
     output: Sound,
     handler: async ({ runtime }, { projectId, sceneId, soundId, ...changes }) => {
       const at = { projectId, sceneId, soundId };

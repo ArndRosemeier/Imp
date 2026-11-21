@@ -1,4 +1,4 @@
-import { CommandError, defineCommand, type Command, type KeyValueStore } from '@imp/core';
+import { CommandError, defineCommand, type Command, type KeyValueStore, patchOf } from '@imp/core';
 import { z } from 'zod';
 import { CUSTOM_ROLE_PREFIX, ROLE_ID, StoredRole, type RoleCatalog } from './role.js';
 
@@ -207,7 +207,7 @@ export function createCrewCommands(
     description:
       'Changes a custom role. Fields left out stay as they are. Agents already hired for it work under the new version from their next task.',
     effect: 'write',
-    input: z.object(RoleFields).partial().extend({ id: z.string() }),
+    input: patchOf(z.object(RoleFields)).extend({ id: z.string() }),
     output: StoredRole,
     handler: async ({ runtime }, { id, ...changes }) => {
       const current = await requireCustom(runtime.store, 'crew.role.update', id);

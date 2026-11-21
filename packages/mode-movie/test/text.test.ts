@@ -487,9 +487,12 @@ describe('the text lane', () => {
     await runtime.store.batch([
       { type: 'put', key: 'crew/ed', value: { name: 'Edith', roleId: 'film-editor' } },
       { type: 'put', key: 'crew/x', value: { broken: true } },
+      { type: 'put', key: 'crew/co', value: { name: 'Coordinator', roleId: 'coordinator' } },
+      { type: 'put', key: 'crew/sd', value: { name: 'Sound Designer', roleId: 'sound-designer' } },
     ]);
     const made = await run('movie.edit.credits.generate', { projectId });
-    expect(made.text.text).toContain('Crew\nFilm Editor · Edith');
+    expect(made.text.text).toContain('Crew\nFilm Editor · Edith\nSound Designer\n');
+    expect(made.text.text).not.toContain('Coordinator');
   });
 
   it('turns an agent’s texts into proposed changes', async () => {
@@ -534,7 +537,15 @@ describe('text styles', () => {
       styleId: 'subtitle',
       color: '#ffd84a',
     });
-    expect(yellow).toMatchObject({ id: 'subtitle', color: '#ffd84a', font: 'sans' });
+    // What is left out stays as it was, defaults included.
+    expect(yellow).toMatchObject({
+      id: 'subtitle',
+      color: '#ffd84a',
+      font: 'sans',
+      outline: 9,
+      weight: 500,
+      enter: 'cut',
+    });
     const made = await run('movie.edit.text.style.set', {
       projectId,
       name: 'Chapter',
@@ -599,5 +610,35 @@ describe('texts in the exported film', () => {
 
     await run('movie.edit.export', { projectId, subtitles: false });
     expect((keeping.seen.job?.plan.texts ?? []).map((text) => text.kind)).toEqual(['title']);
+  });
+});
+
+describe('updates', () => {
+  it('keep what they leave out, defaulted fields included', async () => {
+    const { run, at, shots, projectId } = await setup();
+    const shot = shots[0];
+    const key = { projectId, sceneId: at.sceneId, shotId: shot.id };
+    const lamp = await run('world.object.create', { projectId, name: 'Lamp' });
+    const lampId = lamp.id ?? lamp.objectId;
+    await run('movie.shot.update', { ...key, objects: [{ objectId: lampId, stateId: null }] });
+    const changed = await run('movie.shot.update', { ...key, description: 'Stairs, wet.' });
+    expect(changed.objects).toEqual([{ objectId: lampId, stateId: null }]);
+
+    const sound = await run('movie.sound.create', {
+      projectId,
+      sceneId: at.sceneId,
+      kind: 'effect',
+      name: 'Wind',
+      description: 'Wind',
+    });
+    const placed = await run('movie.edit.sound.place', {
+      ...at,
+      soundId: sound.id,
+      startSeconds: 1,
+    });
+    const id = placed.id ?? placed.placementId;
+    await run('movie.edit.sound.update', { ...at, placementId: id, pan: -0.5, gainDb: 3 });
+    const louder = await run('movie.edit.sound.update', { ...at, placementId: id, volume: 0.4 });
+    expect(louder).toMatchObject({ pan: -0.5, gainDb: 3, volume: 0.4 });
   });
 });

@@ -5,6 +5,7 @@ import {
   requireProject,
   type Command,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { readElement } from '@imp/world';
 import { z } from 'zod';
@@ -123,7 +124,7 @@ export const developmentUpdate = defineCommand({
   description:
     'Changes the logline, premise, tone or treatment of a movie project. Fields left out stay as they are.',
   effect: 'write',
-  input: Development.partial().extend({ projectId: ProjectId }),
+  input: patchOf(Development).extend({ projectId: ProjectId }),
   output: Development,
   handler: async ({ runtime }, { projectId, ...changes }) => {
     await requireProject(runtime.store, 'movie.development.update', projectId, MODE_ID);
@@ -437,7 +438,7 @@ export const characterUpdate = defineCommand({
   title: 'Change character',
   description: 'Changes details of a character. Fields left out stay as they are.',
   effect: 'write',
-  input: CharacterFields.partial().extend({ projectId: ProjectId, characterId: z.string() }),
+  input: patchOf(CharacterFields).extend({ projectId: ProjectId, characterId: z.string() }),
   output: Character,
   handler: async ({ runtime }, { projectId, characterId, ...changes }) => {
     await requireProject(runtime.store, 'movie.character.update', projectId, MODE_ID);

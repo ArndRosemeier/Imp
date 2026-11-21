@@ -6,6 +6,7 @@ import {
   type Command,
   type CoreRuntime,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { mp3DurationSeconds, ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
@@ -1075,7 +1076,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     description:
       'Changes where, how loud and from where in the source a placed sound plays, and its pan (-1 left to 1 right, 0 is the middle), extra gain in dB and the shape of its fades. Fields left out stay as they are.',
     effect: 'write',
-    input: PlacementFields.partial().extend({
+    input: patchOf(PlacementFields).extend({
       projectId: ProjectId,
       sceneId: SceneId,
       placementId: z.string().describe('The id of a placement from movie.edit.get.'),

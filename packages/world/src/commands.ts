@@ -6,6 +6,7 @@ import {
   type Command,
   type CoreRuntime,
   type KeyValueStore,
+  patchOf,
 } from '@imp/core';
 import { ProviderError, type GenerationProvider, type MediaInput } from '@imp/providers';
 import { z } from 'zod';
@@ -892,7 +893,7 @@ export function createWorldCommands(options: WorldCommandOptions): readonly Comm
     description:
       'Changes the name, description, look, layout, ambience or the place it is part of. Fields left out stay as they are. Pictures already made stay; make them again to see the change.',
     effect: 'write',
-    input: LocationFields.partial().extend({ projectId: ProjectId, locationId: z.string() }),
+    input: patchOf(LocationFields).extend({ projectId: ProjectId, locationId: z.string() }),
     output: Location,
     handler: async ({ runtime }, { projectId, locationId, ...changes }) => {
       const id = 'world.location.update';
@@ -955,7 +956,7 @@ export function createWorldCommands(options: WorldCommandOptions): readonly Comm
     description:
       'Changes the name, description, look or owner of an object. Fields left out stay as they are.',
     effect: 'write',
-    input: ObjectFields.partial().extend({ projectId: ProjectId, objectId: z.string() }),
+    input: patchOf(ObjectFields).extend({ projectId: ProjectId, objectId: z.string() }),
     output: WorldObject,
     handler: async ({ runtime }, { projectId, objectId, ...changes }) => {
       const id = 'world.object.update';
