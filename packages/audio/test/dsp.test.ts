@@ -40,6 +40,9 @@ function measuredDb(type: Parameters<typeof designBiquad>[0], frequency: number)
   return db(rms(output, RATE / 4) / rms(input, RATE / 4));
 }
 
+// Seconds of sound at 48 kHz, oversampled for true peaks: slow on a busy CI runner under coverage.
+const HEAVY = { timeout: 30_000 };
+
 describe('filters', () => {
   it('cut below and above their corners and pass the rest', () => {
     const highpass = { type: 'highpass', frequency: 100, gainDb: 0, q: 0.707 } as const;
@@ -129,7 +132,7 @@ describe('FFT', () => {
   });
 });
 
-describe('noise reduction', () => {
+describe('noise reduction', HEAVY, () => {
   it('turns down noise and keeps what stands above it', () => {
     const hiss = noise(0.02, 2);
     const voice = sine(440, 0.3, 1);
@@ -156,7 +159,7 @@ describe('noise reduction', () => {
   });
 });
 
-describe('loudness', () => {
+describe('loudness', HEAVY, () => {
   it('measures the EBU reference tone at -23 LUFS', () => {
     const tone = sine(1000, 10 ** (-23 / 20), 20);
     const report = measureLoudness([tone, tone]);
@@ -188,7 +191,7 @@ describe('loudness', () => {
   });
 });
 
-describe('effect chains', () => {
+describe('effect chains', HEAVY, () => {
   const tone = (amplitude: number) => {
     const samples = sine(1000, amplitude, 6);
     return {
@@ -251,7 +254,7 @@ describe('effect chains', () => {
   });
 });
 
-describe('voice effects', () => {
+describe('voice effects', HEAVY, () => {
   it('shifts pitch and keeps the length', async () => {
     const { shiftPitch } = await import('../src/dsp/voice.js');
     const { measureFrequency } = await import('../src/testing.js');
