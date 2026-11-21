@@ -110,7 +110,12 @@ const Library = z.object({
     }),
   ),
 });
-const Outline = z.object({ min: z.array(z.number()), max: z.array(z.number()) });
+const Outline = z.object({
+  fromSeconds: z.number(),
+  toSeconds: z.number(),
+  min: z.array(z.number()),
+  max: z.array(z.number()),
+});
 const Measured = z.object({ durationSeconds: z.number() });
 const Rendered = z.object({ key: z.string(), durationSeconds: z.number() });
 
@@ -265,6 +270,7 @@ function RegionWave({
   const imp = useImp();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [outline, setOutline] = useState<z.infer<typeof Outline> | null>(null);
+  const [unheard, setUnheard] = useState<string | null>(null);
   // Ask for a power of two of slices, so zooming a little does not ask again.
   const buckets = Math.min(4000, 2 ** Math.ceil(Math.log2(Math.max(8, width))));
   const length = region.endSeconds - region.startSeconds;
@@ -277,10 +283,16 @@ function RegionWave({
       buckets,
     }).then(
       (output) => {
-        if (active) setOutline(Outline.parse(output));
+        if (!active) return;
+        setOutline(Outline.parse(output));
+        setUnheard(null);
       },
-      () => {
-        if (active) setOutline(null);
+      (reason: unknown) => {
+        if (!active) return;
+        setOutline(null);
+        // Past the end of its sound a region is silent by design, not unheard.
+        const message = messageOf(reason);
+        setUnheard(message.includes('range inside it') ? null : message);
       },
     );
     return () => {
@@ -303,10 +315,12 @@ function RegionWave({
     const level = region.volume * dbToGain(region.gainDb);
     const middle = height / 2;
     const slices = outline.min.length;
+    // The sound may end before the region does; past its end there is nothing to draw.
+    const drawn = Math.min(w, (w * (outline.toSeconds - outline.fromSeconds)) / length);
     context.fillStyle = color;
     context.beginPath();
-    for (let x = 0; x < w; x++) {
-      const index = Math.min(slices - 1, Math.floor((x / w) * slices));
+    for (let x = 0; x < drawn; x++) {
+      const index = Math.min(slices - 1, Math.floor((x / drawn) * slices));
       const gain = level * fadeAt(region, (x / w) * length);
       const top = Math.min(1, (outline.max[index] ?? 0) * gain);
       const bottom = Math.max(-1, (outline.min[index] ?? 0) * gain);
@@ -317,7 +331,16 @@ function RegionWave({
     context.fill();
   }, [outline, width, height, region, length]);
 
-  return <canvas ref={canvas} className="wave" aria-hidden="true" style={{ width, height }} />;
+  return (
+    <>
+      <canvas ref={canvas} className="wave" aria-hidden="true" style={{ width, height }} />
+      {unheard !== null && (
+        <span className="unheard" title={unheard}>
+          Silent here: {unheard}
+        </span>
+      )}
+    </>
+  );
 }
 
 /** Where in a region a pointer grabbed it. */

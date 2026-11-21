@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@imp/audio": "workspace:*",
     "@imp/core": "workspace:*",
     "@imp/host": "workspace:*"
   },

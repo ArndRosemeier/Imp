@@ -7,7 +7,7 @@ import {
   RoleCatalog,
   type Mode,
 } from '@imp/agents';
-import { createAudioCommands, createDefaultAudioCodec } from '@imp/audio';
+import { createAudioCommands, createDefaultAudioCodec, type Mp4AudioDecoder } from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
@@ -66,6 +66,12 @@ export interface ImpOptions {
    * frames in other formats are used as guides only.
    */
   readonly frameImage?: FrameImageEncoder;
+  /**
+   * Decodes the sound inside video clips (AAC), which needs a native decoder:
+   * WebCodecs in the browser, ffmpeg on the local server. Without it, clip
+   * sound plays as silence and is reported as unheard.
+   */
+  readonly mp4Audio?: Mp4AudioDecoder;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -101,7 +107,9 @@ export function createImp(options: ImpOptions): Imp {
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createAudioCommands({
-      codec: createDefaultAudioCodec(),
+      codec: createDefaultAudioCodec(
+        options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
+      ),
       links: [createSceneAudioLink()],
     }),
     ...createWorldCommands({
