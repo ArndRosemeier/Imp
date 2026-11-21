@@ -62,6 +62,7 @@ const ShotFields = Shot.omit({
   sceneId: true,
   position: true,
   clip: true,
+  takes: true,
   dialogue: true,
   frames: true,
   frameId: true,
@@ -308,6 +309,22 @@ async function deleteClipFile(runtime: CoreRuntime, clip: Clip | null): Promise<
   if (blobKey !== null) await runtime.blobs.delete(blobKey);
 }
 
+/** How many earlier clips a shot keeps; the oldest beyond this are deleted. */
+export const MAX_TAKES = 20;
+
+/** The clip a shot has, as a take: a ready clip is kept; one not ready has no file to keep. */
+function retire(shot: Shot): { takes: Clip[]; dropped: Clip[] } {
+  const old = shot.clip;
+  if (old === null) return { takes: shot.takes, dropped: [] };
+  if (old.status !== 'ready' || old.blobKey === null) return { takes: shot.takes, dropped: [old] };
+  const all = [old, ...shot.takes];
+  return { takes: all.slice(0, MAX_TAKES), dropped: all.slice(MAX_TAKES) };
+}
+
+async function deleteClipFiles(runtime: CoreRuntime, clips: readonly Clip[]): Promise<void> {
+  for (const clip of clips) await deleteClipFile(runtime, clip);
+}
+
 async function deleteDialogueFile(
   runtime: CoreRuntime,
   dialogue: DialogueTake | null,
@@ -414,6 +431,7 @@ export function createShotCommands(
         frames: [],
         frameId: null,
         clip: null,
+        takes: [],
       };
       await requireShotSetting(runtime.store, 'movie.shot.create', projectId, shot);
       await runtime.store.batch([
@@ -477,7 +495,7 @@ export function createShotCommands(
           value: { ...candidate, position: index + 1 },
         })),
       ]);
-      await deleteClipFile(runtime, shot.clip);
+      await deleteClipFiles(runtime, [...(shot.clip === null ? [] : [shot.clip]), ...shot.takes]);
       await deleteDialogueFile(runtime, shot.dialogue);
       return { shotId: shot.id, remaining: remaining.length };
     },
@@ -487,7 +505,7 @@ export function createShotCommands(
     id: 'movie.shot.clip.generate',
     title: 'Generate clip',
     description:
-      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). When the shot has dialogue (movie.shot.dialogue.generate) the clip is made silent and long enough for it; the voice is played over it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip. Costs money at the video model, more than anything else here.',
+      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). When the shot has dialogue (movie.shot.dialogue.generate) the clip is made silent and long enough for it; the voice is played over it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip, which is kept as a take (movie.shot.take.list) and can be put back. Costs money at the video model, more than anything else here.',
     effect: 'spend',
     input: z.object({
       ...At,
@@ -665,8 +683,9 @@ export function createShotCommands(
         createdAt: runtime.now().toISOString(),
       };
       const latest = (await loadShot(runtime.store, id, input)).shot;
-      await runtime.store.batch([{ type: 'put', key, value: { ...latest, clip } }]);
-      await deleteClipFile(runtime, latest.clip);
+      const { takes, dropped } = retire(latest);
+      await runtime.store.batch([{ type: 'put', key, value: { ...latest, clip, takes } }]);
+      await deleteClipFiles(runtime, dropped);
       return { clip };
     },
   });
@@ -753,7 +772,7 @@ export function createShotCommands(
     id: 'movie.shot.clip.fromFile',
     title: 'Use a video as clip',
     description:
-      "Makes a stored video the clip of a shot, as if it had been generated: an imported video from the library, or another shot's clip. The shot then plays it on the Edit stage. A shot that has a clip must have it deleted first (movie.shot.clip.delete). Costs nothing.",
+      "Makes a stored video the clip of a shot, as if it had been generated: an imported video from the library, or another shot's clip. The shot then plays it on the Edit stage. A clip the shot had is kept as a take (movie.shot.take.list); a clip still being made must finish first. Costs nothing.",
     effect: 'write',
     input: z.object({
       ...At,
@@ -767,11 +786,11 @@ export function createShotCommands(
     handler: async ({ runtime }, input) => {
       const id = 'movie.shot.clip.fromFile';
       const { key, shot } = await loadShot(runtime.store, id, input);
-      if (shot.clip !== null) {
+      if (shot.clip?.status === 'pending') {
         throw new CommandError(
           'invalid_input',
           id,
-          'This shot already has a clip. Delete it first, or use another shot.',
+          'A clip of this shot is still being made. Wait for it (movie.shot.clip.check) or delete it first.',
         );
       }
       const blob = await runtime.blobs.get(input.blobKey);
@@ -783,8 +802,10 @@ export function createShotCommands(
       }
       const blobKey = `${key}/clip/${runtime.newId()}`;
       await runtime.blobs.put(blobKey, blob);
+      const { takes, dropped } = retire(shot);
       const next: Shot = {
         ...shot,
+        takes,
         clip: {
           status: 'ready',
           jobId: '',
@@ -804,7 +825,110 @@ export function createShotCommands(
         },
       };
       await runtime.store.batch([{ type: 'put', key, value: next }]);
+      await deleteClipFiles(runtime, dropped);
       return next;
+    },
+  });
+
+  const TakeView = z.object({
+    number: z.number().int().describe('1 for the newest take, counting back.'),
+    blobKey: z.string().describe('Names the take for movie.shot.take.use and .delete.'),
+    model: z.string(),
+    prompt: z.string(),
+    durationSeconds: z.number().nullable(),
+    silent: z.boolean(),
+    startFrameId: z.string().nullable(),
+    costUsd: z.number().nullable(),
+    createdAt: z.string(),
+  });
+  const viewTake = (clip: Clip, index: number): z.infer<typeof TakeView> => ({
+    number: index + 1,
+    blobKey: clip.blobKey ?? '',
+    model: clip.model,
+    prompt: clip.prompt,
+    durationSeconds: clip.durationSeconds,
+    silent: clip.silent,
+    startFrameId: clip.startFrameId,
+    costUsd: clip.costUsd,
+    createdAt: clip.createdAt,
+  });
+  const TakeAt = {
+    ...At,
+    blobKey: z.string().min(1).describe('The take, by its blobKey from movie.shot.take.list.'),
+  };
+  const findTake = (shot: Shot, id: string, blobKey: string): { index: number; take: Clip } => {
+    const index = shot.takes.findIndex((take) => take.blobKey === blobKey);
+    const take = shot.takes[index];
+    if (take === undefined) {
+      throw new CommandError(
+        'invalid_input',
+        id,
+        `This shot has no take "${blobKey}". movie.shot.take.list names its takes.`,
+      );
+    }
+    return { index, take };
+  };
+
+  const takeList = defineCommand({
+    id: 'movie.shot.take.list',
+    title: 'List takes',
+    description:
+      'Lists the earlier clips of a shot, newest first: each new clip keeps the one it replaced as a take. Watch one with media.view under its blobKey, or look at it with movie.edit.review.stills after putting it back. Returns the current clip beside them.',
+    effect: 'read',
+    input: z.object(At),
+    output: z.object({ current: TakeView.nullable(), takes: z.array(TakeView) }),
+    handler: async ({ runtime }, at) => {
+      const { shot } = await loadShot(runtime.store, 'movie.shot.take.list', at);
+      const current =
+        shot.clip?.status === 'ready' && shot.clip.blobKey !== null
+          ? { ...viewTake(shot.clip, -1), number: 0 }
+          : null;
+      return { current, takes: shot.takes.map(viewTake) };
+    },
+  });
+
+  const takeUse = defineCommand({
+    id: 'movie.shot.take.use',
+    title: 'Use take',
+    description:
+      "Puts an earlier take back as the clip of a shot; the clip it replaces becomes a take in turn, so nothing is lost. The cut plays the take at once, keeping each piece's trims (a shorter take is cut short). A clip still being made must finish or be deleted first. Costs nothing.",
+    effect: 'write',
+    input: z.object(TakeAt),
+    output: z.object({ clip: Clip, takes: z.number().int() }),
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.shot.take.use';
+      const { key, shot } = await loadShot(runtime.store, id, input);
+      const { index, take: chosen } = findTake(shot, id, input.blobKey);
+      if (shot.clip?.status === 'pending') {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          'A clip of this shot is still being made. Wait for it (movie.shot.clip.check) or delete it first.',
+        );
+      }
+      const rest = shot.takes.filter((_, at) => at !== index);
+      const { takes, dropped } = retire({ ...shot, takes: rest });
+      await runtime.store.batch([{ type: 'put', key, value: { ...shot, clip: chosen, takes } }]);
+      await deleteClipFiles(runtime, dropped);
+      return { clip: chosen, takes: takes.length };
+    },
+  });
+
+  const takeDelete = defineCommand({
+    id: 'movie.shot.take.delete',
+    title: 'Delete take',
+    description: 'Deletes an earlier take of a shot for good. The clip in use stays.',
+    effect: 'destructive',
+    input: z.object(TakeAt),
+    output: z.object({ shotId: z.string(), takes: z.number().int() }),
+    handler: async ({ runtime }, input) => {
+      const id = 'movie.shot.take.delete';
+      const { key, shot } = await loadShot(runtime.store, id, input);
+      const { index } = findTake(shot, id, input.blobKey);
+      const takes = shot.takes.filter((_, at) => at !== index);
+      await runtime.store.batch([{ type: 'put', key, value: { ...shot, takes } }]);
+      await deleteClipFiles(runtime, shot.takes.slice(index, index + 1));
+      return { shotId: shot.id, takes: takes.length };
     },
   });
 
@@ -915,5 +1039,8 @@ export function createShotCommands(
     clipCheck,
     clipDelete,
     clipFromFile,
+    takeList,
+    takeUse,
+    takeDelete,
   ];
 }

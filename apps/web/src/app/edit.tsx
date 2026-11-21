@@ -49,6 +49,7 @@ import { EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
 import { SceneTabs } from './shots.js';
+import { SplitEdit, TakeSwitcher } from './split-edit.js';
 import { useLibraryDrop } from './library/drag.js';
 import { isPlayableSound, soundForScene } from './library/scene.js';
 import {
@@ -1026,6 +1027,16 @@ function SceneEditor({
                   <SpeakerHighIcon aria-hidden="true" /> Take the clip&apos;s sound apart
                 </button>
               )}
+              {item.kind === 'shot' && (
+                <TakeSwitcher
+                  shot={shots?.find(
+                    (candidate) =>
+                      candidate.id === item.shotId && candidate.sceneId === item.sceneId,
+                  )}
+                  run={run}
+                />
+              )}
+              <SplitEdit item={item} next={cut.items[index + 1]} run={run} />
             </>
           )}
           {!readOnly && text !== undefined && (

@@ -256,6 +256,23 @@ export const movieLibrarySource: LibrarySource = {
             refs,
           });
         }
+        for (const [index, take] of shot.takes.entries()) {
+          if (take.blobKey === null) continue;
+          assets.push({
+            id: `${MODE_ID}:take:${scene.id}:${shot.id}:${take.blobKey.split('/').at(-1) ?? ''}`,
+            modality: 'video',
+            kind: 'clip',
+            title: `${shotName}, earlier take ${String(index + 1)}`,
+            context: where,
+            origin: 'generated',
+            blobKey: take.blobKey,
+            mediaType: take.mediaType,
+            durationSeconds: take.durationSeconds,
+            createdAt: take.createdAt,
+            open,
+            refs,
+          });
+        }
         if (shot.dialogue !== null) {
           assets.push({
             id: `${MODE_ID}:dialogue:${scene.id}:${shot.id}`,
