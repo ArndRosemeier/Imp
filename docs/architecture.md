@@ -56,6 +56,20 @@ batch of writes, and change subscriptions. Values are JSON. Media will live in
 a separate blob store. Every implementation must pass the shared suite
 `describeKeyValueStoreContract` from `@imp/core/testing`.
 
+## The library
+
+Every asset of a project is in one library (`library.*` commands in
+`@imp/core`), whatever made it. The library stores nothing of its own sources:
+each mode or package hands it a `LibrarySource` that lists what it already
+keeps (the movie mode its portraits, clips, sounds and scenes; the world its
+pictures; the audio editor its documents), and the host passes them all to
+`createLibraryCommands`. A modality is a string, so a later one (3D, comics)
+is a new source, not a change to the library. Its own records are only what
+was imported or written there, under `projects/<id>/library/`, plus tags,
+stars and notes for any asset. In the interface, a drop target is
+`useLibraryDrop`; it also appears in the asset's "Use in" menu, which is the
+path that needs no dragging.
+
 ## Modes
 
 A working mode (movie first) is a package that contributes commands, agent

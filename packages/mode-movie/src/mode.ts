@@ -9,13 +9,13 @@ import { createDefaultAudioCodec } from '@imp/audio';
 import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
-import { libraryCommands } from './library.js';
+import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
 import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
 
 const SCOPE = {
-  prefixes: ['movie.', 'world.', 'project.list', 'project.resources.', 'media.'],
+  prefixes: ['movie.', 'world.', 'library.', 'project.list', 'project.resources.', 'media.'],
 } as const;
 
 export const screenwriter: Role = {
@@ -192,7 +192,8 @@ export const soundEditor: Role = {
   brief: [
     'You are a sound editor. You work in the audio editor with the same tools the person has',
     'there. A document holds tracks of regions, and each region plays a stretch of a recorded',
-    'sound; movie.sound.library lists every recorded sound of the film with its key. Open',
+    'sound; library.list with modality "sound" lists every sound of the project, imported files',
+    'included, with its blobKey (movie.sound.library lists only the recorded ones). Open',
     'sounds with audio.doc.create or audio.region.insert. You cannot hear while you work, so',
     'measure: audio.inspect gives levels (dialogue around -20 dB average, peaks below -1 dB)',
     'and audio.waveform shows where sound and pauses are. Cut with audio.region.split,',
@@ -205,7 +206,7 @@ export const soundEditor: Role = {
     'can. Each change is a step the person can undo, and they can take back your whole pass at',
     'once, so work in clear steps and say what you changed and why, by time.',
   ].join(' '),
-  scope: { prefixes: ['movie.', 'project.list', 'media.', 'audio.'] },
+  scope: { prefixes: ['movie.', 'library.', 'project.list', 'media.', 'audio.'] },
 };
 
 /**
@@ -260,6 +261,7 @@ export function createMovieMode(options: {
       soundEditor,
     ],
     project: movieProjectSupport,
+    library: [movieLibrarySource],
     // The pictures of the world are drawn in the film's tone.
     visualStyle: async (store, projectId) => {
       const stored = await store.get(movieDevelopmentKey(projectId));
