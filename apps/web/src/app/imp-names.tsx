@@ -14,6 +14,7 @@ export const IMP_ALIASES: readonly string[] = [
   'Infinite Montage Pipeline',
   'Images, Mischief, Pictures',
   'It’s Mostly Planning',
+  'Impossible Motion Pictures',
   'Impossibly Many Pictures',
   'Independent Motion Pictures',
 ];
