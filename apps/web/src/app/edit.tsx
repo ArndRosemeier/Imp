@@ -241,6 +241,9 @@ type Selection =
   | { kind: 'marker'; id: string }
   | null;
 
+/** Pieces narrower than this show their words only, without a still. */
+const THUMB_MIN_BLOCK_PX = 96;
+
 function Timeline({
   cut,
   scale,
@@ -258,6 +261,7 @@ function Timeline({
   removed,
   range,
   markers,
+  urls,
 }: {
   cut: Cut;
   scale: number;
@@ -279,6 +283,8 @@ function Timeline({
   removed: readonly Change[];
   range: Range | null;
   markers: readonly MarkerView[];
+  /** Media addresses by blob key, for the still each clip shows on its piece. */
+  urls: ReadonlyMap<string, string>;
 }): ReactElement {
   const edges = useDrag();
   /** Whether a pointer on a piece may start dragging it. */
@@ -287,6 +293,30 @@ function Timeline({
   const marked = (id: string): string => {
     const mark = marks.get(id);
     return mark === undefined ? '' : ` tracked tracked-${mark}`;
+  };
+  /**
+   * A still from the stretch of the clip a piece uses: its first frame, or its
+   * last when it plays backwards. Pieces too short to hold one keep their words.
+   */
+  const thumbFor = (item: Cut['items'][number], width: number): ReactElement | null => {
+    if (item.kind !== 'shot' || item.placeholder || width < THUMB_MIN_BLOCK_PX) return null;
+    const key = source.shots.find((shot) => shot.id === item.shotId)?.clip?.blobKey;
+    const url = key === undefined || key === null ? undefined : urls.get(key);
+    if (url === undefined) return null;
+    const second = item.reverse
+      ? Math.max(0, item.sourceSeconds - item.trimEndSeconds - 0.1)
+      : item.trimStartSeconds + 0.1;
+    return (
+      <video
+        className="block-thumb"
+        src={`${url}#t=${second.toFixed(2)}`}
+        muted
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+    );
   };
   const audioDrag = useDrag();
   const lineDrag = useDrag();
@@ -567,6 +597,7 @@ function Timeline({
                       aria-hidden="true"
                     />
                   )}
+                  {thumbFor(item, blockWidth)}
                   <span className="block-label">
                     {item.index} · {item.placeholder ? 'Pickup · ' : ''}
                     {item.label || 'Untitled'}
@@ -1818,6 +1849,7 @@ function SceneEditor({
           removed={removed}
           range={range}
           markers={markers}
+          urls={urls}
         />
       </div>
     </div>

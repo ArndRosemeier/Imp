@@ -6159,3 +6159,17 @@ dialog.spend-dialog {
   gap: 2px;
   font-size: 13px;
 }
+
+/* A still from each clip at the start of its piece on the picture lane. */
+.block-thumb {
+  flex: none;
+  width: 60px;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  border-right: 1px solid var(--line-strong);
+  background: var(--ground);
+}
+.block-thumb + .block-label {
+  padding-left: 8px;
+}
