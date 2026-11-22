@@ -12,6 +12,7 @@ import { Fragment, useEffect, useRef, useState, type PointerEvent, type ReactEle
 import { z } from 'zod';
 import { messageOf, runCommand } from './context.js';
 import { ModelPicker, useModelSetting, type Act } from './movie.js';
+import { Price } from './spend.js';
 
 const Word = z.object({
   index: z.number(),
@@ -265,6 +266,9 @@ export function WordsPanel({
               : missing === 0 && shown.length > 0
                 ? 'Check for new sound'
                 : `Write down what is said${missing > 1 ? ` (${String(missing)} regions)` : ''}`}
+            {!writing && missing > 0 && (
+              <Price command="audio.transcribe" input={{ projectId: project.id, docId }} />
+            )}
           </button>
         </div>
       </header>

@@ -83,10 +83,13 @@ describe('drawing a text', () => {
       500,
     );
     const [line] = fills(calls);
-    expect(line).toMatchObject({ text: 'Hold the light!', x: 500, align: 'center', alpha: 1 });
+    // Centred: 15 letters half as wide as they are high, 23 px high.
+    expect(line).toMatchObject({ text: 'Hold the light!', align: 'left', alpha: 1 });
+    expect(line?.x).toBeCloseTo(500 - (15 * 23 * 0.5) / 2);
     expect(line?.font).toContain(TEXT_FAMILIES.sans);
-    // Its bottom sits at 93% of the height: one line of 23 px at 1.22 line height.
-    expect(line?.y).toBeCloseTo(465 - (23 * 1.22) / 2);
+    // Its bottom sits at 93% of the height: one line of 23 px at 1.22 line height,
+    // drawn on its baseline a little below the middle of the line.
+    expect(line?.y).toBeCloseTo(465 - (23 * 1.22) / 2 + 23 * 0.3);
     expect(calls.some((call) => call.op === 'stroke')).toBe(true);
     expect(calls[0]?.op).toBe('save');
     expect(calls.at(-1)?.op).toBe('restore');
@@ -136,7 +139,12 @@ describe('drawing a text', () => {
     );
     const lines = fills(calls);
     expect(lines.map((line) => line.text)).toEqual(['ONE TWO', 'THREE FOUR', 'FIVE SIX']);
-    expect(lines.every((line) => line.x === 360 && line.align === 'right')).toBe(true);
+    // Right aligned: each line ends at 90% of the width.
+    expect(
+      lines.every(
+        (line) => Math.abs((line.x ?? 0) + (line.text?.length ?? 0) * 6.8 * 0.5 - 360) < 0.01,
+      ),
+    ).toBe(true);
   });
 
   it('types a caption in and fades a title out', () => {

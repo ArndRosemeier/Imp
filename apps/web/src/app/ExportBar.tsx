@@ -1,7 +1,7 @@
 import type { Project } from '@imp/core';
 import { FilmExport, filmPartKey } from '@imp/mode-movie';
 import { DownloadSimpleIcon, FilmStripIcon, StopIcon, TrashIcon } from '@phosphor-icons/react';
-import { useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import type { ImpClient } from '@imp/host';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
@@ -44,19 +44,27 @@ export function ExportBar({
   project,
   sceneId,
   sceneIds,
+  onStatus,
 }: {
   project: Project;
   sceneId: string | undefined;
   sceneIds: readonly string[];
+  /** What is being exported right now, in a few words, or null while nothing is. */
+  onStatus?: ((status: string | null) => void) | undefined;
 }): ReactElement {
   const live = useLive([`${moviePrefix(project)}exports/`], async (imp) =>
     Exports.parse(await runCommand(imp, 'movie.edit.export.list', { projectId: project.id })),
   );
   if (live.data === undefined) return <div className="stack export-bar" />;
   return live.data.canRender ? (
-    <RenderedExports project={project} sceneId={sceneId} exports={live.data.exports} />
+    <RenderedExports
+      project={project}
+      sceneId={sceneId}
+      exports={live.data.exports}
+      onStatus={onStatus}
+    />
   ) : (
-    <RecordedExport project={project} sceneId={sceneId} sceneIds={sceneIds} />
+    <RecordedExport project={project} sceneId={sceneId} sceneIds={sceneIds} onStatus={onStatus} />
   );
 }
 
@@ -64,10 +72,12 @@ function RenderedExports({
   project,
   sceneId,
   exports,
+  onStatus,
 }: {
   project: Project;
   sceneId: string | undefined;
   exports: readonly FilmExport[];
+  onStatus?: ((status: string | null) => void) | undefined;
 }): ReactElement {
   const imp = useImp();
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +85,21 @@ function RenderedExports({
   const [saving, setSaving] = useState<string | null>(null);
   const rendering = exports.find((film) => film.status === 'rendering');
   const busy = starting || rendering !== undefined;
+  const status =
+    rendering === undefined
+      ? starting
+        ? 'Starting'
+        : null
+      : `${String(Math.floor((rendering.progressSeconds / Math.max(1, rendering.durationSeconds)) * 100))}%`;
+  useEffect(() => {
+    onStatus?.(status);
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => () => {
+      onStatus?.(null);
+    },
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const start = (sceneIds: readonly string[] | undefined): void => {
     setError(null);
@@ -226,10 +251,12 @@ function RecordedExport({
   project,
   sceneId,
   sceneIds,
+  onStatus,
 }: {
   project: Project;
   sceneId: string | undefined;
   sceneIds: readonly string[];
+  onStatus?: ((status: string | null) => void) | undefined;
 }): ReactElement {
   const imp = useImp();
   const format = recordingFormat();
@@ -238,6 +265,19 @@ function RecordedExport({
   const [done, setDone] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const running = progress !== null;
+  const status =
+    progress === null
+      ? null
+      : `${String(Math.floor((progress.seconds / Math.max(1, progress.totalSeconds)) * 100))}%`;
+  useEffect(() => {
+    onStatus?.(status);
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(
+    () => () => {
+      onStatus?.(null);
+    },
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const start = (ids: readonly string[], label: string): void => {
     const controller = new AbortController();

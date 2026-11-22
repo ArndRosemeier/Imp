@@ -5,6 +5,9 @@ import {
   createModelCommands,
   createModelMixCommands,
   createSavedCrewCommands,
+  createSpendCommands,
+  createSpendLedger,
+  withSpendLedger,
   releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
@@ -19,6 +22,7 @@ import {
 import {
   activityCommands,
   CommandRegistry,
+  createHelpCommands,
   createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
@@ -47,6 +51,7 @@ import {
 } from '@imp/mode-movie';
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
+import { workspaceGuides } from './guide.js';
 import type { SecretStore } from './secrets.js';
 
 /** The assembled core of one host. The interface reaches it through `serveImp`. */
@@ -122,13 +127,16 @@ export function createImp(options: ImpOptions): Imp {
     now: () => new Date(),
     newId: () => crypto.randomUUID(),
   };
-  const provider =
+  // Every paid call goes through here and is written down, whichever command made it.
+  const provider = withSpendLedger(
     options.provider ??
-    createOpenRouterProvider({
-      fetch: browserFetch,
-      appName: 'Imp',
-      apiKey: () => options.secrets.getKey() ?? '',
-    });
+      createOpenRouterProvider({
+        fetch: browserFetch,
+        appName: 'Imp',
+        apiKey: () => options.secrets.getKey() ?? '',
+      }),
+    createSpendLedger(runtime),
+  );
   // Adding a working mode to the app is adding it to this list.
   const codec = createDefaultAudioCodec(
     options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
@@ -151,6 +159,11 @@ export function createImp(options: ImpOptions): Imp {
     ...settingsCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
     ...activityCommands,
+    // The guide: Imp's pages about itself, and the stages' pages from each mode.
+    ...createHelpCommands([
+      ...workspaceGuides,
+      ...modes.flatMap((mode) => mode.stages.flatMap((stage) => stage.guide ?? [])),
+    ]),
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createLibraryCommands([
@@ -188,6 +201,7 @@ export function createImp(options: ImpOptions): Imp {
       { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
     ]),
     ...createAgentCommands({ registry, provider, roles }),
+    ...createSpendCommands({ registry, provider }),
   );
   let started: Promise<void> | undefined;
   return {

@@ -1,4 +1,4 @@
-import { CommandError, defineCommand, requireProject, type Command } from '@imp/core';
+import { CommandError, defineCommand, requireProject, type Command, chosenModel } from '@imp/core';
 import { ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
 import { characterPrefix, movieDevelopmentKey } from './commands.js';
@@ -78,6 +78,10 @@ export function createCharacterImageCommands(provider: GenerationProvider): read
         .default('3:4'),
     }),
     output: z.object({ image: CharacterImage, costUsd: z.number().nullable() }),
+    estimate: async ({ runtime }, input) => ({
+      kind: 'image',
+      model: await chosenModel(runtime.store, IMAGE_MODEL_SETTING, input.model),
+    }),
     handler: async ({ runtime }, input) => {
       const id = 'movie.character.image.generate';
       const { key, character } = await load(runtime.store, id, input.projectId, input.characterId);

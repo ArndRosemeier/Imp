@@ -32,3 +32,15 @@ export {
 } from './run.js';
 export { defineMode, type Mode, type Stage } from './mode.js';
 export { createModelCommands } from './models.js';
+export {
+  createSpendCommands,
+  createSpendLedger,
+  Estimate,
+  priceRequest,
+  priceVideo,
+  SPEND_PREFIX,
+  SpendEntry,
+  withSpendLedger,
+  type PaidCall,
+  type SpendLedger,
+} from './spend.js';

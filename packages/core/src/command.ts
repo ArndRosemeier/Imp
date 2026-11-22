@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { Actor } from './actor.js';
 import { CommandError } from './errors.js';
+import type { CostRequest } from './cost.js';
 import type { CoreRuntime } from './runtime.js';
 
 /**
@@ -29,6 +30,11 @@ export interface CommandSpec<I extends z.ZodType, O extends z.ZodType> {
   readonly input: I;
   readonly output: O;
   readonly handler: (context: CommandContext, input: z.output<I>) => Promise<z.input<O>>;
+  /**
+   * For commands that spend: what running it with this input would make, so
+   * it can be priced first. Reads only; null when it cannot say.
+   */
+  readonly estimate?: (context: CommandContext, input: z.output<I>) => Promise<CostRequest | null>;
 }
 
 /** The type-erased form the registry stores and every caller can run. */
@@ -41,6 +47,8 @@ export interface Command {
   readonly output: z.ZodType;
   /** Validates `rawInput`, runs the handler and validates the result. */
   readonly run: (context: CommandContext, rawInput: unknown) => Promise<unknown>;
+  /** What it would make, for pricing before it runs. Null for invalid input or when it cannot say. */
+  readonly estimate?: (context: CommandContext, rawInput: unknown) => Promise<CostRequest | null>;
 }
 
 /** A command that still remembers its input and output types, for typed callers. */
@@ -92,6 +100,15 @@ export function defineCommand<I extends z.ZodType, O extends z.ZodType>(
     effect: spec.effect,
     input: spec.input,
     output: spec.output,
+    ...(spec.estimate === undefined
+      ? {}
+      : {
+          estimate: async (context: CommandContext, rawInput: unknown) => {
+            const input = spec.input.safeParse(rawInput);
+            if (!input.success || spec.estimate === undefined) return null;
+            return spec.estimate(context, input.data);
+          },
+        }),
     run: async (context, rawInput) => {
       const input = spec.input.safeParse(rawInput);
       if (!input.success) {

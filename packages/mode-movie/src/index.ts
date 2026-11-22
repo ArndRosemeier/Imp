@@ -91,6 +91,19 @@ export {
   slateText,
 } from './pickups.js';
 export {
+  escapeMarkup,
+  FAST_READING,
+  hasMarkup,
+  letterCount,
+  MARKUP_SIZES,
+  markupLines,
+  parseMarkup,
+  plainText,
+  readingSpeed,
+  subtitleMarkup,
+  type TextRun,
+} from './text-markup.js';
+export {
   CUE_LETTERS,
   DEFAULT_TEXT_STYLES,
   placeText,
@@ -177,3 +190,4 @@ export {
   type Placed,
   type Punch,
 } from './piece-time.js';
+export { movieGuides } from './guide.js';

@@ -76,6 +76,14 @@ project can load one. A saved crew copies the custom roles its agents hold;
 loading it brings back any that were deleted and never dismisses the
 coordinator, which may be the agent doing the loading.
 
+## Help
+
+Imp explains itself from one set of pages, the guide (`help.*` commands in `@imp/core`). Each stage of a mode carries its own page, with the short tip shown the first time the stage opens (`Stage.guide`); pages about Imp as a whole live in `packages/host/src/guide.ts`. The help panel, the tips, and agents that answer questions all read the same pages. Whether tips are shown, and which were closed, are the settings `help.enabled` and `help.dismissed`, so turning all help off is one command a person or an agent can run.
+
+## Spending
+
+Every paid call goes through one provider wrapper (`withSpendLedger` in `@imp/agents`), which writes it under `spend/` with the model, the amount (an estimate, marked as such, when the provider does not report one) and the project open at the time. A command that spends can say what it is about to make (`estimate` on its definition: a `CostRequest` such as "a 4 second 720p clip on this model"); `spend.estimate` prices that from the video model's price list, from what the same model cost before, or from a typical price, and the interface puts the result on the button and on agents' approval cards. `spend.summary` gives the totals.
+
 ## Modes
 
 A working mode (movie first) is a package that contributes commands, agent

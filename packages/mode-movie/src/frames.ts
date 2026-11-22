@@ -1,4 +1,4 @@
-import { CommandError, defineCommand, type Command } from '@imp/core';
+import { CommandError, defineCommand, type Command, chosenModel } from '@imp/core';
 import { ProviderError, type GenerationProvider, type MediaInput } from '@imp/providers';
 import { IMAGE_MODEL_SETTING } from '@imp/world';
 import { z } from 'zod';
@@ -115,6 +115,10 @@ export function createFrameCommands(
         .describe('Match the clip it will start: 16:9 unless the clip is made otherwise.'),
     }),
     output: z.object({ frame: KeyFrame }),
+    estimate: async ({ runtime }, input) => ({
+      kind: 'image',
+      model: await chosenModel(runtime.store, IMAGE_MODEL_SETTING, input.model),
+    }),
     handler: async ({ runtime }, input) => {
       const id = 'movie.shot.frame.generate';
       const { key, shot } = await loadShot(runtime.store, id, input);

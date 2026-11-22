@@ -7,6 +7,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
   patchOf,
+  chosenModel,
 } from '@imp/core';
 import { ProviderError, type GenerationProvider, type MediaInput } from '@imp/providers';
 import { z } from 'zod';
@@ -553,6 +554,10 @@ function kindCommands(
         .describe('Send the pictures already made as references. Switch off to start afresh.'),
     }),
     output: z.object({ image: WorldImage }),
+    estimate: async ({ runtime }, input) => ({
+      kind: 'image',
+      model: await chosenModel(runtime.store, IMAGE_MODEL_SETTING, input.model),
+    }),
     handler: async ({ runtime }, input) => {
       const id = `${prefix}.image.generate`;
       const elementId = idOf(input);

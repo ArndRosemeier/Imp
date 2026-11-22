@@ -28,6 +28,26 @@ export interface VideoAbilities {
   readonly frameImages: readonly string[];
   /** Whether it makes its own sound; null when the catalog does not say. */
   readonly nativeAudio: boolean | null;
+  /** What a clip costs, when the catalog says. */
+  readonly pricing?: VideoPricing;
+}
+
+/** One line of a video model's price list. */
+export interface VideoPrice {
+  /** For example `720p`; null when the price holds for any size. */
+  readonly resolution: string | null;
+  /** True with its own sound, false without; null when it makes no difference. */
+  readonly audio: boolean | null;
+  /** US dollars per second of video, or per video token. */
+  readonly usd: number;
+}
+
+export interface VideoPricing {
+  readonly perSecond: readonly VideoPrice[];
+  /** Video tokens: about width × height × 24 frames per second ÷ 1024 each second. */
+  readonly perToken: readonly VideoPrice[];
+  /** The least one clip costs. */
+  readonly minimumUsd?: number;
 }
 
 export interface ModelInfo {

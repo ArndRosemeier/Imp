@@ -1,6 +1,7 @@
 import type { JsonValue } from '@imp/core';
 import type { z } from 'zod';
 import { decodeBase64, encodeBase64 } from '../base64.js';
+import { parseVideoPricing } from './video-pricing.js';
 import { ProviderError, type ProviderErrorKind } from '../errors.js';
 import type { HttpFetch, HttpResponse } from '../http.js';
 import {
@@ -19,6 +20,7 @@ import {
   type MediaInput,
   type ModelInfo,
   type VideoAbilities,
+  type VideoPricing,
   type VideoJob,
   type VideoRequest,
   type SoundRequest,
@@ -308,6 +310,17 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
    * What the video models can make. Without it the catalog is still useful, so
    * a failure here only means that abilities are not known.
    */
+  function priced(skus: Readonly<Record<string, string | number>> | null | undefined): {
+    pricing?: VideoPricing;
+  } {
+    const pricing = parseVideoPricing(
+      skus === null || skus === undefined
+        ? undefined
+        : Object.fromEntries(Object.entries(skus).map(([key, value]) => [key, String(value)])),
+    );
+    return pricing === undefined ? {} : { pricing };
+  }
+
   async function videoAbilities(call: CallOptions): Promise<Map<string, VideoAbilities>> {
     const abilities = new Map<string, VideoAbilities>();
     try {
@@ -320,6 +333,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
           aspectRatios: model.supported_aspect_ratios ?? [],
           frameImages: model.supported_frame_images ?? [],
           nativeAudio: model.generate_audio ?? null,
+          ...priced(model.pricing_skus),
         });
       }
     } catch (error) {

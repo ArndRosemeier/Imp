@@ -1,4 +1,5 @@
 import type { TextAnchor, TextItem, TextKind, TextStyle } from './schema.js';
+import { subtitleMarkup } from './text-markup.js';
 
 /**
  * The text lane worked out in time, without drawing: the styles a film starts
@@ -379,7 +380,7 @@ export function toSrt(cues: readonly TimedCue[]): string {
   return cues
     .map(
       (cue, index) =>
-        `${String(index + 1)}\n${stamp(cue.startSeconds, ',')} --> ${stamp(cue.endSeconds, ',')}\n${cue.text}\n`,
+        `${String(index + 1)}\n${stamp(cue.startSeconds, ',')} --> ${stamp(cue.endSeconds, ',')}\n${subtitleMarkup(cue.text, 'srt')}\n`,
     )
     .join('\n');
 }
@@ -389,7 +390,7 @@ export function toVtt(cues: readonly TimedCue[]): string {
   const body = cues
     .map(
       (cue) =>
-        `${stamp(cue.startSeconds, '.')} --> ${stamp(cue.endSeconds, '.')}\n${cue.text.replace(/-->/g, '→')}\n`,
+        `${stamp(cue.startSeconds, '.')} --> ${stamp(cue.endSeconds, '.')}\n${subtitleMarkup(cue.text, 'vtt').replace(/-->/g, '→')}\n`,
     )
     .join('\n');
   return `WEBVTT\n\n${body}`;

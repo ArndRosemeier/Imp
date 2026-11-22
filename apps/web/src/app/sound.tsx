@@ -8,6 +8,7 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
 import { SceneTabs } from './shots.js';
+import { Price } from './spend.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true })),
@@ -109,6 +110,7 @@ function SoundCard({
           }}
         >
           <kind.icon aria-hidden="true" /> {sound.take === null ? 'Generate' : 'Generate again'}
+          <Price command="movie.sound.generate" input={at} />
         </button>
       </div>
     </article>

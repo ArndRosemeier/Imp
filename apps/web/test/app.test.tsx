@@ -783,10 +783,13 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
     // jsdom cannot record video, so export says so instead of offering a broken button.
+    // Export and help live in menus, so the picture and the timeline share one screen.
+    await user.click(screen.getByRole('button', { name: /^Export/ }));
     expect(screen.getByText(/cannot record video/)).toBeTruthy();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Export film/ }).disabled).toBe(
       true,
     );
+    await user.click(screen.getByRole('button', { name: 'Close export' }));
 
     await user.click(first);
     expect(await screen.findByText(/Shot 1/, { selector: 'h3' })).toBeTruthy();
@@ -804,6 +807,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /Redo/ }));
     expect(await screen.findByRole('button', { name: /Shot 3: Mara/ })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Add to the scene' }));
     await user.click(screen.getByRole('button', { name: /Add title/ }));
     expect(await screen.findByRole('button', { name: /Title 2: Title/ })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Delete/ }));
@@ -1361,6 +1365,79 @@ describe('App', () => {
     } finally {
       mark.remove();
     }
+  });
+
+  it('shows a tip the first time a stage opens, and turns all tips off in one step', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+
+    const first = await screen.findByRole('complementary', { name: /Start with the idea/ });
+    await user.click(within(first).getByRole('button', { name: 'Got it' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Start with the idea/ })).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    const second = await screen.findByRole('complementary', { name: /Break the story/ });
+    await user.click(within(second).getByRole('button', { name: 'Turn off all tips' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Break the story/ })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await screen.findByRole('heading', { name: 'Casting' });
+    expect(screen.queryByRole('complementary', { name: /^Tip/ })).toBeNull();
+    expect((await imp.store.get('settings/help.enabled')) ?? true).toBe(false);
+
+    // The guide stays, and searching finds the page about the Edit stage.
+    await user.click(screen.getByRole('button', { name: /Help/ }));
+    const guide = await screen.findByRole('dialog', { name: 'The Imp guide' });
+    expect(await within(guide).findByRole('heading', { name: 'Getting started' })).toBeTruthy();
+    await user.type(within(guide).getByRole('searchbox'), 'dissolve');
+    await user.click(await within(guide).findByRole('button', { name: /^Edit/ }));
+    expect(await within(guide).findByRole('heading', { name: 'Edit' })).toBeTruthy();
+
+    // Tips come back from the same switch, in the guide or in Settings.
+    await user.click(within(guide).getByRole('switch', { name: /Show tips/ }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('settings/help.enabled')).toBe(true);
+    });
+  });
+
+  it('shows the price on a button that spends, and keeps a running total', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await user.click(await screen.findByRole('button', { name: /Add character/ }));
+    const card = await screen.findByRole('article', { name: 'New character' });
+    await screen.findByRole('option', { name: 'vendor/painter' });
+    await user.selectOptions(screen.getByLabelText('Image model'), 'vendor/painter');
+
+    // Before the model has been used, the price is a rough typical one.
+    const make = within(card).getByRole('button', { name: /Portrait/ });
+    await vi.waitFor(() => {
+      expect(make.textContent).toContain('≈ $0.01');
+    });
+    expect(screen.getByRole('button', { name: /Spent \$0\.00 on this project/ })).toBeTruthy();
+
+    await user.click(make);
+    await within(card).findByRole('img', { name: 'Portrait of New character' });
+    // The fake painter charges a cent: the total counts it, and the next price comes from it.
+    const total = await screen.findByRole('button', { name: /Spent \$0\.01 on this project/ });
+    await vi.waitFor(() => {
+      const again = within(card).getByRole('button', { name: /Another/ });
+      expect(again.querySelector('.price')?.getAttribute('data-basis')).toBe('your history');
+    });
+    await user.click(total);
+    const panel = await screen.findByRole('dialog', { name: 'What Imp has spent' });
+    expect(within(panel).getAllByText('Pictures').length).toBe(2);
+    expect(within(panel).getAllByText('vendor/painter').length).toBeGreaterThan(0);
   });
 
   it('switches web search on for a crew member', async () => {
