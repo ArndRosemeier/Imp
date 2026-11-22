@@ -385,7 +385,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             </button>
           ))}
         </nav>
-        <main className="main">
+        <main className="main" data-stage={isStage ? view : undefined}>
           {view === 'crew' && <CrewView />}
           {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
           {view === 'projects' && (

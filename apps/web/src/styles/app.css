@@ -985,12 +985,6 @@ input.input.script {
 .editor {
   outline: none;
 }
-.editor-top {
-  display: grid;
-  grid-template-columns: minmax(320px, 5fr) minmax(280px, 4fr);
-  gap: var(--space-4);
-  align-items: start;
-}
 .preview {
   margin: 0;
 }
@@ -1026,9 +1020,6 @@ input.input.script {
 .toolbar {
   align-items: center;
   gap: var(--space-2);
-}
-.toolbar .zoom {
-  margin-left: auto;
 }
 .timeline {
   border: 1px solid var(--line);
@@ -1375,11 +1366,6 @@ input.input.script {
   border-bottom: 1px solid var(--line);
 }
 /* By the room the stage really has, which depends on the side panels as much as on the window. */
-@container main (max-width: 680px) {
-  .editor-top {
-    grid-template-columns: 1fr;
-  }
-}
 .field.compact {
   flex: 0 0 112px;
   gap: 2px;
@@ -1393,13 +1379,6 @@ input.input.script {
 .field.compact .input {
   width: 100%;
   padding: 4px 8px;
-}
-.field.compact.zoom {
-  flex: 0 0 160px;
-  margin-left: auto;
-}
-.field.compact.zoom > span {
-  min-height: 0;
 }
 .lane .block {
   top: 18px;
@@ -4331,10 +4310,6 @@ dialog.modal.wide:has(.style-editor) {
 .marker-inspector textarea {
   resize: vertical;
 }
-.toolbar .zoom {
-  gap: var(--space-2);
-  align-items: flex-end;
-}
 .grade-filters {
   position: absolute;
   width: 0;
@@ -4630,5 +4605,528 @@ dialog.whats-new-dialog {
     box-shadow:
       0 0 0 2px var(--ground),
       0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+}
+
+/*
+ * The Edit screen fits one screen: header, film strip, the picture with the
+ * selected piece beside it, then the tools and the timeline as one deck at the
+ * bottom. The picture takes the room that is left and shrinks to fit it, so the
+ * timeline is always in view, on a tablet as on a short desktop window.
+ */
+.main[data-stage='edit'] {
+  padding: 14px 20px 12px;
+  gap: 0;
+}
+.edit-screen {
+  flex: 1 1 auto;
+  /* Below this the screen scrolls rather than squeezing the picture to nothing. */
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.edit-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit);
+  min-width: 0;
+}
+.edit-head h1 {
+  font-size: 32px;
+  line-height: 1;
+  flex: none;
+}
+.edit-summary {
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.edit-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex: none;
+}
+.edit-screen > .error,
+.edit-screen > [role='alert'] {
+  flex: none;
+}
+
+/* Square buttons that are only an icon, at least a fingertip in size. */
+.button.icon-only {
+  width: var(--hit);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0;
+  border-radius: var(--radius-s);
+  font-size: 19px;
+}
+.button.quiet.icon-only[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+
+/* The film strip as one slim row. */
+.film-strip.compact {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 4px;
+  border-radius: var(--radius-m);
+}
+.film-strip.compact .film-strip-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px;
+}
+.film-strip.compact .film-scene {
+  height: var(--hit);
+  justify-content: center;
+  gap: 1px;
+  padding: 2px 9px 5px;
+}
+.film-strip.compact .film-scene-name {
+  font-size: 12px;
+  line-height: 1.25;
+}
+.film-strip.compact .film-scene-meta {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.film-strip.compact .film-strip-tools {
+  flex: none;
+  margin-left: 0;
+}
+.film-strip.compact .segmented button,
+.film-strip.compact .film-strip-tools .button {
+  min-width: var(--hit);
+  min-height: var(--hit);
+}
+
+/* The editor below the film strip. */
+.editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor > .proposal {
+  flex: none;
+  margin-bottom: var(--space-2);
+}
+.edit-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 120px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(260px, 34%, 380px);
+  gap: var(--space-3);
+}
+/* A dark monitor well; the frame inside keeps 16:9 and fits whichever side runs out first. */
+.edit-stage .preview {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-m);
+  background: radial-gradient(ellipse at center, #15130f 0%, #070605 70%);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.edit-stage .preview-frame {
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+.edit-stage .inspector {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-m);
+}
+.inspector-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
+}
+.inspector-empty .button {
+  margin-left: -12px;
+}
+.inspector-close,
+.inspector-toggle {
+  display: none;
+}
+.button.icon-only.inspector-close,
+.button.icon-only.inspector-toggle {
+  display: none;
+}
+/* The marked stretch, floating over the bottom of the picture. */
+.edit-stage .range-note {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - 20px);
+  padding: 2px 14px 2px 2px;
+  border-radius: var(--radius-pill);
+  background: rgb(14 13 11 / 0.8);
+  backdrop-filter: blur(6px);
+}
+.edit-stage .range-note .chip {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
+}
+.edit-stage .range-note .muted {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The bar between the picture and the deck: drag it to share the height. */
+.edit-splitbar {
+  flex: none;
+  height: max(14px, var(--handle));
+  display: grid;
+  place-items: center;
+  cursor: row-resize;
+  touch-action: none;
+  outline: none;
+}
+.edit-splitbar > span {
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  transition:
+    background 120ms ease,
+    width 120ms ease;
+}
+.edit-splitbar:focus-visible > span,
+.edit-splitbar[data-dragging='true'] > span {
+  width: 72px;
+  background: var(--accent);
+}
+@media (hover: hover) {
+  .edit-splitbar:hover > span {
+    background: var(--ink-muted);
+  }
+}
+
+/* The deck: tools on top, the timeline under them, one surface. */
+.edit-toolbar {
+  position: relative;
+  /* Above the details panel that slides over the picture, so Add opens over both. */
+  z-index: 10;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-bottom-color: var(--line);
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+  background: var(--surface);
+}
+.play-button.button {
+  flex: none;
+  width: var(--hit);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+}
+.edit-clock {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 0 var(--space-2) 0 6px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.edit-clock strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 15px;
+}
+/* The editing tools scroll sideways when the stage is narrow; Add and zoom stay put. */
+.edit-tools {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.edit-tools {
+  /* A soft edge on the right says there is more to swipe to. */
+  padding-right: 20px;
+  mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
+}
+.edit-tools::-webkit-scrollbar {
+  display: none;
+}
+.tool-group {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  border-left: 1px solid var(--line);
+}
+.tool-group:first-child {
+  border-left: none;
+}
+.button.mark-button {
+  min-width: var(--hit);
+  padding: 0 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.button.mark-button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+.edit-zoom {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+.zoom-slider {
+  width: 92px;
+  height: var(--hit);
+  margin: 0 4px;
+  accent-color: var(--accent);
+}
+.button.fit-button {
+  min-width: var(--hit);
+  padding: 0 10px;
+}
+.edit-timeline {
+  flex: 0 0 var(--timeline-height, 38%);
+  min-height: 140px;
+  max-height: 72%;
+  display: flex;
+  flex-direction: column;
+}
+.edit-timeline .timeline {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: none;
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+}
+.edit-timeline .timeline-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* The time ruler stays on top while the lanes scroll under it. */
+.edit-timeline .timeline-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--surface-raised);
+}
+
+/* Menus that open from a button: Export, Look, Add. */
+.popover {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.popover-trigger[aria-expanded='true'] {
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+.popover-trigger .popover-text {
+  white-space: nowrap;
+}
+.popover-trigger svg {
+  font-size: 18px;
+}
+.popover-badge {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: 600 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.popover-panel {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100cqw - 24px));
+  max-height: min(72vh, 600px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-overlay);
+  text-align: left;
+}
+.popover-panel[hidden] {
+  display: none;
+}
+.popover-panel.wide {
+  width: min(540px, calc(100cqw - 24px));
+}
+.popover-panel[data-side='up'] {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.popover-panel[data-align='start'] {
+  right: auto;
+  left: 0;
+}
+.popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: -4px -8px var(--space-2) 0;
+}
+.popover-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.1;
+}
+.popover-panel .film-look {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+.popover-panel .export-bar {
+  gap: var(--space-3);
+}
+/* Add opens over the picture from the right end of the tools, whatever the stage's width. */
+.edit-add.popover {
+  position: static;
+}
+.edit-add .popover-panel {
+  right: 6px;
+}
+.edit-add-body {
+  gap: var(--space-4);
+}
+.edit-add-body .text-tools {
+  padding-left: 0;
+  border-left: none;
+}
+.edit-add-sound {
+  gap: var(--space-2);
+}
+.edit-add-sound .select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* The editor's help. */
+.edit-help-head {
+  justify-content: space-between;
+  align-items: center;
+}
+.edit-help-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-5);
+}
+.edit-help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.edit-help-table caption {
+  text-align: left;
+  padding-bottom: var(--space-2);
+}
+.edit-help-table th,
+.edit-help-table td {
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+}
+.edit-help-table th {
+  width: 42%;
+  padding-right: var(--space-3);
+  font-weight: 400;
+}
+.edit-help-table td {
+  color: var(--ink-soft);
+}
+
+/* A narrow stage, such as a tablet with the crew open: the details slide over the picture. */
+@container main (max-width: 760px) {
+  .edit-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .edit-stage .inspector {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 6;
+    width: min(360px, 100%);
+    padding-top: calc(var(--hit) + 4px);
+    box-shadow: var(--shadow-overlay);
+  }
+  .edit-stage[data-inspector='closed'] .inspector {
+    display: none;
+  }
+  .button.icon-only.inspector-close {
+    display: inline-flex;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+  .button.icon-only.inspector-toggle {
+    display: inline-flex;
+  }
+  .edit-zoom .button.icon-only {
+    display: none;
+  }
+  .edit-summary {
+    display: none;
+  }
+}
+@container main (max-width: 1000px) {
+  .zoom-slider {
+    display: none;
+  }
+}
+@container main (max-width: 900px) {
+  .edit-head h1 {
+    font-size: 26px;
   }
 }

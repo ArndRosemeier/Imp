@@ -12,7 +12,17 @@ import {
   SpeakerHighIcon,
   TextTIcon,
   TrashIcon,
+  ExportIcon,
+  MagnifyingGlassMinusIcon,
+  MagnifyingGlassPlusIcon,
+  PaletteIcon,
+  PlusIcon,
+  QuestionIcon,
+  SidebarSimpleIcon,
+  SplitHorizontalIcon,
+  XIcon,
 } from '@phosphor-icons/react';
+import { EditHelp, Popover, SplitBar, useTimelineHeight } from './edit-chrome.js';
 import { IDENTITY_MATRIX } from '@imp/mode-movie';
 import { FilmStrip } from './film-strip.js';
 import { FilmLookPanel, GradeTools, LookView, PRESET_LABELS } from './grade.js';
@@ -22,6 +32,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type ReactElement,
@@ -716,9 +727,12 @@ function SceneEditor({
   autoplay = false,
   canMatch = false,
   onEnded,
+  onHelp,
 }: {
   project: Project;
   sceneId: string;
+  /** Opens the help with the editor's gestures and keys. */
+  onHelp: () => void;
   /** How the scene is named to the crew: "Scene 2". */
   sceneLabel: string;
   act: Act;
@@ -766,7 +780,19 @@ function SceneEditor({
   /** The style the style editor is open on, or null while it is closed. */
   const [styling, setStyling] = useState<string | null>(null);
   const coarse = useCoarsePointer();
+  const editorBox = useRef<HTMLDivElement>(null);
+  const timelineHeight = useTimelineHeight();
+  // Beside the picture on a wide stage; on a narrow one it slides over the picture while open.
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  // Selecting a piece, or showing a proposal, opens the details.
+  const selected = selection === null ? '' : `${selection.kind}:${selection.id}`;
+  const [opener, setOpener] = useState('');
   const data = live.data;
+  const openWith = `${selected}|${live.data?.cut.version === 'draft' ? 'draft' : ''}`;
+  if (openWith !== opener) {
+    setOpener(openWith);
+    if (selected !== '' || live.data?.cut.version === 'draft') setInspectorOpen(true);
+  }
   const shots = data?.shots;
   const sounds = data?.sounds;
   const source = useMemo<Source>(
@@ -990,11 +1016,60 @@ function SceneEditor({
   ];
   const notInFilm = cut.items.filter((candidate) => candidate.durationSeconds === 0);
 
+  const tool = (
+    label: string,
+    icon: ReactElement,
+    onClick: () => void,
+    disabled: boolean,
+    keyHint?: string,
+  ): ReactElement => (
+    <button
+      type="button"
+      className="button quiet icon-only"
+      aria-label={label}
+      title={keyHint === undefined ? label : `${label} (${keyHint})`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {icon}
+    </button>
+  );
+  const waiting = notInFilm.length + cut.unplaced.length;
+  const zoomBy = (factor: number): void => {
+    setScale((before) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, before * factor)));
+  };
+
   return (
     // The shortcuts belong to the whole editor, which takes the keys that reach it.
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex, jsx-a11y/no-static-element-interactions
-    <div className="stack editor" tabIndex={0} onKeyDown={keys} aria-label="Cut editor">
-      <div className="editor-top">
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div
+      className="editor"
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      onKeyDown={keys}
+      aria-label="Cut editor"
+      ref={editorBox}
+      style={
+        timelineHeight.height === null
+          ? undefined
+          : ({ '--timeline-height': `${String(timelineHeight.height)}px` } as CSSProperties)
+      }
+    >
+      {cut.draft !== null && (
+        <ProposalBar
+          draft={cut.draft}
+          version={cut.version}
+          onVersion={setVersion}
+          onKeepAll={() => {
+            review('movie.edit.draft.keep');
+          }}
+          onDiscard={() => {
+            review('movie.edit.draft.discard');
+          }}
+        />
+      )}
+
+      <div className="edit-stage" data-inspector={inspectorOpen ? 'open' : 'closed'}>
         <figure className="preview">
           <div className="preview-frame">
             {/* The cut has no captions; the lines are in the shots. */}
@@ -1034,11 +1109,43 @@ function SceneEditor({
           <audio ref={attachVoice} aria-label="Dialogue of the preview" />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio ref={attachSecondVoice} aria-hidden="true" />
+          {range !== null && (
+            <div className="range-note">
+              <span className="chip" aria-label="Marked stretch">
+                {clock(range.from)}–{clock(range.to)} marked
+                <button
+                  type="button"
+                  className="button quiet icon"
+                  aria-label="Clear the marked stretch"
+                  onClick={() => {
+                    setMarksAt({ in: null, out: null });
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+              <span className="muted small">
+                {attached === null
+                  ? 'Detached from the crew panel.'
+                  : 'Goes with your next message to the crew.'}
+              </span>
+            </div>
+          )}
         </figure>
         <div
           className="stack inspector"
           aria-label={readOnly ? 'Proposed changes' : 'Selected piece'}
         >
+          <button
+            type="button"
+            className="button quiet icon-only inspector-close"
+            aria-label="Close the details"
+            onClick={() => {
+              setInspectorOpen(false);
+            }}
+          >
+            <XIcon aria-hidden="true" />
+          </button>
           {readOnly && (
             <ChangeList
               proposal={proposal.data}
@@ -1068,11 +1175,16 @@ function SceneEditor({
             line === undefined &&
             marker === undefined &&
             text === undefined && (
-              <p className="muted">
-                {coarse
-                  ? 'Tap a piece on the timeline to select it; then drag it onto another to reorder, drag its ends to trim, or drag audio sideways to move it. Swipe to scroll the timeline, pinch to zoom, and drag along the time ruler to move the playhead. Mark in and out to ask the crew about a stretch.'
-                  : 'Select a piece on the timeline to change it. Drag a picture onto another to reorder, drag its ends to trim, drag audio sideways to move it. Space plays, S splits at the playhead, comma and full stop step a frame, M leaves a marker, Ctrl+C, X and V copy, cut and paste, Ctrl+Z undoes. I and O mark a stretch to ask the crew about.'}
-              </p>
+              <div className="inspector-empty">
+                <span className="eyebrow">Nothing selected</span>
+                <p className="muted">
+                  {coarse ? 'Tap' : 'Select'} a piece on the timeline to trim, grade, retime or
+                  replace it. Mark in and out to ask the crew about a stretch.
+                </p>
+                <button type="button" className="button quiet" onClick={onHelp}>
+                  <QuestionIcon aria-hidden="true" /> {coarse ? 'Gestures' : 'Shortcuts'} and help
+                </button>
+              </div>
             )}
           {!readOnly && item !== undefined && (
             <>
@@ -1355,210 +1467,332 @@ function SceneEditor({
         }}
       />
 
-      {cut.draft !== null && (
-        <ProposalBar
-          draft={cut.draft}
-          version={cut.version}
-          onVersion={setVersion}
-          onKeepAll={() => {
-            review('movie.edit.draft.keep');
-          }}
-          onDiscard={() => {
-            review('movie.edit.draft.discard');
-          }}
-        />
-      )}
+      <SplitBar
+        height={timelineHeight.height}
+        onHeight={timelineHeight.set}
+        measure={() => {
+          const total = editorBox.current?.clientHeight ?? 0;
+          const timeline = timelineBox.current?.clientHeight ?? 0;
+          return total > 0 ? { total, timeline } : null;
+        }}
+      />
 
-      <div className="row wrap toolbar" role="toolbar" aria-label="Editing">
-        <OpenInAudioEditor project={project} sceneId={sceneId} />
+      <div className="edit-toolbar" role="toolbar" aria-label="Editing">
         <button
-          className="button"
+          type="button"
+          className="button primary play-button"
+          aria-label={playback.playing ? 'Pause' : 'Play'}
+          title={`${playback.playing ? 'Pause' : 'Play'} (Space)`}
           onClick={playback.playing ? playback.pause : playback.play}
           disabled={cut.totalSeconds === 0}
         >
-          {playback.playing ? <PauseIcon aria-hidden="true" /> : <PlayIcon aria-hidden="true" />}{' '}
-          {playback.playing ? 'Pause' : 'Play'}
+          {playback.playing ? (
+            <PauseIcon aria-hidden="true" weight="fill" />
+          ) : (
+            <PlayIcon aria-hidden="true" weight="fill" />
+          )}
         </button>
-        <span className="muted mono">
-          {clock(playback.at)} / {clock(cut.totalSeconds)}
+        <span className="edit-clock mono" aria-label="Playhead and length of the scene">
+          <strong>{clock(playback.at)}</strong>
+          <span>/ {clock(cut.totalSeconds)}</span>
         </span>
-        <button
-          className="button quiet"
-          disabled={readOnly || !cut.canUndo}
-          onClick={() => {
-            void run('movie.edit.undo', {});
-          }}
-        >
-          <ArrowCounterClockwiseIcon aria-hidden="true" /> Undo
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly || !cut.canRedo}
-          onClick={() => {
-            void run('movie.edit.redo', {});
-          }}
-        >
-          <ArrowClockwiseIcon aria-hidden="true" /> Redo
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly || !canSplit}
-          onClick={split}
-          title="Cut the selected shot in two at the playhead"
-        >
-          <ScissorsIcon aria-hidden="true" /> Split
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly || item === undefined}
-          onClick={() => {
-            copy(false);
-          }}
-        >
-          <CopyIcon aria-hidden="true" /> Copy
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly || item === undefined}
-          onClick={() => {
-            copy(true);
-          }}
-        >
-          <ScissorsIcon aria-hidden="true" /> Cut
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly || clipboard === null}
-          onClick={() => {
-            void paste();
-          }}
-        >
-          <ClipboardIcon aria-hidden="true" /> Paste
-        </button>
-        <button
-          className="button quiet"
-          disabled={
-            readOnly || (item === undefined && placement === undefined && text === undefined)
-          }
-          onClick={remove}
-        >
-          <TrashIcon aria-hidden="true" /> Delete
-        </button>
-        <button
-          className="button quiet"
-          disabled={readOnly}
-          onClick={() => {
-            void run('movie.edit.title.add', {
-              text: 'Title',
-              toIndex: index < 0 ? undefined : index + 1,
-            });
-          }}
-        >
-          <TextTIcon aria-hidden="true" /> Add title card
-        </button>
-        <TextTools
-          project={project}
-          sceneId={sceneId}
-          at={playback.at}
-          readOnly={readOnly}
-          act={act}
-          onAdded={(id) => {
-            setSelection({ kind: 'text', id });
-          }}
-          onStyles={() => {
-            setStyling(text?.styleId ?? 'subtitle');
-          }}
-        />
-        <span className="mark-range" role="group" aria-label="Mark a stretch to ask the crew about">
-          <button
-            className="button quiet"
-            title="Mark the start of a stretch at the playhead (I)"
-            onClick={() => {
-              setMarksAt((before) => ({ ...before, in: playback.at }));
-            }}
+        <div className="edit-tools">
+          <span className="tool-group" role="group" aria-label="History">
+            {tool(
+              'Undo',
+              <ArrowCounterClockwiseIcon aria-hidden="true" />,
+              () => {
+                void run('movie.edit.undo', {});
+              },
+              readOnly || !cut.canUndo,
+              'Ctrl+Z',
+            )}
+            {tool(
+              'Redo',
+              <ArrowClockwiseIcon aria-hidden="true" />,
+              () => {
+                void run('movie.edit.redo', {});
+              },
+              readOnly || !cut.canRedo,
+              'Ctrl+Shift+Z',
+            )}
+          </span>
+          <span className="tool-group" role="group" aria-label="Pieces">
+            {tool(
+              'Split at the playhead',
+              <SplitHorizontalIcon aria-hidden="true" />,
+              split,
+              readOnly || !canSplit,
+              'S',
+            )}
+            {tool(
+              'Copy',
+              <CopyIcon aria-hidden="true" />,
+              () => {
+                copy(false);
+              },
+              readOnly || item === undefined,
+              'Ctrl+C',
+            )}
+            {tool(
+              'Cut',
+              <ScissorsIcon aria-hidden="true" />,
+              () => {
+                copy(true);
+              },
+              readOnly || item === undefined,
+              'Ctrl+X',
+            )}
+            {tool(
+              'Paste',
+              <ClipboardIcon aria-hidden="true" />,
+              () => {
+                void paste();
+              },
+              readOnly || clipboard === null,
+              'Ctrl+V',
+            )}
+            {tool(
+              'Delete',
+              <TrashIcon aria-hidden="true" />,
+              remove,
+              readOnly || (item === undefined && placement === undefined && text === undefined),
+              'Delete',
+            )}
+          </span>
+          <span
+            className="tool-group mark-range"
+            role="group"
+            aria-label="Mark a stretch to ask the crew about"
           >
-            In
-          </button>
-          <button
-            className="button quiet"
-            title="Mark the end of a stretch at the playhead (O)"
-            onClick={() => {
-              setMarksAt((before) => ({ ...before, out: playback.at }));
-            }}
-          >
-            Out
-          </button>
-          {item !== undefined && item.durationSeconds > 0 && (
             <button
-              className="button quiet"
-              title="Mark the selected piece"
+              type="button"
+              className="button quiet mark-button"
+              title="Mark the start of a stretch at the playhead (I)"
+              aria-pressed={marksAt.in !== null}
               onClick={() => {
-                setMarksAt({
-                  in: item.startsAtSeconds,
-                  out: item.startsAtSeconds + item.durationSeconds,
-                });
+                setMarksAt((before) => ({ ...before, in: playback.at }));
               }}
             >
-              <BracketsSquareIcon aria-hidden="true" /> Mark piece
+              In
             </button>
-          )}
-        </span>
-        <button
-          className="button quiet"
-          title="Leave a note, to-do or problem at the playhead (M)"
-          onClick={addMarker}
+            <button
+              type="button"
+              className="button quiet mark-button"
+              title="Mark the end of a stretch at the playhead (O)"
+              aria-pressed={marksAt.out !== null}
+              onClick={() => {
+                setMarksAt((before) => ({ ...before, out: playback.at }));
+              }}
+            >
+              Out
+            </button>
+            {item !== undefined &&
+              item.durationSeconds > 0 &&
+              tool(
+                'Mark the selected piece',
+                <BracketsSquareIcon aria-hidden="true" />,
+                () => {
+                  setMarksAt({
+                    in: item.startsAtSeconds,
+                    out: item.startsAtSeconds + item.durationSeconds,
+                  });
+                },
+                false,
+              )}
+            {tool(
+              'Leave a marker at the playhead',
+              <FlagIcon aria-hidden="true" />,
+              addMarker,
+              false,
+              'M',
+            )}
+          </span>
+          <span className="tool-group" role="group" aria-label="Sound">
+            <OpenInAudioEditor project={project} sceneId={sceneId} />
+          </span>
+        </div>
+        <Popover
+          label="Add to the scene"
+          title="Add to the scene"
+          icon={<PlusIcon aria-hidden="true" />}
+          text="Add"
+          badge={waiting > 0 ? String(waiting) : null}
+          side="up"
+          wide
+          className="edit-add"
         >
-          <FlagIcon aria-hidden="true" /> Marker
+          {(close) => (
+            <div className="stack edit-add-body">
+              <section className="stack" aria-label="Words">
+                <span className="eyebrow">Words</span>
+                <div className="row wrap">
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={readOnly}
+                    onClick={() => {
+                      void run('movie.edit.title.add', {
+                        text: 'Title',
+                        toIndex: index < 0 ? undefined : index + 1,
+                      });
+                      close();
+                    }}
+                  >
+                    <TextTIcon aria-hidden="true" /> Add title card
+                  </button>
+                </div>
+                <TextTools
+                  project={project}
+                  sceneId={sceneId}
+                  at={playback.at}
+                  readOnly={readOnly}
+                  act={act}
+                  onAdded={(id) => {
+                    setSelection({ kind: 'text', id });
+                  }}
+                  onStyles={() => {
+                    setStyling(text?.styleId ?? 'subtitle');
+                  }}
+                />
+              </section>
+              {!readOnly && (
+                <section className="stack" aria-label="Sound">
+                  <span className="eyebrow">Sound at the playhead</span>
+                  <div className="row edit-add-sound">
+                    <label htmlFor="place-sound" className="sr-only">
+                      Lay on the audio lane at the playhead
+                    </label>
+                    <select
+                      id="place-sound"
+                      className="select"
+                      value={placing}
+                      onChange={(event) => {
+                        setPlacing(event.target.value);
+                      }}
+                    >
+                      <option value="">Choose a sound or dialogue</option>
+                      {placeable.map((entry) => (
+                        <option key={entry.value} value={entry.value}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={placing === ''}
+                      onClick={() => {
+                        const [kind, id] = placing.split(':');
+                        const music =
+                          source.sounds.find((sound) => sound.id === id)?.kind === 'music';
+                        void run('movie.edit.sound.place', {
+                          ...(kind === 'sound'
+                            ? { soundId: id }
+                            : { source: 'dialogue', shotId: id }),
+                          startSeconds: Math.round(playback.at * 10) / 10,
+                          ...(music ? { volume: 0.4, fadeInSeconds: 1, fadeOutSeconds: 2 } : {}),
+                        }).then(() => {
+                          setPlacing('');
+                        });
+                      }}
+                    >
+                      Lay it down
+                    </button>
+                  </div>
+                </section>
+              )}
+              {waiting > 0 && (
+                <section className="stack" aria-label="Not in the film yet">
+                  <span className="eyebrow">Not in the film yet</span>
+                  <div className="row wrap">
+                    {notInFilm.map((entry) => (
+                      <button
+                        key={entry.itemId}
+                        type="button"
+                        className="chip"
+                        onClick={() => {
+                          setSelection({ kind: 'item', id: entry.itemId });
+                          close();
+                        }}
+                      >
+                        Shot {entry.index}: {ITEM_STATE_TEXT[entry.state].toLowerCase()}
+                      </button>
+                    ))}
+                    {cut.unplaced.map((entry) => (
+                      <button
+                        key={entry.shotId}
+                        type="button"
+                        className="chip"
+                        title="Add this shot to the cut"
+                        disabled={readOnly}
+                        onClick={() => {
+                          void run('movie.edit.item.add', { shotId: entry.shotId });
+                        }}
+                      >
+                        + Shot {entry.position}: {entry.description.slice(0, 40)}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </Popover>
+        <button
+          type="button"
+          className="button quiet icon-only inspector-toggle"
+          aria-label="Details of the selected piece"
+          title="Details of the selected piece"
+          aria-pressed={inspectorOpen}
+          onClick={() => {
+            setInspectorOpen(!inspectorOpen);
+          }}
+        >
+          <SidebarSimpleIcon aria-hidden="true" mirrored />
         </button>
-        <span className="row zoom">
+        <span className="edit-zoom" role="group" aria-label="Zoom the timeline">
+          {tool(
+            'Zoom out',
+            <MagnifyingGlassMinusIcon aria-hidden="true" />,
+            () => {
+              zoomBy(1 / 1.5);
+            },
+            scale <= MIN_SCALE,
+          )}
+          <input
+            type="range"
+            className="zoom-slider"
+            aria-label={scale >= 200 ? 'Zoom · frames' : 'Zoom'}
+            // Even steps of the slider zoom by the same factor, from the whole scene to single frames.
+            min={Math.log(MIN_SCALE)}
+            max={Math.log(MAX_SCALE)}
+            step="any"
+            value={Math.log(scale)}
+            onChange={(event) => {
+              setScale(Math.round(Math.exp(Number(event.target.value)) * 100) / 100);
+            }}
+          />
+          {tool(
+            'Zoom in',
+            <MagnifyingGlassPlusIcon aria-hidden="true" />,
+            () => {
+              zoomBy(1.5);
+            },
+            scale >= MAX_SCALE,
+          )}
           <button
-            className="button quiet small"
+            type="button"
+            className="button quiet fit-button"
             title="Fit the scene to the timeline"
             onClick={fit}
           >
             Fit
           </button>
-          <label className="field compact">
-            <span>{scale >= 200 ? 'Zoom · frames' : 'Zoom'}</span>
-            <input
-              type="range"
-              // Even steps of the slider zoom by the same factor, from the whole scene to single frames.
-              min={Math.log(MIN_SCALE)}
-              max={Math.log(MAX_SCALE)}
-              step="any"
-              value={Math.log(scale)}
-              onChange={(event) => {
-                setScale(Math.round(Math.exp(Number(event.target.value)) * 100) / 100);
-              }}
-            />
-          </label>
         </span>
       </div>
 
-      {range !== null && (
-        <div className="range-note row wrap">
-          <span className="chip" aria-label="Marked stretch">
-            {clock(range.from)}–{clock(range.to)} marked
-            <button
-              type="button"
-              className="button quiet icon"
-              aria-label="Clear the marked stretch"
-              onClick={() => {
-                setMarksAt({ in: null, out: null });
-              }}
-            >
-              ×
-            </button>
-          </span>
-          <span className="muted small">
-            {attached === null
-              ? 'Detached from the crew panel.'
-              : 'Goes with your next message to the crew: tell them what to do with it.'}
-          </span>
-        </div>
-      )}
-
-      <div ref={timelineBox}>
+      <div className="edit-timeline" ref={timelineBox}>
         <Timeline
           cut={cut}
           scale={scale}
@@ -1577,76 +1811,6 @@ function SceneEditor({
           range={range}
           markers={markers}
         />
-      </div>
-
-      {(notInFilm.length > 0 || cut.unplaced.length > 0) && (
-        <div className="stack">
-          <h3>Not in the film yet</h3>
-          <div className="row wrap">
-            {notInFilm.map((entry) => (
-              <button
-                key={entry.itemId}
-                className="chip"
-                onClick={() => {
-                  setSelection({ kind: 'item', id: entry.itemId });
-                }}
-              >
-                Shot {entry.index}: {ITEM_STATE_TEXT[entry.state].toLowerCase()}
-              </button>
-            ))}
-            {cut.unplaced.map((entry) => (
-              <button
-                key={entry.shotId}
-                className="chip"
-                title="Add this shot to the cut"
-                disabled={readOnly}
-                onClick={() => {
-                  void run('movie.edit.item.add', { shotId: entry.shotId });
-                }}
-              >
-                + Shot {entry.position}: {entry.description.slice(0, 40)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="row wrap" hidden={readOnly}>
-        <div className="field">
-          <label htmlFor="place-sound">Lay on the audio lane at the playhead</label>
-          <select
-            id="place-sound"
-            className="select"
-            value={placing}
-            onChange={(event) => {
-              setPlacing(event.target.value);
-            }}
-          >
-            <option value="">Choose a sound or dialogue</option>
-            {placeable.map((entry) => (
-              <option key={entry.value} value={entry.value}>
-                {entry.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          className="button"
-          disabled={placing === ''}
-          onClick={() => {
-            const [kind, id] = placing.split(':');
-            const music = source.sounds.find((sound) => sound.id === id)?.kind === 'music';
-            void run('movie.edit.sound.place', {
-              ...(kind === 'sound' ? { soundId: id } : { source: 'dialogue', shotId: id }),
-              startSeconds: Math.round(playback.at * 10) / 10,
-              ...(music ? { volume: 0.4, fadeInSeconds: 1, fadeOutSeconds: 2 } : {}),
-            }).then(() => {
-              setPlacing('');
-            });
-          }}
-        >
-          Lay it down
-        </button>
       </div>
     </div>
   );
@@ -1686,7 +1850,6 @@ export function EditView({ project }: { project: Project }): ReactElement {
     ).markers,
     look: LookView.parse(await runCommand(imp, 'movie.edit.look.get', { projectId: project.id })),
   }));
-  const [lookOpen, setLookOpen] = useState(false);
   const look = live.data?.look;
   const { act, error } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1703,20 +1866,75 @@ export function EditView({ project }: { project: Project }): ReactElement {
   const scenes = live.data?.scenes ?? [];
   const sceneId = (scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0])?.id;
 
+  const [exporting, setExporting] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const coarse = useCoarsePointer();
+  const openHelp = (): void => {
+    setHelpOpen(true);
+  };
+
   return (
-    <>
-      <div className="view-head">
+    <div className="edit-screen">
+      <header className="edit-head">
         <h1>Edit</h1>
         {film !== undefined && (
-          <span className="muted">
+          <span className="muted edit-summary">
+            {String(film.scenes.length)} {film.scenes.length === 1 ? 'scene' : 'scenes'} ·{' '}
             {String(film.readyItems)} of {String(film.items)} pieces ready ·{' '}
             {clock(film.totalSeconds)} · ${film.totalCostUsd.toFixed(2)} spent
           </span>
         )}
-      </div>
+        <span className="edit-head-tools">
+          {look !== undefined && (
+            <Popover
+              label="Look of the whole film"
+              title="Film look"
+              icon={<PaletteIcon aria-hidden="true" />}
+              text={
+                look.look.preset !== null && look.look.preset !== 'none'
+                  ? `Look · ${PRESET_LABELS[look.look.preset] ?? look.look.preset}`
+                  : 'Look'
+              }
+              wide
+              bare
+              className="edit-look"
+            >
+              {(close) => (
+                <FilmLookPanel view={look} run={(id, input) => act(id, input)} onClose={close} />
+              )}
+            </Popover>
+          )}
+          <Popover
+            label="Export the scene or the film"
+            title="Export"
+            icon={<ExportIcon aria-hidden="true" />}
+            text="Export"
+            badge={exporting}
+            wide
+            className="edit-export"
+          >
+            <ExportBar
+              project={project}
+              sceneId={sceneId}
+              sceneIds={scenes.map((scene) => scene.id)}
+              onStatus={setExporting}
+            />
+          </Popover>
+          <button
+            type="button"
+            className="button quiet icon-only"
+            aria-label="Help with the editor"
+            title="Help with the editor"
+            onClick={openHelp}
+          >
+            <QuestionIcon aria-hidden="true" />
+          </button>
+        </span>
+      </header>
       <Problem text={live.error ?? error} />
       {film !== undefined && film.scenes.length > 0 && (
         <FilmStrip
+          compact
           film={film}
           sceneId={sceneId}
           markers={markers}
@@ -1725,24 +1943,6 @@ export function EditView({ project }: { project: Project }): ReactElement {
             setAutoplay(false);
             setSelectedId(id);
           }}
-          tools={
-            look !== undefined && (
-              <button
-                className="button small quiet"
-                aria-pressed={lookOpen}
-                aria-expanded={lookOpen}
-                title="The colour look of the whole film"
-                onClick={() => {
-                  setLookOpen(!lookOpen);
-                }}
-              >
-                Look
-                {look.look.preset !== null && look.look.preset !== 'none'
-                  ? ` · ${PRESET_LABELS[look.look.preset] ?? look.look.preset}`
-                  : ''}
-              </button>
-            )
-          }
           onPlayOn={(on) => {
             setPlayOn(on);
             try {
@@ -1753,16 +1953,6 @@ export function EditView({ project }: { project: Project }): ReactElement {
           }}
         />
       )}
-      {lookOpen && look !== undefined && (
-        <FilmLookPanel
-          view={look}
-          run={(id, input) => act(id, input)}
-          onClose={() => {
-            setLookOpen(false);
-          }}
-        />
-      )}
-      <ExportBar project={project} sceneId={sceneId} sceneIds={scenes.map((scene) => scene.id)} />
       {sceneId === undefined ? (
         live.data !== undefined && (
           <p className="muted">There are no scenes yet. Write the script first.</p>
@@ -1776,6 +1966,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
           act={act}
           autoplay={autoplay}
           canMatch={look?.canMatch ?? false}
+          onHelp={openHelp}
           onEnded={() => {
             const at = scenes.findIndex((scene) => scene.id === sceneId);
             const next = scenes[at + 1];
@@ -1785,6 +1976,13 @@ export function EditView({ project }: { project: Project }): ReactElement {
           }}
         />
       )}
-    </>
+      <EditHelp
+        open={helpOpen}
+        coarse={coarse}
+        onClose={() => {
+          setHelpOpen(false);
+        }}
+      />
+    </div>
   );
 }
