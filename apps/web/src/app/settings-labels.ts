@@ -5,6 +5,17 @@ import { t } from '../i18n/i18n.js';
  * (apps/web/test/settings-labels.test.ts) fails when a new one is neither.
  */
 export const ACTIVE_MIX_KEY = 'models.mix';
+// Shown in Settings' Models section, where they are changed, so not listed as raw rows.
+export const MODEL_SETTINGS: ReadonlySet<string> = new Set([
+  'coordinator.model',
+  'video.model',
+  'speech.model',
+  'images.model',
+  'sounds.model',
+  'music.model',
+  'transcription.model',
+  ACTIVE_MIX_KEY,
+]);
 // Kept by the app itself, or shown in their own section (Help, Language), so not listed as raw rows.
 export const INTERNAL_SETTINGS: ReadonlySet<string> = new Set([
   'coordinator.member',

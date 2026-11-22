@@ -98,3 +98,14 @@ export function setUpAppTests(): void {
     localStorage.clear();
   });
 }
+
+/** Opens a model picker and picks the model with the given id from its searchable list. */
+export async function chooseModel(
+  user: ReturnType<typeof userEvent.setup>,
+  picker: HTMLElement,
+  id: string,
+): Promise<void> {
+  await user.click(picker);
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await user.click(await screen.findByRole('option', { name: new RegExp(escaped) }));
+}

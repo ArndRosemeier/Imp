@@ -1067,7 +1067,6 @@ export const de: Readonly<Record<string, string>> = {
   Portrait: 'Porträt',
   'Delete image': 'Bild löschen',
   'Delete this image for good?': 'Dieses Bild endgültig löschen?',
-  ' (not offered: unsuitable or unknown)': ' (nicht angeboten: ungeeignet oder unbekannt)',
   'Voice of {name}': 'Stimme von {name}',
   'Voice sample of {name}': 'Stimmprobe von {name}',
   'Line to record': 'Aufzunehmende Zeile',
@@ -1823,7 +1822,6 @@ export const de: Readonly<Record<string, string>> = {
   Language: 'Sprache',
   'The language of Imp’s buttons, tips, guide and What’s new. Agents answer you in it too. Your films keep the language they are written in.':
     'Die Sprache von Imps Schaltflächen, Tipps, Anleitung und Neuigkeiten. Auch die Agenten antworten dir darin. Deine Filme behalten die Sprache, in der sie geschrieben sind.',
-  'Models and preferences': 'Modelle und Vorlieben',
   'Nothing is set yet.': 'Noch ist nichts eingestellt.',
   'What agents do without asking': 'Was Agenten ohne Rückfrage tun',
   'Open the guide': 'Anleitung öffnen',
@@ -2251,4 +2249,23 @@ export const de: Readonly<Record<string, string>> = {
   '{total} object': '{total} Objekt',
   '{total} objects': '{total} Objekte',
   '{voiced} with a voice': '{voiced} mit Stimme',
+  // Settings: models, changed right here.
+  'Choose a model for the agents': 'Wähle ein Modell für die Agenten',
+  'Choose a model to write transcripts': 'Wähle ein Modell für Transkripte',
+  'Looking up models…': 'Suche Modelle …',
+  'Models found': 'Gefundene Modelle',
+  'No model matches.': 'Kein Modell passt.',
+  Preferences: 'Vorlieben',
+  'Search by name or maker, e.g. veo': 'Nach Name oder Hersteller suchen, z. B. veo',
+  'Search for a model': 'Modell suchen',
+  Transcript: 'Transkript',
+  'Which model makes each kind of thing. A change counts at once, on every stage. Switch the whole set with a mix, or change one model and save the set as a mix.':
+    'Welches Modell was macht. Eine Änderung gilt sofort, in jeder Phase. Wechsle alle auf einmal mit einem Modellmix, oder ändere ein Modell und sichere die Auswahl als Modellmix.',
+  'free, often busy': 'kostenlos, oft überlastet',
+  'makes its own sound': 'macht eigenen Ton',
+  'no sound': 'kein Ton',
+  'starts from a picture': 'startet von einem Bild',
+  '{input} in, {output} out per million tokens': '{input} rein, {output} raus pro Million Tokens',
+  '{shown} of {total} shown. Type to narrow the list.':
+    '{shown} von {total} gezeigt. Tippe, um die Liste einzugrenzen.',
 };

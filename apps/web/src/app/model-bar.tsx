@@ -74,31 +74,14 @@ export function ModelBar({
   act: Act;
   note?: ReactNode;
 }): ReactElement {
-  const imp = useImp();
   const panelId = useId();
-  const nameId = useId();
   const mixes = useModelMixes().data;
   const missing = models.some((model) => model.choice.model === null);
   const [open, setOpen] = useState<boolean | null>(null);
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState('');
-  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
   // Open by itself while a model is still to be chosen, so the stage can be used at once.
   const shown = open ?? missing;
   const active = mixes?.mixes.find((mix) => mix.id === mixes.active) ?? null;
   const names = models.map((model) => shortName(model.choice));
-
-  const run = (id: string, input: Record<string, unknown>, done: string): void => {
-    setStatus(null);
-    runCommand(imp, id, input).then(
-      () => {
-        setStatus({ text: done, error: false });
-      },
-      (reason: unknown) => {
-        setStatus({ text: messageOf(reason), error: true });
-      },
-    );
-  };
 
   return (
     <section className={`model-bar${shown ? ' open' : ''}`} aria-label={t('Models')}>
@@ -127,124 +110,164 @@ export function ModelBar({
       </button>
       {shown && (
         <div id={panelId} className="model-panel stack">
-          {mixes !== undefined && mixes.mixes.length > 0 && (
-            <div className="model-mixes row wrap" role="group" aria-label={t('Model mixes')}>
-              <span className="eyebrow">{t('Mixes')}</span>
-              {mixes.mixes.map((mix) => (
-                <button
-                  key={mix.id}
-                  type="button"
-                  className="button small"
-                  aria-pressed={mix.id === mixes.active}
-                  title={mix.notes || undefined}
-                  onClick={() => {
-                    run(
-                      'models.mix.apply',
-                      { id: mix.id },
-                      t('Using “{name}”.', { name: mix.name }),
-                    );
-                  }}
-                >
-                  {mix.id === mixes.active && <CheckIcon aria-hidden="true" />} {mix.name}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="row wrap model-pickers">
-            {models.map((model) => (
-              <ModelPicker
-                key={model.id}
-                id={model.id}
-                label={t('{label} model', { label: model.label })}
-                empty={model.empty}
-                setting={model.setting}
-                choice={model.choice}
-                act={act}
-              />
-            ))}
-          </div>
-          {note !== undefined && <p className="muted">{note}</p>}
-          <div className="row wrap">
-            {active !== null && mixes?.changed === true && (
-              <button
-                type="button"
-                className="button small"
-                onClick={() => {
-                  run(
-                    'models.mix.save',
-                    { id: active.id },
-                    t('“{name}” now holds these models.', { name: active.name }),
-                  );
-                }}
-              >
-                <FloppyDiskIcon aria-hidden="true" /> {t('Update “{name}”', { name: active.name })}
-              </button>
-            )}
-            {naming ? (
-              <form
-                className="row wrap"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (name.trim() === '') return;
-                  run(
-                    'models.mix.save',
-                    { name: name.trim() },
-                    t('Saved “{value}” in the library.', { value: name.trim() }),
-                  );
-                  setNaming(false);
-                  setName('');
-                }}
-              >
-                <label className="sr-only" htmlFor={nameId}>
-                  {t('Name of the mix')}
-                </label>
-                <input
-                  id={nameId}
-                  className="input"
-                  placeholder={t('Name, e.g. Cheap drafts')}
-                  value={name}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus -- the person just asked to name it
-                  autoFocus
-                  onChange={(event) => {
-                    setName(event.target.value);
-                  }}
-                />
-                <button type="submit" className="button small" disabled={name.trim() === ''}>
-                  {t('Save')}
-                </button>
-                <button
-                  type="button"
-                  className="button quiet small"
-                  onClick={() => {
-                    setNaming(false);
-                  }}
-                >
-                  {t('Cancel')}
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                className="button quiet small"
-                disabled={mixes !== undefined && Object.keys(mixes.current).length === 0}
-                onClick={() => {
-                  setNaming(true);
-                }}
-              >
-                <FloppyDiskIcon aria-hidden="true" /> {t('Save all models as a mix')}
-              </button>
-            )}
-          </div>
-          {status !== null && (
-            <p
-              role={status.error ? 'alert' : 'status'}
-              className={status.error ? 'error' : 'muted'}
-            >
-              {status.text}
-            </p>
-          )}
+          <ModelPanel models={models} act={act} note={note} flagChanged={false} />
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Switches the whole model mix, changes single models, and saves the models
+ * in use as a mix. The stages show it under their models chip; Settings shows
+ * it with every model.
+ */
+export function ModelPanel({
+  models,
+  act,
+  note,
+  flagChanged = true,
+}: {
+  models: readonly StageModel[];
+  act: Act;
+  note?: ReactNode;
+  /** Whether to say beside the mixes that the models differ from the mix; the chip says it already. */
+  flagChanged?: boolean;
+}): ReactElement {
+  const imp = useImp();
+  const nameId = useId();
+  const mixes = useModelMixes().data;
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState('');
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
+  const active = mixes?.mixes.find((mix) => mix.id === mixes.active) ?? null;
+
+  const run = (id: string, input: Record<string, unknown>, done: string): void => {
+    setStatus(null);
+    runCommand(imp, id, input).then(
+      () => {
+        setStatus({ text: done, error: false });
+      },
+      (reason: unknown) => {
+        setStatus({ text: messageOf(reason), error: true });
+      },
+    );
+  };
+
+  return (
+    <>
+      {mixes !== undefined && mixes.mixes.length > 0 && (
+        <div className="model-mixes row wrap" role="group" aria-label={t('Model mixes')}>
+          <span className="eyebrow">{t('Mixes')}</span>
+          {mixes.mixes.map((mix) => (
+            <button
+              key={mix.id}
+              type="button"
+              className="button small"
+              aria-pressed={mix.id === mixes.active}
+              title={mix.notes || undefined}
+              onClick={() => {
+                run('models.mix.apply', { id: mix.id }, t('Using “{name}”.', { name: mix.name }));
+              }}
+            >
+              {mix.id === mixes.active && <CheckIcon aria-hidden="true" />} {mix.name}
+            </button>
+          ))}
+          {flagChanged && active !== null && mixes.changed && (
+            <span className="model-chip-flag">{t('changed')}</span>
+          )}
+        </div>
+      )}
+      <div className="row wrap model-pickers">
+        {models.map((model) => (
+          <ModelPicker
+            key={model.id}
+            id={model.id}
+            label={t('{label} model', { label: model.label })}
+            empty={model.empty}
+            setting={model.setting}
+            choice={model.choice}
+            act={act}
+          />
+        ))}
+      </div>
+      {note !== undefined && <p className="muted">{note}</p>}
+      <div className="row wrap">
+        {active !== null && mixes?.changed === true && (
+          <button
+            type="button"
+            className="button small"
+            onClick={() => {
+              run(
+                'models.mix.save',
+                { id: active.id },
+                t('“{name}” now holds these models.', { name: active.name }),
+              );
+            }}
+          >
+            <FloppyDiskIcon aria-hidden="true" /> {t('Update “{name}”', { name: active.name })}
+          </button>
+        )}
+        {naming ? (
+          <form
+            className="row wrap"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (name.trim() === '') return;
+              run(
+                'models.mix.save',
+                { name: name.trim() },
+                t('Saved “{value}” in the library.', { value: name.trim() }),
+              );
+              setNaming(false);
+              setName('');
+            }}
+          >
+            <label className="sr-only" htmlFor={nameId}>
+              {t('Name of the mix')}
+            </label>
+            <input
+              id={nameId}
+              className="input"
+              placeholder={t('Name, e.g. Cheap drafts')}
+              value={name}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- the person just asked to name it
+              autoFocus
+              onChange={(event) => {
+                setName(event.target.value);
+              }}
+            />
+            <button type="submit" className="button small" disabled={name.trim() === ''}>
+              {t('Save')}
+            </button>
+            <button
+              type="button"
+              className="button quiet small"
+              onClick={() => {
+                setNaming(false);
+              }}
+            >
+              {t('Cancel')}
+            </button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            className="button quiet small"
+            disabled={mixes !== undefined && Object.keys(mixes.current).length === 0}
+            onClick={() => {
+              setNaming(true);
+            }}
+          >
+            <FloppyDiskIcon aria-hidden="true" /> {t('Save all models as a mix')}
+          </button>
+        )}
+      </div>
+      {status !== null && (
+        <p role={status.error ? 'alert' : 'status'} className={status.error ? 'error' : 'muted'}>
+          {status.text}
+        </p>
+      )}
+    </>
   );
 }

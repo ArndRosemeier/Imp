@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { completeSetup, start, setUpAppTests } from './app-harness.js';
+import { chooseModel, completeSetup, start, setUpAppTests } from './app-harness.js';
 
 setUpAppTests();
 
@@ -16,7 +16,7 @@ describe('App: stages', () => {
 
     await user.click(screen.getByRole('button', { name: 'Design' }));
     expect(await screen.findByText(/No places yet/)).toBeTruthy();
-    await user.selectOptions(await screen.findByLabelText('Image model'), 'vendor/painter');
+    await chooseModel(user, await screen.findByLabelText('Image model'), 'vendor/painter');
     await user.click(screen.getByRole('button', { name: /Add location/ }));
     const card = await screen.findByRole('article', { name: 'New location' });
     await user.type(within(card).getByLabelText('Look'), 'Round iron room.');
@@ -105,7 +105,7 @@ describe('App: stages', () => {
       const card = await screen.findByRole('article', { name: 'Shot 1' });
       const generate = within(card).getByRole('button', { name: /Generate clip/ });
       expect(generate).toHaveProperty('disabled', true);
-      await user.selectOptions(await screen.findByLabelText('Video model'), 'vendor/clips');
+      await chooseModel(user, await screen.findByLabelText('Video model'), 'vendor/clips');
       await user.type(within(card).getByLabelText('What we see'), 'The lamp turns.');
       await user.tab();
       await user.click(within(card).getByRole('checkbox', { name: 'New character' }));
@@ -462,7 +462,7 @@ describe('App: stages', () => {
     const effect = await screen.findByRole('article', { name: 'Sound effect' });
     const generate = within(effect).getByRole('button', { name: /Generate/ });
     expect(generate).toHaveProperty('disabled', true);
-    await user.selectOptions(await screen.findByLabelText('Sound effects model'), 'vendor/speaker');
+    await chooseModel(user, await screen.findByLabelText('Sound effects model'), 'vendor/speaker');
     await user.type(within(effect).getByLabelText('What is heard'), 'A gale at sea.');
     await user.tab();
     await vi.waitFor(() => {
@@ -477,7 +477,7 @@ describe('App: stages', () => {
 
     await user.click(screen.getByRole('button', { name: /Add music/ }));
     const music = await screen.findByRole('article', { name: 'Music' });
-    await user.selectOptions(await screen.findByLabelText('Music model'), 'vendor/composer');
+    await chooseModel(user, await screen.findByLabelText('Music model'), 'vendor/composer');
     await user.type(within(music).getByLabelText('What is heard'), 'Low strings.');
     await user.tab();
     await vi.waitFor(() => {

@@ -2,7 +2,7 @@
 import { cleanup, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { encodeWav } from '@imp/audio';
-import { completeSetup, start, setUpAppTests } from './app-harness.js';
+import { chooseModel, completeSetup, start, setUpAppTests } from './app-harness.js';
 
 setUpAppTests();
 
@@ -215,8 +215,7 @@ describe('App: library, crew and help', () => {
     const bar = await screen.findByRole('region', { name: 'Models' });
     const chip = within(bar).getByRole('button', { name: /Choose image model/ });
     expect(chip.getAttribute('aria-expanded')).toBe('true');
-    await screen.findByRole('option', { name: 'vendor/painter' });
-    await user.selectOptions(within(bar).getByLabelText('Image model'), 'vendor/painter');
+    await chooseModel(user, within(bar).getByLabelText('Image model'), 'vendor/painter');
     await vi.waitFor(() => {
       expect(chip.getAttribute('aria-expanded')).toBe('false');
     });
@@ -298,15 +297,62 @@ describe('App: library, crew and help', () => {
     expect(href).not.toContain('sk-');
   });
 
+  it('changes models and mixes right in Settings, searching the whole catalog', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    const models = await screen.findByRole('region', { name: 'Models' });
+
+    // A search finds a model by part of its name.
+    await user.click(within(models).getByLabelText('Video model'));
+    await user.type(within(models).getByRole('combobox', { name: 'Search for a model' }), 'clip');
+    await user.click(await within(models).findByRole('option', { name: /vendor\/clips/ }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('settings/video.model')).toBe('vendor/clips');
+    });
+    expect(within(models).queryByRole('listbox')).toBeNull();
+
+    // The agents' model is the coordinator's own, so it changes too.
+    await chooseModel(user, within(models).getByLabelText('Agents model'), '~vendor/latest');
+    await vi.waitFor(async () => {
+      const crew = await imp.store.list('crew/');
+      expect(crew.map((entry) => (entry.value as { model: string }).model)).toEqual([
+        '~vendor/latest',
+      ]);
+    });
+    // Models that cannot call tools are no use to an agent.
+    await user.click(within(models).getByLabelText('Agents model'));
+    await within(models).findByRole('option', { name: /vendor\/writer/ });
+    expect(within(models).queryByRole('option', { name: /no-tools/ })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(within(models).queryByRole('listbox')).toBeNull();
+
+    // Saved as a mix, switched away from, and switched back with one tap.
+    await user.click(within(models).getByRole('button', { name: /Save all models as a mix/ }));
+    await user.type(within(models).getByLabelText('Name of the mix'), 'Drafts');
+    await user.click(within(models).getByRole('button', { name: 'Save' }));
+    const drafts = await within(models).findByRole('button', { name: /Drafts/ });
+    expect(drafts.getAttribute('aria-pressed')).toBe('true');
+    await chooseModel(user, within(models).getByLabelText('Agents model'), 'vendor/writer');
+    expect(await within(models).findByText('changed')).toBeTruthy();
+    await user.click(drafts);
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('settings/coordinator.model')).toBe('~vendor/latest');
+    });
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);
     await user.click(screen.getByRole('button', { name: 'Settings' }));
     // Settings read as words; what the app keeps for itself stays out of the list.
-    const list = await screen.findByRole('region', { name: 'Models and preferences' });
-    expect(await within(list).findByText('Coordinator model')).toBeTruthy();
-    expect(within(list).getByText('vendor/writer')).toBeTruthy();
+    const models = await screen.findByRole('region', { name: 'Models' });
+    expect((await within(models).findByLabelText('Agents model')).textContent).toContain(
+      'vendor/writer',
+    );
+    const list = screen.getByRole('region', { name: 'Preferences' });
     expect(within(list).queryByText(/coordinator\.member/)).toBeNull();
+    expect(within(list).queryByText('Coordinator model')).toBeNull();
     // The budget without approval is set here too, not only in the Spending panel.
     const agents = screen.getByRole('region', { name: 'What agents do without asking' });
     const budget = await within(agents).findByRole('region', { name: 'Budget without approval' });
@@ -423,8 +469,7 @@ describe('App: library, crew and help', () => {
     await user.click(screen.getByRole('button', { name: 'Casting' }));
     await user.click(await screen.findByRole('button', { name: /Add character/ }));
     const card = await screen.findByRole('article', { name: 'New character' });
-    await screen.findByRole('option', { name: 'vendor/painter' });
-    await user.selectOptions(screen.getByLabelText('Image model'), 'vendor/painter');
+    await chooseModel(user, screen.getByLabelText('Image model'), 'vendor/painter');
 
     // Before the model has been used, the price is a rough typical one.
     const make = within(card).getByRole('button', { name: /Portrait/ });
