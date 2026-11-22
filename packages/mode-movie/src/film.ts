@@ -22,7 +22,7 @@ import {
 } from '@imp/core';
 import { z } from 'zod';
 import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
-import { itemsOf, laidOut, readCut, readFilmLook, requireScene } from './edit.js';
+import { itemsOf, laidOut, readCut, readDraft, readFilmLook, requireScene } from './edit.js';
 import { pieceMatrix, type ColorMatrix } from './grade.js';
 import { createSceneAudioLink } from './scene-audio.js';
 import { slateText } from './pickups.js';
@@ -239,6 +239,8 @@ export const FilmExport = z.object({
   notReady: z.array(NotReady).default([]),
   /** Sounds that could not be decoded and are silent in the film. */
   unheard: z.array(z.string()).default([]),
+  /** Scenes with changes agents proposed that were not kept yet, so the film leaves them out. */
+  draftsLeftOut: z.array(z.string()).default([]),
   error: z.string().default(''),
   by: z.string(),
   createdAt: z.string(),
@@ -495,7 +497,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
     id: 'movie.edit.export',
     title: 'Export the film',
     description:
-      'Renders the cut of the whole film, or of the scenes you name, into one MP4 video file kept in the project: pictures with their trims and fades, title cards, and the sound mixed as in the audio editor (dialogue, clip sound, effects, music, character lanes, with volume, gain, fades, pan and region effects). It renders offline, faster than real time, and waits until the file is done (a few seconds to minutes). Returns the rendered film: its id, length, size, codecs, any items that were not ready, and sounds that could not be decoded. Check movie.edit.film first; items whose clip is missing take no time and are left out. The person downloads the file from the Edit screen. Only one film renders at a time.',
+      'Renders the cut of the whole film, or of the scenes you name, into one MP4 video file kept in the project: pictures with their trims and fades, title cards, and the sound mixed as in the audio editor (dialogue, clip sound, effects, music, character lanes, with volume, gain, fades, pan and region effects). It renders offline, faster than real time, and waits until the file is done (a few seconds to minutes). Returns the rendered film: its id, length, size, codecs, any items that were not ready, sounds that could not be decoded, and scenes whose proposed changes are left out (draftsLeftOut). The film is made from the kept cut: changes agents proposed (movie.edit.draft.get) are only in it once the person keeps them, so render after that, or say plainly that the film leaves them out. Check movie.edit.film first; items whose clip is missing take no time and are left out. The film is only made once this returns status "ready"; never say a film is done before that. The person finds every film in the Library under Films and in the Export panel of the Edit screen, and gets a notice when you finish one. When you report a film, give its file name (fileName): your reply then shows a card to play and save it. Only one film renders at a time.',
     effect: 'write',
     input: z.object({
       projectId: ProjectId,
@@ -549,6 +551,12 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         throw new CommandError('invalid_input', id, 'The film has no scenes to export yet.');
       }
       const plan = await planFilm(runtime, id, input.projectId, sceneIds);
+      const draftsLeftOut: string[] = [];
+      for (const sceneId of sceneIds) {
+        if ((await readDraft(runtime.store, input.projectId, sceneId)) !== undefined) {
+          draftsLeftOut.push(sceneId);
+        }
+      }
       const styles = await readStyles(runtime.store, input.projectId);
       const texts: FilmText[] = (
         await filmTexts({ runtime, actor }, id, input.projectId, sceneIds)
@@ -567,7 +575,9 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         throw new CommandError(
           'invalid_input',
           id,
-          'There is nothing in the cut to export yet: no item has a ready clip or is a title.',
+          draftsLeftOut.length > 0
+            ? `There is nothing in the kept cut to export yet. The changes proposed for ${String(draftsLeftOut.length)} scene(s) are not kept: the person keeps them on the Edit stage, then export again.`
+            : 'There is nothing in the cut to export yet: no item has a ready clip or is a title.',
         );
       }
       const single =
@@ -578,17 +588,27 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
       const label =
         input.label ??
         (whole ? 'film' : single !== undefined ? `scene-${String(single.position)}` : 'scenes');
+      // Every film gets a name of its own, so two renders of the same cut can be told apart.
+      const taken = new Set(
+        (await runtime.store.list(filmExportPrefix(input.projectId))).map(
+          (entry) => FilmExport.parse(entry.value).fileName,
+        ),
+      );
+      const stem = `${fileSafe(project.name)}-${fileSafe(label)}`;
+      let fileName = `${stem}.mp4`;
+      for (let copy = 2; taken.has(fileName); copy++) fileName = `${stem}-${String(copy)}.mp4`;
       const exportId = runtime.newId();
       const key = exportKey(input.projectId, exportId);
       let record: FilmExport = FilmExport.parse({
         id: exportId,
         label,
-        fileName: `${fileSafe(project.name)}-${fileSafe(label)}.mp4`,
+        fileName,
         sceneIds,
         status: 'rendering',
         progressSeconds: 0,
         durationSeconds: Math.round(plan.durationSeconds * 100) / 100,
         notReady: plan.notReady,
+        draftsLeftOut,
         by: actor.kind === 'agent' ? actor.role : 'you',
         createdAt: runtime.now().toISOString(),
       });
@@ -638,6 +658,9 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
           cancelled: () => controller.cancelled,
         });
         const file = await writer.finish();
+        if (file.sizeBytes === 0 || file.parts === 0) {
+          throw new Error('the renderer wrote no data, so there is no film file');
+        }
         await save({
           ...record,
           status: 'ready',

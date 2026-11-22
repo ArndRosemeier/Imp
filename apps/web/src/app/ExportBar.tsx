@@ -1,45 +1,24 @@
 import type { Project } from '@imp/core';
-import { FilmExport, filmPartKey } from '@imp/mode-movie';
-import { DownloadSimpleIcon, FilmStripIcon, StopIcon, TrashIcon } from '@phosphor-icons/react';
+import type { FilmExport } from '@imp/mode-movie';
+import {
+  BooksIcon,
+  DownloadSimpleIcon,
+  FilmStripIcon,
+  StopIcon,
+  TrashIcon,
+} from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { z } from 'zod';
-import type { ImpClient } from '@imp/host';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { clock } from './cut-player.js';
 import { recordingFormat, recordScenes, type Progress } from './export.js';
 import { saveFileAs } from './save-file.js';
-import { moviePrefix } from './movie.js';
+import { filmFacts, FilmList, filmsPrefix, saveFilm, showFilms, useMadeBy } from './films.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
 import { FFMPEG_STATE_KEY } from '@imp/host';
 import { fixed, t, tn } from '../i18n/i18n.js';
 
-const Exports = z.object({
-  canRender: z.boolean(),
-  reason: z.string(),
-  exports: z.array(FilmExport),
-});
-
 /** How many rendered films the list shows; older ones stay until deleted. */
 const SHOWN = 5;
-
-function size(bytes: number): string {
-  if (bytes >= 1024 ** 3) return t('{value} GB', { value: fixed(bytes / 1024 ** 3, 1) });
-  if (bytes >= 1024 ** 2) return t('{value} MB', { value: fixed(bytes / 1024 ** 2, 1) });
-  return t('{value} KB', { value: String(Math.max(1, Math.round(bytes / 1024))) });
-}
-
-/** The stored parts of a rendered film, in order, written to the file one at a time. */
-async function* filmParts(
-  imp: ImpClient,
-  projectId: string,
-  film: FilmExport,
-): AsyncGenerator<Uint8Array> {
-  for (let index = 0; index < film.parts; index++) {
-    const part = await imp.blob(filmPartKey(projectId, film.id, index));
-    if (part === undefined) throw new Error(t('Part of the file is missing; render it again.'));
-    yield part.bytes;
-  }
-}
 
 /**
  * Exporting the cut of one scene or the whole film. Where the core can render
@@ -59,8 +38,8 @@ export function ExportBar({
   onStatus?: ((status: string | null) => void) | undefined;
 }): ReactElement {
   // ffmpeg arriving on the local server lets it render, so its state is watched too.
-  const live = useLive([`${moviePrefix(project)}exports/`, FFMPEG_STATE_KEY], async (imp) =>
-    Exports.parse(await runCommand(imp, 'movie.edit.export.list', { projectId: project.id })),
+  const live = useLive([filmsPrefix(project.id), FFMPEG_STATE_KEY], async (imp) =>
+    FilmList.parse(await runCommand(imp, 'movie.edit.export.list', { projectId: project.id })),
   );
   if (live.data === undefined) return <div className="stack export-bar" />;
   return live.data.canRender ? (
@@ -90,6 +69,7 @@ function RenderedExports({
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const madeBy = useMadeBy();
   const rendering = exports.find((film) => film.status === 'rendering');
   const busy = starting || rendering !== undefined;
   const status =
@@ -130,10 +110,7 @@ function RenderedExports({
   };
   const save = (film: FilmExport): void => {
     setSaving(film.id);
-    saveFileAs(
-      { suggestedName: film.fileName, mediaType: film.mediaType, description: t('Film') },
-      () => filmParts(imp, project.id, film),
-    )
+    saveFilm(imp, project.id, film)
       .catch((cause: unknown) => {
         setError(messageOf(cause));
       })
@@ -192,7 +169,7 @@ function RenderedExports({
                 durationSeconds: clock(rendering.durationSeconds),
                 rendering: speed(rendering),
               })}
-              {rendering.by === 'you' ? '' : ` · ${t('by {name}', { name: rendering.by })}`}
+              {rendering.by === 'you' ? '' : ` · ${t('by {name}', { name: madeBy(rendering.by) })}`}
             </span>
           </>
         )}
@@ -212,20 +189,7 @@ function RenderedExports({
           {shown.map((film) => (
             <li key={film.id} className="film-export">
               <span className="film-export-name">{film.fileName}</span>
-              <span className="muted mono">
-                {film.status === 'ready'
-                  ? t('{durationSeconds} · {width}×{height} {fps} fps · {sizeBytes}', {
-                      durationSeconds: clock(film.durationSeconds),
-                      width: String(film.width),
-                      height: String(film.height),
-                      fps: String(film.fps),
-                      sizeBytes: size(film.sizeBytes),
-                    })
-                  : film.status === 'cancelled'
-                    ? t('Cancelled')
-                    : t('Failed: {error}', { error: film.error })}
-                {film.by === 'you' ? '' : ` · ${t('by {name}', { name: film.by })}`}
-              </span>
+              <span className="muted mono">{filmFacts(film, madeBy)}</span>
               {film.status === 'ready' && (film.notReady.length > 0 || film.unheard.length > 0) && (
                 <span className="muted film-export-note">
                   {film.notReady.length > 0 &&
@@ -244,7 +208,7 @@ function RenderedExports({
                     }}
                   >
                     <DownloadSimpleIcon aria-hidden="true" />{' '}
-                    {saving === film.id ? t('Preparing…') : t('Download')}
+                    {saving === film.id ? t('Preparing…') : t('Save as…')}
                   </button>
                 )}
                 <button
@@ -261,6 +225,17 @@ function RenderedExports({
             </li>
           ))}
         </ul>
+      )}
+      {exports.length > 0 && (
+        <button
+          type="button"
+          className="button quiet small"
+          onClick={() => {
+            showFilms();
+          }}
+        >
+          <BooksIcon aria-hidden="true" /> {t('All films in the Library')}
+        </button>
       )}
     </div>
   );

@@ -429,6 +429,52 @@ describe('exporting a film', () => {
     });
   });
 
+  it('gives every film a file name of its own', async () => {
+    const fake = fakeRenderer();
+    const { run, projectId } = await setup(fake.renderer);
+    const first = (await run('movie.edit.export', { projectId })) as FilmExport;
+    const second = (await run('movie.edit.export', { projectId })) as FilmExport;
+    const third = (await run('movie.edit.export', { projectId })) as FilmExport;
+    expect(first.fileName).toMatch(/-film\.mp4$/);
+    expect(second.fileName).toBe(first.fileName.replace(/\.mp4$/, '-2.mp4'));
+    expect(third.fileName).toBe(first.fileName.replace(/\.mp4$/, '-3.mp4'));
+  });
+
+  it('fails rather than calling an empty file a film', async () => {
+    const empty: FilmRenderer = {
+      unavailable: () => null,
+      render: () =>
+        Promise.resolve({
+          mediaType: 'video/mp4',
+          extension: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: 'aac',
+          width: 640,
+          height: 360,
+          fps: 24,
+        }),
+    };
+    const { run, projectId } = await setup(empty);
+    await expect(run('movie.edit.export', { projectId })).rejects.toThrow(/no film file/);
+    const listed = (await run('movie.edit.export.list', { projectId })) as {
+      exports: FilmExport[];
+    };
+    expect(listed.exports[0]?.status).toBe('failed');
+  });
+
+  it("says which scenes' proposed changes a film leaves out", async () => {
+    const fake = fakeRenderer();
+    const { run, projectId, first } = await setup(fake.renderer);
+    await run(
+      'movie.edit.title.add',
+      { projectId, sceneId: first, text: 'Proposed', toIndex: 0 },
+      editor,
+    );
+    const film = (await run('movie.edit.export', { projectId }, editor)) as FilmExport;
+    expect(film.draftsLeftOut).toEqual([first]);
+    expect(film.by).toBe(editor.role);
+  });
+
   it('deletes a rendered film with its file', async () => {
     const fake = fakeRenderer();
     const { runtime, run, projectId } = await setup(fake.renderer);

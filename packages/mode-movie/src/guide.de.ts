@@ -228,7 +228,11 @@ Der **Cutter** kann ebenfalls schneiden. Seine Änderungen kommen als **Vorschla
 
 ## Exportieren
 
-Der Export rendert die Szene oder den ganzen Film als MP4-Datei, schneller als in Echtzeit: im Browser oder mit ffmpeg auf dem lokalen Server, wo Imp anbietet, ffmpeg herunterzuladen, falls es fehlt.`,
+Der Export rendert die Szene oder den ganzen Film als MP4-Datei, schneller als in Echtzeit: im Browser oder mit ffmpeg auf dem lokalen Server, wo Imp anbietet, ffmpeg herunterzuladen, falls es fehlt.
+
+## Wo fertige Filme landen
+
+Jeder fertige Film bleibt im Projekt. Alle findest du in der **Bibliothek** unter **Filme**, die neuesten auch im **Export**-Fenster. Jeder zeigt, wann und von wem er gemacht wurde und wie lang er ist, mit **Abspielen** und **Speichern unter …**, das fragt, wo die MP4-Datei hin soll. Macht ein Agent einen Film fertig, erscheint ein Hinweis mit **Ansehen**, und seine Antwort im Chat trägt dieselbe Karte.`,
   },
   {
     id: 'stage-audio',
