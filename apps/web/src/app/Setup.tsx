@@ -11,6 +11,7 @@ import {
 import { useEffect, useId, useState, type SyntheticEvent, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp } from './context.js';
 import { ImpMark } from './ImpMark.js';
+import { IMP_NAME } from './imp-names.js';
 import { starterMixes, type StarterMix } from './onboarding/presets.js';
 import { formatUsd } from './spend.js';
 import { servedByLocalServer } from '../host/served.js';
@@ -185,9 +186,12 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
   return (
     <main className="setup">
       <div className="setup-panel" data-wide={hasKey && !showCustom ? 'true' : undefined}>
-        <div className="wordmark">
-          <ImpMark />
-          Imp
+        <div className="setup-brand">
+          <div className="wordmark">
+            <ImpMark />
+            Imp
+          </div>
+          <span className="setup-motto">{IMP_NAME}</span>
         </div>
         <div className="steps" aria-hidden="true">
           <span data-done="true" />

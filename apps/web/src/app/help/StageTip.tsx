@@ -1,9 +1,10 @@
-import { LightbulbFilamentIcon, XIcon } from '@phosphor-icons/react';
+import { XIcon } from '@phosphor-icons/react';
 import type { ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { openHelp, stageHintId, TopicListing, useHelpState } from './help.js';
 import { GuideTopic } from '@imp/core';
+import { ImpMark } from '../ImpMark.js';
 
 /** Stages that are full-screen editors: their tip keeps to one line, so the editor keeps its room. */
 const COMPACT = new Set(['edit', 'audio']);
@@ -42,7 +43,10 @@ export function StageTip({ stage }: { stage: string }): ReactElement | null {
       data-compact={COMPACT.has(stage) ? 'true' : undefined}
       aria-label={`Tip: ${page.hint.title}`}
     >
-      <LightbulbFilamentIcon className="stage-tip-icon" aria-hidden="true" size={22} />
+      {/* Tips come from the imp, so they carry its mark. */}
+      <span className="stage-tip-icon">
+        <ImpMark height={26} />
+      </span>
       <div className="stage-tip-text">
         <strong>{page.hint.title}</strong>
         <p title={page.hint.body}>{page.hint.body}</p>

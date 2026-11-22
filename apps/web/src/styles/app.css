@@ -5558,8 +5558,8 @@ dialog.whats-new-dialog {
   }
 }
 .stage-tip-icon {
-  color: var(--accent);
-  margin-top: 2px;
+  display: inline-flex;
+  margin-top: -1px;
 }
 .stage-tip-text {
   display: flex;
@@ -6846,4 +6846,234 @@ dialog.spend-dialog {
 }
 .backup .notice {
   border-radius: var(--radius-m);
+}
+
+/*
+ * The imp's touches. Tasteful mischief: the gold of the mark, its horns and
+ * its barb, in the places that frame the work (the mark, tips, empty stages,
+ * the busy sign, the name). Working surfaces stay as they are.
+ */
+::selection {
+  background: rgb(232 163 61 / 0.32);
+}
+:root[data-theme='light'] ::selection {
+  background: rgb(154 91 0 / 0.2);
+}
+
+/* The mark: horns twitch and the barb flicks when the pointer comes by, and once when Imp opens. */
+.imp-mark-horn,
+.imp-mark-barb,
+.horned-badge-horn {
+  /* Each part turns about its own root: horns where they meet the dot, the barb where it meets the tail. */
+  transform-box: fill-box;
+  transform-origin: 83% 89%;
+}
+.imp-mark-horn-right,
+.horned-badge-horn-right {
+  transform-origin: 17% 89%;
+}
+.imp-mark-barb {
+  transform-origin: 8% 60%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wordmark .imp-mark-horn,
+  .stage-tip-icon .imp-mark-horn {
+    animation: imp-horn-left 900ms ease-in-out 600ms 1;
+  }
+  .wordmark .imp-mark-horn-right,
+  .stage-tip-icon .imp-mark-horn-right {
+    animation-name: imp-horn-right;
+  }
+  .wordmark .imp-mark-barb,
+  .stage-tip-icon .imp-mark-barb {
+    animation: imp-barb 900ms ease-in-out 700ms 1;
+  }
+  .wordmark:hover .imp-mark-horn {
+    animation: imp-horn-left 900ms ease-in-out infinite;
+  }
+  .wordmark:hover .imp-mark-horn-right {
+    animation-name: imp-horn-right;
+  }
+  .wordmark:hover .imp-mark-barb {
+    animation: imp-barb 900ms ease-in-out infinite;
+  }
+}
+@keyframes imp-horn-left {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(-9deg);
+  }
+  55% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes imp-horn-right {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(9deg);
+  }
+  55% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes imp-barb {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  35% {
+    transform: rotate(-14deg) translateY(-3px);
+  }
+  60% {
+    transform: rotate(6deg);
+  }
+}
+.wordmark {
+  cursor: default;
+}
+.wordmark .imp-mark {
+  filter: drop-shadow(0 0 6px rgb(232 163 61 / 0.25));
+}
+:root[data-theme='light'] .wordmark .imp-mark {
+  filter: none;
+}
+
+/* Setup: the mark with its motto. */
+.setup-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.setup-panel .imp-mark {
+  filter: drop-shadow(0 0 14px rgb(232 163 61 / 0.3));
+}
+.setup-motto,
+.imp-alias {
+  font: 500 11px/1.2 var(--font-body);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* The busy sign: the imp's tail chasing itself. */
+.imp-spinner {
+  flex: none;
+  vertical-align: -4px;
+  margin-right: 4px;
+  color: var(--accent);
+}
+.imp-spinner-track {
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.imp-spinner-barb {
+  fill: currentcolor;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .imp-spinner {
+    animation: imp-spin 1.1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .imp-spinner {
+    animation: imp-glow 1.6s ease-in-out infinite;
+  }
+}
+@keyframes imp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes imp-glow {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* An empty stage's badge: the stage's icon in a ring the imp's horns peek over. */
+.horned-badge {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 2px;
+}
+.horned-badge > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.horned-badge-horn {
+  fill: var(--accent);
+}
+.horned-badge-ring {
+  fill: color-mix(in srgb, var(--accent) 9%, var(--ground));
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 1.5;
+}
+.horned-badge-icon {
+  position: relative;
+  display: inline-flex;
+  margin-top: 12px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .empty-state:hover .horned-badge-horn {
+    animation: imp-horn-left 900ms ease-in-out 1;
+  }
+  .empty-state:hover .horned-badge-horn-right {
+    animation-name: imp-horn-right;
+  }
+}
+.empty-state-quip {
+  font: italic 400 17px/1.3 var(--font-display);
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+/* What Imp stands for this visit, over the Projects heading. A press tries the next one. */
+.imp-alias {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.imp-alias-word {
+  color: var(--accent);
+}
+.imp-alias:hover .imp-alias-name,
+.imp-alias:focus-visible .imp-alias-name {
+  color: var(--ink-soft);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .imp-alias-name {
+    animation: imp-alias-in 260ms ease-out;
+  }
+}
+@keyframes imp-alias-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (pointer: coarse) {
+  .imp-alias {
+    min-height: var(--hit);
+  }
 }

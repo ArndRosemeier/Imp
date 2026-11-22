@@ -270,6 +270,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
           <EmptyState
             icon={ScrollIcon}
             title="No scenes yet"
+            quip="A blank page. The imp finds that very tempting."
             body="There are no scenes yet. Add one with Add scene, or have the script written from the development notes."
             ask="Write the script of this film from the development notes, scene by scene."
           />
@@ -753,6 +754,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
         <EmptyState
           icon={UsersThreeIcon}
           title="Nobody is cast yet"
+          quip="An empty stage, and the imp is bored already."
           body="Nobody is cast yet. Add a character, or have the cast built from the script, with a look and a voice for each."
           ask="Build the cast of this film from the script: who appears, how they look and sound. Tell me the price before making portraits."
         />

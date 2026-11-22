@@ -2000,6 +2000,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
           <EmptyState
             icon={FilmReelIcon}
             title="Nothing to cut yet"
+            quip="The scissors are getting restless."
             body="There are no scenes yet. Write the script first, then make clips of its shots; they come together here."
             go={{ stage: 'script', label: 'Go to Script' }}
           />

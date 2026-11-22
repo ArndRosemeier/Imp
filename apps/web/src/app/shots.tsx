@@ -839,6 +839,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
           <EmptyState
             icon={FilmStripIcon}
             title="Write a scene first"
+            quip="No scenes, no shots. Even mischief needs a plan."
             body="Shots belong to scenes, and there are no scenes yet. Write the script first."
             go={{ stage: 'script', label: 'Go to Script' }}
           />
@@ -849,6 +850,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
             <EmptyState
               icon={FilmStripIcon}
               title="No shots in this scene"
+              quip="Nothing is rolling yet."
               body="This scene has no shots yet. Add one, or have the scene broken into shots of a few seconds each."
               ask="Break the scene I am looking at into shots of four to eight seconds each."
             />

@@ -37,6 +37,7 @@ import { useHelpState } from './help/help.js';
 import { Problem, useBlobUrl } from './movie.js';
 import { saveFileAs } from './save-file.js';
 import { BackupButton } from './backup.js';
+import { ImpAlias } from './imp-names.js';
 
 const OverviewEntry = Project.extend({
   summary: ProjectSummary.nullable(),
@@ -1132,10 +1133,11 @@ export function ProjectsView({
     <>
       <div className="view-head spread projects-head">
         <div className="stack tight">
+          <ImpAlias />
           <h1>Projects</h1>
           <span className="muted">
             {projects.length === 0
-              ? 'Nothing here yet. Start one, or bring one in from a file.'
+              ? 'Nothing here yet, and an idle imp gets ideas. Start one, or bring one in from a file.'
               : `${String(projects.length)} ${projects.length === 1 ? 'project' : 'projects'}, most recently opened first.`}
           </span>
         </div>
