@@ -215,6 +215,7 @@ export const editGuide: GuideTopic = {
 
 - Trim a piece by dragging its edges; split it at the playhead; drag pieces to reorder them.
 - Select a piece to see its inspector: takes, speed, freeze frame, punch-in, colour grade, and how it comes in (cut, dissolve, dip, wipe).
+- **Transitions**: select the second of two pieces and choose under *Comes in with* how it arrives: cut, dissolve, dip to black or white, or wipe. **Length (s)** below the choice sets how long it takes (0.1 to 5 seconds). A dissolve or wipe lies over the piece before, so the scene gets that much shorter; a dip keeps its length.
 - **J and L cuts** let the sound of one shot start early or run on under the next.
 - Leave **markers** (notes, to-dos, problems) at the playhead with M.
 - Undo and redo work for every change.
@@ -232,7 +233,7 @@ The **Film Editor** can cut too. Its changes arrive as a **proposal**, like trac
 
 ## Export
 
-Export renders the film as an MP4 file, faster than real time, in the browser.`,
+Export renders the scene or the whole film as an MP4 file, faster than real time: in the browser, or with ffmpeg on the local server, where Imp offers to download ffmpeg if it is missing.`,
 };
 
 export const audioGuide: GuideTopic = {

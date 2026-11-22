@@ -307,7 +307,7 @@ function TagsField({
           id={id}
           className="input"
           value={draft}
-          placeholder={tags.length === 0 ? 'act two, storm, keep' : 'Add a tag'}
+          placeholder={tags.length === 0 ? 'Add tags, such as storm or keep' : 'Add a tag'}
           onChange={(event) => {
             setDraft(event.target.value);
           }}

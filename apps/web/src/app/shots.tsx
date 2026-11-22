@@ -82,18 +82,25 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
           <video controls src={url} aria-label={`Clip of shot ${String(shot.position)}`} />
         ))}
       <figcaption className="muted">
-        {clip.model}
-        {clip.durationSeconds === null ? '' : ` · ${String(clip.durationSeconds)} s`}
+        {clip.model === 'file' ? 'From a file' : clip.model}
+        {clip.durationSeconds === null ? '' : ` · ${seconds(clip.durationSeconds)}`}
         {clip.costUsd === null ? '' : ` · $${clip.costUsd.toFixed(2)}`}
-        {clip.startFrameId !== null
-          ? ' · starts on the key frame'
-          : clip.guides.length === 0
-            ? ' · made from the words alone, without pictures'
-            : ` · guided by ${clip.guides.join(', ')}`}
+        {clip.model === 'file'
+          ? ''
+          : clip.startFrameId !== null
+            ? ' · starts on the key frame'
+            : clip.guides.length === 0
+              ? ' · made from the words alone, without pictures'
+              : ` · guided by ${clip.guides.join(', ')}`}
         {overlaid ? ' · silent, the recorded dialogue plays over it' : ''}
       </figcaption>
     </figure>
   );
+}
+
+/** A clip length as people read it: "4 s", "4.5 s", never "4.041667 s". */
+function seconds(value: number): string {
+  return `${String(Math.round(value * 10) / 10)} s`;
 }
 
 /** One earlier clip of a shot: a still that plays when tapped, and what it was made with. */
@@ -156,7 +163,7 @@ function TakeCard({
       </button>
       <span className="muted small take-info" title={take.prompt}>
         {take.model === 'file' ? 'From a file' : take.model.split('/').at(-1)}
-        {take.durationSeconds === null ? '' : ` · ${String(take.durationSeconds)} s`}
+        {take.durationSeconds === null ? '' : ` · ${seconds(take.durationSeconds)}`}
       </span>
       <div className="row take-actions">
         <button

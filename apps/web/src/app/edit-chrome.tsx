@@ -1,6 +1,7 @@
 import { XIcon } from '@phosphor-icons/react';
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -69,6 +70,25 @@ export function Popover({
       document.removeEventListener('keydown', escape);
     };
   }, [open]);
+  const panel = useRef<HTMLDivElement>(null);
+  // The panel never reaches past the stage: on a short screen (a tablet) a panel that opens
+  // upwards from the timeline would otherwise slide under the top bar.
+  useLayoutEffect(() => {
+    const element = panel.current;
+    const trigger = root.current;
+    if (!open || element === null || trigger === null) return;
+    const fit = (): void => {
+      const box = trigger.getBoundingClientRect();
+      const stageTop = trigger.closest('.main')?.getBoundingClientRect().top ?? 0;
+      const room = side === 'up' ? box.top - stageTop - 16 : window.innerHeight - box.bottom - 16;
+      element.style.maxHeight = `${String(Math.max(160, Math.min(600, room)))}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => {
+      window.removeEventListener('resize', fit);
+    };
+  }, [open, side]);
   const heading = title ?? label;
   return (
     <div className={`popover ${className}`} ref={root}>
@@ -89,6 +109,7 @@ export function Popover({
         {badge !== undefined && badge !== null && <span className="popover-badge">{badge}</span>}
       </button>
       <div
+        ref={panel}
         className={`popover-panel${wide ? ' wide' : ''}`}
         data-side={side}
         data-align={align}
