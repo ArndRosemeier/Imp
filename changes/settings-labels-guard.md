@@ -1,0 +1,1 @@
+**Settings stay readable.** A check now makes sure every setting Imp stores either has a name in words on the Settings screen or stays hidden as something the app keeps for itself, so internal values like the list of closed tips can't show up there again.
