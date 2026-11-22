@@ -26,6 +26,7 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { ScenePlace, useWorld } from './place.js';
 import { useLibraryDrop } from './library/drag.js';
 import { ModelBar } from './model-bar.js';
+import { chooseModel, ModelChoice } from './model-choice.js';
 import { Price } from './spend.js';
 import { SceneScript, ScriptFiles } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
@@ -474,15 +475,22 @@ const ImageModels = z.object({
 });
 const StringSetting = z.object({ value: z.json() });
 
+/** What kind of thing a model setting's model makes, for asking the catalog. */
+export type ModelOutput = 'text' | 'image' | 'speech' | 'audio' | 'video' | 'transcription';
+
 /** Reads a setting that names a generation model, and the models it can be set to. */
 export function useModelSetting(
   key: string,
-  output: 'image' | 'speech' | 'audio' | 'video' | 'transcription',
+  output: ModelOutput,
+  options: { tools?: boolean } = {},
 ): {
   model: string | null;
   models: readonly { id: string; name: string; abilities?: string[] | undefined }[];
   error: string | null;
+  output: ModelOutput;
+  tools: boolean;
 } {
+  const tools = options.tools ?? false;
   const setting = useLive([`settings/${key}`], async (imp) => {
     const { value } = StringSetting.parse(await runCommand(imp, 'settings.get', { key }));
     return typeof value === 'string' && value !== '' ? value : null;
@@ -495,7 +503,7 @@ export function useModelSetting(
   });
   useEffect(() => {
     let active = true;
-    runCommand(imp, 'models.list', { output }).then(
+    runCommand(imp, 'models.list', { output, tools }).then(
       (listed) => {
         if (active) setCatalog({ data: ImageModels.parse(listed), error: null });
       },
@@ -506,11 +514,13 @@ export function useModelSetting(
     return () => {
       active = false;
     };
-  }, [imp, output]);
+  }, [imp, output, tools]);
   return {
     model: setting.data ?? null,
     models: catalog.data?.models ?? [],
     error: setting.error ?? catalog.error,
+    output,
+    tools,
   };
 }
 
@@ -677,33 +687,16 @@ export function ModelPicker({
   act: Act;
 }): ReactElement {
   return (
-    <div className="field model-picker">
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        className="select"
-        value={choice.model ?? ''}
-        onChange={(event) => {
-          void act('settings.set', { key: setting, value: event.target.value });
-        }}
-      >
-        {choice.model === null && <option value="">{empty}</option>}
-        {choice.model !== null && !choice.models.some((model) => model.id === choice.model) && (
-          <option value={choice.model}>
-            {choice.model}
-            {choice.models.length > 0 ? t(' (not offered: unsuitable or unknown)') : ''}
-          </option>
-        )}
-        {choice.models.map((model) => (
-          <option key={model.id} value={model.id}>
-            {model.name}
-            {model.abilities === undefined || model.abilities.length === 0
-              ? ''
-              : ` · ${model.abilities.join(' · ')}`}
-          </option>
-        ))}
-      </select>
-    </div>
+    <ModelChoice
+      id={id}
+      label={label}
+      empty={empty}
+      output={choice.output}
+      tools={choice.tools}
+      value={choice.model}
+      known={choice.models}
+      onChoose={(model) => chooseModel(act, setting, model)}
+    />
   );
 }
 

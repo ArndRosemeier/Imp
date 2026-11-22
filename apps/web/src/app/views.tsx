@@ -13,13 +13,23 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
-import { useModelMixes } from './model-bar.js';
+import { ModelPanel } from './model-bar.js';
+import { AGENTS_MODEL_SETTING } from './model-choice.js';
+import { useModelSetting, type Act } from './movie.js';
+import {
+  EFFECT_MODEL_SETTING,
+  IMAGE_MODEL_SETTING,
+  MUSIC_MODEL_SETTING,
+  SPEECH_MODEL_SETTING,
+  VIDEO_MODEL_SETTING,
+} from '@imp/mode-movie';
+import { TRANSCRIPTION_MODEL_SETTING } from '@imp/audio';
 import { TipsSwitch } from './help/HelpPanel.js';
 import { openHelp } from './help/help.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
 import { BackupPanel } from './backup.js';
 import { saveFileAs } from './save-file.js';
-import { ACTIVE_MIX_KEY, INTERNAL_SETTINGS, settingLabel } from './settings-labels.js';
+import { INTERNAL_SETTINGS, MODEL_SETTINGS, settingLabel } from './settings-labels.js';
 import { currentLanguage, t, tx } from '../i18n/i18n.js';
 import { LanguagePicker } from '../i18n/LanguagePicker.js';
 import { AllowanceFields, formatUsd } from './spend.js';
@@ -406,14 +416,107 @@ function settingValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Every model Imp makes things with, and the mix they come from, each changed right here. */
+function SettingsModels(): ReactElement {
+  const imp = useImp();
+  const [error, setError] = useState<string | null>(null);
+  const agents = useModelSetting(AGENTS_MODEL_SETTING, 'text', { tools: true });
+  const video = useModelSetting(VIDEO_MODEL_SETTING, 'video');
+  const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
+  const images = useModelSetting(IMAGE_MODEL_SETTING, 'image');
+  const effects = useModelSetting(EFFECT_MODEL_SETTING, 'speech');
+  const music = useModelSetting(MUSIC_MODEL_SETTING, 'audio');
+  const transcripts = useModelSetting(TRANSCRIPTION_MODEL_SETTING, 'transcription');
+  const act: Act = async (id, input) => {
+    setError(null);
+    try {
+      return await runCommand(imp, id, input);
+    } catch (reason) {
+      setError(messageOf(reason));
+      return undefined;
+    }
+  };
+  return (
+    <section className="card stack settings-models" aria-labelledby="models-heading">
+      <h3 id="models-heading">{t('Models')}</h3>
+      <p className="muted">
+        {t(
+          'Which model makes each kind of thing. A change counts at once, on every stage. Switch the whole set with a mix, or change one model and save the set as a mix.',
+        )}
+      </p>
+      <ModelPanel
+        act={act}
+        models={[
+          {
+            id: 'settings-agents-model',
+            label: t('Agents'),
+            empty: t('Choose a model for the agents'),
+            setting: AGENTS_MODEL_SETTING,
+            choice: agents,
+          },
+          {
+            id: 'settings-video-model',
+            label: t('Video'),
+            empty: t('Choose a model to make clips'),
+            setting: VIDEO_MODEL_SETTING,
+            choice: video,
+          },
+          {
+            id: 'settings-voice-model',
+            label: t('Voice'),
+            empty: t('Choose a model to record voices'),
+            setting: SPEECH_MODEL_SETTING,
+            choice: speech,
+          },
+          {
+            id: 'settings-image-model',
+            label: t('Image'),
+            empty: t('Choose a model to draw pictures'),
+            setting: IMAGE_MODEL_SETTING,
+            choice: images,
+          },
+          {
+            id: 'settings-effects-model',
+            label: t('Sound effects'),
+            empty: t('Choose a model to make effects'),
+            setting: EFFECT_MODEL_SETTING,
+            choice: effects,
+          },
+          {
+            id: 'settings-music-model',
+            label: t('Music'),
+            empty: t('Choose a model to make music'),
+            setting: MUSIC_MODEL_SETTING,
+            choice: music,
+          },
+          {
+            id: 'settings-transcript-model',
+            label: t('Transcript'),
+            empty: t('Choose a model to write transcripts'),
+            setting: TRANSCRIPTION_MODEL_SETTING,
+            choice: transcripts,
+          },
+        ]}
+      />
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
   const [serverError, setServerError] = useState<string | null>(null);
   const settings = useLive(['settings/'], async (current) =>
     SettingList.parse(await runCommand(current, 'settings.list', {})),
   );
-  const mixes = useModelMixes().data;
+  const imp = useImp();
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
+  // The models have their own section above, where they can be changed.
   const shown = (settings.data?.settings ?? [])
-    .filter((setting) => !INTERNAL_SETTINGS.has(setting.key))
+    .filter((setting) => !INTERNAL_SETTINGS.has(setting.key) && !MODEL_SETTINGS.has(setting.key))
     .sort((a, b) => settingLabel(a.key).localeCompare(settingLabel(b.key)));
   return (
     <>
@@ -435,20 +538,43 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
         </p>
         <LanguagePicker />
       </section>
+      <SettingsModels />
       <section className="card stack" aria-labelledby="settings-heading">
-        <h3 id="settings-heading">{t('Models and preferences')}</h3>
+        <h3 id="settings-heading">{t('Preferences')}</h3>
         <dl className="settings-list">
           {shown.map((setting) => (
             <div key={setting.key} className="settings-row" title={setting.key}>
               <dt>{settingLabel(setting.key)}</dt>
               <dd className={typeof setting.value === 'string' ? 'mono' : undefined}>
-                {setting.key === ACTIVE_MIX_KEY
-                  ? (mixes?.mixes.find((mix) => mix.id === setting.value)?.name ?? t('None'))
-                  : settingValue(setting.value)}
+                {typeof setting.value === 'boolean' ? (
+                  <label className="choice">
+                    <input
+                      type="checkbox"
+                      checked={setting.value}
+                      aria-label={settingLabel(setting.key)}
+                      onChange={() => {
+                        runCommand(imp, 'settings.set', {
+                          key: setting.key,
+                          value: !setting.value,
+                        }).catch((error: unknown) => {
+                          setPreferenceError(messageOf(error));
+                        });
+                      }}
+                    />
+                    {settingValue(setting.value)}
+                  </label>
+                ) : (
+                  settingValue(setting.value)
+                )}
               </dd>
             </div>
           ))}
         </dl>
+        {preferenceError !== null && (
+          <p className="error" role="alert">
+            {preferenceError}
+          </p>
+        )}
         {settings.data !== undefined && shown.length === 0 && (
           <p className="muted">{t('Nothing is set yet.')}</p>
         )}

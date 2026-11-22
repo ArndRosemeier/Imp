@@ -12,7 +12,7 @@ import { starterMixes } from '../src/app/onboarding/presets.js';
 import { unseenVersions } from '../src/app/WhatsNew.js';
 import { createImp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
-import { completeSetup, connect, model, start, setUpAppTests } from './app-harness.js';
+import { chooseModel, completeSetup, connect, model, start, setUpAppTests } from './app-harness.js';
 
 setUpAppTests();
 
@@ -321,8 +321,7 @@ describe('App: setup and agents', () => {
     // Nothing can be made before a model is chosen.
     const make = within(card).getByRole('button', { name: /Portrait/ });
     expect(make).toHaveProperty('disabled', true);
-    await screen.findByRole('option', { name: 'vendor/painter' });
-    await user.selectOptions(screen.getByLabelText('Image model'), 'vendor/painter');
+    await chooseModel(user, screen.getByLabelText('Image model'), 'vendor/painter');
     await vi.waitFor(() => {
       expect(make).toHaveProperty('disabled', false);
     });
@@ -363,7 +362,7 @@ describe('App: setup and agents', () => {
     const voice = within(card).getByRole('form', { name: 'Voice of New character' });
     const recordButton = within(voice).getByRole('button', { name: /Record voice/ });
     expect(recordButton).toHaveProperty('disabled', true);
-    await user.selectOptions(screen.getByLabelText('Voice model'), 'vendor/speaker');
+    await chooseModel(user, screen.getByLabelText('Voice model'), 'vendor/speaker');
     await vi.waitFor(() => {
       expect(recordButton).toHaveProperty('disabled', false);
     });
