@@ -70,6 +70,12 @@ stars and notes for any asset. In the interface, a drop target is
 `useLibraryDrop`; it also appears in the asset's "Use in" menu, which is the
 path that needs no dragging.
 
+The library's Crews tab shows saved crews (`crew.saved.*` in `@imp/agents`).
+Unlike assets they belong to the workspace, under `saved-crews/`, so any
+project can load one. A saved crew copies the custom roles its agents hold;
+loading it brings back any that were deleted and never dismisses the
+coordinator, which may be the agent doing the loading.
+
 ## Modes
 
 A working mode (movie first) is a package that contributes commands, agent

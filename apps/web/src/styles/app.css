@@ -4632,3 +4632,92 @@ dialog.whats-new-dialog {
       0 0 0 6px color-mix(in srgb, var(--accent) 25%, transparent);
   }
 }
+
+/* Saved crews, in the library's Crews tab. */
+.crew-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.crew-save {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  background: radial-gradient(120% 120% at 0% 0%, var(--accent-wash), transparent 70%);
+}
+.crew-save .row {
+  flex-wrap: nowrap;
+}
+.crew-save .input {
+  flex: 1;
+  min-width: 0;
+}
+.crew-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.crew-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+}
+.crew-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+}
+.crew-card-head > svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+.crew-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.crew-card-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.crew-card-members li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.crew-card-name {
+  font-weight: 600;
+}
+.crew-card-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.crew-card-actions .button {
+  min-height: 36px;
+}
+.crew-card-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 10px;
+  border-radius: var(--radius-s);
+  background: var(--accent-wash);
+}
