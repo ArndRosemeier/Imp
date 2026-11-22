@@ -313,7 +313,10 @@ describe('Save all and Load all', () => {
     const file = await savedFile(pending);
     await runtime.blobs.delete('library/video/big');
     await run('backup.load', { fileKey: await pick(file, 3 * 1024 * 1024 + 7) });
-    expect((await runtime.blobs.get('library/video/big'))?.bytes).toEqual(big);
+    const loaded = (await runtime.blobs.get('library/video/big'))?.bytes ?? new Uint8Array();
+    // toEqual on 16 MB takes 8 s; a plain loop finds the first differing byte in milliseconds.
+    expect(loaded.length).toBe(big.length);
+    expect(loaded.findIndex((byte, i) => byte !== big[i])).toBe(-1);
   });
 
   it('changes nothing when the file is damaged, and says what is wrong', async () => {

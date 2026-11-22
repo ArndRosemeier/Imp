@@ -1,5 +1,9 @@
 name: CI
 
+# The fast checks: they guard every pull request and every change to main, and
+# they are what a pull request needs to be green before it merges. They run as
+# parallel jobs, so the wait is the slowest job, not the sum of them.
+# The slow checks (Imp in a real browser) are in slow.yml: by hand and nightly.
 on:
   push:
     branches: [main]
@@ -13,7 +17,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The whole history, as the build reads it; it takes about a second.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # The local server renders films and reads clips with ffmpeg; its tests run it for real.
+      # Without it they skip and coverage falls under the threshold.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
+
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,13 +77,18 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm typecheck
-      # The local server renders films and reads clips with ffmpeg; its tests run it for real.
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
-      - run: pnpm test:coverage
       - run: pnpm --filter @imp/web build
       - run: pnpm --filter @imp/server build
       # The packaged server must start by itself, without the workspace around it.
       - run: cp -r apps/server/dist/imp-server "$RUNNER_TEMP/imp-server" && node "$RUNNER_TEMP/imp-server/imp.mjs" --help
+
+  # One check that is green only when every job above is, for the pull request page.
+  check:
+    if: always()
+    needs: [lint, typecheck, test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: All fast checks passed
+        run: |
+          echo '${{ toJSON(needs) }}' | jq -e 'to_entries | all(.value.result == "success")'

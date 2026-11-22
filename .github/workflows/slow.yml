@@ -1,0 +1,56 @@
+name: Slow checks
+
+# Imp in a real Chromium, at desktop size and on a landscape tablet: the first
+# screen loads without errors and fits, and films render with WebCodecs.
+# Not run on pull requests, to keep them quick. Start it by hand under
+# Actions → Slow checks → Run workflow (on any branch), for example before a
+# release or after changing film export or layout. It also runs every night
+# on main when main changed that day.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: slow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Skip a night without changes
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = schedule ] && [ -z "$(git log --since='25 hours ago' --format=%H -1)" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No changes on main since the last nightly run."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changed.outputs.run == 'true'
+        uses: pnpm/action-setup@v4
+      - if: steps.changed.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm --filter @imp/web exec playwright install --with-deps chromium
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm test:slow
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-results
+          path: apps/web/test-results
+          retention-days: 7

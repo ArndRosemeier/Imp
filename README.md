@@ -34,6 +34,26 @@ pnpm --filter @imp/web dev   # the web app at http://localhost:5173
 | `pnpm lint`          | ESLint with type-aware rules, no warnings allowed |
 | `pnpm typecheck`     | Strict TypeScript across all packages             |
 | `pnpm format`        | Formats everything with Prettier                  |
+| `pnpm test:slow`     | Imp in a real Chromium (desktop and tablet)       |
+
+### Fast and slow checks
+
+- **Fast checks** (`.github/workflows/ci.yml`) run on every pull request and
+  every push to `main`: format and lint, type check, the Vitest suite with
+  coverage (with ffmpeg installed), and the web and server builds, as parallel
+  jobs. A pull request merges only when they are green. Keep them quick: a
+  test that takes more than a few seconds should be made faster or moved to
+  the slow checks.
+- **Slow checks** (`.github/workflows/slow.yml`, tests in `apps/web/browser/`)
+  run Imp in a real Chromium with Playwright, at desktop size and on a
+  landscape tablet, and render films with WebCodecs. They do not run on pull
+  requests. They run every night on `main` when it changed, and by hand under
+  **Actions → Slow checks → Run workflow** (pick the branch). Run them before
+  calling a release, and on the branch of any change to film export, the
+  renderer, layout or touch handling.
+- Locally, `pnpm test:slow` runs the slow checks. It needs Chromium for
+  Playwright: `pnpm --filter @imp/web exec playwright install chromium`, or
+  set `PLAYWRIGHT_BROWSERS_PATH` to where one is installed.
 
 ## Adding a capability
 
