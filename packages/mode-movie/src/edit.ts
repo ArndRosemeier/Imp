@@ -42,6 +42,7 @@ import {
   TransitionKind,
 } from './schema.js';
 import { placeText } from './text-layout.js';
+import { readingSpeed } from './text-markup.js';
 import { FilmLook, Grade, NEUTRAL_LOOK } from './grade.js';
 import { dipOf, overlapSeconds } from './transitions.js';
 import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
@@ -366,6 +367,11 @@ export const TextView = TextItem.extend({
   follows: z.string().nullable(),
   /** What it follows is gone from the cut: it is not shown in the film until moved or removed. */
   orphaned: z.boolean(),
+  /**
+   * For a subtitle, how many letters a second it asks the viewer to read;
+   * above about 20 it is hard to follow. Null for other kinds.
+   */
+  lettersPerSecond: z.number().nullable().default(null),
 });
 export type TextView = z.infer<typeof TextView>;
 
@@ -557,7 +563,15 @@ export async function viewOf(
     lines: cut.lines.map((line) => lineView(line)),
     spoken,
     texts: cut.texts
-      .map((text) => ({ ...text, ...placeText(text, { items: laid.items, spoken }) }))
+      .map((text) => {
+        const placed = placeText(text, { items: laid.items, spoken });
+        return {
+          ...text,
+          ...placed,
+          lettersPerSecond:
+            text.kind === 'subtitle' ? readingSpeed(text.text, placed.durationSeconds) : null,
+        };
+      })
       .sort((a, b) => a.startSeconds - b.startSeconds),
     look: await readFilmLook(store, projectId),
   };

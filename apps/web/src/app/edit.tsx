@@ -68,6 +68,7 @@ import {
   StyleEditor,
   TextInspector,
   TextLane,
+  TEXT_WORDS_ID,
   TextOverlay,
   TextTools,
   useTextStyles,
@@ -1028,6 +1029,13 @@ function SceneEditor({
               now={playback.now}
               playing={playback.playing}
               look={playback.look}
+              selectedId={readOnly ? null : (text?.id ?? null)}
+              onPlace={(textId, x, y) => {
+                void act('movie.edit.text.set', { sceneId, textId, x, y });
+              }}
+              onEdit={() => {
+                document.getElementById(TEXT_WORDS_ID)?.focus();
+              }}
             />
           </div>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}

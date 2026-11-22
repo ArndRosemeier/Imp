@@ -1,5 +1,13 @@
 import type { Project } from '@imp/core';
-import { DEFAULT_TEXT_STYLES, TextStyle, type TextKind, type TextView } from '@imp/mode-movie';
+import {
+  DEFAULT_TEXT_STYLES,
+  FAST_READING,
+  plainText,
+  styleOf,
+  TextStyle,
+  type TextKind,
+  type TextView,
+} from '@imp/mode-movie';
 import {
   ClosedCaptioningIcon,
   DownloadSimpleIcon,
@@ -8,11 +16,14 @@ import {
   LinkSimpleIcon,
   PaletteIcon,
   PlusIcon,
+  TextBIcon,
+  TextItalicIcon,
+  TextUnderlineIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type PointerEvent, type ReactElement } from 'react';
 import { z } from 'zod';
-import { drawLane, drawText } from '@imp/host/film';
+import { drawLane, drawText, layoutText } from '@imp/host/film';
 import { loadTextFonts } from '../host/text-fonts.js';
 import { runCommand, useImp, useLive } from './context.js';
 import { clock, type Item, type Look } from './cut-player.js';
@@ -108,9 +119,102 @@ function useCanvas(draw: (g: CanvasRenderingContext2D, width: number, height: nu
   return { canvas, paint, ready: fonts, size };
 }
 
+/** The title-safe area: texts are kept inside it, 5% in from each edge. */
+const TITLE_SAFE = 0.05;
+/** The action-safe area, 3.5% in from each edge. */
+const ACTION_SAFE = 0.035;
+/** How close, in screen pixels, a dragged text comes before it snaps to a guide. */
+const SNAP_PX = 8;
+
+/** A text as the preview draws it, with its style. */
+function drawnOf(text: TextView, styles: readonly StyleEntry[]) {
+  const style = styles.find((candidate) => candidate.id === text.styleId) ?? styleOf(styles, text);
+  return {
+    kind: text.kind,
+    text: text.text,
+    style,
+    startSeconds: text.startSeconds,
+    durationSeconds: text.durationSeconds,
+    x: text.x,
+    y: text.y,
+  };
+}
+
+interface Box {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Where a box dragged by dx, dy lands, snapped to the centre lines and the
+ * title-safe edges when it comes close; and which guides it snapped to.
+ */
+export function snapBox(
+  box: Box,
+  dx: number,
+  dy: number,
+  width: number,
+  height: number,
+): { dx: number; dy: number; guides: string[] } {
+  const guides: string[] = [];
+  const snap = (
+    start: number,
+    size: number,
+    whole: number,
+    names: readonly [string, string, string],
+  ): number => {
+    const candidates: [number, string][] = [
+      [whole / 2 - (start + size / 2), names[1]],
+      [whole * TITLE_SAFE - start, names[0]],
+      [whole * (1 - TITLE_SAFE) - (start + size), names[2]],
+    ];
+    let best: [number, string] | null = null;
+    for (const candidate of candidates) {
+      if (
+        Math.abs(candidate[0]) <= SNAP_PX &&
+        (best === null || Math.abs(candidate[0]) < Math.abs(best[0]))
+      ) {
+        best = candidate;
+      }
+    }
+    if (best === null) return 0;
+    guides.push(best[1]);
+    return best[0];
+  };
+  const moved = { left: box.left + dx, top: box.top + dy };
+  const sx = snap(moved.left, box.width, width, ['left', 'centre-x', 'right']);
+  const sy = snap(moved.top, box.height, height, ['top', 'centre-y', 'bottom']);
+  return { dx: dx + sx, dy: dy + sy, guides };
+}
+
+const inside = (box: Box, width: number, height: number, margin: number): boolean =>
+  box.left >= width * margin - 0.5 &&
+  box.top >= height * margin - 0.5 &&
+  box.left + box.width <= width * (1 - margin) + 0.5 &&
+  box.top + box.height <= height * (1 - margin) + 0.5;
+
+const round3 = (value: number): number => Math.round(value * 1000) / 1000;
+
+let measuring: CanvasRenderingContext2D | null | undefined;
+
+/** A canvas of its own to measure texts with, in CSS pixels, outside of drawing. */
+function measuringContext(): CanvasRenderingContext2D | null {
+  if (measuring === undefined) {
+    measuring =
+      typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  }
+  return measuring;
+}
+
 /**
  * The texts over the preview, drawn by the same function as the film export.
  * While the cut plays it is drawn every frame, so fades and rolls are smooth.
+ * A selected text gets a frame on the picture: drag it (or use the arrow
+ * keys) to place it, with guides for the centre and the title-safe area.
+ * When the selected text is not on screen at the playhead, it is shown faint,
+ * so that it can still be seen and placed.
  */
 export function TextOverlay({
   texts,
@@ -119,6 +223,9 @@ export function TextOverlay({
   now,
   playing,
   look,
+  selectedId = null,
+  onPlace,
+  onEdit,
 }: {
   texts: readonly TextView[];
   styles: readonly StyleEntry[];
@@ -126,18 +233,52 @@ export function TextOverlay({
   now: () => number;
   playing: boolean;
   look: Look;
+  /** The selected text, framed on the picture while the preview is still. */
+  selectedId?: string | null;
+  /** Puts a text at a new place: shares of the frame, as its x and y. */
+  onPlace?: (textId: string, x: number, y: number) => void;
+  /** Asked to change the selected text's words (a double tap on its frame). */
+  onEdit?: () => void;
 }): ReactElement {
   const time = useRef(at);
   time.current = at;
-  const { canvas, paint } = useCanvas((g, width, height) => {
+  const [drag, setDrag] = useState<{ dx: number; dy: number; guides: string[] } | null>(null);
+  const start = useRef<{ x: number; y: number; id: number } | null>(null);
+  const selected = playing ? undefined : texts.find((text) => text.id === selectedId);
+  const { canvas, paint, size } = useCanvas((g, width, height) => {
+    const seconds = playing ? now() : time.current;
+    // The selected text is drawn still (as it looks once it is on), so that it can be seen and placed
+    // even at the moment it starts to fade in; faint while it is not on screen at the playhead.
+    const still = selected !== undefined && !selected.orphaned;
     drawLane(g, {
-      texts,
+      texts: still ? texts.filter((text) => text.id !== selected.id) : texts,
       styles,
-      seconds: playing ? now() : time.current,
+      seconds,
       width,
       height,
       card: look.card ? { title: look.title, brightness: look.brightness } : null,
     });
+    if (!still) return;
+    const drawn = drawnOf(selected, styles);
+    const showing =
+      seconds >= selected.startSeconds &&
+      seconds < selected.startSeconds + selected.durationSeconds;
+    const moved =
+      drag === null
+        ? drawn
+        : {
+            ...drawn,
+            x: (drawn.x ?? drawn.style.x) + drag.dx / width,
+            y: (drawn.y ?? drawn.style.y) + drag.dy / height,
+          };
+    drawText(
+      g,
+      { ...moved, style: { ...drawn.style, enter: 'cut', exit: 'cut', roll: false } },
+      0,
+      width,
+      height,
+      showing || drag !== null ? 1 : 0.45,
+    );
   });
   // Drawn again whenever what is shown changes; every frame while playing.
   useEffect(() => {
@@ -153,7 +294,141 @@ export function TextOverlay({
       cancelAnimationFrame(frame);
     };
   });
-  return <canvas ref={canvas} className="preview-text" aria-hidden="true" />;
+  const g = measuringContext();
+  const box: Box | null =
+    selected === undefined || selected.orphaned || g === null || size.width === 0
+      ? null
+      : (() => {
+          const drawn = drawnOf(selected, styles);
+          const laid = layoutText(
+            g,
+            { ...drawn, style: { ...drawn.style, roll: false } },
+            size.width,
+            size.height,
+          );
+          const pad = laid.size * 0.3;
+          return {
+            left: laid.left - pad,
+            top: laid.top - pad,
+            width: laid.width + pad * 2,
+            height: laid.height + pad * 2,
+          };
+        })();
+  const place = (dx: number, dy: number): void => {
+    if (selected === undefined || onPlace === undefined) return;
+    const drawn = drawnOf(selected, styles);
+    const x = Math.min(1, Math.max(0, (drawn.x ?? drawn.style.x) + dx / size.width));
+    const y = Math.min(1, Math.max(0, (drawn.y ?? drawn.style.y) + dy / size.height));
+    onPlace(selected.id, round3(x), round3(y));
+  };
+  const moved =
+    box === null
+      ? null
+      : drag === null
+        ? box
+        : { ...box, left: box.left + drag.dx, top: box.top + drag.dy };
+  const safe = moved === null || inside(moved, size.width, size.height, TITLE_SAFE);
+  const placed =
+    selected === undefined
+      ? null
+      : (() => {
+          const drawn = drawnOf(selected, styles);
+          return { x: drawn.x ?? drawn.style.x, y: drawn.y ?? drawn.style.y };
+        })();
+  return (
+    <>
+      <canvas ref={canvas} className="preview-text" aria-hidden="true" />
+      {moved !== null && onPlace !== undefined && (
+        <div className="text-stage">
+          <div
+            className="safe-area safe-title"
+            style={{ inset: `${String(TITLE_SAFE * 100)}%` }}
+            aria-hidden="true"
+          />
+          <div
+            className="safe-area safe-action"
+            style={{ inset: `${String(ACTION_SAFE * 100)}%` }}
+            aria-hidden="true"
+          />
+          {drag?.guides.includes('centre-x') === true && (
+            <div className="snap-guide snap-x" aria-hidden="true" />
+          )}
+          {drag?.guides.includes('centre-y') === true && (
+            <div className="snap-guide snap-y" aria-hidden="true" />
+          )}
+          <div
+            className={`text-frame${safe ? '' : ' unsafe'}${drag === null ? '' : ' dragging'}`}
+            style={{ left: moved.left, top: moved.top, width: moved.width, height: moved.height }}
+            role="slider"
+            tabIndex={0}
+            aria-label="Place of the selected text: drag it, or use the arrow keys"
+            aria-valuenow={placed === null ? 0 : Math.round(placed.x * 100)}
+            aria-valuetext={
+              placed === null
+                ? undefined
+                : `${String(Math.round(placed.x * 100))}% across, ${String(Math.round(placed.y * 100))}% down`
+            }
+            title={
+              safe
+                ? 'Drag to place. Double-tap to change the words.'
+                : 'Outside the title-safe area: some screens may cut it off.'
+            }
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              start.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+              setDrag({ dx: 0, dy: 0, guides: [] });
+            }}
+            onPointerMove={(event) => {
+              const from = start.current;
+              if (from?.id !== event.pointerId || box === null) return;
+              setDrag(
+                snapBox(
+                  box,
+                  event.clientX - from.x,
+                  event.clientY - from.y,
+                  size.width,
+                  size.height,
+                ),
+              );
+            }}
+            onPointerUp={(event) => {
+              const from = start.current;
+              start.current = null;
+              if (from?.id !== event.pointerId) return;
+              const last = drag;
+              setDrag(null);
+              if (last !== null && Math.hypot(last.dx, last.dy) >= 2) place(last.dx, last.dy);
+            }}
+            onPointerCancel={() => {
+              start.current = null;
+              setDrag(null);
+            }}
+            onDoubleClick={onEdit}
+            onKeyDown={(event) => {
+              const step = event.shiftKey ? 0.05 : 0.005;
+              const keys: Record<string, [number, number]> = {
+                ArrowLeft: [-step, 0],
+                ArrowRight: [step, 0],
+                ArrowUp: [0, -step],
+                ArrowDown: [0, step],
+              };
+              const by = keys[event.key];
+              if (by === undefined) {
+                if (event.key === 'Enter') onEdit?.();
+                return;
+              }
+              event.preventDefault();
+              event.stopPropagation();
+              place(by[0] * size.width, by[1] * size.height);
+            }}
+          >
+            {!safe && <span className="text-frame-note">Outside the safe area</span>}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 /** Puts texts in rows so that texts that show at the same time do not cover each other. */
@@ -207,11 +482,12 @@ export function TextLane({
         const selected = selectedId === text.id;
         const move = moving.dragging?.id === text.id ? moving.dragging.dx / scale : 0;
         const stretch = edge.dragging?.id === text.id ? edge.dragging.dx / scale : 0;
-        const first = text.text.split('\n')[0] ?? '';
+        const first = plainText(text.text).split('\n')[0] ?? '';
+        const fast = text.lettersPerSecond !== null && text.lettersPerSecond > FAST_READING;
         return (
           <div
             key={text.id}
-            className={`block block-text text-${text.kind}${selected ? ' selected' : ''}${text.orphaned ? ' orphaned' : ''}${move === 0 ? '' : ' lifted'}${marked(text.id)}`}
+            className={`block block-text text-${text.kind}${selected ? ' selected' : ''}${text.orphaned ? ' orphaned' : ''}${fast ? ' fast' : ''}${move === 0 ? '' : ' lifted'}${marked(text.id)}`}
             style={{
               left: Math.max(0, text.startSeconds + move) * scale,
               width: Math.max(18, (text.durationSeconds + stretch) * scale),
@@ -224,7 +500,9 @@ export function TextLane({
             title={
               text.orphaned
                 ? `Not shown: it followed ${text.follows ?? 'a piece'} that is gone`
-                : text.text
+                : fast
+                  ? `Hard to read in time (${String(text.lettersPerSecond)} letters a second): ${plainText(text.text)}`
+                  : plainText(text.text)
             }
             onClick={(event) => {
               event.stopPropagation();
@@ -279,6 +557,163 @@ export function TextLane({
   );
 }
 
+/** The id of the words field of the selected text, so that the picture can send the focus there. */
+export const TEXT_WORDS_ID = 'text-words';
+
+/** The colours offered for a word, besides the style's own. */
+const WORD_COLOURS = ['#ffd166', '#ef6f5e', '#7cc4ff', '#8fe3a1'] as const;
+
+/**
+ * Wraps the selected words of a field in marks, or takes the marks away when
+ * they are already there; with nothing selected, puts the marks at the caret.
+ */
+export function wrapSelection(
+  value: string,
+  from: number,
+  to: number,
+  open: string,
+  close: string,
+): { value: string; from: number; to: number } {
+  const before = value.slice(0, from);
+  const picked = value.slice(from, to);
+  const after = value.slice(to);
+  if (before.endsWith(open) && after.startsWith(close)) {
+    return {
+      value: before.slice(0, before.length - open.length) + picked + after.slice(close.length),
+      from: from - open.length,
+      to: to - open.length,
+    };
+  }
+  if (
+    picked.startsWith(open) &&
+    picked.endsWith(close) &&
+    picked.length >= open.length + close.length
+  ) {
+    const inner = picked.slice(open.length, picked.length - close.length);
+    return { value: before + inner + after, from, to: from + inner.length };
+  }
+  return {
+    value: before + open + picked + close + after,
+    from: from + open.length,
+    to: to + open.length,
+  };
+}
+
+/**
+ * The words of a text, with buttons that style the selected words: bold,
+ * italic, underlined, a colour, smaller or bigger. The marks are plain text
+ * (the same ones agents write), and the picture shows them styled.
+ */
+function MarkupField({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (words: string) => Promise<unknown>;
+}): ReactElement {
+  const [draft, setDraft] = useState(value);
+  const [stored, setStored] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+  if (value !== stored) {
+    setStored(value);
+    setDraft(value);
+  }
+  const commit = (words: string): void => {
+    if (words === value || words.trim() === '') return;
+    setError(null);
+    onCommit(words).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    });
+  };
+  const mark = (open: string, close: string): void => {
+    const element = area.current;
+    if (element === null) return;
+    const next = wrapSelection(draft, element.selectionStart, element.selectionEnd, open, close);
+    setDraft(next.value);
+    commit(next.value);
+    requestAnimationFrame(() => {
+      element.focus();
+      element.setSelectionRange(next.from, next.to);
+    });
+  };
+  const tool = (label: string, open: string, close: string, child: ReactElement | string) => (
+    <button
+      type="button"
+      className="button quiet markup-tool"
+      aria-label={label}
+      title={label}
+      // Keeps the words selected in the field while the button is pressed.
+      onPointerDown={(event) => {
+        event.preventDefault();
+      }}
+      onClick={() => {
+        mark(open, close);
+      }}
+    >
+      {child}
+    </button>
+  );
+  return (
+    <div className="field markup-field">
+      <label htmlFor={TEXT_WORDS_ID}>Words</label>
+      <div className="markup-tools" role="toolbar" aria-label="Style the selected words">
+        {tool('Bold', '**', '**', <TextBIcon aria-hidden="true" weight="bold" />)}
+        {tool('Italic', '*', '*', <TextItalicIcon aria-hidden="true" />)}
+        {tool('Underline', '_', '_', <TextUnderlineIcon aria-hidden="true" />)}
+        <span className="markup-sep" aria-hidden="true" />
+        {WORD_COLOURS.map((colour) =>
+          tool(
+            `Colour ${colour}`,
+            `{${colour}|`,
+            '}',
+            <span className="markup-swatch" style={{ background: colour }} />,
+          ),
+        )}
+        <span className="markup-sep" aria-hidden="true" />
+        {tool('Smaller', '{small|', '}', <span className="markup-size small">A</span>)}
+        {tool('Bigger', '{big|', '}', <span className="markup-size big">A</span>)}
+      </div>
+      <textarea
+        id={TEXT_WORDS_ID}
+        ref={area}
+        className="input"
+        rows={3}
+        value={draft}
+        placeholder="A new line breaks the line"
+        onChange={(event) => {
+          setDraft(event.target.value);
+        }}
+        onBlur={() => {
+          commit(draft);
+        }}
+        onKeyDown={(event) => {
+          if (!(event.ctrlKey || event.metaKey)) return;
+          const keys: Record<string, [string, string]> = {
+            b: ['**', '**'],
+            i: ['*', '*'],
+            u: ['_', '_'],
+          };
+          const marks = keys[event.key.toLowerCase()];
+          if (marks === undefined) return;
+          event.preventDefault();
+          event.stopPropagation();
+          mark(marks[0], marks[1]);
+        }}
+      />
+      <p className="muted small">
+        Select words and style them, or write *italic*, **bold**, _underline_, {'{#ffd166|colour}'},{' '}
+        {'{small|smaller}'} or {'{big|bigger}'}.
+      </p>
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Changes the selected text: words, kind, style, time, anchor and place in the frame. */
 export function TextInspector({
   text,
@@ -320,15 +755,15 @@ export function TextInspector({
           the film. Give it a time of its own, or remove it.
         </p>
       )}
-      <EditableField
-        label="Words"
-        rows={3}
-        value={text.text}
-        placeholder="A new line breaks the line"
-        onCommit={(words) => set({ text: words })}
-      />
+      <MarkupField value={text.text} onCommit={(words) => set({ text: words })} />
+      {text.lettersPerSecond !== null && text.lettersPerSecond > FAST_READING && (
+        <p className="change-flag">
+          Hard to read in time: {text.lettersPerSecond} letters a second (keep it under{' '}
+          {FAST_READING}). Shorten the words or show it longer.
+        </p>
+      )}
       <div className="row wrap">
-        <label className="field compact">
+        <label className="field compact wide">
           <span>Kind</span>
           <select
             className="select"
@@ -344,7 +779,7 @@ export function TextInspector({
             ))}
           </select>
         </label>
-        <label className="field compact">
+        <label className="field compact wide">
           <span>Style</span>
           <select
             className="select"

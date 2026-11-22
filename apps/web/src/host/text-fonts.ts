@@ -53,11 +53,28 @@ export interface FontScope {
 const loaded = new WeakMap<object, Promise<boolean>>();
 
 /**
+ * Where fonts go here: a worker keeps its fonts on itself, a page on its
+ * document. (A page has no fonts of its own on globalThis, so loading there
+ * left the preview drawing every text in the fallback fonts.)
+ */
+function defaultScope(): FontScope {
+  const scope = globalThis as FontScope & { document?: { fonts?: FontScope['fonts'] } };
+  const fonts = scope.fonts ?? scope.document?.fonts;
+  if (fonts === scope.fonts) return scope;
+  return {
+    ...(scope.FontFace === undefined ? {} : { FontFace: scope.FontFace }),
+    ...(fonts === undefined ? {} : { fonts }),
+  };
+}
+
+/**
  * Loads the text fonts into a page or a worker, once; true when they are
  * there. Where fonts cannot be loaded, texts are drawn in the fallbacks.
  */
-export function loadTextFonts(scope: FontScope = globalThis): Promise<boolean> {
-  const known = loaded.get(scope);
+export function loadTextFonts(scope: FontScope = defaultScope()): Promise<boolean> {
+  // Kept by the font set loaded into, so that loading twice into one page or worker loads once.
+  const key: object = (scope.fonts as object | undefined) ?? scope;
+  const known = loaded.get(key);
   if (known !== undefined) return known;
   const { FontFace: Face, fonts } = scope;
   const loading =
@@ -76,7 +93,7 @@ export function loadTextFonts(scope: FontScope = globalThis): Promise<boolean> {
           () => true,
           () => false,
         );
-  loaded.set(scope, loading);
+  loaded.set(key, loading);
   return loading;
 }
 
