@@ -1,11 +1,18 @@
 import { CrewMember } from '@imp/agents';
 import { ActivityEntry } from '@imp/core';
-import { DownloadSimpleIcon, PlusIcon, TrashIcon, UserPlusIcon } from '@phosphor-icons/react';
+import {
+  CaretUpIcon,
+  DownloadSimpleIcon,
+  PlusIcon,
+  TrashIcon,
+  UserPlusIcon,
+} from '@phosphor-icons/react';
 import { useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
+import { useModelMixes } from './model-bar.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
@@ -327,10 +334,45 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
   );
 }
 
+const ACTIVE_MIX_KEY = 'models.mix';
+/** Settings the app keeps for itself, such as which crew member is the coordinator. */
+const INTERNAL_SETTINGS: ReadonlySet<string> = new Set(['coordinator.member', 'project.current']);
+const SETTING_LABELS: Readonly<Record<string, string>> = {
+  'coordinator.model': 'Coordinator model',
+  'video.model': 'Video model',
+  'speech.model': 'Voice model',
+  'images.model': 'Image model',
+  'sounds.model': 'Sound effects model',
+  'music.model': 'Music model',
+  'transcription.model': 'Transcript model',
+  [ACTIVE_MIX_KEY]: 'Model mix',
+  'edit.agent-drafts': 'Agents cut drafts on the Edit stage',
+  theme: 'Theme',
+  'budget.daily': 'Daily budget',
+};
+
+/** A setting's name in words: "video.model" reads as "Video model". */
+function settingLabel(key: string): string {
+  const known = SETTING_LABELS[key];
+  if (known !== undefined) return known;
+  const words = key.replace(/[._-]+/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function settingValue(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'On' : 'Off';
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
 export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
   const settings = useLive(['settings/'], async (current) =>
     SettingList.parse(await runCommand(current, 'settings.list', {})),
   );
+  const mixes = useModelMixes().data;
+  const shown = (settings.data?.settings ?? [])
+    .filter((setting) => !INTERNAL_SETTINGS.has(setting.key))
+    .sort((a, b) => settingLabel(a.key).localeCompare(settingLabel(b.key)));
   return (
     <>
       <div className="view-head">
@@ -340,15 +382,24 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
         </span>
       </div>
       {settings.error !== null && <p className="error">{settings.error}</p>}
-      <div className="card stack">
-        {(settings.data?.settings ?? []).map((setting) => (
-          <div key={setting.key} className="row spread">
-            <span className="mono">{setting.key}</span>
-            <span className="mono muted">{JSON.stringify(setting.value)}</span>
-          </div>
-        ))}
-        {settings.data?.settings.length === 0 && <p className="muted">Nothing is set yet.</p>}
-      </div>
+      <section className="card stack" aria-labelledby="settings-heading">
+        <h3 id="settings-heading">Models and preferences</h3>
+        <dl className="settings-list">
+          {shown.map((setting) => (
+            <div key={setting.key} className="settings-row" title={setting.key}>
+              <dt>{settingLabel(setting.key)}</dt>
+              <dd className={typeof setting.value === 'string' ? 'mono' : undefined}>
+                {setting.key === ACTIVE_MIX_KEY
+                  ? (mixes?.mixes.find((mix) => mix.id === setting.value)?.name ?? 'None')
+                  : settingValue(setting.value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {settings.data !== undefined && shown.length === 0 && (
+          <p className="muted">Nothing is set yet.</p>
+        )}
+      </section>
       <section className="card stack" aria-labelledby="key-heading">
         <h3 id="key-heading">OpenRouter key</h3>
         <p className="muted">
@@ -390,25 +441,59 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
   );
 }
 
+/** One command in the activity strip: when, who, what, and how it went. */
+function activityLine(entry: z.infer<typeof ActivityEntry>): string {
+  return `${new Date(entry.at).toLocaleTimeString()} · ${
+    entry.actor.kind === 'user' ? 'you' : entry.actor.role
+  } · ${entry.commandId} · ${entry.outcome}`;
+}
+
+/**
+ * Every command that ran, newest first. It keeps to one line with the latest
+ * command, so the stage keeps its room, and opens to the recent ones on a tap.
+ */
 export function ActivityStrip(): ReactElement {
   const activity = useLive(['activity/'], async (current) =>
     ActivityList.parse(await runCommand(current, 'activity.list', { limit: 30 })),
   );
+  const [open, setOpen] = useState(false);
   const latest = activity.data?.entries ?? [];
+  const [first] = latest;
   return (
-    <footer className="strip mono" aria-label="Activity">
-      {latest.length === 0 ? (
-        <span>Nothing has happened yet. Every command will be listed here with who ran it.</span>
+    <footer className={`strip mono${open ? ' open' : ''}`} aria-label="Activity">
+      {first === undefined ? (
+        <span className="strip-line">
+          Nothing has happened yet. Every command will be listed here with who ran it.
+        </span>
       ) : (
-        <ol>
-          {latest.map((entry) => (
-            <li key={entry.id} data-outcome={entry.outcome}>
-              {new Date(entry.at).toLocaleTimeString()} ·{' '}
-              {entry.actor.kind === 'user' ? 'you' : entry.actor.role} · {entry.commandId} ·{' '}
-              {entry.outcome}
-            </li>
-          ))}
-        </ol>
+        <>
+          <button
+            type="button"
+            className="strip-toggle"
+            aria-expanded={open}
+            aria-controls="activity-list"
+            onClick={() => {
+              setOpen(!open);
+            }}
+          >
+            <span className="strip-line" data-outcome={open ? undefined : first.outcome}>
+              {open ? 'Recent commands, newest first' : activityLine(first)}
+            </span>
+            <span className="strip-more">
+              {open ? 'Hide' : `Recent ${String(latest.length)}`}
+              <CaretUpIcon aria-hidden="true" />
+            </span>
+          </button>
+          {open && (
+            <ol id="activity-list">
+              {latest.map((entry) => (
+                <li key={entry.id} data-outcome={entry.outcome}>
+                  {activityLine(entry)}
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </footer>
   );

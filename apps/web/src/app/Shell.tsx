@@ -82,6 +82,9 @@ function useTheme(): [string, () => void] {
   ];
 }
 
+/** The least room the stage keeps between the side panels. */
+const STAGE_MIN_WIDTH = 760;
+
 /**
  * Whether the crew panel is shown. Remembered in this browser; on a tablet
  * narrower than 1200 pixels it starts closed, so the stage gets the room.
@@ -152,18 +155,19 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const [libraryOpen, setLibraryOpen] = useStoredFlag('imp.library.open', () => false);
   const [libraryWide, setLibraryWide] = useStoredFlag('imp.library.wide', () => false);
   const libraryWidth = usePanelWidth('library', { initial: 340, min: 280, max: 640 });
-  // On a narrow screen, such as a tablet, the library and the crew take turns, so the stage keeps room.
-  const narrow = (): boolean => window.innerWidth < 1280;
+  const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
+  const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
+  // When both side panels would leave the stage too little room, the library and the crew take turns.
+  const crowded = (): boolean =>
+    window.innerWidth - navWidth.value - libraryWidth.value - crewWidth.value < STAGE_MIN_WIDTH;
   const openLibrary = (next: boolean): void => {
-    if (next && crewOpen && narrow()) toggleCrew();
+    if (next && crewOpen && crowded()) toggleCrew();
     setLibraryOpen(next);
   };
   const switchCrew = (): void => {
-    if (!crewOpen && libraryOpen && narrow()) setLibraryOpen(false);
+    if (!crewOpen && libraryOpen && crowded()) setLibraryOpen(false);
     toggleCrew();
   };
-  const navWidth = usePanelWidth('nav', { initial: 220, min: 168, max: 360 });
-  const crewWidth = usePanelWidth('crew', { initial: 360, min: 300, max: 720 });
 
   const state = useLive(['crew/', 'settings/', 'project-index/'], async (current) => {
     const setting = async (key: string): Promise<unknown> =>

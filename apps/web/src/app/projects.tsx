@@ -13,6 +13,7 @@ import {
   ArrowsLeftRightIcon,
   BookmarkSimpleIcon,
   CopyIcon,
+  DotsThreeIcon,
   DownloadSimpleIcon,
   FilmSlateIcon,
   PencilSimpleIcon,
@@ -200,20 +201,43 @@ function ProjectCard({
       },
     );
   };
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: PointerEvent): void => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenu(false);
+    };
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setMenu(false);
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [menu]);
   const tool = (
     label: string,
     icon: ReactElement,
     action: () => void,
     danger = false,
   ): ReactElement => (
-    <button
-      className={danger ? 'button quiet icon danger-quiet' : 'button quiet icon'}
-      aria-label={`${label}: ${entry.name}`}
-      title={label}
-      onClick={action}
-    >
-      {icon}
-    </button>
+    <li>
+      <button
+        type="button"
+        className={danger ? 'project-action danger-quiet' : 'project-action'}
+        aria-label={`${label}: ${entry.name}`}
+        onClick={() => {
+          setMenu(false);
+          action();
+        }}
+      >
+        {icon}
+        <span>{label}</span>
+      </button>
+    </li>
   );
   return (
     <article className="project-card" aria-current={current ? 'true' : undefined}>
@@ -267,32 +291,48 @@ function ProjectCard({
             ? `made ${ago(entry.createdAt)}`
             : `opened ${ago(entry.openedAt)}`}
         </span>
-        <span className="row tools">
-          {tool('Rename', <PencilSimpleIcon aria-hidden="true" />, () => {
-            setName(entry.name);
-            setRenaming(true);
-          })}
-          {tool('Duplicate', <CopyIcon aria-hidden="true" />, () => {
-            onAct('duplicate');
-          })}
-          {tool('Save as template', <BookmarkSimpleIcon aria-hidden="true" />, () => {
-            onAct('template');
-          })}
-          {tool('Copy resources from here', <ArrowsLeftRightIcon aria-hidden="true" />, () => {
-            onAct('copy');
-          })}
-          {tool('Export to a file', <DownloadSimpleIcon aria-hidden="true" />, () => {
-            onAct('export');
-          })}
-          {tool(
-            'Delete',
-            <TrashIcon aria-hidden="true" />,
-            () => {
-              onAct('delete');
-            },
-            true,
+        <div className="project-actions" ref={menuRef}>
+          <button
+            type="button"
+            className="button quiet small"
+            aria-expanded={menu}
+            aria-controls={`project-actions-${entry.id}`}
+            aria-label={`Actions for ${entry.name}`}
+            onClick={() => {
+              setMenu(!menu);
+            }}
+          >
+            <DotsThreeIcon aria-hidden="true" weight="bold" /> Actions
+          </button>
+          {menu && (
+            <ul id={`project-actions-${entry.id}`} className="project-action-list">
+              {tool('Rename', <PencilSimpleIcon aria-hidden="true" />, () => {
+                setName(entry.name);
+                setRenaming(true);
+              })}
+              {tool('Duplicate', <CopyIcon aria-hidden="true" />, () => {
+                onAct('duplicate');
+              })}
+              {tool('Save as template', <BookmarkSimpleIcon aria-hidden="true" />, () => {
+                onAct('template');
+              })}
+              {tool('Copy resources from here', <ArrowsLeftRightIcon aria-hidden="true" />, () => {
+                onAct('copy');
+              })}
+              {tool('Export to a file', <DownloadSimpleIcon aria-hidden="true" />, () => {
+                onAct('export');
+              })}
+              {tool(
+                'Delete',
+                <TrashIcon aria-hidden="true" />,
+                () => {
+                  onAct('delete');
+                },
+                true,
+              )}
+            </ul>
           )}
-        </span>
+        </div>
       </footer>
     </article>
   );
