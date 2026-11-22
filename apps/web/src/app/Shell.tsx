@@ -42,6 +42,7 @@ import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 import { LibraryDragProvider } from './library/drag.js';
 import { LibraryPanel } from './library/LibraryPanel.js';
+import { SpendTotal } from './spend.js';
 
 /**
  * One icon per stage, so the stages stay apart when the navigation shrinks
@@ -349,6 +350,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           >
             <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
           </button>
+          <SpendTotal />
           <HelpPanel />
           <WhatsNew />
           <button

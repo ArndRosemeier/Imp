@@ -83,6 +83,7 @@ export {
   UNKNOWN_RELEASE,
 } from './commands/release.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
+export { chosenModel, CostRequest } from './cost.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
 export { patchOf } from './patch.js';
 export type { JsonValue } from './json.js';

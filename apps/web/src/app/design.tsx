@@ -16,6 +16,7 @@ import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
+import { Price } from './spend.js';
 
 const Items = z.object({ items: z.array(WorldElement) });
 const Cast = z.object({ characters: z.array(Character.pick({ id: true, name: true })) });
@@ -170,6 +171,10 @@ function Stage({
           title={model === null ? 'Choose an image model first.' : `Drawn by ${model}`}
         >
           <SparkleIcon aria-hidden="true" /> {key === undefined ? 'Draw' : 'Another'}
+          <Price
+            command={`world.${element.kind}.image.generate`}
+            input={{ ...at, viewId: view.id, stateId: state?.id ?? null }}
+          />
         </button>
       </form>
       {key !== undefined && (

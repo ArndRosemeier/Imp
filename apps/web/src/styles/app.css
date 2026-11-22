@@ -5185,3 +5185,114 @@ dialog.help-dialog[open] {
 .continue-run {
   align-self: flex-start;
 }
+
+/* Spending: the price inside a button that spends, and the running total in the top bar */
+.price {
+  margin-left: 2px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: 500 11px/1.4 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.price[data-basis='typical'],
+.price[data-basis='budget'] {
+  background: none;
+  color: var(--ink-muted);
+  border: 1px dashed var(--line-strong);
+}
+.button.primary .price {
+  background: rgb(0 0 0 / 0.14);
+  color: inherit;
+}
+.spend-total {
+  gap: 6px;
+  color: var(--ink-soft);
+}
+.spend-amount {
+  font: 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+dialog.spend-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+.spend-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 24px 20px 16px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.spend-head .stack {
+  gap: var(--space-1);
+}
+.spend-head h2 {
+  font-size: 32px;
+}
+.spend-body {
+  padding: var(--space-5) 32px var(--space-5);
+  gap: var(--space-5);
+}
+.spend-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+.spend-totals div {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+.spend-totals dt {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.spend-totals dd {
+  margin: 6px 0 0;
+  font: 400 30px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.spend-totals div:first-child dd {
+  color: var(--accent);
+}
+.spend-kinds {
+  gap: var(--space-2);
+}
+.spend-kind {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+.spend-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  opacity: 0.8;
+}
+.spend-latest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+}
+.spend-latest li {
+  display: grid;
+  grid-template-columns: 88px 110px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.spend-model {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

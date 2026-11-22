@@ -1351,6 +1351,40 @@ describe('App', () => {
     });
   });
 
+  it('shows the price on a button that spends, and keeps a running total', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await user.click(await screen.findByRole('button', { name: /Add character/ }));
+    const card = await screen.findByRole('article', { name: 'New character' });
+    await screen.findByRole('option', { name: 'vendor/painter' });
+    await user.selectOptions(screen.getByLabelText('Image model'), 'vendor/painter');
+
+    // Before the model has been used, the price is a rough typical one.
+    const make = within(card).getByRole('button', { name: /Portrait/ });
+    await vi.waitFor(() => {
+      expect(make.textContent).toContain('≈ $0.01');
+    });
+    expect(screen.getByRole('button', { name: /Spent \$0\.00 on this project/ })).toBeTruthy();
+
+    await user.click(make);
+    await within(card).findByRole('img', { name: 'Portrait of New character' });
+    // The fake painter charges a cent: the total counts it, and the next price comes from it.
+    const total = await screen.findByRole('button', { name: /Spent \$0\.01 on this project/ });
+    await vi.waitFor(() => {
+      const again = within(card).getByRole('button', { name: /Another/ });
+      expect(again.querySelector('.price')?.getAttribute('data-basis')).toBe('your history');
+    });
+    await user.click(total);
+    const panel = await screen.findByRole('dialog', { name: 'What Imp has spent' });
+    expect(within(panel).getAllByText('Pictures').length).toBe(2);
+    expect(within(panel).getAllByText('vendor/painter').length).toBeGreaterThan(0);
+  });
+
   it('switches web search on for a crew member', async () => {
     const { imp, user } = start();
     await completeSetup(user);

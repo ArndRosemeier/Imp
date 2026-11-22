@@ -23,6 +23,7 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { ScenePlace, useWorld } from './place.js';
 import { useLibraryDrop } from './library/drag.js';
 import { ModelBar } from './model-bar.js';
+import { Price } from './spend.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const CharacterList = z.object({ characters: z.array(Character) });
@@ -471,6 +472,7 @@ function CharacterImages({
           title={model === null ? 'Choose an image model first.' : `Made with ${model}`}
         >
           <SparkleIcon aria-hidden="true" /> {portrait === undefined ? 'Portrait' : 'Another'}
+          <Price command="movie.character.image.generate" input={at} />
         </button>
       </form>
       {portrait !== undefined && (
@@ -616,6 +618,12 @@ function CharacterVoice({
         >
           <MicrophoneIcon aria-hidden="true" />{' '}
           {busy ? 'Recording…' : sample === null ? 'Record voice' : 'Record again'}
+          {!busy && (
+            <Price
+              command="movie.character.voice.generate"
+              input={line.trim() === '' ? at : { ...at, line: line.trim() }}
+            />
+          )}
         </button>
         {sample !== null && (
           <ConfirmButton

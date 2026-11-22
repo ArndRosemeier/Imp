@@ -31,6 +31,7 @@ export const VideoModelsResponse = z.object({
       supported_durations: z.array(z.number()).nullish(),
       supported_frame_images: z.array(z.string()).nullish(),
       generate_audio: z.boolean().nullish(),
+      pricing_skus: z.record(z.string(), z.union([z.string(), z.number()])).nullish(),
     }),
   ),
 });

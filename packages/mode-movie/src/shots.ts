@@ -6,6 +6,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
   patchOf,
+  chosenModel,
 } from '@imp/core';
 import {
   describeVideoModel,
@@ -553,6 +554,24 @@ export function createShotCommands(
         ),
     }),
     output: z.object({ clip: Clip }),
+    estimate: async ({ runtime }, input) => {
+      const { shot } = await loadShot(runtime.store, 'movie.shot.clip.generate', input);
+      const model = await chosenModel(runtime.store, VIDEO_MODEL_SETTING, input.model);
+      const dialogueApart = shot.dialogue !== null && shot.line.trim() !== '';
+      const wanted =
+        input.durationSeconds ??
+        (dialogueApart && typeof shot.dialogue?.durationSeconds === 'number'
+          ? Math.ceil(shot.dialogue.durationSeconds + 0.5)
+          : 4);
+      const info = model === null ? undefined : await findModel(provider, model);
+      return {
+        kind: 'video',
+        model,
+        seconds: fitDuration(info?.video, wanted),
+        resolution: input.resolution,
+        audio: input.audio ?? (dialogueApart ? false : shot.line.trim() !== ''),
+      };
+    },
     handler: async ({ runtime }, input) => {
       const id = 'movie.shot.clip.generate';
       const { key, shot } = await loadShot(runtime.store, id, input);
@@ -955,6 +974,14 @@ export function createShotCommands(
         ),
     }),
     output: z.object({ dialogue: DialogueTake }),
+    estimate: async ({ runtime }, input) => {
+      const { shot } = await loadShot(runtime.store, 'movie.shot.dialogue.generate', input);
+      return {
+        kind: 'speech',
+        model: await chosenModel(runtime.store, SPEECH_MODEL_SETTING, input.model),
+        characters: shot.line.trim().length,
+      };
+    },
     handler: async ({ runtime }, input) => {
       const id = 'movie.shot.dialogue.generate';
       const { key, shot } = await loadShot(runtime.store, id, input);

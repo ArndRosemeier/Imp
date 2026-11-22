@@ -81,7 +81,7 @@ export const castingGuide: GuideTopic = {
 
 ## Costs
 
-A portrait costs about a cent with a cheap image model, a voice sample a little more.
+A portrait costs about a cent with a cheap image model, a voice sample a little more. The price is on the button before you press it.
 
 ## Tips
 
@@ -123,7 +123,7 @@ export const shotsGuide: GuideTopic = {
   summary: 'Each scene split into shots, each shot made into a video clip.',
   hint: {
     title: 'Plan shots, then make clips',
-    body: 'Describe each shot (framing, action, who is in it), choose a key frame if you want the clip to start on a set picture, then make the clip. Clips are the most expensive part of a film, so check the key frame first.',
+    body: 'Describe each shot (framing, action, who is in it), choose a key frame if you want the clip to start on a set picture, then make the clip. Clips are the most expensive part of a film: the price is on the button, and a key frame is a cheap check first.',
   },
   body: `Shots splits each scene into **shots** and turns each into a **video clip**.
 
@@ -141,7 +141,7 @@ Making a clip again never throws the old one away. Earlier clips stay as **takes
 
 ## Costs
 
-A 4 second clip costs roughly 15 to 40 cents depending on the model and resolution.
+A 4 second clip costs roughly 15 to 40 cents depending on the model and resolution. The price is on the button before every clip, and the total is in the top bar.
 
 ## Let the crew do it
 

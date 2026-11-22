@@ -5,10 +5,11 @@ import {
   encodeUtf8,
   requireProject,
   type Command,
+  chosenModel,
 } from '@imp/core';
 import { z } from 'zod';
 import { UnsupportedAudioError } from './codec.js';
-import { deleteRange, regionEnd, silenceRange, type AudioDoc } from './doc.js';
+import { deleteRange, docDuration, regionEnd, silenceRange, type AudioDoc } from './doc.js';
 import type { EffectCommandHelpers } from './fx-commands.js';
 import { resample } from './pcm.js';
 import { MissingSourceError } from './sources.js';
@@ -153,6 +154,15 @@ export function createTranscriptCommands(
       costUsd: z.number().nullable(),
       regions: z.array(RegionText),
     }),
+    estimate: async ({ runtime }, input) => {
+      const doc = await helpers.load(runtime, 'audio.transcribe', input.projectId, input.docId);
+      const seconds = docDuration(doc);
+      return {
+        kind: 'transcription',
+        model: await chosenModel(runtime.store, TRANSCRIPTION_MODEL_SETTING, input.model),
+        ...(seconds > 0 ? { seconds } : {}),
+      };
+    },
     handler: async ({ runtime }, input) => {
       const id = 'audio.transcribe';
       await requireProject(runtime.store, id, input.projectId);
