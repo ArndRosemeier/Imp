@@ -1,9 +1,8 @@
 import type { ImpClient } from '@imp/host';
 import { applyMatrix, placePicture, TextStyle, type ColorMatrix } from '@imp/mode-movie';
 import { z } from 'zod';
-import { drawLane, type LaneText } from '../host/text-draw.js';
+import { drawLane, wrapLines, type LaneText } from '@imp/host/film';
 import { loadTextFonts } from '../host/text-fonts.js';
-import { wrapLines } from '../host/title-lines.js';
 import { runCommand } from './context.js';
 import { blobKeys, CutPlayer, HIDDEN, loadCut, type Look, type ScreenLook } from './cut-player.js';
 

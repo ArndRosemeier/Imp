@@ -21,15 +21,8 @@ import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
-import {
-  ModelPicker,
-  moviePrefix,
-  Problem,
-  useAct,
-  useBlobUrl,
-  useModelSetting,
-  type Act,
-} from './movie.js';
+import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
+import { ModelBar } from './model-bar.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
@@ -757,36 +750,33 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
           {shots.length === 1 ? '1 shot' : `${String(shots.length)} shots`} in this scene
         </span>
       </div>
-      <div className="row wrap model-pickers">
-        <ModelPicker
-          id="video-model"
-          label="Video model"
-          empty="Choose a model to make clips"
-          setting={VIDEO_MODEL_SETTING}
-          choice={video}
-          act={act}
-        />
-        <ModelPicker
-          id="shots-voice-model"
-          label="Voice model"
-          empty="Choose a model to record dialogue"
-          setting={SPEECH_MODEL_SETTING}
-          choice={speech}
-          act={act}
-        />
-        <ModelPicker
-          id="shots-image-model"
-          label="Image model"
-          empty="Choose a model to paint key frames"
-          setting={IMAGE_MODEL_SETTING}
-          choice={images}
-          act={act}
-        />
-      </div>
-      <p className="muted">
-        Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the
-        character and played over a silent clip; it is not lip-synced.
-      </p>
+      <ModelBar
+        act={act}
+        models={[
+          {
+            id: 'video-model',
+            label: 'Video',
+            empty: 'Choose a model to make clips',
+            setting: VIDEO_MODEL_SETTING,
+            choice: video,
+          },
+          {
+            id: 'shots-voice-model',
+            label: 'Voice',
+            empty: 'Choose a model to record dialogue',
+            setting: SPEECH_MODEL_SETTING,
+            choice: speech,
+          },
+          {
+            id: 'shots-image-model',
+            label: 'Image',
+            empty: 'Choose a model to paint key frames',
+            setting: IMAGE_MODEL_SETTING,
+            choice: images,
+          },
+        ]}
+        note="Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the character and played over a silent clip; it is not lip-synced."
+      />
       <Problem
         text={outline.error ?? listed.error ?? error ?? video.error ?? speech.error ?? images.error}
       />

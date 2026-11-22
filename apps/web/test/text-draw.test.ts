@@ -1,6 +1,6 @@
 import { DEFAULT_TEXT_STYLES, type TextStyle } from '@imp/mode-movie';
 import { describe, expect, it } from 'vitest';
-import { drawLane, drawText, drawTexts, type TextCanvas } from '../src/host/text-draw.js';
+import { drawLane, drawText, drawTexts, type TextCanvas } from '@imp/host/film';
 import { loadTextFonts, TEXT_FACES, TEXT_FAMILIES } from '../src/host/text-fonts.js';
 
 interface Call {

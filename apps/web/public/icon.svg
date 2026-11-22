@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Imp</title>
+  <!-- The imp: an italic i whose dot has horns and whose tail ends in a barb. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.28" r="0.85">
+      <stop offset="0" stop-color="#2a221a" />
+      <stop offset="0.55" stop-color="#15120f" />
+      <stop offset="1" stop-color="#0b0a08" />
+    </radialGradient>
+    <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="414">
+      <stop offset="0" stop-color="#f6c66e" />
+      <stop offset="0.55" stop-color="#e8a33d" />
+      <stop offset="1" stop-color="#c97f1f" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect x="3" y="3" width="506" height="506" rx="109" fill="none" stroke="#e8a33d" stroke-opacity="0.16" stroke-width="6" />
+  <g fill="url(#gold)" transform="translate(-24 10)">
+    <path d="M300 190 L262 360 C258 378 264 386 276 382 C290 376 302 360 312 340 L322 346 C306 384 280 412 248 412 C218 412 206 392 212 364 L240 240 C242 230 238 226 226 230 L222 222 C248 206 276 192 300 190 Z" />
+    <path d="M298 338 Q324 326 350 302 Q338 330 336 364 Q330 350 320 346 Z" />
+    <circle cx="300" cy="152" r="31" />
+    <path d="M278 142 C258 126 252 102 262 78 C270 100 284 116 298 124 Z" />
+    <path d="M322 142 C342 126 348 102 338 78 C330 100 316 116 302 124 Z" />
+  </g>
+</svg>

@@ -21,6 +21,7 @@ import { messageOf, runCommand, useImp, useLive, type Live } from './context.js'
 import { ConfirmButton, EditableField } from './Field.js';
 import { ScenePlace, useWorld } from './place.js';
 import { useLibraryDrop } from './library/drag.js';
+import { ModelBar } from './model-bar.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const CharacterList = z.object({ characters: z.array(Character) });
@@ -656,24 +657,25 @@ export function CastingView({ project }: { project: Project }): ReactElement {
           <PlusIcon aria-hidden="true" /> Add character
         </button>
       </div>
-      <div className="row wrap model-pickers">
-        <ModelPicker
-          id="image-model"
-          label="Image model"
-          empty="Choose a model to make portraits"
-          setting={IMAGE_MODEL_SETTING}
-          choice={images}
-          act={act}
-        />
-        <ModelPicker
-          id="speech-model"
-          label="Voice model"
-          empty="Choose a model to record voices"
-          setting={SPEECH_MODEL_SETTING}
-          choice={speech}
-          act={act}
-        />
-      </div>
+      <ModelBar
+        act={act}
+        models={[
+          {
+            id: 'image-model',
+            label: 'Image',
+            empty: 'Choose a model to make portraits',
+            setting: IMAGE_MODEL_SETTING,
+            choice: images,
+          },
+          {
+            id: 'speech-model',
+            label: 'Voice',
+            empty: 'Choose a model to record voices',
+            setting: SPEECH_MODEL_SETTING,
+            choice: speech,
+          },
+        ]}
+      />
       <Problem text={listed.error ?? error ?? images.error ?? speech.error} />
       {listed.data !== undefined && characters.length === 0 && (
         <p className="muted">

@@ -1,5 +1,6 @@
 import { AudioView, OPEN_VIEW } from './audio.js';
 import { EditView } from './edit.js';
+import { ImpMark } from './ImpMark.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
@@ -268,7 +269,10 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
         }
       >
         <header className="topbar">
-          <div className="wordmark">Imp</div>
+          <div className="wordmark">
+            <ImpMark />
+            Imp
+          </div>
           {projects.length > 0 && (
             <div className="row project-switch">
               <label className="sr-only" htmlFor="project-select">
