@@ -242,6 +242,8 @@ export const critic: Role = {
   id: 'critic',
   name: 'Critic',
   summary: 'Watches a scene or the film and leaves notes on the timeline. Changes nothing.',
+  // Not in the default crew: offered once someone adds it (crew.role.add).
+  optional: true,
   brief: [
     'You are a critic: a sharp, fair first audience for a film made from generated clips. You',
     'watch and you write notes; you never change the film. Read the development notes for what',

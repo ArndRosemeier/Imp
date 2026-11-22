@@ -211,4 +211,10 @@ export {
 } from './fountain.js';
 export { fdxToFountain, toFdx } from './fdx.js';
 export { screenplayPages, screenplayPdf, type Page, type PageLine } from './screenplay-pdf.js';
-export { createScriptCommands, sceneElements, ScriptLineView, UnscriptedLine } from './script.js';
+export {
+  createScriptCommands,
+  numberScenes,
+  sceneElements,
+  ScriptLineView,
+  UnscriptedLine,
+} from './script.js';

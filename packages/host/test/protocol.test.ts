@@ -71,16 +71,60 @@ describe('the channel between the interface and the core', () => {
     const client = connectImp(page, stored);
     await client.start();
     expect(held.secrets?.getKey()).toBe('sk-first');
+    expect(client.secrets.hasKey()).toBe(true);
     client.secrets.setKey('sk-second');
     await client.verifyCredentials();
-    expect([client.secrets.getKey(), stored.getKey(), held.secrets?.getKey()]).toEqual([
-      'sk-second',
-      'sk-second',
-      'sk-second',
-    ]);
+    expect([stored.getKey(), held.secrets?.getKey()]).toEqual(['sk-second', 'sk-second']);
     client.secrets.clearKey();
+    expect(client.secrets.hasKey()).toBe(false);
     await client.listModels();
     expect([stored.getKey(), held.secrets?.getKey()]).toEqual([null, null]);
+  });
+
+  it('leaves the key with a core that keeps its own, and never holds it', async () => {
+    const { page, held } = setup();
+    const client = connectImp(page, { by: 'core' });
+    await client.start();
+    expect(client.secrets.hasKey()).toBe(false);
+    client.secrets.setKey('sk-core');
+    await client.verifyCredentials();
+    expect(held.secrets?.getKey()).toBe('sk-core');
+    expect(client.secrets.hasKey()).toBe(true);
+    expect(client.secrets).not.toHaveProperty('getKey');
+  });
+
+  it('moves a key an older version left in the page over to the core once', async () => {
+    const { page, held } = setup();
+    const forget = vi.fn();
+    const client = connectImp(page, { by: 'core', leftover: { key: 'sk-old', forget } });
+    await client.start();
+    await client.listModels();
+    expect(held.secrets?.getKey()).toBe('sk-old');
+    expect(client.secrets.hasKey()).toBe(true);
+    expect(forget).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the core’s own key over one left in the page', async () => {
+    const [page, core] = createLocalPorts();
+    const secrets = createMemorySecretStore();
+    secrets.setKey('sk-core');
+    serveImp(
+      (held) =>
+        createImp({
+          store: new MemoryKeyValueStore(),
+          secrets: held,
+          provider: createFakeProvider({}),
+        }),
+      core,
+      secrets,
+    );
+    const forget = vi.fn();
+    const client = connectImp(page, { by: 'core', leftover: { key: 'sk-old', forget } });
+    await client.start();
+    await client.listModels();
+    expect(secrets.getKey()).toBe('sk-core');
+    expect(client.secrets.hasKey()).toBe(true);
+    expect(forget).toHaveBeenCalledOnce();
   });
 
   it('tells subscribers of changes until they unsubscribe, also one made at once', async () => {

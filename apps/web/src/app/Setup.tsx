@@ -13,6 +13,7 @@ import { messageOf, runCommand, useImp } from './context.js';
 import { ImpMark } from './ImpMark.js';
 import { starterMixes, type StarterMix } from './onboarding/presets.js';
 import { formatUsd } from './spend.js';
+import { servedByLocalServer } from '../host/served.js';
 
 /** Models an agent can run on: they write text and accept tools. */
 export function agentModels(models: readonly ModelInfo[]): ModelInfo[] {
@@ -95,7 +96,7 @@ function HelpChoice({
  */
 export function Setup({ onDone }: { onDone: () => void }): ReactElement {
   const imp = useImp();
-  const [hasKey, setHasKey] = useState(() => imp.secrets.getKey() !== null);
+  const [hasKey, setHasKey] = useState(() => imp.secrets.hasKey());
   const [key, setKey] = useState('');
   const [catalog, setCatalog] = useState<ModelInfo[]>([]);
   const [custom, setCustom] = useState(false);
@@ -197,8 +198,10 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
             <h1>Connect OpenRouter</h1>
             <p className="muted">
               Imp makes pictures, voices, sound and video through your own OpenRouter account, and
-              you pay OpenRouter only for what you make. The key stays in this browser and is sent
-              only to OpenRouter.
+              you pay OpenRouter only for what you make.{' '}
+              {servedByLocalServer()
+                ? 'The key is kept by Imp on this computer, never in the browser, and is sent only to OpenRouter.'
+                : 'The key is kept encrypted in this browser and is sent only to OpenRouter.'}
             </p>
             <label className="field" htmlFor={keyId}>
               <span>OpenRouter API key</span>

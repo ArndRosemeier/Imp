@@ -11,12 +11,19 @@ const screenwriter: Role = {
   scope: { prefixes: ['settings.'] },
 };
 const casting: Role = { ...screenwriter, id: 'casting-director', name: 'Casting Director' };
+const critic: Role = {
+  ...screenwriter,
+  id: 'critic',
+  name: 'Critic',
+  summary: 'Leaves notes.',
+  optional: true,
+};
 const user = { kind: 'user', id: 'arnd' } as const;
 
 function setup() {
   const runtime = createTestRuntime();
   const registry = new CommandRegistry({ runtime }).register(
-    ...createCrewCommands(new RoleCatalog([screenwriter, casting]), {
+    ...createCrewCommands(new RoleCatalog([screenwriter, casting, critic]), {
       commandIds: () => ['settings.get', 'settings.set', 'movie.scene.update'],
     }),
   );
@@ -60,7 +67,34 @@ describe('crew commands', () => {
           custom: false,
         },
       ],
+      extras: [{ id: 'critic', name: 'Critic', summary: 'Leaves notes.' }],
     });
+  });
+
+  it('offers an extra role only once it is added, and puts it away again', async () => {
+    const { run } = setup();
+    const ids = async () =>
+      ((await run('crew.roles', {})) as { roles: { id: string }[] }).roles.map((r) => r.id);
+    expect(await ids()).not.toContain('critic');
+    expect(await run('crew.role.get', { id: 'critic' })).toMatchObject({ name: 'Critic' });
+    expect(await run('crew.role.add', { id: 'critic' })).toEqual({ id: 'critic', name: 'Critic' });
+    expect(await ids()).toContain('critic');
+    expect(await run('crew.roles', {})).toMatchObject({ extras: [] });
+    expect(await run('crew.role.remove', { id: 'critic' })).toEqual({ id: 'critic' });
+    expect(await ids()).not.toContain('critic');
+    await expect(run('crew.role.add', { id: 'screenwriter' })).rejects.toThrow(/always offered/);
+    await expect(run('crew.role.remove', { id: 'nobody' })).rejects.toThrow(/No built-in role/);
+  });
+
+  it('adds an extra role by hiring for it, and keeps it while someone holds it', async () => {
+    const { run } = setup();
+    const ids = async () =>
+      ((await run('crew.roles', {})) as { roles: { id: string }[] }).roles.map((r) => r.id);
+    const hired = (await run('crew.hire', { roleId: 'critic', model: 'm/a' })) as { id: string };
+    expect(await ids()).toContain('critic');
+    await expect(run('crew.role.remove', { id: 'critic' })).rejects.toThrow(/Dismiss Critic first/);
+    await run('crew.dismiss', { id: hired.id });
+    expect(await ids()).toContain('critic');
   });
 
   it('hires with defaults, lists and dismisses', async () => {

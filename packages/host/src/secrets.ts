@@ -21,3 +21,14 @@ export function createMemorySecretStore(): SecretStore {
     },
   };
 }
+
+/**
+ * What the interface can do with the key: know whether there is one, give a
+ * new one, or forget it. It cannot read it back, so it works the same whether
+ * the key is kept by the page or by the local server.
+ */
+export interface KeyAccess {
+  hasKey(): boolean;
+  setKey(key: string): void;
+  clearKey(): void;
+}

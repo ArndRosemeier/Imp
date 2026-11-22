@@ -55,6 +55,7 @@ import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import { workspaceGuides } from './guide.js';
 import type { SecretStore } from './secrets.js';
+import { createFfmpegCommands, type FfmpegService } from './ffmpeg-commands.js';
 
 /** The assembled core of one host. The interface reaches it through `serveImp`. */
 export interface Imp {
@@ -116,6 +117,8 @@ export interface ImpOptions {
   readonly frameGrabber?: FrameGrabber;
   /** Reads the colours of clips to match shots: mediabunny in the browser, ffmpeg on the server. */
   readonly colorSampler?: ColorSampler;
+  /** The local server's ffmpeg, which it can download; the browser host has none. */
+  readonly ffmpeg?: FfmpegService;
   /** Replaces the OpenRouter provider. Tests pass a scripted one. */
   readonly provider?: GenerationProvider;
 }
@@ -212,6 +215,7 @@ export function createImp(options: ImpOptions): Imp {
       { setting: MUSIC_MODEL_SETTING, label: 'Music' },
       { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
     ]),
+    ...(options.ffmpeg === undefined ? [] : createFfmpegCommands(options.ffmpeg)),
     ...createAgentCommands({ registry, provider, roles }),
     ...createSpendCommands({ registry, provider }),
   );

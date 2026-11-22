@@ -1646,6 +1646,21 @@ describe('App', () => {
   });
 });
 
+describe('extra roles', () => {
+  it('keeps the Critic out of the roles until it is added, then offers it for hire', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(await screen.findByRole('button', { name: 'Crew' }));
+    expect(await screen.findByRole('heading', { name: 'More roles' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Hire Critic/ })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /Add Critic/ }));
+    expect(await screen.findByRole('button', { name: /Hire Critic/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'More roles' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Put away' }));
+    expect(await screen.findByRole('button', { name: /Add Critic/ })).toBeTruthy();
+  });
+});
+
 describe('fades of a placed sound', () => {
   it('follows the audio editor: linear, or a soft S, and silent outside the sound', async () => {
     const { fadeGain } = await import('../src/app/cut-player.js');

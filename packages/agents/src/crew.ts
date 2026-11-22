@@ -1,6 +1,12 @@
 import { CommandError, defineCommand, type Command, type KeyValueStore, patchOf } from '@imp/core';
 import { z } from 'zod';
-import { CUSTOM_ROLE_PREFIX, ROLE_ID, StoredRole, type RoleCatalog } from './role.js';
+import {
+  ADDED_ROLE_PREFIX,
+  CUSTOM_ROLE_PREFIX,
+  ROLE_ID,
+  StoredRole,
+  type RoleCatalog,
+} from './role.js';
 
 const CREW_PREFIX = 'crew/';
 /** Where the conversation with each crew member is kept, by member id. */
@@ -27,6 +33,8 @@ const RoleSummary = z.object({
   summary: z.string(),
   /** True for a role defined while using the app, which can be changed and removed. */
   custom: z.boolean(),
+  /** Present for an extra built-in role that was added, which crew.role.remove puts away. */
+  extra: z.literal(true).optional(),
 });
 
 const RoleFields = {
@@ -113,18 +121,93 @@ export function createCrewCommands(
   const roleList = defineCommand({
     id: 'crew.roles',
     title: 'List roles',
-    description: 'Returns the roles an agent can be hired for, with what each one does.',
+    description:
+      'Returns the roles an agent can be hired for, with what each one does, and the extra built-in roles (such as a critic) that are not offered until added with crew.role.add.',
     effect: 'read',
     input: z.object({}),
-    output: z.object({ roles: z.array(RoleSummary) }),
+    output: z.object({
+      roles: z.array(RoleSummary),
+      extras: z
+        .array(z.object({ id: z.string(), name: z.string(), summary: z.string() }))
+        .describe('Built-in roles not offered for hire yet; crew.role.add offers one.'),
+    }),
     handler: async ({ runtime }) => ({
-      roles: (await roles.all(runtime.store)).map(({ id, name, summary, custom }) => ({
+      roles: (await roles.all(runtime.store)).map(({ id, name, summary, custom, optional }) => ({
         id,
         name,
         summary,
         custom,
+        ...(optional === true ? { extra: true as const } : {}),
+      })),
+      extras: (await roles.extras(runtime.store)).map(({ id, name, summary }) => ({
+        id,
+        name,
+        summary,
       })),
     }),
+  });
+
+  function requireExtra(commandId: string, id: string) {
+    const role = roles.get(id);
+    if (role?.optional !== true) {
+      throw new CommandError(
+        'invalid_input',
+        commandId,
+        role === undefined
+          ? `No built-in role "${id}".`
+          : `"${id}" is always offered; only extra roles are added and put away.`,
+        {
+          details: [
+            `id: the extra roles are ${roles
+              .list()
+              .filter((candidate) => candidate.optional === true)
+              .map((candidate) => candidate.id)
+              .join(', ')}`,
+          ],
+        },
+      );
+    }
+    return role;
+  }
+
+  const roleAdd = defineCommand({
+    id: 'crew.role.add',
+    title: 'Add a role',
+    description:
+      'Offers one of the extra built-in roles (listed under extras by crew.roles, such as the critic) for hire in this workspace. It does not hire anyone; crew.hire does.',
+    effect: 'write',
+    input: z.object({ id: z.string().describe('A role id from the extras of crew.roles.') }),
+    output: z.object({ id: z.string(), name: z.string() }),
+    handler: async ({ runtime }, { id }) => {
+      const role = requireExtra('crew.role.add', id);
+      await runtime.store.batch([{ type: 'put', key: `${ADDED_ROLE_PREFIX}${id}`, value: true }]);
+      return { id, name: role.name };
+    },
+  });
+
+  const roleRemove = defineCommand({
+    id: 'crew.role.remove',
+    title: 'Put a role away',
+    description:
+      'Stops offering an extra built-in role for hire, as it was before it was added. Refused while an agent is hired for it.',
+    effect: 'write',
+    input: z.object({ id: z.string() }),
+    output: z.object({ id: z.string() }),
+    handler: async ({ runtime }, { id }) => {
+      requireExtra('crew.role.remove', id);
+      const holders = (await runtime.store.list(CREW_PREFIX))
+        .map((entry) => CrewMember.parse(entry.value))
+        .filter((member) => member.roleId === id);
+      if (holders.length > 0) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.role.remove',
+          `Dismiss ${holders.map((member) => member.name).join(', ')} first.`,
+        );
+      }
+      await runtime.store.batch([{ type: 'delete', key: `${ADDED_ROLE_PREFIX}${id}` }]);
+      return { id };
+    },
   });
 
   const roleGet = defineCommand({
@@ -140,7 +223,12 @@ export function createCrewCommands(
       webSearch: z.boolean(),
     }),
     handler: async ({ runtime }, { id }) => {
-      const role = (await roles.all(runtime.store)).find((candidate) => candidate.id === id);
+      // Extra roles can be read before they are added, to decide whether to add them.
+      const role =
+        (await roles.all(runtime.store)).find((candidate) => candidate.id === id) ??
+        (await roles.extras(runtime.store))
+          .filter((candidate) => candidate.id === id)
+          .map((candidate) => ({ ...candidate, custom: false }))[0];
       if (role === undefined) {
         throw new CommandError('invalid_input', 'crew.role.get', `Unknown role "${id}".`);
       }
@@ -293,6 +381,10 @@ export function createCrewCommands(
       };
       await runtime.store.batch([
         { type: 'put', key: `${CREW_PREFIX}${member.id}`, value: member },
+        // Hiring for an extra role adds it, so it stays offered after a dismissal.
+        ...(role.optional === true
+          ? [{ type: 'put' as const, key: `${ADDED_ROLE_PREFIX}${role.id}`, value: true }]
+          : []),
       ]);
       return member;
     },
@@ -359,5 +451,17 @@ export function createCrewCommands(
     },
   });
 
-  return [roleList, roleGet, roleCreate, roleUpdate, roleDelete, hire, update, list, dismiss];
+  return [
+    roleList,
+    roleGet,
+    roleCreate,
+    roleUpdate,
+    roleDelete,
+    roleAdd,
+    roleRemove,
+    hire,
+    update,
+    list,
+    dismiss,
+  ];
 }

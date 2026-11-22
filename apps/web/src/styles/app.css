@@ -6654,3 +6654,35 @@ dialog.spend-dialog {
   justify-content: center;
   margin-top: var(--space-2);
 }
+/* An offer inside a working area, such as fetching ffmpeg from the export bar. */
+.callout {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-m);
+  background: var(--accent-wash);
+  font-size: 13px;
+}
+/* Dual dialogue: two speeches said at once, side by side. */
+.sp-dual-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2ch;
+  margin-top: 1em;
+}
+.sp-dual-side > .sp {
+  margin-top: 0;
+}
+.sp-dual-side > .sp-character {
+  margin-left: 9ch;
+  max-width: none;
+}
+.sp-dual-side > .sp-parenthetical {
+  margin-left: 4ch;
+  max-width: 22ch;
+}
+.sp-dual-side > .sp-dialogue,
+.sp-dual-side > .sp-lyric {
+  margin-left: 0;
+  max-width: 28ch;
+}

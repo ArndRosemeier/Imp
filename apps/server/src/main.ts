@@ -4,9 +4,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
 import release from 'virtual:imp-release';
-import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
 import { createFfmpegFilmRenderer } from './ffmpeg-film.js';
-import { createFfmpegColorSampler, createFfmpegFrameGrabber } from './ffmpeg-frames.js';
+import { ffmpegServices, openFfmpegTool } from './ffmpeg-tool.js';
+import { createFileSecretStore } from './file-secrets.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
 import { createImpServer } from './server.js';
 
@@ -32,12 +32,12 @@ if (process.argv.includes('--help')) {
 const port = Number(option('port') ?? 4747);
 const dataDir = resolve(option('data') ?? join(homedir(), 'Imp'));
 const here = dirname(fileURLToPath(import.meta.url));
-// The sound inside video clips is AAC, which only a native decoder reads.
-const ffmpeg = await hasFfmpeg();
+// ffmpeg is optional: the one on this computer, or one Imp downloads into its data folder when asked.
+const ffmpeg = await openFfmpegTool({ folder: join(dataDir, 'tools') });
 
 // Films are put together here and encoded by ffmpeg; their texts use the fonts shipped beside imp.mjs.
 const filmRenderer = createFfmpegFilmRenderer({
-  installed: ffmpeg,
+  command: () => ffmpeg.command(),
   font: (file) => {
     try {
       return new Uint8Array(readFileSync(join(here, 'fonts', file)));
@@ -49,21 +49,18 @@ const filmRenderer = createFfmpegFilmRenderer({
 
 const server = createImpServer({
   webDir: join(here, 'web'),
+  // The key is kept here, outside the projects, and never handed to the browser.
+  secrets: createFileSecretStore(join(dataDir, 'secrets', 'openrouter-key')),
   open: async (secrets) =>
     createImp({
       store: await FileKeyValueStore.open(join(dataDir, 'data.jsonl')),
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
       release,
-      runsOn: `local server, Node ${process.version} on ${process.platform}${ffmpeg ? ', with ffmpeg' : ', without ffmpeg'}`,
+      runsOn: `local server, Node ${process.version} on ${process.platform}${ffmpeg.command() === null ? ', without ffmpeg' : ', with ffmpeg'}`,
       filmRenderer,
-      ...(ffmpeg
-        ? {
-            mp4Audio: createFfmpegMp4Decoder(),
-            frameGrabber: createFfmpegFrameGrabber(),
-            colorSampler: createFfmpegColorSampler(),
-          }
-        : {}),
+      ffmpeg,
+      ...ffmpegServices(ffmpeg),
     }),
 });
 server.on('error', (error: Error & { code?: string }) => {
@@ -80,9 +77,9 @@ server.listen(port, '127.0.0.1', () => {
     `Imp ${release.version} is running. Open http://localhost:${String(port)}/ in your browser.`,
   );
   console.log(`Your projects are kept in ${dataDir}`);
-  if (!ffmpeg) {
+  if (ffmpeg.command() === null) {
     console.log(
-      'ffmpeg was not found, so films cannot be exported here, the sound inside video clips stays silent and agents see no stills of the cut. Install it for all three.',
+      'ffmpeg was not found. Imp offers to download it when you export a film (or under Settings). Until then films are recorded in the browser and the sound inside video clips stays silent.',
     );
   }
   console.log('Press Ctrl+C to stop.');

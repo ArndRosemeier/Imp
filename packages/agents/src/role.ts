@@ -24,12 +24,24 @@ export interface Role {
   readonly direct?: readonly string[];
   /** Whether agents hired for this role can search the web unless the hire says otherwise. */
   readonly webSearch?: boolean;
+  /**
+   * An extra: built in, but not among the roles offered for hire until a
+   * person or the coordinator adds it (crew.role.add), so the default crew
+   * stays small. A critic is one.
+   */
+  readonly optional?: boolean;
 }
 
 export const ROLE_ID = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 /** Where the roles defined while using the app are kept, by role id. */
 export const CUSTOM_ROLE_PREFIX = 'roles/';
+
+/** Which extra built-in roles were added to the ones offered for hire, by role id. */
+export const ADDED_ROLE_PREFIX = 'roles-added/';
+
+/** Where the crew is kept; an extra role someone holds counts as added. */
+const CREW_PREFIX = 'crew/';
 
 /** A role as stored data. Built-in roles come from code and are never stored. */
 export const StoredRole = z.object({
@@ -91,15 +103,41 @@ export class RoleCatalog {
     return stored === undefined ? undefined : toRole(StoredRole.parse(stored));
   }
 
-  /** Every role that can be hired for, sorted by id, with whether it is a custom one. */
+  /** The extra roles that are offered for hire: added, or held by someone on the crew. */
+  async #addedIds(store: KeyValueStore): Promise<Set<string>> {
+    const added = new Set(
+      (await store.list(ADDED_ROLE_PREFIX)).map((entry) =>
+        entry.key.slice(ADDED_ROLE_PREFIX.length),
+      ),
+    );
+    for (const entry of await store.list(CREW_PREFIX)) {
+      const roleId = (entry.value as { roleId?: unknown } | null)?.roleId;
+      if (typeof roleId === 'string') added.add(roleId);
+    }
+    return added;
+  }
+
+  /**
+   * Every role that can be hired for, sorted by id, with whether it is a
+   * custom one. Extra roles count only once added.
+   */
   async all(store: KeyValueStore): Promise<readonly (Role & { readonly custom: boolean })[]> {
     const custom = (await store.list(CUSTOM_ROLE_PREFIX))
       .map((entry) => toRole(StoredRole.parse(entry.value)))
       .filter((role) => !this.#roles.has(role.id));
+    const added = await this.#addedIds(store);
     return [
-      ...this.list().map((role) => ({ ...role, custom: false })),
+      ...this.list()
+        .filter((role) => role.optional !== true || added.has(role.id))
+        .map((role) => ({ ...role, custom: false })),
       ...custom.map((role) => ({ ...role, custom: true })),
     ].sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  /** The extra roles not added yet, which crew.role.add can offer for hire. */
+  async extras(store: KeyValueStore): Promise<readonly Role[]> {
+    const added = await this.#addedIds(store);
+    return this.list().filter((role) => role.optional === true && !added.has(role.id));
   }
 }
 

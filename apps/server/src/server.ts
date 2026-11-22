@@ -18,6 +18,8 @@ export interface ImpServerOptions {
   readonly webDir: string;
   /** How long an interface may be gone before the server forgets it. */
   readonly forgetAfterMs?: number;
+  /** Where the OpenRouter key is kept. Left out, it is held in memory until the server stops. */
+  readonly secrets?: SecretStore;
 }
 
 const TYPES: Record<string, string> = {
@@ -59,7 +61,7 @@ interface Session {
 export function createImpServer(options: ImpServerOptions): Server {
   const webDir = normalize(options.webDir);
   const forgetAfterMs = options.forgetAfterMs ?? 30_000;
-  const secrets = createMemorySecretStore();
+  const secrets = options.secrets ?? createMemorySecretStore();
   let opened: Promise<Imp> | undefined;
   const open = (): Promise<Imp> => (opened ??= Promise.resolve(options.open(secrets)));
   const sessions = new Map<string, Session>();

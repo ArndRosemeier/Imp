@@ -108,6 +108,13 @@ describe('the script commands', () => {
     expect(text).toContain('INT. LAMP ROOM - NIGHT\n\nRain.');
     const fdx = await run('movie.script.export', { ...p, format: 'fdx' });
     expect(fdx.fileName).toBe('The-Keeper.fdx');
+    const fdxText = decodeUtf8((await runtime.blobs.get(fdx.blobKey))?.bytes ?? new Uint8Array());
+    expect(fdxText).toContain('Number="1"');
+    const plain = await run('movie.script.export', { ...p, format: 'fdx', sceneNumbers: false });
+    const plainText = decodeUtf8(
+      (await runtime.blobs.get(plain.blobKey))?.bytes ?? new Uint8Array(),
+    );
+    expect(plainText).not.toContain('Number=');
   });
 
   it('brings in scenes from Fountain text, a Final Draft file or an upload, after the others', async () => {

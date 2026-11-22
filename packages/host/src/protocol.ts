@@ -26,7 +26,15 @@ export interface StoredFile {
 /** What the interface can ask of the core, with what each answers. */
 export interface Calls {
   /** Puts the stored state in order and describes what the core offers. Asked once, first. */
-  start: { args: []; result: { commands: readonly CommandInfo[]; modes: readonly ModeInfo[] } };
+  start: {
+    args: [];
+    result: {
+      commands: readonly CommandInfo[];
+      modes: readonly ModeInfo[];
+      /** Whether the core holds an OpenRouter key, which the interface may never have seen. */
+      keyHeld: boolean;
+    };
+  };
   /** Runs a command as the user. */
   run: { args: [commandId: string, input: unknown]; result: ExecutionResult<unknown> };
   /** Reads a stored file. With `take`, an export is removed once read: it was only waiting to be saved. */
@@ -46,7 +54,11 @@ export interface Calls {
 
 export type Request =
   | { [K in keyof Calls]: { call: number; op: K; args: Calls[K]['args'] } }[keyof Calls]
-  /** The key stays with the page; the core is handed it and told when it goes. */
+  /**
+   * A new key for the core, or null to forget it. In the browser the page
+   * keeps the key and hands it over on every start; the local server keeps it
+   * itself, so the page sends it once and never holds it.
+   */
   | { op: 'key'; key: string | null }
   | { op: 'subscribe'; subscription: number; prefix: string }
   | { op: 'unsubscribe'; subscription: number };

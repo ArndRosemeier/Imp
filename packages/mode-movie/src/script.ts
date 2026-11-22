@@ -41,6 +41,24 @@ export function sceneElements(scene: Pick<Scene, 'heading' | 'body'>): ScriptEle
   return heading === '' ? body : [{ type: 'heading', text: heading.replace(/^\./, '') }, ...body];
 }
 
+/**
+ * Gives every scene heading a number, in order. A heading that has one
+ * already (#12#) keeps it, and numbering goes on after it.
+ */
+export function numberScenes(elements: readonly ScriptElement[]): ScriptElement[] {
+  let last = 0;
+  return elements.map((element) => {
+    if (element.type !== 'heading') return element;
+    if (element.sceneNumber !== undefined) {
+      const given = Number.parseInt(element.sceneNumber, 10);
+      if (Number.isFinite(given)) last = given;
+      return element;
+    }
+    last += 1;
+    return { ...element, sceneNumber: String(last) };
+  });
+}
+
 const fileSafe = (text: string): string =>
   text
     .replace(/[^\w.-]+/g, '-')
@@ -187,6 +205,12 @@ export function createScriptCommands(): readonly Command[] {
       projectId: ProjectId,
       format: z.enum(['pdf', 'fountain', 'fdx']).default('pdf'),
       author: z.string().max(200).optional().describe('Who wrote it, for the title page.'),
+      sceneNumbers: z
+        .boolean()
+        .default(true)
+        .describe(
+          'Numbers the scenes in both margins of the PDF and in the Final Draft file, as shooting scripts are. A number written in a heading (#12#) is kept.',
+        ),
     }),
     output: z.object({
       blobKey: z.string(),
@@ -194,11 +218,12 @@ export function createScriptCommands(): readonly Command[] {
       mediaType: z.string(),
       pages: z.number(),
     }),
-    handler: async ({ runtime }, { projectId, format, author }) => {
+    handler: async ({ runtime }, { projectId, format, author, sceneNumbers }) => {
       const id = 'movie.script.export';
       const project = await requireProject(runtime.store, id, projectId, MODE_ID);
       const scenes = await readScenes(runtime.store, projectId);
-      const elements = scenes.flatMap((scene) => sceneElements(scene));
+      const written = scenes.flatMap((scene) => sceneElements(scene));
+      const elements = sceneNumbers ? numberScenes(written) : written;
       const title: Record<string, string> = {
         title: project.name,
         ...(author === undefined || author.trim() === ''
