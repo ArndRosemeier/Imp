@@ -1,7 +1,8 @@
 import { CoinsIcon, XIcon } from '@phosphor-icons/react';
 import { useRef, type ReactElement } from 'react';
 import { z } from 'zod';
-import { runCommand, useLive } from './context.js';
+import { runCommand, useImp, useLive } from './context.js';
+import { NumberField } from './NumberField.js';
 
 const Kind = z.enum(['chat', 'image', 'speech', 'sound', 'music', 'video', 'transcription']);
 const Estimate = z.object({
@@ -32,6 +33,62 @@ const Summary = z.object({
     }),
   ),
 });
+
+const AllowanceView = z.object({
+  step: z.number(),
+  project: z.number(),
+  projectSpentUsd: z.number(),
+  projectLeftUsd: z.number(),
+});
+
+/** What agents may spend without asking, set by the person and only by them. */
+function AllowanceFields(): ReactElement | null {
+  const imp = useImp();
+  const allowance = useLive(['settings/', 'spend/'], async (current) =>
+    AllowanceView.parse(await runCommand(current, 'spend.allowance.get', {})),
+  );
+  const data = allowance.data;
+  if (data === undefined) return null;
+  const set = (change: { step?: number; project?: number }): void => {
+    runCommand(imp, 'spend.allowance.set', change).catch(() => undefined);
+  };
+  return (
+    <section className="stack spend-allowance" aria-labelledby="spend-allowance">
+      <h3 id="spend-allowance" className="eyebrow">
+        Budget without approval
+      </h3>
+      <div className="row">
+        <NumberField
+          label="Per project, $"
+          value={data.project}
+          step={0.5}
+          max={1000}
+          onCommit={(project) => {
+            set({ project });
+          }}
+        />
+        <NumberField
+          label="Most per step, $ (0: no limit)"
+          value={data.step}
+          step={0.05}
+          max={100}
+          onCommit={(step) => {
+            set({ step });
+          }}
+        />
+      </div>
+      <p className="spend-left">
+        <strong>{formatUsd(data.projectLeftUsd)}</strong> left of {formatUsd(data.project)}
+        <span className="muted"> · {formatUsd(data.projectSpentUsd)} spent here</span>
+      </p>
+      <p className="muted small">
+        Agents spend without asking until this budget is used up; then every paid step asks again.
+        Steps whose price is unknown still ask, and so does anything that deletes. Set the budget to
+        0 to approve every paid step yourself.
+      </p>
+    </section>
+  );
+}
 
 const KIND_NAMES: Readonly<Record<z.infer<typeof Kind>, string>> = {
   chat: 'Agents',
@@ -210,6 +267,7 @@ export function SpendTotal(): ReactElement | null {
           ) : (
             <p className="muted">Nothing has been spent yet.</p>
           )}
+          <AllowanceFields />
           <p className="muted small">
             Imp itself is free; this is what OpenRouter charges your key. Amounts marked ≈ were not
             reported by the model and are estimates

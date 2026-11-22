@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineCommand } from '../command.js';
+import { CommandError } from '../errors.js';
 import type { JsonValue } from '../json.js';
 
 const SETTINGS_PREFIX = 'settings/';
@@ -10,6 +11,12 @@ const SettingKey = z
   .describe('Dotted setting name, for example "coordinator.model".');
 
 const SettingValue: z.ZodType<JsonValue> = z.json();
+
+/**
+ * Settings only the person may change: what agents may spend without asking.
+ * An agent that could raise it would need no approval at all.
+ */
+const PERSON_ONLY = /^spend\.allowance(\.|$)/;
 
 const Setting = z.object({ key: SettingKey, value: SettingValue });
 
@@ -37,7 +44,14 @@ export const settingsSet = defineCommand({
   effect: 'write',
   input: Setting,
   output: Setting,
-  handler: async ({ runtime }, { key, value }) => {
+  handler: async ({ actor, runtime }, { key, value }) => {
+    if (actor.kind !== 'user' && PERSON_ONLY.test(key)) {
+      throw new CommandError(
+        'denied',
+        'settings.set',
+        `Only the person can change "${key}": it is what agents may spend without asking.`,
+      );
+    }
     await runtime.store.batch([{ type: 'put', key: `${SETTINGS_PREFIX}${key}`, value }]);
     return { key, value };
   },

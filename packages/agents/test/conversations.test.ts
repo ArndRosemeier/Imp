@@ -297,3 +297,72 @@ describe('conversations from before they were per project', () => {
     expect(said((await empty.conversation(lone.id)).messages)).toEqual(['Old.']);
   });
 });
+
+describe('a run that opens a project', () => {
+  const opens = (id: string) => ({
+    toolCalls: [
+      {
+        id: 'c1',
+        name: 'settings__set',
+        arguments: { key: 'project.current', value: id } as never,
+        argumentsText: '{}',
+      },
+    ],
+  });
+
+  it('moves the conversation into the project it opened', async () => {
+    const { run, hire, conversation, addProject, runtime } = setup([
+      opens('p1'),
+      { content: 'Made it.' },
+    ]);
+    await addProject('p1', 'Dragon bakery');
+    const coordinator = await hire('coordinator');
+    await run('crew.ask', { memberId: coordinator.id, task: 'Make a whole film.' });
+    const now = await conversation(coordinator.id);
+    expect(now.projectId).toBe('p1');
+    expect(said(now.messages)).toEqual(['Make a whole film.']);
+    expect(now.running).toBe(false);
+    expect(await runtime.store.get(conversationKey(coordinator.id, null))).toBeUndefined();
+  });
+
+  it('leaves it where it was when the project already has a chat with that agent', async () => {
+    const { run, hire, conversation, addProject, open, runtime } = setup([
+      { content: 'Earlier.' },
+      opens('p1'),
+      { content: 'Opened it.' },
+    ]);
+    await addProject('p1', 'Dragon bakery');
+    const coordinator = await hire('coordinator');
+    await open('p1');
+    await run('crew.ask', { memberId: coordinator.id, task: 'Hello.' });
+    await open(null);
+    await run('crew.ask', { memberId: coordinator.id, task: 'Open the bakery.' });
+    expect(said((await conversation(coordinator.id)).messages)).toEqual(['Hello.']);
+    expect(await runtime.store.get(conversationKey(coordinator.id, null))).toBeDefined();
+  });
+});
+
+describe('the project an agent works in', () => {
+  it('is always in what the agent is told, also when another agent gives the task', async () => {
+    const { run, hire, addProject, open, provider } = setup([
+      { content: 'Done.' },
+      { content: 'Done again.' },
+    ]);
+    await addProject('p1', 'Dragon bakery');
+    await open('p1');
+    const artist = await hire('artist');
+    await run('crew.ask', { memberId: artist.id, task: 'Paint.' });
+    await run('crew.ask', {
+      memberId: artist.id,
+      task: 'Paint more.',
+      context: 'Open project: projectId "p1".',
+    });
+    const contexts = provider.requests.map(
+      (request) => request.messages.findLast((m) => m.role === 'user')?.context,
+    );
+    expect(contexts[0]).toContain('projectId "p1"');
+    expect(contexts[0]).toContain('Dragon bakery');
+    // Given already, it is not said twice.
+    expect(contexts[1]).toBe('Open project: projectId "p1".');
+  });
+});

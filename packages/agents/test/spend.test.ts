@@ -5,6 +5,7 @@ import { createFakeProvider } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  createSpendAllowance,
   createSpendCommands,
   createSpendLedger,
   priceVideo,
@@ -203,6 +204,95 @@ describe('spending', () => {
     );
     expect(await run('spend.estimate', { commandId: 'media.paint', input: {} })).toEqual({
       estimate: null,
+    });
+  });
+});
+
+describe('spending without asking', () => {
+  const agent = { kind: 'agent', id: 'casting', role: 'casting-director' } as const;
+  const wipe = defineCommand({
+    id: 'media.wipe',
+    title: 'Wipe',
+    description: 'A stand-in for deleting.',
+    effect: 'destructive',
+    input: z.object({}),
+    output: z.object({ ok: z.boolean() }),
+    handler: () => Promise.resolve({ ok: true }),
+  });
+
+  function allowanceSetup() {
+    const runtime = createTestRuntime();
+    const fake = createFakeProvider({ models: [clips] });
+    const provider = withSpendLedger(fake, createSpendLedger(runtime));
+    const registry = new CommandRegistry({ runtime, autoApprove: createSpendAllowance(provider) });
+    registry.register(
+      ...settingsCommands,
+      paint,
+      film,
+      wipe,
+      ...createSpendCommands({ registry, provider }),
+    );
+    const asAgent = (id: string, input: unknown) =>
+      registry.executeById(id, input, { actor: agent }).then((result) => result.status);
+    const asUser = (id: string, input: unknown) =>
+      registry.executeById(id, input, { actor: user }).then((result) => result.status);
+    return { runtime, registry, provider, asAgent, asUser };
+  }
+
+  it('lets an agent spend within the budget unasked, but asks for deleting', async () => {
+    const { asAgent, asUser } = allowanceSetup();
+    expect(await asAgent('media.paint', { prompt: 'a dragon' })).toBe('ok');
+    // 4 seconds at 5 cents: 20 cents, within the dollar.
+    expect(await asAgent('media.film', { seconds: 4, audio: true })).toBe('ok');
+    expect(await asAgent('media.wipe', {})).toBe('needs-approval');
+    // A step limit, when set, asks for anything above it.
+    expect(await asUser('spend.allowance.set', { step: 0.05 })).toBe('ok');
+    expect(await asAgent('media.film', { seconds: 4, audio: true })).toBe('needs-approval');
+    expect(await asAgent('media.paint', { prompt: 'a dragon' })).toBe('ok');
+    // 24 seconds is $1.20: over the budget.
+    expect(await asUser('spend.allowance.set', { step: 0 })).toBe('ok');
+    expect(await asAgent('media.film', { seconds: 24, audio: true })).toBe('needs-approval');
+  });
+
+  it('asks again once the project has used its allowance', async () => {
+    const { runtime, provider, asAgent } = allowanceSetup();
+    await runtime.store.batch([{ type: 'put', key: 'settings/project.current', value: 'p1' }]);
+    await provider.generateImage({ model: 'vendor/painter', prompt: 'x' });
+    expect(await asAgent('media.paint', { prompt: 'again' })).toBe('ok');
+    await runtime.store.batch([
+      { type: 'put', key: 'settings/spend.allowance.project', value: 0.015 },
+    ]);
+    expect(await asAgent('media.paint', { prompt: 'once more' })).toBe('needs-approval');
+    // Another project has its own allowance.
+    await runtime.store.batch([{ type: 'put', key: 'settings/project.current', value: 'p2' }]);
+    expect(await asAgent('media.paint', { prompt: 'elsewhere' })).toBe('ok');
+  });
+
+  it('always asks when the person sets it to 0, or the price is unknown', async () => {
+    const { asAgent, asUser } = allowanceSetup();
+    expect(await asUser('spend.allowance.set', { project: 0 })).toBe('ok');
+    expect(await asAgent('media.paint', { prompt: 'a dragon' })).toBe('needs-approval');
+    expect(await asUser('spend.allowance.set', { project: 1 })).toBe('ok');
+    expect(await asAgent('media.paint', { prompt: 'a dragon' })).toBe('ok');
+  });
+
+  it('can be changed only by the person', async () => {
+    const { registry, asUser } = allowanceSetup();
+    await expect(
+      registry.executeById('spend.allowance.set', { step: 100 }, { actor: agent }),
+    ).rejects.toThrow(/Only the person/);
+    await expect(
+      registry.executeById(
+        'settings.set',
+        { key: 'spend.allowance.step', value: 100 },
+        { actor: agent },
+      ),
+    ).rejects.toThrow(/Only the person/);
+    expect(await asUser('spend.allowance.set', { step: 0.1, project: 2 })).toBe('ok');
+    const shown = await registry.executeById('spend.allowance.get', {}, { actor: agent });
+    expect(shown).toMatchObject({
+      status: 'ok',
+      output: { step: 0.1, project: 2, projectSpentUsd: 0, projectLeftUsd: 2 },
     });
   });
 });
