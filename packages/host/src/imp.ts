@@ -3,6 +3,7 @@ import {
   createAgentCommands,
   createCrewCommands,
   createModelCommands,
+  createSavedCrewCommands,
   releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
@@ -169,6 +170,7 @@ export function createImp(options: ImpOptions): Imp {
     ...createCrewCommands(roles, {
       commandIds: () => registry.list().map((command) => command.id),
     }),
+    ...createSavedCrewCommands(roles),
     ...createAgentCommands({ registry, provider, roles }),
   );
   let started: Promise<void> | undefined;
