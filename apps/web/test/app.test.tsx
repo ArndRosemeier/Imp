@@ -853,6 +853,9 @@ describe('App', () => {
     });
     const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
+    // Each piece shows a still from the start of the stretch of its clip it uses.
+    const thumb = first.querySelector('video.block-thumb');
+    expect(thumb?.getAttribute('src')).toMatch(/^blob:test\/\d+#t=0\.10$/);
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
     // jsdom cannot record video, so export says so instead of offering a broken button.
     // Export and help live in menus, so the picture and the timeline share one screen.
