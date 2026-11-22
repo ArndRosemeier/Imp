@@ -7,7 +7,7 @@ import {
 } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import {
   ConversationSchema,
@@ -86,7 +86,7 @@ function setup(replies: ScriptedChatReply[] = []) {
   return { runtime, registry, provider, run, hire, conversation, addProject, open, release };
 }
 
-const said = (messages: { role: string; content?: string | null }[]) =>
+const said = (messages: readonly { role: string; content?: string | null }[]) =>
   messages.filter((m) => m.role === 'user').map((m) => m.content);
 
 describe('conversations per project', () => {
@@ -158,7 +158,9 @@ describe('conversations per project', () => {
     await addProject('pb', 'Beta');
     await open('pa');
     const working = run('crew.ask', { memberId: painter.id, task: 'Paint.' });
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(async () => {
+      expect((await conversation(painter.id)).running).toBe(true);
+    });
 
     // The person opens another project while the agent works.
     await open('pb');

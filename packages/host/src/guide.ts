@@ -66,6 +66,12 @@ Under **More roles** on the **Crew** page are extras that are not part of the us
 
 Define roles of your own on the **Crew** page, such as an advisor or a second critic, and save a whole crew to the library to load it into another project.
 
+## Chats belong to projects
+
+Each project has its own chat with the coordinator and with every crew member. When you open another project, its chats come up, and the agents only remember what was said in that project. The crew itself is the same in every project, and the coordinator can still look after things across projects, such as the library, saved crews and your other projects. On the start screen, with no project open, agents talk in a chat of their own.
+
+**Clear chat** at the top of a chat forgets it for the current project, after asking; other projects keep theirs. What the agent made stays.
+
 ## Everything you can do, they can do
 
 Every button in Imp runs a command, and agents use the same commands. Whatever you can do by hand, an agent can do for you, and whatever an agent did, you can change by hand.

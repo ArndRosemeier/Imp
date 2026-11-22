@@ -148,10 +148,11 @@ export function CrewPanel({
       ),
   );
   const liveProject = live.data?.projectId ?? null;
-  useEffect(() => {
+  if (liveProject !== shownProject) {
+    // Another project was opened: follow its conversation, and drop a question about the last one.
     setShownProject(liveProject);
     setClearing(false);
-  }, [liveProject]);
+  }
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
