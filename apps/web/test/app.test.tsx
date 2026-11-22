@@ -8,6 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
+import { starterMixes } from '../src/app/onboarding/presets.js';
 import { unseenVersions } from '../src/app/WhatsNew.js';
 import { connectImp, createImp, createLocalPorts, serveImp, type Imp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
@@ -206,7 +207,86 @@ describe('App', () => {
     ).toBeTruthy();
     // The setup itself went through commands, so it shows in the activity strip.
     const strip = screen.getByRole('contentinfo', { name: 'Activity' });
-    expect(await within(strip).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+    // One line with the latest command; a tap opens the recent ones.
+    const toggle = await within(strip).findByRole('button', { name: /Recent/ });
+    expect(within(strip).queryByRole('list')).toBeNull();
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const recent = await within(strip).findByRole('list');
+    expect(await within(recent).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+    await user.click(toggle);
+    expect(within(strip).queryByRole('list')).toBeNull();
+  });
+
+  it('starts with a model mix and no tips, for someone who knows their way around', async () => {
+    const provider = createFakeProvider({
+      models: [
+        model('~anthropic/claude-haiku-latest'),
+        model('~anthropic/claude-sonnet-latest'),
+        model('meta/muse-image', { outputModalities: ['image'], supportsTools: false }),
+        model('bytedance-seed/seed-audio-1-0', {
+          outputModalities: ['speech'],
+          supportsTools: false,
+        }),
+        model('google/veo-3.1-lite', {
+          outputModalities: ['video'],
+          supportsTools: false,
+          video: {
+            durationsSeconds: [4, 6, 8],
+            resolutions: ['720p'],
+            aspectRatios: ['16:9'],
+            frameImages: [],
+            nativeAudio: true,
+            pricing: { perSecond: [{ resolution: '720p', audio: true, usd: 0.05 }], perToken: [] },
+          },
+        }),
+      ],
+    });
+    const imp = createImp({
+      store: new MemoryKeyValueStore(),
+      secrets: createLocalSecretStore(),
+      provider,
+    });
+    render(<App imp={connect(imp)} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('OpenRouter API key'), 'sk-test');
+    await user.click(screen.getByRole('button', { name: /Continue/ }));
+
+    const balanced = await screen.findByRole('radio', { name: /Balanced/ });
+    // The clip price on the card comes from the video model's price list.
+    expect(balanced.closest('label')?.textContent).toContain('≈ $0.20');
+    await user.click(balanced);
+    await user.click(screen.getByRole('radio', { name: /I know my way around/ }));
+    await user.click(screen.getByRole('button', { name: /Start with Balanced/ }));
+    await screen.findByRole('heading', { name: 'Projects' });
+
+    expect(await imp.store.get('settings/coordinator.model')).toBe(
+      '~anthropic/claude-sonnet-latest',
+    );
+    expect(await imp.store.get('settings/video.model')).toBe('google/veo-3.1-lite');
+    expect(await imp.store.get('settings/speech.model')).toBe('bytedance-seed/seed-audio-1-0');
+    expect(await imp.store.get('settings/help.enabled')).toBe(false);
+    // All three mixes are kept, so the final film is one switch away.
+    expect((await imp.store.list('model-mixes/')).length).toBe(3);
+  });
+
+  it('fills the starter mixes from the catalog, newest versions first', () => {
+    const mixes = starterMixes([
+      model('~anthropic/claude-haiku-latest'),
+      model('bytedance/seedance-2.0-mini', { outputModalities: ['video'] }),
+      model('bytedance/seedance-2.10-mini', { outputModalities: ['video'] }),
+      model('google/lyria-3-clip-preview', { outputModalities: ['audio'] }),
+      model('elevenlabs/scribe-v2', { outputModalities: ['transcription'] }),
+    ]);
+    expect(mixes[0]?.models).toMatchObject({
+      'coordinator.model': '~anthropic/claude-haiku-latest',
+      'video.model': 'bytedance/seedance-2.10-mini',
+      'music.model': 'google/lyria-3-clip-preview',
+      'transcription.model': 'elevenlabs/scribe-v2',
+    });
+    // Nothing is guessed: a slot the catalog cannot fill is left out.
+    expect(mixes[0]?.models['images.model']).toBeUndefined();
+    expect(mixes[2]?.models['coordinator.model']).toBeUndefined();
   });
 
   it('does not accept a model that is not in the catalog', async () => {
@@ -411,6 +491,39 @@ describe('App', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Script' }));
     expect(await screen.findByRole('tab', { name: '1 · Harbour, dusk' })).toBeTruthy();
+  });
+
+  it('lets the library and the crew take turns only when the stage would get too narrow', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    const shell = (): string | null | undefined =>
+      document.querySelector('.shell')?.getAttribute('data-crew');
+    const width = window.innerWidth;
+    try {
+      // A wide screen has room for both.
+      window.innerWidth = 2400;
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+      await screen.findByRole('complementary', { name: 'Library' });
+      expect(shell()).toBe('open');
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+
+      // A 1440 px screen does not: opening the library hides the crew, and the other way round.
+      window.innerWidth = 1440;
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+      await screen.findByRole('complementary', { name: 'Library' });
+      expect(shell()).toBe('closed');
+      await user.click(screen.getByRole('button', { name: 'Crew panel' }));
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('complementary', { name: 'Library' })).toBeNull();
+      });
+      expect(shell()).toBe('open');
+    } finally {
+      window.innerWidth = width;
+    }
   });
 
   it('resizes the side panels with the keyboard and remembers the widths', async () => {
@@ -810,15 +923,18 @@ describe('App', () => {
     expect(screen.getByText('Open')).toBeTruthy();
     expect(screen.getAllByText('0/5').length).toBeGreaterThan(0);
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Storm' }));
     await user.click(screen.getByRole('button', { name: 'Duplicate: Storm' }));
     expect(await screen.findByRole('heading', { name: 'Storm (2)' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Storm (2)' }));
     await user.click(screen.getByRole('button', { name: 'Rename: Storm (2)' }));
     const field = screen.getByLabelText('Project name');
     await user.clear(field);
     await user.type(field, 'Squall{Enter}');
     expect(await screen.findByRole('heading', { name: 'Squall' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall' }));
     await user.click(screen.getByRole('button', { name: 'Save as template: Squall' }));
     await user.click(await screen.findByRole('button', { name: /Save template/ }));
     expect(await screen.findByText(/Saved the template “Squall template”/)).toBeTruthy();
@@ -829,6 +945,7 @@ describe('App', () => {
     HTMLAnchorElement.prototype.click = () => {
       saved += 1;
     };
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall' }));
     await user.click(screen.getByRole('button', { name: 'Export to a file: Squall' }));
     expect(await screen.findByText(/Saved Squall\.imp\.zip/)).toBeTruthy();
     expect(saved).toBe(1);
@@ -845,6 +962,7 @@ describe('App', () => {
     await user.upload(screen.getByLabelText('Project file to import'), picked);
     expect(await screen.findByRole('heading', { name: 'Squall (2)' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall (2)' }));
     await user.click(screen.getByRole('button', { name: 'Delete: Squall (2)' }));
     await user.click(await screen.findByRole('button', { name: /Delete for good/ }));
     await vi.waitFor(() => {
@@ -1295,6 +1413,11 @@ describe('App', () => {
     const { user } = start();
     await completeSetup(user);
     await user.click(screen.getByRole('button', { name: 'Settings' }));
+    // Settings read as words; what the app keeps for itself stays out of the list.
+    const list = await screen.findByRole('region', { name: 'Models and preferences' });
+    expect(await within(list).findByText('Coordinator model')).toBeTruthy();
+    expect(within(list).getByText('vendor/writer')).toBeTruthy();
+    expect(within(list).queryByText(/coordinator\.member/)).toBeNull();
     const link = await screen.findByRole('link', { name: /Download Imp for your computer/ });
     expect(link.getAttribute('href')).toBe('./imp-server.zip');
 

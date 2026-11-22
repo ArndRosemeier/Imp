@@ -327,15 +327,62 @@ kbd {
 .strip {
   grid-area: strip;
   border-top: 1px solid var(--line);
-  padding: 10px 48px;
-  max-height: 92px;
-  overflow-y: auto;
+  padding: 0 48px;
   color: var(--ink-muted);
+  font-size: 12.5px;
+}
+.strip-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.strip > .strip-line {
+  padding: 10px 0;
+}
+/* The whole strip is the toggle, one line high and still a full touch target. */
+.strip-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.strip-toggle .strip-line {
+  flex: 1;
+}
+.strip-more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-soft);
+}
+.strip-more svg {
+  transition: transform 0.15s ease;
+}
+.strip.open .strip-more svg {
+  transform: rotate(180deg);
+}
+@media (pointer: coarse) {
+  .strip-toggle {
+    min-height: var(--hit);
+  }
 }
 .strip ol {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 10px;
+  max-height: 180px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2324,9 +2371,18 @@ html {
     width: 44px;
     height: 44px;
   }
+  /* A lane is 88 px high: the name and the buttons below it share that. */
   .ms {
-    width: 36px;
-    height: 32px;
+    width: 44px;
+    height: 40px;
+  }
+  .track-name {
+    min-height: 36px;
+    line-height: 36px;
+  }
+  .library-filters .chip.small,
+  .library-filters .select.small {
+    min-height: var(--hit);
   }
   .region-bar {
     height: 28px;
@@ -2418,7 +2474,8 @@ html {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
-  overflow: hidden;
+  /* Visible, so the actions list can open over the card; the poster rounds its own corners. */
+  overflow: visible;
   transition:
     border-color 160ms,
     transform 160ms;
@@ -2431,6 +2488,8 @@ html {
 }
 .project-open {
   display: block;
+  overflow: hidden;
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
   padding: 0;
   border: none;
   background: none;
@@ -5809,6 +5868,79 @@ dialog.help-dialog[open] {
   align-self: flex-start;
 }
 
+/* Settings, named in words. */
+.settings-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.settings-row:first-child {
+  border-top: 0;
+}
+.settings-row dt {
+  color: var(--ink);
+}
+.settings-row dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* A project card's actions, named, in a list that opens from the card's foot. */
+.project-actions {
+  position: relative;
+  flex: none;
+}
+.project-action-list {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  min-width: 232px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+}
+.project-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.project-action:hover,
+.project-action:focus-visible {
+  background: var(--accent-wash);
+}
+.project-action.danger-quiet {
+  color: var(--danger);
+}
+
 /* Spending: the price inside a button that spends, and the running total in the top bar */
 .price {
   margin-left: 2px;
@@ -6112,4 +6244,112 @@ dialog.spend-dialog {
   .scene-script .segmented button {
     min-height: var(--hit);
   }
+}
+
+/* First run: the starter mixes and the help choice */
+.setup-panel[data-wide='true'] {
+  width: min(860px, 100%);
+}
+.mix-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.mix-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.mix-choice[data-selected='true'] {
+  border-color: var(--accent);
+  background: linear-gradient(160deg, var(--accent-wash), transparent 70%), var(--surface);
+}
+.mix-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mix-choice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mix-choice-head svg {
+  color: var(--ink-muted);
+}
+.mix-choice[data-selected='true'] .mix-choice-head svg {
+  color: var(--accent);
+}
+.mix-choice-head strong {
+  font: 400 24px/1 var(--font-display);
+}
+.mix-choice-head .tag {
+  margin-left: auto;
+}
+.mix-choice-notes {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.mix-choice-models {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.mix-choice-price {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.setup-help {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.setup-help-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+.setup-help-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+.setup-help-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.setup-help-option input {
+  accent-color: var(--accent);
+}
+.setup-help-option svg {
+  flex: none;
+  color: var(--accent);
+}
+.setup-help-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
 }
