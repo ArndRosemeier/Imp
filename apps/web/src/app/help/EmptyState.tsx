@@ -2,6 +2,7 @@ import { ArrowRightIcon, ChatCircleDotsIcon, type Icon } from '@phosphor-icons/r
 import type { ReactElement } from 'react';
 import { OPEN_VIEW } from '../library/model.js';
 import { askCoordinator } from './help.js';
+import { HornedBadge } from '../ImpMark.js';
 
 /**
  * What a stage shows while it has nothing to show: what belongs here, and the
@@ -13,12 +14,15 @@ export function EmptyState({
   icon: Glyph,
   title,
   body,
+  quip,
   ask,
   go,
 }: {
   icon: Icon;
   title: string;
   body: string;
+  /** A short aside in the imp's voice, shown small under the title. */
+  quip?: string;
   /** What to put in the coordinator's message box. Nothing is sent until the person presses Send. */
   ask?: string;
   /** Another stage to fill first, such as the script before shots. */
@@ -26,8 +30,11 @@ export function EmptyState({
 }): ReactElement {
   return (
     <section className="empty-state" aria-label={title}>
-      <Glyph className="empty-state-icon" aria-hidden="true" size={28} weight="duotone" />
+      <HornedBadge>
+        <Glyph className="empty-state-icon" aria-hidden="true" size={26} weight="duotone" />
+      </HornedBadge>
       <h2>{title}</h2>
+      {quip !== undefined && <p className="empty-state-quip">{quip}</p>}
       <p className="muted">{body}</p>
       <div className="row wrap empty-state-actions">
         {go !== undefined && (

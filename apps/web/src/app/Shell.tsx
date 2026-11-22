@@ -1,6 +1,7 @@
 import { AudioView, OPEN_VIEW } from './audio.js';
 import { EditView } from './edit.js';
 import { ImpMark } from './ImpMark.js';
+import { aliasOfTheVisit } from './imp-names.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
@@ -290,7 +291,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
         }
       >
         <header className="topbar">
-          <div className="wordmark">
+          <div className="wordmark" title={`Imp: ${aliasOfTheVisit}`}>
             <ImpMark />
             Imp
           </div>

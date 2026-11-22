@@ -174,6 +174,7 @@ export function SoundView({ project }: { project: Project }): ReactElement {
           <EmptyState
             icon={WaveformIcon}
             title="Write a scene first"
+            quip="Even an imp can’t score a scene nobody has written."
             body="Sounds belong to scenes, and there are no scenes yet. Write the script first."
             go={{ stage: 'script', label: 'Go to Script' }}
           />
@@ -184,6 +185,7 @@ export function SoundView({ project }: { project: Project }): ReactElement {
             <EmptyState
               icon={WaveformIcon}
               title="Nothing to hear yet"
+              quip="Suspiciously quiet in here."
               body="This scene is silent so far. Add an effect or music, or have the sound of the scene worked out for you."
               ask="Work out what the scene I am looking at sounds like: ambience, effects and music. Tell me the price before making them."
             />

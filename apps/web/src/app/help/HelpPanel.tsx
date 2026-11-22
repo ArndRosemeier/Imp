@@ -16,6 +16,7 @@ import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { GuideText } from './GuideText.js';
 import { ReportProblem } from './ReportProblem.js';
 import { OPEN_HELP, useHelpState, useTopic, useTopics, type TopicListing } from './help.js';
+import { ImpSpinner } from '../ImpMark.js';
 
 const AREA_ORDER = ['workspace'];
 
@@ -134,7 +135,13 @@ function AskImp({ context }: { context: string }): ReactElement {
       <p className="muted ask-waiting" role="status">
         {problem ??
           state.error ??
-          (model === null ? 'Choose a coordinator model first.' : 'One moment…')}
+          (model === null ? (
+            'Choose a coordinator model first.'
+          ) : (
+            <>
+              <ImpSpinner /> One moment…
+            </>
+          ))}
       </p>
     );
   }
@@ -145,8 +152,9 @@ function AskImp({ context }: { context: string }): ReactElement {
       intro={(suggest) => (
         <div className="ask-intro stack">
           <p>
-            Ask anything about Imp in your own words. Imp answers from its guide, and does the step
-            for you if you ask. It asks before spending money.
+            Ask me anything about Imp, in your own words. I answer from the guide, and do the step
+            for you if you like. Mischief, yes; surprise bills, never: I always ask before spending
+            money.
           </p>
           <div className="ask-examples" role="group" aria-label="Example questions">
             {EXAMPLES.map((example) => (

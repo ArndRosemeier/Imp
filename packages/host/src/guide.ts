@@ -12,6 +12,8 @@ export const workspaceGuides: readonly GuideTopic[] = [
     summary: 'What Imp is, how a film is made in it, and the fastest way to a first film.',
     body: `Imp makes films of any length from AI-generated pictures, voices, sounds and video clips, and keeps them coherent from the first scene to the last. You can do every step yourself, hand any step to an AI agent, or mix both.
 
+The name stands for **Imp Makes Pictures**, a name that contains itself, in the spirit of GNU. On the Projects screen the imp tries on other meanings, one per visit (Imp Movie Production, Intelligent Movie Production, Infinite Montage Pipeline and more); press the line above the heading to see the next one.
+
 ## How a film is made
 
 The stages on the left follow the way films are made. Visit them in any order:

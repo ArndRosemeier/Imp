@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { ASK_COORDINATOR } from './help/help.js';
+import { ImpSpinner } from './ImpMark.js';
 import { RichText } from './RichText.js';
 import { servedByLocalServer } from '../host/served.js';
 import { Price } from './spend.js';
@@ -330,8 +331,8 @@ export function CrewPanel({
           return null;
         })}
         {working && (
-          <p className="muted">
-            Working
+          <p className="muted crew-working" role="status">
+            <ImpSpinner /> {member.name} is on it
             {inTab && (
               <span className="small">
                 {' '}
