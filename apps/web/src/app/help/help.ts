@@ -18,6 +18,14 @@ export function openHelp(topicId?: string): void {
   window.dispatchEvent(new CustomEvent(OPEN_HELP, { detail: topicId ?? null }));
 }
 
+/** The event that puts words in the coordinator's message box, for the person to send. */
+export const ASK_COORDINATOR = 'imp:ask-coordinator';
+
+/** Opens the coordinator with `text` ready to send. Nothing is sent: the person reads it and presses Send. */
+export function askCoordinator(text: string): void {
+  window.dispatchEvent(new CustomEvent(ASK_COORDINATOR, { detail: text }));
+}
+
 /** Whether tips are shown and which are closed. Settings, so it follows agents' changes too. */
 export function useHelpState(): Live<HelpState> {
   return useLive(['settings/'], async (imp) =>

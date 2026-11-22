@@ -2672,6 +2672,17 @@ html {
   border-color: var(--accent);
   color: var(--accent);
 }
+.project-sample {
+  border-style: solid;
+  border-color: var(--line);
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--accent) 10%, transparent),
+    transparent 60%
+  );
+  padding: var(--space-4);
+  text-align: center;
+}
 .saved-templates {
   list-style: none;
   margin: 0;
@@ -4894,7 +4905,8 @@ dialog.whats-new-dialog {
   padding: 14px 20px 12px;
   gap: 0;
 }
-.main[data-stage='edit'] > .stage-tip {
+.main[data-stage='edit'] > .stage-tip,
+.main[data-stage='edit'] > .first-film {
   flex: none;
   margin-bottom: 10px;
 }
@@ -6448,4 +6460,120 @@ dialog.spend-dialog {
 }
 .block-thumb + .block-label {
   padding-left: 8px;
+}
+
+/* The guided way to a first film: one slim bar above the stage that opens into the steps. */
+.first-film {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+.first-film-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 4px 6px 4px 4px;
+  flex-wrap: wrap;
+}
+.first-film-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.first-film-toggle:hover {
+  background: var(--surface-raised, var(--ground));
+}
+.first-film-caret {
+  transition: transform 160ms ease;
+}
+.first-film[data-open='true'] .first-film-caret {
+  transform: rotate(180deg);
+}
+.first-film-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.first-film-dots span {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+.first-film-dots span[data-done='true'] {
+  background: var(--accent);
+}
+.first-film-dots span[data-next='true'] {
+  background: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+}
+.first-film-next {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.first-film-next svg {
+  align-self: center;
+  color: var(--accent);
+}
+.first-film-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.first-film-close {
+  margin-left: auto;
+}
+.first-film-steps {
+  list-style: none;
+  margin: 0;
+  padding: 4px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.first-film-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.first-film-steps li:last-child {
+  border-bottom: 0;
+}
+.first-film-steps li > svg {
+  margin-top: 1px;
+  color: var(--ink-soft);
+}
+.first-film-steps li[data-done='true'] > svg {
+  color: var(--accent);
+}
+.first-film-steps li[data-done='true'] strong {
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+.first-film-steps li[data-next='true'] strong {
+  color: var(--accent);
+}
+.first-film-step {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.first-film-step strong {
+  font-size: 14px;
 }

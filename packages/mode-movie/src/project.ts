@@ -7,6 +7,7 @@ import {
   type CollisionChoice,
   type CopyOutcome,
   type CoreRuntime,
+  type GuidedPath,
   type JsonValue,
   type KeyValueStore,
   type PlannedItem,
@@ -727,8 +728,79 @@ export const movieCopier: ResourceCopier = {
   },
 };
 
+/**
+ * The guided way to a first film: the smallest set of steps that ends in a
+ * finished piece, each one done in its stage or handed to the coordinator.
+ * A step counts as done from what the project holds, however it was done.
+ */
+export const firstFilmPath: GuidedPath = {
+  steps: [
+    {
+      id: 'idea',
+      title: 'Say what the film is',
+      body: 'Write the logline in Development: the whole film in one or two sentences. Everything after it, from scenes to shots, is built on it. Free.',
+      stage: 'development',
+      ask: 'Help me write the logline, premise and tone of this film. Ask me what it is about first.',
+    },
+    {
+      id: 'scene',
+      title: 'Write a scene',
+      body: 'In Script, write one scene: where it happens, what is done and said. One short scene is enough for a first film. Free, apart from a writer agent at a few cents.',
+      stage: 'script',
+      ask: 'Write the first scene of this film from the development, short enough for a first film.',
+    },
+    {
+      id: 'cast',
+      title: 'Cast a character',
+      body: 'In Casting, describe how a character looks and make a portrait. The portrait keeps them the same in every clip. A portrait costs about a cent; the price is on the button.',
+      stage: 'casting',
+      ask: 'Cast the main character of this film: describe their appearance and make one portrait. Tell me the price first.',
+    },
+    {
+      id: 'shots',
+      title: 'Plan the shots',
+      body: 'In Shots, split the scene into shots of a few seconds each: what the camera sees, who is in it, the line spoken. Free.',
+      stage: 'shots',
+      ask: 'Break the first scene into shots of four to eight seconds each.',
+    },
+    {
+      id: 'clip',
+      title: 'Make your first clip',
+      body: 'Make the clip of one shot. Clips are the expensive part, so start with one and look at it before making the rest. The price is on the button.',
+      stage: 'shots',
+      ask: 'Make the clip of the first shot. Tell me the price before you start.',
+    },
+    {
+      id: 'cut',
+      title: 'Cut it together',
+      body: 'In Edit, the clips play in order. Trim one, add a title card, then export the film to a file. Free.',
+      stage: 'edit',
+      ask: 'Put the first scene together in the Edit stage with a title card at the start, then tell me how to export it.',
+    },
+  ],
+  done: async (runtime, projectId) => {
+    const movie = await readMovie(runtime.store, projectId);
+    const shots = [...movie.shots.values()].flat();
+    const done = new Set<string>();
+    if (movie.development.logline.trim() !== '') done.add('idea');
+    if (movie.scenes.some((scene) => scene.body.trim() !== '')) done.add('scene');
+    if (movie.characters.some((character) => character.portraitId !== null)) done.add('cast');
+    if (shots.length > 0) done.add('shots');
+    if (shots.some((shot) => shot.clip?.status === 'ready')) done.add('clip');
+    if (
+      [...movie.cuts.values()].some(
+        (cut) => (cut.items !== null && cut.items.length > 0) || cut.sounds.length > 0,
+      )
+    ) {
+      done.add('cut');
+    }
+    return done;
+  },
+};
+
 export const movieProjectSupport: ProjectSupport = {
   templates: movieTemplates,
   summarize: summarizeMovie,
   resources: movieCopier,
+  path: firstFilmPath,
 };

@@ -16,6 +16,7 @@ import {
   DotsThreeIcon,
   DownloadSimpleIcon,
   FilmSlateIcon,
+  LighthouseIcon,
   PencilSimpleIcon,
   PlusIcon,
   TrashIcon,
@@ -31,6 +32,7 @@ import {
 } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { useHelpState } from './help/help.js';
 import { Problem, useBlobUrl } from './movie.js';
 
 const OverviewEntry = Project.extend({
@@ -1057,6 +1059,23 @@ export function ProjectsView({
   const projects = overview.data?.projects ?? [];
   const currentId = overview.data?.currentProjectId ?? null;
   const saved = (templates.data?.templates ?? []).filter((t) => !t.builtIn);
+  const help = useHelpState();
+  // The sample is for learning: offered while tips are on, or when there is nothing else to open.
+  const samples = (templates.data?.templates ?? []).filter((t) => t.sample);
+  const offerSamples = help.data?.enabled !== false || projects.length === 0;
+
+  const openSample = (template: Template): void => {
+    setError(null);
+    setNotice(`Opening the sample “${template.name}”…`);
+    runCommand(imp, 'project.create', {
+      name: template.name,
+      mode: template.mode,
+      templateId: template.id,
+    }).then((made) => {
+      setNotice(null);
+      onOpen(Project.parse(made).id);
+    }, fail);
+  };
 
   const fail = (reason: unknown): void => {
     setNotice(null);
@@ -1186,6 +1205,22 @@ export function ProjectsView({
           <span>New project</span>
           <span className="muted small">Empty, or from a template</span>
         </button>
+        {offerSamples &&
+          samples.map((template) => (
+            <button
+              key={template.id}
+              className="project-new project-sample"
+              onClick={() => {
+                openSample(template);
+              }}
+            >
+              <LighthouseIcon aria-hidden="true" size={28} />
+              <span>Open the sample film</span>
+              <span className="muted small">
+                “{template.name}”: written down to every shot. Free to open; take it apart.
+              </span>
+            </button>
+          ))}
       </div>
       {saved.length > 0 && (
         <section className="stack">

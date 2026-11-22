@@ -977,6 +977,31 @@ describe('App', () => {
     });
   });
 
+  it('opens the sample film from the start screen, written down to its shots', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(await screen.findByRole('button', { name: /Open the sample film/ }));
+    await screen.findByRole('heading', { name: 'Development' });
+    expect(await screen.findByDisplayValue(/last night before her lighthouse/)).toBeTruthy();
+
+    // The guided path has ticked off what the sample holds, and hands the next step on.
+    const path = await screen.findByRole('region', { name: 'Your first film' });
+    expect(within(path).getByText('3 of 6')).toBeTruthy();
+    expect(within(path).getByText('Cast a character')).toBeTruthy();
+    await user.click(within(path).getByRole('button', { name: /Ask the coordinator/ }));
+    await vi.waitFor(() => {
+      expect(screen.getByDisplayValue(/Cast the main character/)).toBeTruthy();
+    });
+    await user.click(within(path).getByRole('button', { name: /Your first film/ }));
+    expect(within(path).getAllByLabelText('Done')).toHaveLength(3);
+    await user.click(within(path).getByRole('button', { name: /Hide the guided path/ }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Your first film' })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Projects' }));
+    expect(await screen.findByRole('heading', { name: 'The Last Light' })).toBeTruthy();
+  });
+
   it('copies between projects and puts collisions to the person, also when an agent copies', async () => {
     const { imp, user } = start();
     await completeSetup(user);
