@@ -15,6 +15,8 @@ import {
   PlusIcon,
   SparkleIcon,
   TrashIcon,
+  ScrollIcon,
+  UsersThreeIcon,
 } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
@@ -25,6 +27,7 @@ import { useLibraryDrop } from './library/drag.js';
 import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
 import { SceneScript, ScriptFiles } from './screenplay.js';
+import { EmptyState } from './help/EmptyState.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const ScriptLength = z.object({ pages: z.number(), minutes: z.number() });
@@ -264,10 +267,12 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
       </div>
       {scene === undefined ? (
         listed.data !== undefined && (
-          <p className="muted">
-            There are no scenes yet. Add one, or ask the Screenwriter to write the script from the
-            development notes.
-          </p>
+          <EmptyState
+            icon={ScrollIcon}
+            title="No scenes yet"
+            body="There are no scenes yet. Add one with Add scene, or have the script written from the development notes."
+            ask="Write the script of this film from the development notes, scene by scene."
+          />
         )
       ) : (
         <article
@@ -745,10 +750,12 @@ export function CastingView({ project }: { project: Project }): ReactElement {
       />
       <Problem text={listed.error ?? error ?? images.error ?? speech.error} />
       {listed.data !== undefined && characters.length === 0 && (
-        <p className="muted">
-          Nobody is cast yet. Add a character, or ask the Casting Director to build the cast from
-          the script.
-        </p>
+        <EmptyState
+          icon={UsersThreeIcon}
+          title="Nobody is cast yet"
+          body="Nobody is cast yet. Add a character, or have the cast built from the script, with a look and a voice for each."
+          ask="Build the cast of this film from the script: who appears, how they look and sound. Tell me the price before making portraits."
+        />
       )}
       <div className="grid cast">
         {characters.map((character) => (

@@ -21,6 +21,7 @@ import {
   SidebarSimpleIcon,
   SplitHorizontalIcon,
   XIcon,
+  FilmReelIcon,
 } from '@phosphor-icons/react';
 import { EditHelp, Popover, SplitBar, useTimelineHeight } from './edit-chrome.js';
 import { IDENTITY_MATRIX } from '@imp/mode-movie';
@@ -84,6 +85,7 @@ import {
   TextTools,
   useTextStyles,
 } from './texts.js';
+import { EmptyState } from './help/EmptyState.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -1995,7 +1997,12 @@ export function EditView({ project }: { project: Project }): ReactElement {
       )}
       {sceneId === undefined ? (
         live.data !== undefined && (
-          <p className="muted">There are no scenes yet. Write the script first.</p>
+          <EmptyState
+            icon={FilmReelIcon}
+            title="Nothing to cut yet"
+            body="There are no scenes yet. Write the script first, then make clips of its shots; they come together here."
+            go={{ stage: 'script', label: 'Go to Script' }}
+          />
         )
       ) : (
         <SceneEditor

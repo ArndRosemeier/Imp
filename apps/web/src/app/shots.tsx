@@ -27,6 +27,7 @@ import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } f
 import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
 import { useScriptLines } from './screenplay.js';
+import { EmptyState } from './help/EmptyState.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
@@ -828,17 +829,22 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         outline.data !== undefined && (
-          <p className="muted">
-            Shots belong to scenes, and there are no scenes yet. Write the script first.
-          </p>
+          <EmptyState
+            icon={FilmStripIcon}
+            title="Write a scene first"
+            body="Shots belong to scenes, and there are no scenes yet. Write the script first."
+            go={{ stage: 'script', label: 'Go to Script' }}
+          />
         )
       ) : (
         <>
           {listed.data !== undefined && shots.length === 0 && (
-            <p className="muted">
-              This scene has no shots yet. Add one, or ask the Clip Designer to break the scene into
-              shots.
-            </p>
+            <EmptyState
+              icon={FilmStripIcon}
+              title="No shots in this scene"
+              body="This scene has no shots yet. Add one, or have the scene broken into shots of a few seconds each."
+              ask="Break the scene I am looking at into shots of four to eight seconds each."
+            />
           )}
           <div className="grid shots">
             {shots.map((shot) => (

@@ -9,6 +9,7 @@ import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } f
 import { ModelBar } from './model-bar.js';
 import { SceneTabs } from './shots.js';
 import { Price } from './spend.js';
+import { EmptyState } from './help/EmptyState.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true })),
@@ -170,17 +171,22 @@ export function SoundView({ project }: { project: Project }): ReactElement {
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         outline.data !== undefined && (
-          <p className="muted">
-            Sounds belong to scenes, and there are no scenes yet. Write the script first.
-          </p>
+          <EmptyState
+            icon={WaveformIcon}
+            title="Write a scene first"
+            body="Sounds belong to scenes, and there are no scenes yet. Write the script first."
+            go={{ stage: 'script', label: 'Go to Script' }}
+          />
         )
       ) : (
         <>
           {listed.data !== undefined && sounds.length === 0 && (
-            <p className="muted">
-              This scene is silent so far. Add a sound, or ask the Sound Designer to work out what
-              the scene sounds like.
-            </p>
+            <EmptyState
+              icon={WaveformIcon}
+              title="Nothing to hear yet"
+              body="This scene is silent so far. Add an effect or music, or have the sound of the scene worked out for you."
+              ask="Work out what the scene I am looking at sounds like: ambience, effects and music. Tell me the price before making them."
+            />
           )}
           <div className="grid sounds">
             {sounds.map((sound) => (
