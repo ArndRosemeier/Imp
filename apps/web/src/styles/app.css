@@ -7612,3 +7612,403 @@ h3 .working-on {
 .spend-left {
   margin: 0;
 }
+
+/*
+ * Approvals: every request the crew is waiting on, decided together.
+ * Rows are whole tap targets; the check on the left says approve.
+ */
+dialog.approvals-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(820px, calc(var(--app-height, 100dvh) - 32px));
+  display: none;
+  overflow: hidden;
+}
+dialog.approvals-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.approvals-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: 24px 20px 18px 28px;
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accent-wash), transparent 60%), var(--surface-raised);
+}
+.approvals-head .horned-badge {
+  flex: none;
+  color: var(--accent);
+}
+.approvals-heading {
+  flex: 1;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.approvals-heading .eyebrow {
+  color: var(--accent);
+}
+.approvals-heading h2 {
+  font-size: 30px;
+  line-height: 1.1;
+}
+.approvals-heading .muted {
+  font-size: 13px;
+}
+.approvals-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: 8px 20px 8px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.approvals-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) 20px var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.approvals-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.approvals-asker {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: 4px;
+  font: 600 11px/1.4 var(--font-body);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.approvals-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.approvals-row {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    opacity 140ms ease;
+}
+.approvals-row[data-choice='approve'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.approvals-row[data-choice='decline'] .approvals-what {
+  opacity: 0.62;
+}
+.approvals-row[data-choice='decline'] .approvals-title {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
+}
+.approvals-row[data-outcome='approved'] {
+  border-color: color-mix(in srgb, var(--ok) 60%, var(--line-strong));
+}
+.approvals-row[data-outcome='failed'] {
+  border-color: var(--danger);
+}
+.approvals-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+}
+.approvals-pick {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--hit);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 4px 10px 14px;
+  cursor: pointer;
+}
+.approvals-all {
+  flex: none;
+  padding-left: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.approvals-check {
+  appearance: none;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--ground);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.approvals-check::after {
+  content: '';
+  width: 11px;
+  height: 6px;
+  border-left: 2.5px solid var(--accent-ink);
+  border-bottom: 2.5px solid var(--accent-ink);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform 140ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+.approvals-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.approvals-check:checked::after {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+.approvals-check:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.approvals-check:indeterminate::after {
+  width: 10px;
+  height: 0;
+  border-left: none;
+  transform: none;
+}
+.approvals-check:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.approvals-check:disabled {
+  cursor: default;
+}
+.approvals-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.approvals-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  color: var(--ink);
+}
+.approvals-effect {
+  font: 600 10px/1 var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 3px 7px;
+}
+.approvals-summary {
+  font-size: 13px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.approvals-side {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.approvals-expand svg {
+  transition: transform 160ms ease;
+}
+.approvals-expand[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.approvals-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.approvals-outcome[data-state='approved'] {
+  color: var(--ok);
+}
+.approvals-outcome[data-state='declined'] {
+  color: var(--ink-muted);
+}
+.approvals-outcome[data-state='failed'] {
+  color: var(--danger);
+}
+.approvals-details {
+  padding: 0 16px 14px 52px;
+}
+.approvals-details .request {
+  max-height: 220px;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line);
+}
+.approvals-note {
+  margin: 0;
+  padding: 0 16px 12px 52px;
+  font-size: 13px;
+}
+.approvals-always {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  margin: 0 10px 10px 48px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.approvals-always input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex: none;
+}
+.approvals-always[data-on='true'] {
+  background: var(--accent-wash);
+}
+.approvals-row[data-choice='decline'] .approvals-always {
+  opacity: 0.45;
+  cursor: default;
+}
+.approvals-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: 14px 20px 16px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.approvals-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.approvals-sum {
+  font: 22px/1.1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+.approvals-sum .muted {
+  font: 13px var(--font-body);
+}
+.approvals-actions {
+  gap: var(--space-2);
+  margin-left: auto;
+}
+@media (hover: hover) {
+  .approvals-row:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line-strong));
+  }
+  .approvals-always:hover:not([data-on='true']) {
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+}
+@media (pointer: coarse) {
+  .approvals-check {
+    width: 28px;
+    height: 28px;
+  }
+  .approvals-always {
+    min-height: var(--hit);
+  }
+  .approvals-always input {
+    width: 22px;
+    height: 22px;
+  }
+}
+@media (max-width: 720px) {
+  .approvals-head {
+    padding-left: 20px;
+  }
+  .approvals-head .horned-badge {
+    display: none;
+  }
+  .approvals-details,
+  .approvals-note {
+    padding-left: 16px;
+  }
+  .approvals-always {
+    margin-left: 10px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  dialog.approvals-dialog[open] {
+    animation: whats-new-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+/* In the crew panel: several requests open the dialog to decide them together. */
+.approvals-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: calc(100% - 2 * var(--space-4));
+  min-height: var(--hit);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-m);
+  background: var(--accent-wash);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.approvals-banner > svg {
+  color: var(--accent);
+  flex: none;
+}
+.approvals-banner .stack {
+  gap: 2px;
+}
+@media (hover: hover) {
+  .approvals-banner:hover {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+}
+
+/* Settings: what agents may do without asking. */
+.always-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.always-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+}
+.always-list .stack {
+  gap: 2px;
+}

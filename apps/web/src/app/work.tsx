@@ -1,4 +1,5 @@
 import { CrewMember, WorkBoardSchema, type WorkBoard, type WorkEntry } from '@imp/agents';
+import { openApprovals } from './Approvals.js';
 import {
   BrainIcon,
   CheckCircleIcon,
@@ -580,7 +581,9 @@ export function WorkBoardView({
                       type="button"
                       className="button primary small"
                       onClick={() => {
+                        // The chat shows the agent's reasons; the dialog decides everything at once.
                         onTalk(waiting.memberId);
+                        openApprovals();
                       }}
                     >
                       Decide
