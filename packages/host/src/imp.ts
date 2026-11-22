@@ -23,6 +23,7 @@ import {
 import {
   activityCommands,
   CommandRegistry,
+  createBackupCommands,
   createHelpCommands,
   createSupportCommands,
   createLibraryCommands,
@@ -218,6 +219,11 @@ export function createImp(options: ImpOptions): Imp {
     ...(options.ffmpeg === undefined ? [] : createFfmpegCommands(options.ffmpeg)),
     ...createAgentCommands({ registry, provider, roles }),
     ...createSpendCommands({ registry, provider }),
+    // Save all and Load all. The key is not in the store, so it is never in a backup.
+    ...createBackupCommands({
+      appVersion: (options.release ?? UNKNOWN_RELEASE).version,
+      afterLoad: releaseInterruptedRuns,
+    }),
   );
   let started: Promise<void> | undefined;
   return {

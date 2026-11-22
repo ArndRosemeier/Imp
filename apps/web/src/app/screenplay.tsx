@@ -19,7 +19,7 @@ import { useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useImp, useLive, type Live } from './context.js';
 import { moviePrefix, type Act } from './movie.js';
-import { saveFile } from './projects.js';
+import { fileSafe, saveFileAs } from './save-file.js';
 
 /**
  * The script as a screenplay: a page set the way scripts are set, and a
@@ -566,14 +566,24 @@ export function ScriptFiles({
   const download = (format: 'pdf' | 'fountain' | 'fdx'): void => {
     setBusy(format);
     setError(null);
+    const types = {
+      pdf: { mediaType: 'application/pdf', description: 'Screenplay PDF' },
+      fountain: { mediaType: 'text/plain', description: 'Fountain screenplay' },
+      fdx: { mediaType: 'application/xml', description: 'Final Draft screenplay' },
+    } as const;
     void (async () => {
       try {
-        const file = Exported.parse(
-          await runCommand(imp, 'movie.script.export', { projectId: project.id, format }),
+        await saveFileAs(
+          { suggestedName: `${fileSafe(project.name, 'script')}.${format}`, ...types[format] },
+          async () => {
+            const file = Exported.parse(
+              await runCommand(imp, 'movie.script.export', { projectId: project.id, format }),
+            );
+            const blob = await imp.blob(file.blobKey);
+            if (blob === undefined) throw new Error('The file went missing.');
+            return blob.bytes;
+          },
         );
-        const blob = await imp.blob(file.blobKey);
-        if (blob === undefined) throw new Error('The file went missing.');
-        saveFile(blob.bytes, file.mediaType, file.fileName);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason));
       } finally {

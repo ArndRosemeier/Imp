@@ -1,4 +1,4 @@
-import { EXPORT_PREFIX, inputSchemaOf, UPLOAD_PREFIX } from '@imp/core';
+import { EXPORT_PREFIX, inputSchemaOf, partKey, UPLOAD_PREFIX } from '@imp/core';
 import type { Imp } from './imp.js';
 import type { Port } from './port.js';
 import { toWireError, type Calls, type Reply, type Request } from './protocol.js';
@@ -76,6 +76,14 @@ export function serveImp(
       const key = `${UPLOAD_PREFIX}${uploadId}`;
       await (await core()).blobs.put(key, { bytes, mediaType: last.mediaType });
       return { key };
+    },
+    uploadPart: async (uploadId, index, part, last) => {
+      if (!UPLOAD_ID.test(uploadId)) throw new Error('Not an upload id.');
+      if (!Number.isInteger(index) || index < 0 || index > 999_999) throw new Error('Not a part.');
+      const base = `${UPLOAD_PREFIX}${uploadId}`;
+      const mediaType = last?.mediaType ?? 'application/octet-stream';
+      await (await core()).blobs.put(partKey(base, index), { bytes: part, mediaType });
+      return last === null ? null : { key: base };
     },
     models: async () => (await core()).provider.listModels(),
     verify: async () => {

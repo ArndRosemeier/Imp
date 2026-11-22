@@ -1,5 +1,6 @@
 import {
   CopyRequest,
+  fileNameFor,
   itemKey,
   Project,
   ProjectSummary,
@@ -34,6 +35,8 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { useHelpState } from './help/help.js';
 import { Problem, useBlobUrl } from './movie.js';
+import { saveFileAs } from './save-file.js';
+import { BackupButton } from './backup.js';
 
 const OverviewEntry = Project.extend({
   summary: ProjectSummary.nullable(),
@@ -113,18 +116,6 @@ export function ago(iso: string, now = Date.now()): string {
 function sizeOf(bytes: number): string {
   if (bytes < 1024 * 1024) return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-/** Saves bytes as a file on the person's computer. */
-export function saveFile(bytes: Uint8Array, mediaType: string, fileName: string): void {
-  const url = URL.createObjectURL(new Blob([bytes.slice()], { type: mediaType }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(url);
-  }, 10_000);
 }
 
 function Poster({ entry }: { entry: OverviewEntry }): ReactElement {
@@ -1092,14 +1083,26 @@ export function ProjectsView({
         setNotice(`Made “${Project.parse(made).name}”, a copy of “${entry.name}”.`);
       }, fail);
     } else if (action === 'export') {
-      setNotice(`Packing “${entry.name}”…`);
-      runCommand(imp, 'project.export', { projectId: entry.id })
-        .then(async (raw) => {
-          const exported = Exported.parse(raw);
+      let size = 0;
+      saveFileAs(
+        {
+          suggestedName: fileNameFor(entry.name),
+          mediaType: 'application/zip',
+          description: 'Imp project',
+        },
+        async () => {
+          setNotice(`Packing “${entry.name}”…`);
+          const exported = Exported.parse(
+            await runCommand(imp, 'project.export', { projectId: entry.id }),
+          );
           const file = await imp.blob(exported.fileKey, true);
           if (file === undefined) throw new Error('The exported file went missing.');
-          saveFile(file.bytes, file.mediaType, exported.fileName);
-          setNotice(`Saved ${exported.fileName} (${sizeOf(exported.sizeBytes)}).`);
+          size = exported.sizeBytes;
+          return file.bytes;
+        },
+      )
+        .then((outcome) => {
+          setNotice(outcome.saved ? `Saved ${outcome.name} (${sizeOf(size)}).` : null);
         })
         .catch(fail);
     } else if (action === 'template') {
@@ -1137,6 +1140,7 @@ export function ProjectsView({
           </span>
         </div>
         <div className="row wrap">
+          <BackupButton />
           <button
             className="button"
             onClick={() => picker.current?.click()}

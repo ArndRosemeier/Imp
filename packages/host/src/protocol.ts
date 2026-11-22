@@ -48,6 +48,17 @@ export interface Calls {
     args: [uploadId: string, part: Uint8Array, last: { mediaType: string } | null];
     result: { key: string } | null;
   };
+  /**
+   * Hands the core one part of a large file, stored as it arrives so the
+   * whole file never has to be in memory: part `index` of upload `uploadId`.
+   * Every part but the last has the same size. The last part names its media
+   * type and answers with the key the parts are stored under, for a command
+   * such as backup.load to read.
+   */
+  uploadPart: {
+    args: [uploadId: string, index: number, part: Uint8Array, last: { mediaType: string } | null];
+    result: { key: string } | null;
+  };
   models: { args: []; result: readonly ModelInfo[] };
   verify: { args: []; result: undefined };
 }

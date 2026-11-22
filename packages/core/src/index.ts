@@ -60,6 +60,31 @@ export {
 export { copyTree, createRewriter, removeTree } from './projects/tree.js';
 export { COPY_REQUEST_PREFIX, CopyRequest } from './commands/project-copy.js';
 export { EXPORT_PREFIX, fileNameFor, UPLOAD_PREFIX } from './commands/project-files.js';
+export {
+  BACKUP_EXPORT_BASE,
+  BACKUP_LAST_SAVED_KEY,
+  BACKUP_PART_BYTES,
+  BACKUP_PENDING_KEY,
+  BACKUP_PREFIX,
+  BACKUP_PROGRESS_KEY,
+  BACKUP_RESTORED_KEY,
+  BackupPending,
+  BackupProgress,
+  BackupRestored,
+  BackupSaved,
+  createBackupCommands,
+  partKey,
+  type BackupOptions,
+} from './commands/backup.js';
+export {
+  ArchiveStreamWriter,
+  bytesSource,
+  readArchiveDirectory,
+  readArchiveFile,
+  type ArchiveDirectoryEntry,
+  type ArchiveSink,
+  type ArchiveSource,
+} from './zip-stream.js';
 export { Template, templatePrefix } from './commands/project-templates.js';
 export {
   ArchiveError,

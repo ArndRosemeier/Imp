@@ -41,6 +41,7 @@ import { FirstFilm } from './help/FirstFilm.js';
 import { ASK_COORDINATOR } from './help/help.js';
 import { StageTip } from './help/StageTip.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
+import { BackupWatcher } from './backup.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 import { LibraryDragProvider } from './library/drag.js';
 import { LibraryPanel } from './library/LibraryPanel.js';
@@ -463,6 +464,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           <Resizer label="Resize the library" side="right" panel="library" width={libraryWidth} />
         )}
         <ActivityStrip />
+        <BackupWatcher />
         <Resizer label="Resize the navigation" side="left" width={navWidth} />
         {crewOpen && (
           <Resizer label="Resize the crew panel" side="right" panel="crew" width={crewWidth} />

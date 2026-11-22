@@ -32,6 +32,12 @@ export interface ImpClient {
   blob(key: string, take?: boolean): Promise<StoredFile | undefined>;
   /** Stores a file the person picked and returns its key, for project.import and the like. */
   upload(bytes: Uint8Array, mediaType: string): Promise<string>;
+  /**
+   * Stores a large file the person picked part by part, reading it a piece at
+   * a time, so it never has to be in memory whole. Returns its key, for
+   * backup.load. `progress` hears how many bytes have gone over.
+   */
+  uploadFile(file: Blob, progress?: (sentBytes: number) => void): Promise<string>;
   listModels(): Promise<readonly ModelInfo[]>;
   /** Resolves when the stored key is accepted. */
   verifyCredentials(): Promise<void>;
@@ -145,6 +151,25 @@ export function connectImp(
       const done = await ask('upload', uploadId, bytes.slice(lastStart), { mediaType });
       if (done === null) throw new Error('The file did not arrive.');
       return done.key;
+    },
+    uploadFile: async (file, progress) => {
+      const uploadId = newUploadId();
+      const mediaType = file.type === '' ? 'application/octet-stream' : file.type;
+      const parts = Math.max(1, Math.ceil(file.size / UPLOAD_PART));
+      for (let index = 0; index < parts; index += 1) {
+        const start = index * UPLOAD_PART;
+        const bytes = new Uint8Array(
+          await file.slice(start, Math.min(file.size, start + UPLOAD_PART)).arrayBuffer(),
+        );
+        const last = index === parts - 1;
+        const done = await ask('uploadPart', uploadId, index, bytes, last ? { mediaType } : null);
+        progress?.(start + bytes.length);
+        if (last) {
+          if (done === null) throw new Error('The file did not arrive.');
+          return done.key;
+        }
+      }
+      throw new Error('The file did not arrive.');
     },
     listModels: () => ask('models'),
     verifyCredentials: async () => {
