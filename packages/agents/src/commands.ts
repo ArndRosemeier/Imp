@@ -19,7 +19,7 @@ import {
   conversationPrefix,
   currentConversationProject,
 } from './conversations.js';
-import { readCrewMember } from './crew.js';
+import { CrewMember, readCrewMember } from './crew.js';
 import type { RoleCatalog } from './role.js';
 import { runAgent } from './run.js';
 
@@ -298,6 +298,28 @@ export async function releaseInterruptedRuns(store: KeyValueStore): Promise<void
   }
 }
 
+/** Where the commands the user always allows agents to run are kept. Not a setting: agents can change settings. */
+export const ALWAYS_ALLOW_KEY = 'approvals/always-allow';
+const AlwaysAllowSchema = z.object({ commandIds: z.array(z.string()) });
+
+async function readAlwaysAllowed(store: KeyValueStore): Promise<string[]> {
+  const parsed = AlwaysAllowSchema.safeParse(await store.get(ALWAYS_ALLOW_KEY));
+  return parsed.success ? parsed.data.commandIds : [];
+}
+
+/** One request waiting for the user, with who asked for it. */
+export const WaitingApprovalSchema = z.object({
+  memberId: z.string(),
+  memberName: z.string(),
+  approvalId: z.string(),
+  commandId: z.string(),
+  /** The command's title, or its id when it no longer exists. */
+  title: z.string(),
+  effect: z.enum(['read', 'write', 'spend', 'destructive']).nullable(),
+  input: z.json(),
+});
+export type WaitingApproval = z.infer<typeof WaitingApprovalSchema>;
+
 export interface AgentCommandOptions {
   /** The registry the agents act through. It is also where these commands get registered. */
   readonly registry: CommandRegistry;
@@ -411,6 +433,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           member,
           role,
           blobs: runtime.blobs,
+          alwaysAllowed: async (commandId) => (await readAlwaysAllowed(store)).includes(commandId),
           history: toChatMessages(before.messages),
           maxSteps: input.maxSteps,
           ...(input.task === undefined ? {} : { task: input.task }),
@@ -598,5 +621,111 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     },
   });
 
-  return [ask, approve, conversationGet, conversationClear];
+  const approvalsList = defineCommand({
+    id: 'crew.approvals.list',
+    title: 'List waiting approvals',
+    description:
+      'Returns everything any crew member asked for in the open project that waits for the user to approve or decline, with who asked. The user decides with crew.approve.',
+    effect: 'read',
+    input: z.object({}),
+    output: z.object({ approvals: z.array(WaitingApprovalSchema) }),
+    handler: async ({ runtime }) => {
+      const { store } = runtime;
+      const projectId = await currentConversationProject(store);
+      const crew = (await store.list('crew/')).flatMap((entry) => {
+        const parsed = CrewMember.safeParse(entry.value);
+        return parsed.success ? [parsed.data] : [];
+      });
+      const approvals: WaitingApproval[] = [];
+      for (const member of crew) {
+        const conversation = await readConversation(store, member.id, projectId);
+        for (const pending of conversation.pendingApprovals) {
+          const command = registry.has(pending.commandId)
+            ? registry.get(pending.commandId)
+            : undefined;
+          approvals.push({
+            memberId: member.id,
+            memberName: member.name,
+            approvalId: pending.id,
+            commandId: pending.commandId,
+            title: command?.title ?? pending.commandId,
+            effect: command?.effect ?? null,
+            input: pending.input,
+          });
+        }
+      }
+      return { approvals };
+    },
+  });
+
+  const AlwaysAllowed = z.object({
+    commands: z.array(
+      z.object({
+        commandId: z.string(),
+        title: z.string(),
+        effect: z.enum(['read', 'write', 'spend', 'destructive']).nullable(),
+      }),
+    ),
+  });
+  const describeAllowed = (commandIds: readonly string[]) => ({
+    commands: commandIds.map((commandId) => {
+      const command = registry.has(commandId) ? registry.get(commandId) : undefined;
+      return {
+        commandId,
+        title: command?.title ?? commandId,
+        effect: command?.effect ?? null,
+      };
+    }),
+  });
+
+  const alwaysList = defineCommand({
+    id: 'crew.approvals.always.list',
+    title: 'List always-allowed actions',
+    description:
+      'Returns the commands the user lets agents run without asking, although they spend or delete.',
+    effect: 'read',
+    input: z.object({}),
+    output: AlwaysAllowed,
+    handler: async ({ runtime }) => describeAllowed(await readAlwaysAllowed(runtime.store)),
+  });
+
+  const alwaysSet = defineCommand({
+    id: 'crew.approvals.always.set',
+    title: 'Always allow an action',
+    description:
+      'Lets agents run one command without asking first from now on, or makes them ask again. Only the user can change this.',
+    effect: 'write',
+    input: z.object({
+      commandId: z.string().min(1),
+      allow: z.boolean().default(true).describe('False makes agents ask again.'),
+    }),
+    output: AlwaysAllowed,
+    handler: async ({ actor, runtime }, { commandId, allow }) => {
+      if (actor.kind !== 'user') {
+        // Otherwise an agent could let itself spend without asking.
+        throw new CommandError(
+          'denied',
+          'crew.approvals.always.set',
+          'Only the user can decide what agents may do without asking.',
+        );
+      }
+      if (allow && !registry.has(commandId)) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.approvals.always.set',
+          `No command "${commandId}".`,
+        );
+      }
+      const current = await readAlwaysAllowed(runtime.store);
+      const next = allow
+        ? [...new Set([...current, commandId])]
+        : current.filter((id) => id !== commandId);
+      await runtime.store.batch([
+        { type: 'put', key: ALWAYS_ALLOW_KEY, value: { commandIds: next } },
+      ]);
+      return describeAllowed(next);
+    },
+  });
+
+  return [ask, approve, conversationGet, conversationClear, approvalsList, alwaysList, alwaysSet];
 }

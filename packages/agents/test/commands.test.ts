@@ -458,3 +458,86 @@ describe('coordinatorRole', () => {
     });
   });
 });
+
+describe('waiting approvals', () => {
+  const askToGenerate = (prompt: string): ScriptedChatReply[] => [
+    { toolCalls: [toolCall(`c-${prompt}`, 'media__generate', { prompt })] },
+    { content: 'Waiting for your approval.' },
+  ];
+
+  it('lists every request waiting across the crew, with who asked', async () => {
+    const { run, hire, conversation } = setup([...askToGenerate('Mara'), ...askToGenerate('Ivo')]);
+    const first = await hire('artist');
+    const second = (await run('crew.hire', {
+      roleId: 'artist',
+      model: 'vendor/model',
+      name: 'Second artist',
+    })) as { id: string };
+    expect(await run('crew.approvals.list', {})).toEqual({ approvals: [] });
+    await run('crew.ask', { memberId: first.id, task: 'Draw Mara.' });
+    await run('crew.ask', { memberId: second.id, task: 'Draw Ivo.' });
+    const [pending] = (await conversation(first.id)).pendingApprovals;
+    const { approvals } = z
+      .object({ approvals: z.array(z.record(z.string(), z.unknown())) })
+      .parse(await run('crew.approvals.list', {}));
+    expect(approvals).toHaveLength(2);
+    expect(approvals).toContainEqual({
+      memberId: first.id,
+      memberName: 'Artist',
+      approvalId: pending?.id,
+      commandId: 'media.generate',
+      title: 'Generate media',
+      effect: 'spend',
+      input: { prompt: 'Mara' },
+    });
+    expect(approvals).toContainEqual(
+      expect.objectContaining({ memberName: 'Second artist', input: { prompt: 'Ivo' } }),
+    );
+  });
+
+  it('runs an always-allowed command without asking, until the user takes it back', async () => {
+    const { run, hire, runtime } = setup([...askToGenerate('Mara'), ...askToGenerate('Ivo')]);
+    const member = await hire('artist');
+    expect(
+      await run('crew.approvals.always.set', { commandId: 'media.generate', allow: true }),
+    ).toEqual({
+      commands: [{ commandId: 'media.generate', title: 'Generate media', effect: 'spend' }],
+    });
+    const allowed = AgentRunSchema.parse(
+      await run('crew.ask', { memberId: member.id, task: 'Draw Mara.' }),
+    );
+    expect(allowed.status).toBe('completed');
+    expect(allowed.pendingApprovals).toEqual([]);
+    const outcomes = (await readActivity(runtime.store))
+      .filter((entry) => entry.commandId === 'media.generate')
+      .map((entry) => entry.outcome);
+    expect(outcomes).toEqual(['needs-approval', 'ok']);
+
+    expect(
+      await run('crew.approvals.always.set', { commandId: 'media.generate', allow: false }),
+    ).toEqual({ commands: [] });
+    const asked = AgentRunSchema.parse(
+      await run('crew.ask', { memberId: member.id, task: 'Draw Ivo.' }),
+    );
+    expect(asked.status).toBe('awaiting-approval');
+    expect(await run('crew.approvals.always.list', {})).toEqual({ commands: [] });
+  });
+
+  it('lets only the user always allow something, and only a command that exists', async () => {
+    const { registry, run } = setup([]);
+    await expect(
+      registry.executeById(
+        'crew.approvals.always.set',
+        { commandId: 'media.generate' },
+        { actor: { kind: 'agent', id: 'coordinator-1', role: 'coordinator' } },
+      ),
+    ).rejects.toMatchObject({ code: 'denied' });
+    await expect(run('crew.approvals.always.set', { commandId: 'made.up' })).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    // Taking back something unknown is harmless.
+    expect(await run('crew.approvals.always.set', { commandId: 'made.up', allow: false })).toEqual({
+      commands: [],
+    });
+  });
+});

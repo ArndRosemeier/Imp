@@ -12,6 +12,7 @@ import {
   PaperclipIcon,
   PaperPlaneRightIcon,
   PlayIcon,
+  StampIcon,
   WrenchIcon,
   XIcon,
 } from '@phosphor-icons/react';
@@ -28,10 +29,15 @@ import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { ASK_COORDINATOR } from './help/help.js';
+import {
+  ApprovalRequest,
+  CONTINUE_AGENT,
+  openApprovals,
+  useWaitingApprovals,
+} from './Approvals.js';
 import { ImpSpinner } from './ImpMark.js';
 import { RichText } from './RichText.js';
 import { servedByLocalServer } from '../host/served.js';
-import { Price } from './spend.js';
 
 const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
   'step-limit': 'Stopped at the step limit.',
@@ -61,53 +67,6 @@ function actionOf(call: { name: string; arguments?: unknown }): string {
     return typeof id === 'string' ? id : 'run_command';
   }
   return call.name === 'find_commands' ? 'looked up commands' : fromToolName(call.name);
-}
-
-/** What an agent asks to run, in words where possible and never hiding a value. */
-function ApprovalRequest({
-  commandId,
-  input,
-}: {
-  commandId: string;
-  input: unknown;
-}): ReactElement {
-  const imp = useImp();
-  const crew = useLive(['crew/'], async (current) =>
-    z
-      .object({ crew: z.array(z.object({ id: z.string(), name: z.string() })) })
-      .parse(await runCommand(current, 'crew.list', {})),
-  );
-  const title = imp.commands.find((command) => command.id === commandId)?.title ?? commandId;
-  const fields =
-    typeof input === 'object' && input !== null && !Array.isArray(input)
-      ? Object.entries(input)
-      : [['input', input] as const];
-  const show = (key: string, value: unknown): string => {
-    if (key === 'memberId') {
-      return crew.data?.crew.find((member) => member.id === value)?.name ?? String(value);
-    }
-    return typeof value === 'string' ? value : JSON.stringify(value);
-  };
-  return (
-    <>
-      <div className="row spread wrap">
-        <span>
-          <strong>{title}</strong> <span className="mono muted">{commandId}</span>
-        </span>
-        {typeof input === 'object' && input !== null && !Array.isArray(input) && (
-          <Price command={commandId} input={input as Record<string, unknown>} />
-        )}
-      </div>
-      <dl className="request">
-        {fields.map(([key, value]) => (
-          <div key={key}>
-            <dt>{key === 'memberId' ? 'crew member' : key}</dt>
-            <dd>{show(key, value)}</dd>
-          </div>
-        ))}
-      </dl>
-    </>
-  );
 }
 
 /**
@@ -163,6 +122,8 @@ export function CrewPanel({
   const conversation = live.data;
   const messages = conversation?.messages ?? [];
   const approvals = conversation?.pendingApprovals ?? [];
+  const everyone = useWaitingApprovals().data ?? [];
+  const elsewhere = everyone.filter((item) => item.memberId !== member.id).length;
   const working = busy || conversation?.running === true;
   const note =
     problem ??
@@ -230,6 +191,23 @@ export function CrewPanel({
         setBusy(false);
       });
   };
+
+  // The approvals dialog decided everything this agent asked for: it goes on.
+  const continueRef = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    continueRef.current = () => {
+      if (!working) ask();
+    };
+  });
+  useEffect(() => {
+    const onContinue = (event: Event): void => {
+      if ((event as CustomEvent<unknown>).detail === member.id) continueRef.current();
+    };
+    window.addEventListener(CONTINUE_AGENT, onContinue);
+    return () => {
+      window.removeEventListener(CONTINUE_AGENT, onContinue);
+    };
+  }, [member.id]);
 
   const send = (event: SyntheticEvent): void => {
     event.preventDefault();
@@ -402,11 +380,38 @@ export function CrewPanel({
             )}
           </p>
         )}
+        {!working && everyone.length > 1 && (approvals.length > 0 || elsewhere > 0) && (
+          <button
+            type="button"
+            className="approvals-banner"
+            aria-haspopup="dialog"
+            onClick={openApprovals}
+          >
+            <StampIcon aria-hidden="true" size={20} />
+            <span className="stack">
+              <strong>Review all {everyone.length} requests at once</strong>
+              <span className="muted small">
+                {elsewhere > 0 && approvals.length === 0
+                  ? `Other crew members are waiting on you.`
+                  : elsewhere > 0
+                    ? `${String(elsewhere)} of them from other crew members.`
+                    : 'Approve or decline them together.'}
+              </span>
+            </span>
+          </button>
+        )}
         {!working &&
           approvals.map((approval) => (
             <section key={approval.id} className="approval" aria-label="Needs your approval">
               <span className="eyebrow">Needs your approval</span>
-              <ApprovalRequest commandId={approval.commandId} input={approval.input} />
+              <ApprovalRequest
+                commandId={approval.commandId}
+                title={
+                  imp.commands.find((command) => command.id === approval.commandId)?.title ??
+                  approval.commandId
+                }
+                input={approval.input}
+              />
               <div className="row">
                 <button
                   className="button primary"

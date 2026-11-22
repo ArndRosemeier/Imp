@@ -1,4 +1,5 @@
 import { CrewMember } from '@imp/agents';
+import { AlwaysAllowed } from './Approvals.js';
 import { ActivityEntry } from '@imp/core';
 import {
   CaretUpIcon,
@@ -434,6 +435,10 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
         {settings.data !== undefined && shown.length === 0 && (
           <p className="muted">Nothing is set yet.</p>
         )}
+      </section>
+      <section className="card stack" aria-labelledby="always-heading">
+        <h3 id="always-heading">What agents do without asking</h3>
+        <AlwaysAllowed />
       </section>
       <section className="card stack" aria-labelledby="help-heading">
         <h3 id="help-heading">Help</h3>
