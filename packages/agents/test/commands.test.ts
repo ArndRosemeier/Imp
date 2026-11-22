@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   AgentRunSchema,
+  alwaysAllowed,
   ConversationSchema,
   coordinatorRole,
   createAgentCommands,
@@ -43,7 +44,7 @@ function setup(replies: ScriptedChatReply[], roles = [coordinatorRole, artist]) 
   const runtime = createTestRuntime();
   const provider = createFakeProvider({ replies });
   const catalog = new RoleCatalog(roles);
-  const registry = new CommandRegistry({ runtime });
+  const registry = new CommandRegistry({ runtime, autoApprove: alwaysAllowed });
   registry.register(
     ...settingsCommands,
     generate,
@@ -511,7 +512,7 @@ describe('waiting approvals', () => {
     const outcomes = (await readActivity(runtime.store))
       .filter((entry) => entry.commandId === 'media.generate')
       .map((entry) => entry.outcome);
-    expect(outcomes).toEqual(['needs-approval', 'ok']);
+    expect(outcomes).toEqual(['ok']);
 
     expect(
       await run('crew.approvals.always.set', { commandId: 'media.generate', allow: false }),

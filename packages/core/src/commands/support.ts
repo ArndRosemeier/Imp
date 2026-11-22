@@ -33,6 +33,17 @@ export const ProblemReport = z.object({
 });
 export type ProblemReport = z.infer<typeof ProblemReport>;
 
+/** The report an agent prepared last, for the button in its chat. */
+export const READY_REPORT_KEY = 'support/report';
+
+export const ReadyReport = z.object({
+  memberId: z.string(),
+  title: z.string(),
+  url: z.string(),
+  at: z.string(),
+});
+export type ReadyReport = z.infer<typeof ReadyReport>;
+
 export interface SupportOptions {
   readonly release: ReleaseNotes;
   /** Where this copy of Imp runs, for example "browser" or "local server, Node 24 on linux". */
@@ -51,7 +62,7 @@ export function createSupportCommands(options: SupportOptions): readonly Command
     id: 'support.report.prepare',
     title: 'Prepare a problem report',
     description:
-      "Writes a problem report for Imp's developers and returns a link that opens it as a new GitHub issue, filled in, for the person to check and submit. It adds the version, where Imp runs and, unless told not to, the latest commands with their errors. No keys, prompts or story text go in. Give the person the link; nothing is sent until they submit it on GitHub.",
+      "Writes a problem report for Imp's developers and returns a link that opens it as a new GitHub issue, filled in, for the person to check and submit. It adds the version, where Imp runs and, unless told not to, the latest commands with their errors. No keys, prompts or story text go in. When an agent prepares it, the person gets a button for it in that agent's chat, because the link is long and carries the whole report: tell them to use the button there instead of pasting the link. Nothing is sent until they submit it on GitHub.",
     effect: 'read',
     input: z.object({
       title: z.string().min(1).max(200).describe('The problem in a few words.'),
@@ -72,7 +83,7 @@ export function createSupportCommands(options: SupportOptions): readonly Command
         .describe('The screen and input the person uses, as the interface knows it.'),
     }),
     output: ProblemReport,
-    handler: async ({ runtime }, input) => {
+    handler: async ({ actor, runtime }, input) => {
       const { release } = options;
       const lines = [
         `- Version: ${release.version}${release.preview ? ' (preview build)' : ''}`,
@@ -112,8 +123,45 @@ export function createSupportCommands(options: SupportOptions): readonly Command
       if (body.length > MAX_BODY) body = `${body.slice(0, MAX_BODY)}\n\n(cut short)`;
       const title = redactSecrets(input.title.trim());
       const url = `${ISSUES_URL}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+      if (actor.kind === 'agent') {
+        // Agents retell links shortened, and a cut link loses the report it carries.
+        const ready: ReadyReport = {
+          memberId: actor.id,
+          title,
+          url,
+          at: runtime.now().toISOString(),
+        };
+        await runtime.store.batch([{ type: 'put', key: READY_REPORT_KEY, value: ready }]);
+      }
       return { title, body, url, diagnostics };
     },
   });
-  return [prepare];
+
+  const latest = defineCommand({
+    id: 'support.report.ready',
+    title: 'Show the report an agent prepared',
+    description:
+      'Returns the problem report an agent prepared last and the person has not opened or dismissed yet, with its full link, or null.',
+    effect: 'read',
+    input: z.object({}),
+    output: z.object({ report: ReadyReport.nullable() }),
+    handler: async ({ runtime }) => {
+      const parsed = ReadyReport.safeParse(await runtime.store.get(READY_REPORT_KEY));
+      return { report: parsed.success ? parsed.data : null };
+    },
+  });
+
+  const dismiss = defineCommand({
+    id: 'support.report.dismiss',
+    title: 'Dismiss the prepared report',
+    description: 'Removes the button for the problem report an agent prepared.',
+    effect: 'write',
+    input: z.object({}),
+    output: z.object({}),
+    handler: async ({ runtime }) => {
+      await runtime.store.batch([{ type: 'delete', key: READY_REPORT_KEY }]);
+      return {};
+    },
+  });
+  return [prepare, latest, dismiss];
 }

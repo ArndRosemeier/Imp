@@ -1,6 +1,7 @@
 export {
   AgentRunSchema,
   ALWAYS_ALLOW_KEY,
+  alwaysAllowed,
   ChatMessageSchema,
   ConversationSchema,
   createAgentCommands,
@@ -43,6 +44,12 @@ export {
 export { defineMode, type Mode, type Stage } from './mode.js';
 export { createModelCommands } from './models.js';
 export {
+  ALLOWANCE_PROJECT_SETTING,
+  ALLOWANCE_STEP_SETTING,
+  Allowance,
+  createSpendAllowance,
+  DEFAULT_ALLOWANCE,
+  readAllowance,
   createSpendCommands,
   createSpendLedger,
   Estimate,

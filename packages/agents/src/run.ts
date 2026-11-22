@@ -86,11 +86,8 @@ export interface AgentRunOptions {
   readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
   /** Where the media that commands show the agent is read from. Without it, nothing is shown. */
   readonly blobs?: BlobStore;
-  /**
-   * Whether the user said to always allow a command that would otherwise
-   * wait for their approval. Such a command runs as if it had been approved.
-   */
-  readonly alwaysAllowed?: (commandId: string) => Promise<boolean>;
+  /** Called after each command the agent ran successfully, with its id. */
+  readonly onCommand?: (commandId: string) => void;
 }
 
 const DEFAULT_MAX_STEPS = 20;
@@ -255,10 +252,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       return JSON.stringify({ error: `"${commandId}" is not a command you can run.` });
     }
     try {
-      let result = await registry.executeById(commandId, input, { actor });
-      if (result.status === 'needs-approval' && (await options.alwaysAllowed?.(commandId))) {
-        result = await registry.executeById(commandId, input, { actor, approved: true });
-      }
+      const result = await registry.executeById(commandId, input, { actor });
       if (result.status === 'needs-approval') {
         pendingApprovals.push({ commandId, input: result.input });
         return JSON.stringify({
@@ -266,6 +260,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
           note: 'The user must approve this before it runs. It has been put in front of them.',
         });
       }
+      options.onCommand?.(commandId);
       const content = JSON.stringify({ status: 'ok', output: result.output });
       const attachments = attachmentsOf(result.output);
       if (attachments.length === 0) return content;

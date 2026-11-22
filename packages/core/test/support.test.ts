@@ -32,7 +32,7 @@ function setup() {
     }),
   );
   const run = (id: string, input: unknown) => registry.executeById(id, input, { actor: user });
-  return { run };
+  return { run, registry };
 }
 
 describe('problem reports', () => {
@@ -71,5 +71,28 @@ describe('problem reports', () => {
       'Bearer [removed] and ?key=[removed]&x=1',
     );
     expect(redactSecrets('nothing secret here')).toBe('nothing secret here');
+  });
+});
+
+describe('a report an agent prepared', () => {
+  it('waits whole, with its full link, for the button in the chat until it is dismissed', async () => {
+    const { run, registry } = setup();
+    const agent = { kind: 'agent', id: 'guide-1', role: 'guide' } as const;
+    const made = await registry.executeById(
+      'support.report.prepare',
+      { title: 'Shots not saved', whatHappened: 'The shot list changed between checks.' },
+      { actor: agent },
+    );
+    const url = (made as { output: { url: string } }).output.url;
+    expect(url).toContain('&body=');
+    expect(await run('support.report.ready', {})).toMatchObject({
+      status: 'ok',
+      output: { report: { memberId: 'guide-1', title: 'Shots not saved', url } },
+    });
+    await run('support.report.dismiss', {});
+    expect(await run('support.report.ready', {})).toMatchObject({ output: { report: null } });
+    // One the person makes in the Help view needs no button.
+    await run('support.report.prepare', { title: 'Mine', whatHappened: 'Something.' });
+    expect(await run('support.report.ready', {})).toMatchObject({ output: { report: null } });
   });
 });
