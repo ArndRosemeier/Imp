@@ -135,6 +135,7 @@ function systemPrompt(member: CrewMember, role: Role, hiddenGroups: string | nul
         ]
       : []),
     'If a tool reports that it needs approval, do not call it again; finish and say what is waiting.',
+    'If a tool result says it is retryable, call it once more. If it fails again, stop and say what failed.',
     'When the task is done, reply with a short summary of what you did.',
   ].join('\n\n');
 }
@@ -285,7 +286,13 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       return refused === null ? { content, attachments } : JSON.stringify({ error: refused });
     } catch (error) {
       if (error instanceof CommandError) {
-        return JSON.stringify({ error: error.message, details: error.details });
+        return JSON.stringify({
+          error: error.message,
+          details: error.details,
+          ...(error.retryable
+            ? { retryable: true, note: 'This failed outside Imp. Trying again may work.' }
+            : {}),
+        });
       }
       throw error;
     }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { encodeBase64 } from '../src/base64.js';
-import { createOpenRouterProvider, ProviderError, type ProviderErrorKind } from '../src/index.js';
+import {
+  createOpenRouterProvider,
+  ProviderError,
+  refusalMessage,
+  type ProviderErrorKind,
+} from '../src/index.js';
 import { createScriptedFetch } from '../src/testing.js';
 
 type Reply = Parameters<typeof createScriptedFetch>[0][number];
@@ -12,6 +17,8 @@ function setup(...replies: Reply[]) {
     apiKey: () => 'test-key',
     appName: 'Imp',
     baseUrl: 'https://example.test/api/v1/',
+    // Automatic retries have tests of their own below.
+    retryDelaysMs: [],
   });
   return { provider, calls: scripted.calls };
 }
@@ -443,7 +450,7 @@ describe('OpenRouter provider: chat', () => {
 
   it('reports the status when an error body is not JSON', async () => {
     const { provider } = setup({ status: 502, body: '<html>Bad gateway</html>' });
-    await expect(provider.chat({ model: 'm', messages: [] })).rejects.toThrow(/HTTP 502/);
+    await expect(provider.chat({ model: 'm', messages: [] })).rejects.toThrow(/error 502/);
   });
 
   it('treats an error body under HTTP 200 as the provider being unavailable', async () => {
@@ -451,6 +458,37 @@ describe('OpenRouter provider: chat', () => {
     const attempt = provider.chat({ model: 'm', messages: [] });
     await expect(attempt).rejects.toMatchObject({ kind: 'unavailable', status: null });
     await expect(attempt).rejects.toThrow(/upstream failed/);
+  });
+
+  it('says in plain words what to do about each refusal', () => {
+    expect(refusalMessage('auth', 401, null)).toBe(
+      'OpenRouter did not accept the API key. Check it in Settings.',
+    );
+    expect(refusalMessage('rate_limit', 429, 'Slow down')).toMatch(
+      /^OpenRouter is limiting requests right now\. Wait a moment, then try again\. OpenRouter said: "Slow down"$/,
+    );
+    expect(refusalMessage('unavailable', 503, null)).toMatch(/error 503.*Try again/);
+    expect(refusalMessage('bad_request', 400, null)).toBe(
+      'OpenRouter refused the request: error 400',
+    );
+    const long = refusalMessage('bad_request', 400, `{"raw": "${'x'.repeat(1000)}"}`);
+    expect(long.length).toBeLessThan(300);
+    expect(long.endsWith('…')).toBe(true);
+  });
+
+  it('gives up on a chat answer that never comes, as a retryable error', async () => {
+    const provider = createOpenRouterProvider({
+      fetch: () => new Promise(() => undefined),
+      apiKey: () => 'k',
+      chatTimeoutMs: 5,
+      retryDelaysMs: [],
+    });
+    await expect(provider.chat({ model: 'm', messages: [] })).rejects.toMatchObject({
+      kind: 'network',
+      retryable: true,
+      message:
+        'The model did not answer within 1 second. The connection may have dropped. Try again.',
+    });
   });
 
   it('rejects a completion without choices', async () => {
@@ -481,11 +519,109 @@ describe('OpenRouter provider: chat', () => {
     const provider = createOpenRouterProvider({
       fetch: scripted.fetch,
       apiKey: () => Promise.resolve('async-key'),
+      retryDelaysMs: [],
     });
     await provider.chat({ model: 'm', messages: [] });
     expect(scripted.calls[0]?.url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(scripted.calls[0]?.request.headers).toMatchObject({ Authorization: 'Bearer async-key' });
     expect(scripted.calls[0]?.request.headers).not.toHaveProperty('X-Title');
+  });
+});
+
+describe('OpenRouter provider: automatic retries', () => {
+  function retrying(...replies: Reply[]) {
+    const scripted = createScriptedFetch(replies);
+    const waits: number[] = [];
+    const provider = createOpenRouterProvider({
+      fetch: scripted.fetch,
+      apiKey: () => 'k',
+      retryDelaysMs: [100, 300],
+      sleep: (ms) => {
+        waits.push(ms);
+        return Promise.resolve();
+      },
+    });
+    return { provider, calls: scripted.calls, waits };
+  }
+  const offline = Object.assign(new TypeError('Failed to fetch'), {
+    cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+  });
+
+  it('sends a request again after a dropped connection, a busy server or a failing model', async () => {
+    const { provider, calls, waits } = retrying(
+      offline,
+      { status: 502, body: '<html>Bad gateway</html>' },
+      completion({ content: 'Third time lucky.' }),
+    );
+    expect((await provider.chat({ model: 'm', messages: [] })).content).toBe('Third time lucky.');
+    expect(calls).toHaveLength(3);
+    expect(waits).toHaveLength(2);
+    expect(waits[0]).toBeGreaterThanOrEqual(100);
+    expect(waits[0]).toBeLessThanOrEqual(120);
+    expect(waits[1]).toBeGreaterThanOrEqual(300);
+  });
+
+  it('gives up after the last wait and keeps what the browser said', async () => {
+    const { provider, calls } = retrying(offline, offline, offline);
+    await expect(provider.chat({ model: 'm', messages: [] })).rejects.toMatchObject({
+      kind: 'network',
+      message: expect.stringContaining('(Failed to fetch: ECONNRESET)') as string,
+    });
+    expect(calls).toHaveLength(3);
+  });
+
+  it('retries a chat model that failed under HTTP 200', async () => {
+    const { provider, calls } = retrying(
+      { status: 200, body: { error: { message: 'Provider returned error' } } },
+      completion({ content: 'ok' }),
+    );
+    expect((await provider.chat({ model: 'm', messages: [] })).content).toBe('ok');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('waits as long as OpenRouter asks, but not for minutes', async () => {
+    const { provider, waits } = retrying(
+      { status: 429, body: { error: { message: 'Slow down' } }, headers: { 'retry-after': '2' } },
+      completion({ content: 'ok' }),
+    );
+    await provider.chat({ model: 'm', messages: [] });
+    expect(waits).toEqual([2000]);
+
+    const patient = retrying({
+      status: 429,
+      body: { error: { message: 'Slow down' } },
+      headers: { 'retry-after': '600' },
+    });
+    expect(await kindOf(patient.provider.chat({ model: 'm', messages: [] }))).toBe('rate_limit');
+    expect(patient.waits).toEqual([]);
+  });
+
+  it('never retries what cannot go through by waiting', async () => {
+    const { provider, calls } = retrying({ status: 401, body: { error: { message: 'bad key' } } });
+    expect(await kindOf(provider.chat({ model: 'm', messages: [] }))).toBe('auth');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('starts a paid video again only when OpenRouter said it did not take it', async () => {
+    const request = { model: 'm', prompt: 'x', audio: false, durationSeconds: 5 };
+    const lost = retrying(offline);
+    expect(await kindOf(lost.provider.startVideo(request))).toBe('network');
+    expect(lost.calls).toHaveLength(1);
+
+    const busy = retrying(
+      { status: 503, body: { error: { message: 'busy' } } },
+      { status: 200, body: { id: 'job-1', status: 'pending' } },
+    );
+    expect(await busy.provider.startVideo(request)).toMatchObject({ id: 'job-1' });
+    expect(busy.calls).toHaveLength(2);
+  });
+
+  it('stops retrying once the caller cancels', async () => {
+    const { provider, calls } = retrying(offline, completion({ content: 'ok' }));
+    await expect(
+      provider.chat({ model: 'm', messages: [] }, { signal: { aborted: true } }),
+    ).rejects.toMatchObject({ kind: 'network' });
+    expect(calls).toHaveLength(1);
   });
 });
 
@@ -591,7 +727,7 @@ describe('OpenRouter provider: images', () => {
     const { provider } = setup({ status: 402, body: { error: { message: 'No credit' } } });
     await expect(provider.generateSpeech({ model: 'm', text: 'x' })).rejects.toMatchObject({
       kind: 'insufficient_credit',
-      message: 'OpenRouter refused the request: No credit',
+      message: expect.stringMatching(/run out of credit.*OpenRouter said: "No credit"/) as string,
     });
   });
 
@@ -745,7 +881,7 @@ describe('OpenRouter provider: images', () => {
     });
     await expect(provider.generateSound(music)).rejects.toMatchObject({
       kind: 'unavailable',
-      message: 'OpenRouter reported an error: Upstream failed',
+      message: expect.stringMatching(/Try again.*OpenRouter said: "Upstream failed"/) as string,
     });
     const refused = setup({ status: 400, body: { error: { message: 'No such model' } } });
     expect(await kindOf(refused.provider.generateSound(music))).toBe('bad_request');

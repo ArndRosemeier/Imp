@@ -86,6 +86,7 @@ const browserFetch: HttpFetch = async (url, request) => {
     ok: response.ok,
     status: response.status,
     contentType: response.headers.get('content-type'),
+    header: (name) => response.headers.get(name),
     text: () => response.text(),
     bytes: async () => new Uint8Array(await response.arrayBuffer()),
   };

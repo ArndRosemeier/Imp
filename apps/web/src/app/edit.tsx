@@ -1893,7 +1893,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
     look: LookView.parse(await runCommand(imp, 'movie.edit.look.get', { projectId: project.id })),
   }));
   const look = live.data?.look;
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [autoplay, setAutoplay] = useState(false);
   const [playOn, setPlayOn] = useState(() => {
@@ -1973,7 +1973,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
           </button>
         </span>
       </header>
-      <Problem text={live.error ?? error} />
+      <Problem text={live.error ?? error} retry={retry} />
       {film !== undefined && film.scenes.length > 0 && (
         <FilmStrip
           compact

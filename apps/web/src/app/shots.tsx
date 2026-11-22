@@ -792,7 +792,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
     cast: Cast.parse(await runCommand(imp, 'movie.character.list', { projectId: project.id }))
       .characters,
   }));
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const world = useWorld(project);
   const video = useModelSetting(VIDEO_MODEL_SETTING, 'video');
   const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
@@ -868,6 +868,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
       />
       <Problem
         text={outline.error ?? listed.error ?? error ?? video.error ?? speech.error ?? images.error}
+        retry={retry}
       />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (

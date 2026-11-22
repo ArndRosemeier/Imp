@@ -37,6 +37,7 @@ import {
   useWaitingApprovals,
 } from './Approvals.js';
 import { ImpSpinner } from './ImpMark.js';
+import { RetryNote } from './retry.js';
 import { RichText } from './RichText.js';
 import { servedByLocalServer } from '../host/served.js';
 
@@ -126,6 +127,10 @@ export function CrewPanel({
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // What was being sent when sending itself failed, so that Retry can send it again.
+  const [unsent, setUnsent] = useState<{ task?: string; about?: string; edit?: boolean } | null>(
+    null,
+  );
   const end = useRef<HTMLDivElement>(null);
   const inputId = useId();
   const attachment = useAttachment();
@@ -136,18 +141,26 @@ export function CrewPanel({
   const everyone = useWaitingApprovals().data ?? [];
   const elsewhere = everyone.filter((item) => item.memberId !== member.id).length;
   const working = busy || conversation?.running === true;
+  const lastMessage = messages.at(-1);
+  const lastRole = lastMessage?.role;
+  // A failed run kept the message that got no answer: Retry runs again from it, so nothing is
+  // said twice. It is offered for every failure, since after fixing the key or adding credit,
+  // the same message should go through.
+  const failedRun =
+    conversation?.lastStatus === 'failed' && (lastRole === 'user' || lastRole === 'tool');
   const note =
     problem ??
     live.error ??
     (conversation?.lastStatus === 'failed'
-      ? conversation.lastError
+      ? (conversation.lastError ?? 'The last message did not go through.')
       : conversation?.lastStatus
         ? (STATUS_NOTE[conversation.lastStatus] ?? null)
         : null);
+  const canRetry =
+    !working && approvals.length === 0 && (problem !== null ? unsent !== null : failedRun);
 
   // In the browser the agents run in this tab, so leaving it stops them.
   const inTab = !servedByLocalServer();
-  const lastRole = messages.at(-1)?.role;
   const canContinue =
     !working &&
     approvals.length === 0 &&
@@ -186,17 +199,24 @@ export function CrewPanel({
     };
   }, [working, inTab]);
 
-  const ask = (task?: string, about?: string): void => {
+  const ask = (task?: string, about?: string): Promise<void> => {
     setBusy(true);
     setProblem(null);
-    runCommand(imp, 'crew.ask', {
+    setUnsent(null);
+    return runCommand(imp, 'crew.ask', {
       memberId: member.id,
       context: about === undefined ? context : `${context}\n${about}`,
       ...(task ? { task } : {}),
     })
-      .then((output) => AgentRunSchema.parse(output))
+      .then((output) => {
+        AgentRunSchema.parse(output);
+      })
       .catch((reason: unknown) => {
         setProblem(messageOf(reason));
+        setUnsent({
+          ...(task === undefined ? {} : { task }),
+          ...(about === undefined ? {} : { about }),
+        });
       })
       .finally(() => {
         setBusy(false);
@@ -207,7 +227,7 @@ export function CrewPanel({
   const continueRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     continueRef.current = () => {
-      if (!working) ask();
+      if (!working) void ask();
     };
   });
   useEffect(() => {
@@ -220,32 +240,48 @@ export function CrewPanel({
     };
   }, [member.id]);
 
-  const send = (event: SyntheticEvent): void => {
-    event.preventDefault();
-    const task = draft.trim();
-    if (task === '' || working || approvals.length > 0) return;
-    setDraft('');
-    if (attachment === null) {
-      ask(task);
-      return;
-    }
+  const submit = (task: string): Promise<void> => {
+    if (attachment === null) return ask(task);
     // A marked stretch of a scene makes the message a request about it, kept with the proposal.
     setBusy(true);
-    runCommand(imp, 'movie.edit.request', {
+    setProblem(null);
+    setUnsent(null);
+    return runCommand(imp, 'movie.edit.request', {
       projectId: attachment.projectId,
       sceneId: attachment.sceneId,
       fromSeconds: attachment.fromSeconds,
       toSeconds: attachment.toSeconds,
       instruction: task,
     }).then(
-      (output) => {
-        ask(task, z.object({ context: z.string() }).parse(output).context);
-      },
+      (output) => ask(task, z.object({ context: z.string() }).parse(output).context),
       (reason: unknown) => {
         setProblem(messageOf(reason));
+        setUnsent({ task, edit: true });
         setBusy(false);
       },
     );
+  };
+
+  const send = (event: SyntheticEvent): void => {
+    event.preventDefault();
+    const task = draft.trim();
+    if (task === '' || working || approvals.length > 0) return;
+    setDraft('');
+    void submit(task);
+  };
+
+  /**
+   * Sends what failed again. When the message reached the conversation, the
+   * run goes on from it without a new task, so it never appears twice.
+   */
+  const retry = (): Promise<void> => {
+    if (problem === null || unsent === null) return ask();
+    const { task, about, edit } = unsent;
+    if (task === undefined) return ask();
+    const stored = lastMessage?.role === 'user' && lastMessage.content === task;
+    if (stored) return ask();
+    if (edit === true) return submit(task);
+    return ask(task, about);
   };
 
   const settle = (approvalId: string, approve: boolean): void => {
@@ -254,7 +290,7 @@ export function CrewPanel({
     runCommand(imp, 'crew.approve', { memberId: member.id, approvalId, approve }).then(
       (output) => {
         // Once everything is decided, the agent goes on with the outcomes.
-        if ((output as { remaining: number }).remaining === 0) ask();
+        if ((output as { remaining: number }).remaining === 0) void ask();
         else setBusy(false);
       },
       (reason: unknown) => {
@@ -444,16 +480,20 @@ export function CrewPanel({
           </section>
         )}
         {!working && note !== null && (
-          <p className="error" role="status">
-            {note}
-          </p>
+          <RetryNote
+            text={note}
+            role="status"
+            {...(canRetry
+              ? { onRetry: retry, heading: `${member.name} did not get your message` }
+              : {})}
+          />
         )}
         {canContinue && (
           <button
             type="button"
             className="button small continue-run"
             onClick={() => {
-              ask();
+              void ask();
             }}
           >
             <PlayIcon aria-hidden="true" /> Continue where {member.name} stopped

@@ -81,6 +81,8 @@ export interface WireError {
   readonly code?: string;
   readonly kind?: string;
   readonly details?: readonly string[];
+  /** Set when trying again may help, so the page can offer Retry. */
+  readonly retryable?: boolean;
 }
 
 export type Reply =
@@ -90,13 +92,19 @@ export type Reply =
 
 export function toWireError(error: unknown): WireError {
   if (!(error instanceof Error)) return { name: 'Error', message: String(error) };
-  const extra = error as { code?: unknown; kind?: unknown; details?: unknown };
+  const extra = error as {
+    code?: unknown;
+    kind?: unknown;
+    details?: unknown;
+    retryable?: unknown;
+  };
   return {
     name: error.name,
     message: error.message,
     ...(typeof extra.code === 'string' ? { code: extra.code } : {}),
     ...(typeof extra.kind === 'string' ? { kind: extra.kind } : {}),
     ...(Array.isArray(extra.details) ? { details: extra.details.map(String) } : {}),
+    ...(extra.retryable === true ? { retryable: true } : {}),
   };
 }
 

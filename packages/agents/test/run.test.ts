@@ -1,4 +1,5 @@
 import {
+  CommandError,
   CommandRegistry,
   defineCommand,
   mediaCommands,
@@ -248,6 +249,42 @@ describe('runAgent', () => {
     expect((await readActivity(runtime.store)).map((entry) => entry.outcome)).toEqual([
       'needs-approval',
     ]);
+  });
+
+  it('tells the agent when a command failed outside Imp and may work if tried again', async () => {
+    const runtime = createTestRuntime();
+    let attempts = 0;
+    const flaky = defineCommand({
+      id: 'media.flaky',
+      title: 'Flaky generation',
+      description: 'Fails once because the provider is busy.',
+      effect: 'write',
+      input: z.object({}),
+      output: z.object({ done: z.literal(true) }),
+      handler: () => {
+        attempts += 1;
+        if (attempts > 1) return Promise.resolve({ done: true as const });
+        const busy = new ProviderError('rate_limit', 'fake', 'Busy.');
+        return Promise.reject(
+          new CommandError('handler_failed', 'media.flaky', 'Nothing was made: Busy.', {
+            cause: busy,
+          }),
+        );
+      },
+    });
+    const registry = new CommandRegistry({ runtime }).register(flaky);
+    const provider = createFakeProvider({
+      replies: [
+        { toolCalls: [call('media__flaky', {})] },
+        { toolCalls: [call('media__flaky', {})] },
+        { content: 'Made it on the second try.' },
+      ],
+    });
+    const result = await runAgent({ registry, provider, member, role, task: 'Make it.' });
+    const results = toolResults(result.messages);
+    expect(results[0]).toMatchObject({ error: 'Nothing was made: Busy.', retryable: true });
+    expect(results[1]).toMatchObject({ status: 'ok' });
+    expect(provider.requests[0]?.messages[0]?.content).toMatch(/retryable, call it once more/);
   });
 
   it('reports a policy denial to the model as an error', async () => {

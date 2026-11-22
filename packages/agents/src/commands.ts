@@ -383,7 +383,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.ask',
     title: 'Give an agent a task',
     description:
-      'Runs a crew member on a task and returns what it said and what is waiting for approval. The agent remembers the earlier conversation with it. Without a task, it continues where it stopped, such as after a run that was interrupted or reached its step limit. Costs model usage.',
+      'Runs a crew member on a task and returns what it said and what is waiting for approval. The agent remembers the earlier conversation with it. Without a task, it continues where it stopped, such as after a run that was interrupted or reached its step limit, or retries a run that failed (status failed, for example because OpenRouter could not be reached) without repeating the task. Costs model usage.',
     effect: 'spend',
     input: z.object({
       memberId: z.string().describe('The id of a crew member from crew.list.'),

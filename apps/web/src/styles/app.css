@@ -8012,3 +8012,58 @@ dialog.approvals-dialog[open] {
 .always-list .stack {
   gap: 2px;
 }
+
+/* A failure with a Retry button: what went wrong in plain words, and one press to send it again. */
+.retry-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--line));
+  border-left-width: 3px;
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.retry-note .retry-icon {
+  flex: none;
+  color: var(--danger);
+  margin-top: 1px;
+}
+.retry-note .retry-words {
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.retry-note strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.retry-note .retry-button {
+  flex: none;
+  align-self: center;
+  min-height: var(--hit);
+  white-space: nowrap;
+}
+.retry-note .retry-button svg {
+  transition: transform 0.4s ease;
+}
+.retry-note .retry-button:hover:not(:disabled) svg {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .retry-note .retry-button:hover:not(:disabled) svg {
+    transform: none;
+  }
+}
+/* In a narrow crew panel the button goes under the words. */
+.crew-panel .retry-note {
+  flex-wrap: wrap;
+}
+.crew-panel .retry-note .retry-button {
+  margin-left: calc(20px + var(--space-3));
+  align-self: flex-start;
+}
