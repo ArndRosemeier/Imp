@@ -1,5 +1,6 @@
 import type { Command, GuideTopic, KeyValueStore, LibrarySource, ProjectSupport } from '@imp/core';
 import type { Role } from './role.js';
+import type { WorkDescriber } from './work.js';
 
 /** One step of a mode's workflow, shown in the navigation. Stages can be visited in any order. */
 export interface Stage {
@@ -34,6 +35,11 @@ export interface Mode {
   readonly visualStyle?: (store: KeyValueStore, projectId: string) => Promise<string>;
   /** What the mode brings to the library: the assets its projects make. */
   readonly library?: readonly LibrarySource[];
+  /**
+   * What the work board shows of this mode: the stage each command belongs
+   * to, and names for the scenes, shots and others agents work on.
+   */
+  readonly work?: WorkDescriber;
 }
 
 /** Checks a mode's own consistency once, at start-up, instead of failing later in use. */

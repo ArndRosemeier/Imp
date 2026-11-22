@@ -147,12 +147,14 @@ function ApprovalRow({
   const [open, setOpen] = useState(false);
   const fields = useFields(item.input);
   const estimate = useEstimate(item.commandId, isRecord(item.input) ? item.input : {});
-  const usd = costOf(estimate);
+  // Only spending costs money; deleting is free.
+  const usd = item.effect === 'spend' ? costOf(estimate) : 0;
   useEffect(() => {
     onCost(item.approvalId, usd);
   }, [item.approvalId, usd, onCost]);
+  // Ids say little at a glance; the details below show every value.
   const summary = fields
-    .filter((field) => field.key !== 'projectId')
+    .filter((field) => field.key === 'memberId' || !field.key.endsWith('Id'))
     .slice(0, 2)
     .map((field) => `${field.label}: ${field.value}`)
     .join(' · ');
@@ -179,7 +181,9 @@ function ApprovalRow({
               {item.title}
               {risky && <span className="approvals-effect">deletes</span>}
             </span>
-            <span className="approvals-summary">{summary || item.commandId}</span>
+            <span className="approvals-summary">
+              {summary || <span className="mono">{item.commandId}</span>}
+            </span>
           </span>
         </label>
         <div className="approvals-side">

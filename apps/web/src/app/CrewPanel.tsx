@@ -391,26 +391,6 @@ export function CrewPanel({
             )}
           </p>
         )}
-        {!working && everyone.length > 1 && (approvals.length > 0 || elsewhere > 0) && (
-          <button
-            type="button"
-            className="approvals-banner"
-            aria-haspopup="dialog"
-            onClick={openApprovals}
-          >
-            <StampIcon aria-hidden="true" size={20} />
-            <span className="stack">
-              <strong>Review all {everyone.length} requests at once</strong>
-              <span className="muted small">
-                {elsewhere > 0 && approvals.length === 0
-                  ? `Other crew members are waiting on you.`
-                  : elsewhere > 0
-                    ? `${String(elsewhere)} of them from other crew members.`
-                    : 'Approve or decline them together.'}
-              </span>
-            </span>
-          </button>
-        )}
         {!working &&
           approvals.map((approval) => (
             <section key={approval.id} className="approval" aria-label="Needs your approval">
@@ -481,6 +461,26 @@ export function CrewPanel({
         )}
         <div ref={end} />
       </div>
+      {!working && everyone.length > 1 && (approvals.length > 0 || elsewhere > 0) && (
+        <button
+          type="button"
+          className="approvals-banner"
+          aria-haspopup="dialog"
+          onClick={openApprovals}
+        >
+          <StampIcon aria-hidden="true" size={20} />
+          <span className="stack">
+            <strong>Review all {everyone.length} requests at once</strong>
+            <span className="muted small">
+              {elsewhere > 0 && approvals.length === 0
+                ? `Other crew members are waiting on you.`
+                : elsewhere > 0
+                  ? `${String(elsewhere)} of them from other crew members.`
+                  : 'Approve or decline them together.'}
+            </span>
+          </span>
+        </button>
+      )}
       <form className="composer" onSubmit={send}>
         {attachment !== null && (
           <div className="attached">

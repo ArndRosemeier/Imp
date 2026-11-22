@@ -23,6 +23,12 @@ import {
 import { CrewMember, readCrewMember } from './crew.js';
 import type { RoleCatalog } from './role.js';
 import { runAgent } from './run.js';
+import {
+  createWorkCommands,
+  releaseInterruptedWork,
+  startWork,
+  type WorkDescriber,
+} from './work.js';
 
 const ToolCallSchema = z.object({
   id: z.string(),
@@ -284,6 +290,7 @@ async function moveConversationsIntoProjects(store: KeyValueStore): Promise<void
  */
 export async function releaseInterruptedRuns(store: KeyValueStore): Promise<void> {
   await moveConversationsIntoProjects(store);
+  await releaseInterruptedWork(store, new Date().toISOString());
   for (const prefix of await allConversationPrefixes(store)) {
     const operations: WriteOperation[] = [];
     for (const entry of await store.list(prefix)) {
@@ -339,6 +346,8 @@ export interface AgentCommandOptions {
   readonly registry: CommandRegistry;
   readonly provider: GenerationProvider;
   readonly roles: RoleCatalog;
+  /** What the modes add to the work board: stages and the names of things. */
+  readonly work?: WorkDescriber;
 }
 
 /**
@@ -347,7 +356,7 @@ export interface AgentCommandOptions {
  * and one agent can give work to another.
  */
 export function createAgentCommands(options: AgentCommandOptions): readonly Command[] {
-  const { registry, provider, roles } = options;
+  const { registry, provider, roles, work } = options;
   /**
    * Which project each working agent is working in. An agent works on one
    * thing at a time: while it works in one project it cannot start in another.
@@ -452,6 +461,17 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         lastError: null,
       };
       working.set(member.id, projectId);
+      const tracker = await startWork(
+        {
+          store,
+          registry,
+          describer: work,
+          now: () => runtime.now().toISOString(),
+          newId: runtime.newId,
+        },
+        { member, role, projectId, task: input.task ?? null, actor, maxSteps: input.maxSteps },
+      );
+      let finished = false;
       // Where the conversation is kept. A run that opens a project itself, such as a whole film
       // made from one prompt on the start screen, moves there with it, so that the chat and what
       // waits for approval are where the person now looks. When the person opens another
@@ -468,6 +488,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         ) {
           home = now;
           working.set(member.id, now);
+          await tracker.moveTo(now);
         }
         await store.batch([
           ...(from === home
@@ -494,6 +515,15 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
             conversation = { ...conversation, messages: toStored(messages) };
             await save(conversation);
           },
+          onStep: (step) => tracker.step(step),
+        });
+        finished = true;
+        await tracker.finish({
+          status: result.status,
+          summary: result.finalText,
+          error: result.error,
+          costUsd: result.costUsd,
+          steps: result.steps,
         });
         const pendingApprovals = result.pendingApprovals.map((pending) => ({
           id: runtime.newId(),
@@ -528,6 +558,13 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         // Also after an unexpected failure, so the agent is never left marked as working.
         working.delete(member.id);
         await save({ ...conversation, running: false });
+        if (!finished) {
+          await tracker.finish({
+            status: 'failed',
+            summary: null,
+            error: 'The run stopped unexpectedly.',
+          });
+        }
       }
     },
   });
@@ -779,5 +816,14 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     },
   });
 
-  return [ask, approve, conversationGet, conversationClear, approvalsList, alwaysList, alwaysSet];
+  return [
+    ask,
+    approve,
+    conversationGet,
+    conversationClear,
+    approvalsList,
+    alwaysList,
+    alwaysSet,
+    ...createWorkCommands(),
+  ];
 }

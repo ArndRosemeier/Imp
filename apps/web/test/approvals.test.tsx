@@ -51,13 +51,23 @@ describe('deciding many requests at once', () => {
     expect(provider.requests).toHaveLength(3);
   });
 
-  it('opens from the crew panel, and declines everything with one press', async () => {
-    const { provider, user } = start([
+  it('opens from the crew panel, and declines everything with one press, in a project', async () => {
+    const { imp, provider, user } = start([
       { toolCalls: [deleteCall('c1', 'a'), deleteCall('c2', 'b'), deleteCall('c3', 'c')] },
       { content: 'Waiting for you.' },
       { content: 'Nothing deleted.' },
     ]);
     await completeSetup(user);
+    // In a project the conversations are kept with it, and those are the ones watched.
+    const opened = await imp.registry.executeById(
+      'project.create',
+      { name: 'Short', mode: 'movie' },
+      { actor: { kind: 'user', id: 'arnd' } },
+    );
+    if (opened.status !== 'ok') throw new Error('project expected');
+    await imp.store.batch([
+      { type: 'put', key: 'settings/project.current', value: (opened.output as { id: string }).id },
+    ]);
     await user.type(screen.getByLabelText('Message to Coordinator'), 'Tidy up.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
     const dialog = await screen.findByRole('dialog', { name: '3 requests are waiting' });

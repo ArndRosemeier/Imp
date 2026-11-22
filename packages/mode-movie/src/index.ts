@@ -218,3 +218,4 @@ export {
   ScriptLineView,
   UnscriptedLine,
 } from './script.js';
+export { movieStageOf, movieWork } from './work.js';
