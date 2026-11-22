@@ -10,6 +10,13 @@ export {
 } from './commands.js';
 export { CrewMember, createCrewCommands, readCrewMember, type CrewCommandOptions } from './crew.js';
 export {
+  ACTIVE_MIX_SETTING,
+  createModelMixCommands,
+  MODEL_MIX_PREFIX,
+  ModelMix,
+  type ModelSlot,
+} from './model-mixes.js';
+export {
   createSavedCrewCommands,
   SAVED_CREW_PREFIX,
   SavedCrew,

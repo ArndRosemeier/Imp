@@ -15,6 +15,7 @@ import {
   NotePencilIcon,
   PauseIcon,
   PlayIcon,
+  SlidersHorizontalIcon,
   StarIcon,
   TrashIcon,
   UploadSimpleIcon,
@@ -38,6 +39,8 @@ import { ConfirmButton } from '../Field.js';
 import { useBlobUrl } from '../movie.js';
 import { actionsFor } from './actions.js';
 import { CrewShelf, useSavedCrewCount } from './crews.js';
+import { MixShelf } from './mixes.js';
+import { useModelMixes } from '../model-bar.js';
 import { useDragSource, useLibraryDrag } from './drag.js';
 import { formatDuration, Listing, openWhereMade, type Asset } from './model.js';
 
@@ -621,9 +624,11 @@ export function LibraryPanel({
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [modality, setModality] = useState<string | null>(null);
-  // The Crews tab shows saved crews in place of assets.
-  const [crews, setCrews] = useState(false);
+  // The Crews and Mixes tabs show saved crews or model mixes in place of assets.
+  const [shelf, setShelf] = useState<'crews' | 'mixes' | null>(null);
+  const crews = shelf !== null;
   const crewCount = useSavedCrewCount();
+  const mixCount = useModelMixes().data?.mixes.length;
   const [kind, setKind] = useState<string | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [favorite, setFavorite] = useState(false);
@@ -836,7 +841,13 @@ export function LibraryPanel({
               id={searchId}
               type="search"
               className="input"
-              placeholder={crews ? 'Search saved crews' : 'Search names, words, tags'}
+              placeholder={
+                shelf === 'crews'
+                  ? 'Search saved crews'
+                  : shelf === 'mixes'
+                    ? 'Search model mixes'
+                    : 'Search names, words, tags'
+              }
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -852,7 +863,7 @@ export function LibraryPanel({
               onClick={() => {
                 setModality(null);
                 setKind(null);
-                setCrews(false);
+                setShelf(null);
               }}
             >
               <span>All</span>
@@ -872,7 +883,7 @@ export function LibraryPanel({
                   onClick={() => {
                     setModality(facet.id);
                     setKind(null);
-                    setCrews(false);
+                    setShelf(null);
                   }}
                 >
                   <FacetIcon aria-hidden="true" />
@@ -884,20 +895,43 @@ export function LibraryPanel({
             <button
               type="button"
               role="tab"
-              aria-selected={crews}
+              aria-selected={shelf === 'crews'}
               aria-label={`Crews, ${String(crewCount ?? 0)}`}
               title="Saved crews"
               className="library-modality"
               onClick={() => {
-                setCrews(true);
+                setShelf('crews');
               }}
             >
               <UsersThreeIcon aria-hidden="true" />
               <span className="label">Crews</span>
               <span className="count">{crewCount ?? 0}</span>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shelf === 'mixes'}
+              aria-label={`Model mixes, ${String(mixCount ?? 0)}`}
+              title="Model mixes"
+              className="library-modality"
+              onClick={() => {
+                setShelf('mixes');
+              }}
+            >
+              <SlidersHorizontalIcon aria-hidden="true" />
+              <span className="label">Mixes</span>
+              <span className="count">{mixCount ?? 0}</span>
+            </button>
           </div>
-          {crews ? (
+          {shelf === 'mixes' ? (
+            <MixShelf
+              query={debounced}
+              onStatus={(message, failed = false) => {
+                if (failed) setError(message);
+                else setStatus(message);
+              }}
+            />
+          ) : shelf === 'crews' ? (
             <CrewShelf
               query={debounced}
               onStatus={(message, failed = false) => {

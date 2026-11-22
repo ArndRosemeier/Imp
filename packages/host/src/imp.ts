@@ -3,6 +3,7 @@ import {
   createAgentCommands,
   createCrewCommands,
   createModelCommands,
+  createModelMixCommands,
   createSavedCrewCommands,
   releaseInterruptedRuns,
   RoleCatalog,
@@ -12,6 +13,7 @@ import {
   audioLibrarySource,
   createAudioCommands,
   createDefaultAudioCodec,
+  TRANSCRIPTION_MODEL_SETTING,
   type Mp4AudioDecoder,
 } from '@imp/audio';
 import {
@@ -33,6 +35,11 @@ import {
 import {
   createMovieMode,
   createSceneAudioLink,
+  EFFECT_MODEL_SETTING,
+  IMAGE_MODEL_SETTING,
+  MUSIC_MODEL_SETTING,
+  SPEECH_MODEL_SETTING,
+  VIDEO_MODEL_SETTING,
   type FilmRenderer,
   type ColorSampler,
   type FrameGrabber,
@@ -171,6 +178,15 @@ export function createImp(options: ImpOptions): Imp {
       commandIds: () => registry.list().map((command) => command.id),
     }),
     ...createSavedCrewCommands(roles),
+    ...createModelMixCommands([
+      { setting: 'coordinator.model', label: 'Agents' },
+      { setting: VIDEO_MODEL_SETTING, label: 'Video' },
+      { setting: SPEECH_MODEL_SETTING, label: 'Voices' },
+      { setting: IMAGE_MODEL_SETTING, label: 'Pictures' },
+      { setting: EFFECT_MODEL_SETTING, label: 'Sound effects' },
+      { setting: MUSIC_MODEL_SETTING, label: 'Music' },
+      { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
+    ]),
     ...createAgentCommands({ registry, provider, roles }),
   );
   let started: Promise<void> | undefined;
