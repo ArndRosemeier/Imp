@@ -40,9 +40,13 @@ import { RecordControl } from './recorder.js';
 import { WordsPanel } from './audio-words.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { Problem } from './movie.js';
+import { saveFileAs } from './save-file.js';
 import { useLibraryDrop } from './library/drag.js';
 import { soundForScene } from './library/scene.js';
 import { FOCUS_EVENT, type Focus } from './library/model.js';
+
+/** A failure the editor has already shown, so saving says nothing more. */
+class SilentFailure extends Error {}
 
 // What the audio commands return, as far as the screen reads it.
 
@@ -982,20 +986,19 @@ function AudioEditor({
       void edit('audio.track.add', { name: `Track ${String(tracks.length + 1)}` });
     },
     exportFile: () => {
-      void (async () => {
-        const output = await edit('audio.export');
-        if (output === undefined) return;
-        const file = await imp.blob(Rendered.parse(output).key);
-        if (file === undefined) return;
-        const url = URL.createObjectURL(new Blob([file.bytes.slice()], { type: 'audio/wav' }));
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${doc.name}.wav`;
-        link.click();
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-        }, 10_000);
-      })();
+      saveFileAs(
+        { suggestedName: `${doc.name}.wav`, mediaType: 'audio/wav', description: 'Sound' },
+        async () => {
+          const output = await edit('audio.export');
+          // The editor has already said what went wrong.
+          if (output === undefined) throw new SilentFailure();
+          const file = await imp.blob(Rendered.parse(output).key);
+          if (file === undefined) throw new Error('The exported sound went missing.');
+          return file.bytes;
+        },
+      ).catch((reason: unknown) => {
+        if (!(reason instanceof SilentFailure)) setError(messageOf(reason));
+      });
     },
   };
 

@@ -128,8 +128,36 @@ Agents use the same library.`,
 - **Duplicate** a project to try a different direction without losing the original.
 - **Export** a project as one file to keep it safe or move it to another computer, and **Import** it back.
 - **Copy** characters, scenes, locations and other parts from one project into another.
+- **Save all / Load all** keeps everything in Imp in one file; see the page on saving all.
 
 The project switcher at the top of the screen changes the open project from anywhere.`,
+  },
+  {
+    id: 'save-all',
+    area: 'workspace',
+    title: 'Save all and Load all',
+    summary: 'Keep everything in Imp in one .zip file, and bring it all back.',
+    body: `**Save all** puts everything in Imp into one .zip file: every project with its pictures, voices, clips and rendered films, the library, saved crews, model mixes, custom roles, conversations with agents, settings, help choices and the look of the screen. Your **OpenRouter key is never in it**, so the file is safe to keep on a drive or in a cloud folder.
+
+**Load all** replaces everything in Imp with what such a file holds. Use it to restore a backup, or to move all your work between browsers, computers and the local server at once.
+
+## Where they are
+
+On the **Projects** screen under **Save all / Load all**, and under **Settings**. The coordinator can do both too: ask it to save everything, and Imp offers you the file to keep.
+
+## Saving
+
+In Chrome and Edge on a computer, Imp asks where to save the file. Other browsers, and tablets, save it to the downloads. Large workspaces take a while: the file is written piece by piece, so even many gigabytes fit.
+
+## Loading
+
+- Imp shows the file and asks before it changes anything. Choose **Save all first** if you may want your current work back.
+- The whole file is checked before anything changes. A damaged file changes nothing.
+- Projects, library items and settings that are in Imp now but not in the file are gone afterwards.
+- Your OpenRouter key stays as it is.
+- The page reloads when it is done.
+
+A single project's file (.imp.zip) is not a full backup: bring it in with **Import** on the Projects screen.`,
   },
   {
     id: 'where-imp-runs',
@@ -146,7 +174,7 @@ Nothing to install. Your projects are kept in the browser's own storage on this 
 
 Download Imp from **Settings** and run it with Node.js 22 or newer: unzip it, run \`node imp.mjs\` in the folder and open the address it prints. Your work is then kept as files in a folder of yours, with room for large media, and agents keep working when the browser is closed.
 
-Work done in the browser does not move over by itself: export the project and import it there.
+Work done in the browser does not move over by itself: export the project and import it there, or move everything at once with **Save all** and **Load all**.
 
 ## Your OpenRouter key
 

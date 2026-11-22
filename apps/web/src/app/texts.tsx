@@ -31,7 +31,8 @@ import { useDrag } from './drag.js';
 import { EditableField } from './Field.js';
 import { moviePrefix, type Act } from './movie.js';
 import { NumberField } from './NumberField.js';
-import { Modal, saveFile } from './projects.js';
+import { Modal } from './projects.js';
+import { fileSafe, saveFileAs } from './save-file.js';
 
 /** A style as the list gives it: built-in ones can be reset, the film's own removed. */
 const StyleEntry = TextStyle.extend({ builtIn: z.boolean() });
@@ -927,26 +928,34 @@ export function TextTools({
     if (made?.id !== undefined) onAdded(made.id);
   };
   const download = async (): Promise<void> => {
-    const file = z
-      .object({
-        blobKey: z.string(),
-        fileName: z.string(),
-        mediaType: z.string(),
-        subtitles: z.number(),
-      })
-      .parse(
-        await runCommand(imp, 'movie.edit.subtitles.export', {
-          projectId: project.id,
-          format: 'srt',
-        }),
-      );
-    if (file.subtitles === 0) {
-      setNote('The film has no subtitles yet: make them first.');
-      return;
-    }
-    const blob = await imp.blob(file.blobKey);
-    if (blob !== undefined) saveFile(blob.bytes, file.mediaType, file.fileName);
     setNote('');
+    await saveFileAs(
+      {
+        suggestedName: `${fileSafe(project.name, 'film')}.srt`,
+        mediaType: 'application/x-subrip',
+        description: 'Subtitles',
+      },
+      async () => {
+        const file = z
+          .object({
+            blobKey: z.string(),
+            fileName: z.string(),
+            mediaType: z.string(),
+            subtitles: z.number(),
+          })
+          .parse(
+            await runCommand(imp, 'movie.edit.subtitles.export', {
+              projectId: project.id,
+              format: 'srt',
+            }),
+          );
+        if (file.subtitles === 0)
+          throw new Error('The film has no subtitles yet: make them first.');
+        const blob = await imp.blob(file.blobKey);
+        if (blob === undefined) throw new Error('The subtitle file went missing.');
+        return blob.bytes;
+      },
+    );
   };
   return (
     <span className="text-tools" role="group" aria-label="Text">
@@ -997,7 +1006,7 @@ export function TextTools({
       <button
         type="button"
         className="button quiet"
-        title="Download the film’s subtitles as an .srt file, for players and video sites"
+        title="Save the film’s subtitles as an .srt file, for players and video sites"
         onClick={() => {
           void download().catch((reason: unknown) => {
             setNote(reason instanceof Error ? reason.message : String(reason));

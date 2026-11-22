@@ -6,7 +6,8 @@ import { z } from 'zod';
 import type { ImpClient } from '@imp/host';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { clock } from './cut-player.js';
-import { download, recordingFormat, recordScenes, type Progress } from './export.js';
+import { recordingFormat, recordScenes, type Progress } from './export.js';
+import { saveFileAs } from './save-file.js';
 import { moviePrefix } from './movie.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
 import { FFMPEG_STATE_KEY } from '@imp/host';
@@ -26,15 +27,17 @@ function size(bytes: number): string {
   return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
 }
 
-/** The stored parts of a rendered film, joined into one file for the browser's download. */
-async function filmFile(imp: ImpClient, projectId: string, film: FilmExport): Promise<Blob> {
-  const parts: BlobPart[] = [];
+/** The stored parts of a rendered film, in order, written to the file one at a time. */
+async function* filmParts(
+  imp: ImpClient,
+  projectId: string,
+  film: FilmExport,
+): AsyncGenerator<Uint8Array> {
   for (let index = 0; index < film.parts; index++) {
-    const part = await imp.blob(filmPartKey(projectId, film.id, index), true);
+    const part = await imp.blob(filmPartKey(projectId, film.id, index));
     if (part === undefined) throw new Error('Part of the file is missing; render it again.');
-    parts.push(part.bytes.slice());
+    yield part.bytes;
   }
-  return new Blob(parts, { type: film.mediaType });
 }
 
 /**
@@ -126,10 +129,10 @@ function RenderedExports({
   };
   const save = (film: FilmExport): void => {
     setSaving(film.id);
-    filmFile(imp, project.id, film)
-      .then((blob) => {
-        download(blob, film.fileName);
-      })
+    saveFileAs(
+      { suggestedName: film.fileName, mediaType: film.mediaType, description: 'Film' },
+      () => filmParts(imp, project.id, film),
+    )
       .catch((cause: unknown) => {
         setError(messageOf(cause));
       })
@@ -288,11 +291,22 @@ function RecordedExport({
     setError(null);
     setDone(null);
     setProgress({ scene: 0, scenes: ids.length, seconds: 0, totalSeconds: 0 });
-    recordScenes(imp, project.id, ids, setProgress, controller.signal)
-      .then((recording) => {
-        const name = `${project.name.replace(/[^\w.-]+/g, '-')}-${label}.${recording.extension}`;
-        download(recording.blob, name);
-        setDone(`Saved ${name} (${clock(recording.seconds)}).`);
+    let seconds = 0;
+    const extension = format?.extension ?? 'webm';
+    saveFileAs(
+      {
+        suggestedName: `${project.name.replace(/[^\w.-]+/g, '-')}-${label}.${extension}`,
+        mediaType: format?.mimeType.split(';')[0] ?? 'video/webm',
+        description: 'Film',
+      },
+      async () => {
+        const recording = await recordScenes(imp, project.id, ids, setProgress, controller.signal);
+        seconds = recording.seconds;
+        return recording.blob;
+      },
+    )
+      .then((outcome) => {
+        if (outcome.saved) setDone(`Saved ${outcome.name} (${clock(seconds)}).`);
       })
       .catch((cause: unknown) => {
         setError(messageOf(cause));

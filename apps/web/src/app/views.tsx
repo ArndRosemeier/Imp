@@ -16,6 +16,8 @@ import { useModelMixes } from './model-bar.js';
 import { TipsSwitch } from './help/HelpPanel.js';
 import { openHelp } from './help/help.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
+import { BackupPanel } from './backup.js';
+import { saveFileAs } from './save-file.js';
 import { ACTIVE_MIX_KEY, INTERNAL_SETTINGS, settingLabel } from './settings-labels.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
@@ -398,6 +400,7 @@ function settingValue(value: unknown): string {
 }
 
 export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): ReactElement {
+  const [serverError, setServerError] = useState<string | null>(null);
   const settings = useLive(['settings/'], async (current) =>
     SettingList.parse(await runCommand(current, 'settings.list', {})),
   );
@@ -446,6 +449,10 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
           </button>
         </div>
       </section>
+      <section className="card stack" aria-labelledby="backup-heading">
+        <h3 id="backup-heading">Save all and Load all</h3>
+        <BackupPanel />
+      </section>
       <section className="card stack" aria-labelledby="key-heading">
         <h3 id="key-heading">OpenRouter key</h3>
         <p className="muted">
@@ -479,10 +486,29 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
               folder of yours, with room for large media. It needs Node.js 22 or newer.
             </p>
             <div className="row">
-              <a className="button" href="./imp-server.zip" download>
+              <button
+                className="button"
+                onClick={() => {
+                  void saveFileAs(
+                    {
+                      suggestedName: 'imp-server.zip',
+                      mediaType: 'application/zip',
+                      description: 'Imp for your computer',
+                    },
+                    async () => {
+                      const response = await fetch('./imp-server.zip');
+                      if (!response.ok) throw new Error('The download is not available here.');
+                      return response.blob();
+                    },
+                  ).catch((reason: unknown) => {
+                    setServerError(messageOf(reason));
+                  });
+                }}
+              >
                 <DownloadSimpleIcon aria-hidden="true" /> Download Imp for your computer
-              </a>
+              </button>
             </div>
+            {serverError !== null && <p className="error">{serverError}</p>}
             <p className="muted">
               Unzip it, run <span className="mono">node imp.mjs</span> in the folder and open the
               address it prints. Work done in the browser does not move over by itself.

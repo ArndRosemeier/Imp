@@ -181,6 +181,33 @@ describe('the channel between the interface and the core', () => {
     expect(await client.upload(new Uint8Array(), 'text/plain')).toMatch(/^uploads\//);
   });
 
+  it('saves everything and loads it back through a picked file stored in parts', async () => {
+    const { page, blobs, stored } = setup();
+    const client = connectImp(page, stored);
+    await client.start();
+    await client.run('project.create', { name: 'Keeper', mode: 'movie' });
+    await blobs.put('library/big', {
+      bytes: new Uint8Array(5 * 1024 * 1024).fill(3),
+      mediaType: 'video/mp4',
+    });
+    const saved = (await client.run('backup.save', {})) as { output: { parts: string[] } };
+    const parts = await Promise.all(saved.output.parts.map((key) => client.blob(key, true)));
+    const file = new Blob(parts.map((part) => (part?.bytes ?? new Uint8Array()).slice()));
+    await client.run('project.create', { name: 'Later', mode: 'movie' });
+    // Larger than one upload part, so it crosses in two and is stored as two.
+    const sent: number[] = [];
+    const key = await client.uploadFile(file, (bytes) => sent.push(bytes));
+    expect(sent).toEqual([4 * 1024 * 1024, file.size]);
+    expect(await blobs.list(`${key}/part-`)).toHaveLength(2);
+    const loaded = await client.run('backup.load', { fileKey: key });
+    expect(loaded).toMatchObject({ status: 'ok', output: { projects: 1 } });
+    const listed = (await client.run('project.list', {})) as {
+      output: { projects: { name: string }[] };
+    };
+    expect(listed.output.projects.map((p) => p.name)).toEqual(['Keeper']);
+    expect(await blobs.list('uploads/')).toEqual([]);
+  });
+
   it('fails the start when the other end is lost', async () => {
     const [page] = createLocalPorts();
     const client = connectImp(

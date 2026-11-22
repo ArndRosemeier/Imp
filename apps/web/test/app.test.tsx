@@ -1469,8 +1469,10 @@ describe('App', () => {
     expect(await within(list).findByText('Coordinator model')).toBeTruthy();
     expect(within(list).getByText('vendor/writer')).toBeTruthy();
     expect(within(list).queryByText(/coordinator\.member/)).toBeNull();
-    const link = await screen.findByRole('link', { name: /Download Imp for your computer/ });
-    expect(link.getAttribute('href')).toBe('./imp-server.zip');
+    // A button, so the save dialog can ask where the download goes.
+    expect(
+      await screen.findByRole('button', { name: /Download Imp for your computer/ }),
+    ).toBeTruthy();
 
     cleanup();
     const mark = document.createElement('meta');
