@@ -1,5 +1,7 @@
 export {
   AgentRunSchema,
+  ALWAYS_ALLOW_KEY,
+  alwaysAllowed,
   ChatMessageSchema,
   ConversationSchema,
   createAgentCommands,
@@ -7,6 +9,8 @@ export {
   type AgentCommandOptions,
   type AgentRun,
   type Conversation,
+  type WaitingApproval,
+  WaitingApprovalSchema,
 } from './commands.js';
 export { CrewMember, createCrewCommands, readCrewMember, type CrewCommandOptions } from './crew.js';
 export {

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState, type CSSProperties, type ReactElement
 import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { Approvals } from './Approvals.js';
 import { CrewPanel } from './CrewPanel.js';
 import { isCoarsePointer } from './gestures.js';
 import { Resizer, usePanelWidth } from './Resizer.js';
@@ -538,6 +539,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               </div>
             )}
           </div>
+          <Approvals />
           <CopyQuestions />
           <CommandPalette
             open={paletteOpen}

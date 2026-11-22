@@ -4,6 +4,7 @@ import {
   createAgentCommands,
   type WorkSubject,
   createCrewCommands,
+  alwaysAllowed,
   createModelCommands,
   createModelMixCommands,
   createSavedCrewCommands,
@@ -169,8 +170,14 @@ export function createImp(options: ImpOptions): Imp {
     guideRole,
     ...modes.flatMap((mode) => mode.roles),
   ]);
-  // Agents spend cents without stopping to ask, within the allowance the person sets.
-  const registry = new CommandRegistry({ runtime, autoApprove: createSpendAllowance(provider) });
+  // Agents spend cents without stopping to ask, within the allowance the person sets,
+  // and do what the person said to always allow.
+  const allowance = createSpendAllowance(provider);
+  const registry = new CommandRegistry({
+    runtime,
+    autoApprove: async (context, command, input) =>
+      (await alwaysAllowed(context, command, input)) || allowance(context, command, input),
+  });
   registry.register(
     ...settingsCommands,
     ...languageCommands,
