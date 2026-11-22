@@ -742,10 +742,13 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
     // jsdom cannot record video, so export says so instead of offering a broken button.
+    // Export and help live in menus, so the picture and the timeline share one screen.
+    await user.click(screen.getByRole('button', { name: /^Export/ }));
     expect(screen.getByText(/cannot record video/)).toBeTruthy();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Export film/ }).disabled).toBe(
       true,
     );
+    await user.click(screen.getByRole('button', { name: 'Close export' }));
 
     await user.click(first);
     expect(await screen.findByText(/Shot 1/, { selector: 'h3' })).toBeTruthy();
@@ -763,6 +766,7 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: /Redo/ }));
     expect(await screen.findByRole('button', { name: /Shot 3: Mara/ })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Add to the scene' }));
     await user.click(screen.getByRole('button', { name: /Add title/ }));
     expect(await screen.findByRole('button', { name: /Title 2: Title/ })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Delete/ }));

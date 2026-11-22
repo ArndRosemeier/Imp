@@ -106,6 +106,7 @@ export function FilmStrip({
   onOpen,
   onPlayOn,
   tools,
+  compact = false,
 }: {
   film: FilmView;
   sceneId: string | undefined;
@@ -116,6 +117,11 @@ export function FilmStrip({
   onPlayOn: (on: boolean) => void;
   /** More controls for the whole film, beside Play on. */
   tools?: ReactNode;
+  /**
+   * One slim row for the one-screen editor: the scenes and the controls beside
+   * them, without the heading and summary (the editor's header has those).
+   */
+  compact?: boolean;
 }): ReactElement {
   const scroller = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState<number | null>(null);
@@ -161,57 +167,62 @@ export function FilmStrip({
     target?.focus();
   };
   const ready = film.scenes.filter((scene) => sceneState(scene) === 'ready').length;
+  const controls = (
+    <span className="film-strip-tools">
+      {tools}
+      <button
+        className="button small quiet"
+        aria-pressed={playOn}
+        title="When a scene ends, open the next one and play on"
+        onClick={() => {
+          onPlayOn(!playOn);
+        }}
+      >
+        Play on
+      </button>
+      <span className="segmented" role="group" aria-label="Zoom the film">
+        <button
+          aria-label="Zoom out"
+          onClick={() => {
+            step(1 / 1.6);
+          }}
+        >
+          −
+        </button>
+        <button
+          aria-pressed={scale === null}
+          onClick={() => {
+            setScale(null);
+          }}
+        >
+          Fit
+        </button>
+        <button
+          aria-label="Zoom in"
+          onClick={() => {
+            step(1.6);
+          }}
+        >
+          +
+        </button>
+      </span>
+    </span>
+  );
   return (
-    <section className="film-strip" aria-label="The whole film">
-      <div className="film-strip-head">
-        <span className="film-strip-title">Film</span>
-        <span className="muted small">
-          {String(film.scenes.length)} {film.scenes.length === 1 ? 'scene' : 'scenes'} ·{' '}
-          {filmClock(film.totalSeconds)} · {String(ready)} finished
-          {film.openMarkers > 0
-            ? ` · ${String(film.openMarkers)} open marker${film.openMarkers === 1 ? '' : 's'}`
-            : ''}
-        </span>
-        <span className="film-strip-tools">
-          {tools}
-          <button
-            className="button small quiet"
-            aria-pressed={playOn}
-            title="When a scene ends, open the next one and play on"
-            onClick={() => {
-              onPlayOn(!playOn);
-            }}
-          >
-            Play on
-          </button>
-          <span className="segmented" role="group" aria-label="Zoom the film">
-            <button
-              aria-label="Zoom out"
-              onClick={() => {
-                step(1 / 1.6);
-              }}
-            >
-              −
-            </button>
-            <button
-              aria-pressed={scale === null}
-              onClick={() => {
-                setScale(null);
-              }}
-            >
-              Fit
-            </button>
-            <button
-              aria-label="Zoom in"
-              onClick={() => {
-                step(1.6);
-              }}
-            >
-              +
-            </button>
+    <section className={`film-strip${compact ? ' compact' : ''}`} aria-label="The whole film">
+      {!compact && (
+        <div className="film-strip-head">
+          <span className="film-strip-title">Film</span>
+          <span className="muted small">
+            {String(film.scenes.length)} {film.scenes.length === 1 ? 'scene' : 'scenes'} ·{' '}
+            {filmClock(film.totalSeconds)} · {String(ready)} finished
+            {film.openMarkers > 0
+              ? ` · ${String(film.openMarkers)} open marker${film.openMarkers === 1 ? '' : 's'}`
+              : ''}
           </span>
-        </span>
-      </div>
+          {controls}
+        </div>
+      )}
       <div
         className="film-strip-scroll"
         ref={scroller}
@@ -271,6 +282,7 @@ export function FilmStrip({
           })}
         </div>
       </div>
+      {compact && controls}
     </section>
   );
 }
