@@ -13,6 +13,7 @@ import { useId, useRef, useState, type ReactElement, type SyntheticEvent } from 
 import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
+import { WorkingOn } from './work.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
@@ -406,6 +407,7 @@ function ElementEditor({
           value={element.name}
           onCommit={(name) => change({ name })}
         />
+        <WorkingOn kind={element.kind} id={element.id} />
         <ConfirmButton
           label={text.remove}
           question={text.removeQuestion}

@@ -35,11 +35,33 @@ export {
   type AgentRunOptions,
   type AgentRunResult,
   type AgentRunStatus,
+  type AgentStep,
   type PendingApproval,
 } from './run.js';
+export {
+  createWorkCommands,
+  KEPT_FINISHED_WORK,
+  mergeSubjects,
+  readWork,
+  subjectsOfInput,
+  WORK_PREFIX,
+  WorkBoardSchema,
+  WorkEntry,
+  WorkStatus,
+  WorkSubject,
+  workKey,
+  type WorkBoard,
+  type WorkDescriber,
+} from './work.js';
 export { defineMode, type Mode, type Stage } from './mode.js';
 export { createModelCommands } from './models.js';
 export {
+  ALLOWANCE_PROJECT_SETTING,
+  ALLOWANCE_STEP_SETTING,
+  Allowance,
+  createSpendAllowance,
+  DEFAULT_ALLOWANCE,
+  readAllowance,
   createSpendCommands,
   createSpendLedger,
   Estimate,

@@ -1,6 +1,9 @@
 import {
+  CommandError,
   CostRequest,
+  CURRENT_PROJECT_SETTING,
   defineCommand,
+  type AutoApproval,
   type Command,
   type CommandRegistry,
   type CoreRuntime,
@@ -352,6 +355,86 @@ export function withSpendLedger(
   };
 }
 
+/** The model catalog, read at most every ten minutes: prices change rarely and it is large. */
+function cachedCatalog(provider: GenerationProvider): () => Promise<readonly ModelInfo[]> {
+  let catalog: { at: number; models: Promise<readonly ModelInfo[]> } | undefined;
+  return () => {
+    const now = Date.now();
+    if (catalog === undefined || now - catalog.at > 600_000) {
+      const loading = provider.listModels();
+      loading.catch(() => {
+        catalog = undefined;
+      });
+      catalog = { at: now, models: loading };
+    }
+    return catalog.models;
+  };
+}
+
+/** Optional: the most one step may cost without asking, in US dollars. 0 sets no such limit. */
+export const ALLOWANCE_STEP_SETTING = 'spend.allowance.step';
+/** The budget: what agents may spend on one project without asking, in US dollars. 0 always asks. */
+export const ALLOWANCE_PROJECT_SETTING = 'spend.allowance.project';
+/**
+ * Arnd (2026-11-22): "i would like to be able to set a budget where no approval
+ * is needed until its exceeded." A dollar per project to start, no step limit.
+ */
+export const DEFAULT_ALLOWANCE = { step: 0, project: 1 } as const;
+
+export const Allowance = z.object({
+  step: z.number().nonnegative(),
+  project: z.number().nonnegative(),
+});
+export type Allowance = z.infer<typeof Allowance>;
+
+export async function readAllowance(store: KeyValueStore): Promise<Allowance> {
+  const number = async (key: string, fallback: number): Promise<number> => {
+    const value = await store.get(`settings/${key}`);
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+  };
+  return {
+    step: await number(ALLOWANCE_STEP_SETTING, DEFAULT_ALLOWANCE.step),
+    project: await number(ALLOWANCE_PROJECT_SETTING, DEFAULT_ALLOWANCE.project),
+  };
+}
+
+/**
+ * Lets agents spend small amounts without stopping to ask, so that a film made
+ * from one prompt does not halt for every one-cent picture. A step runs
+ * unasked while the open project (or the start screen) stays within its
+ * budget with it, and, when the person set a step limit, the step is within
+ * that too; anything else, and anything whose price is unknown, is put to the
+ * person as before. Only spending: deleting always asks.
+ */
+export function createSpendAllowance(provider: GenerationProvider): AutoApproval {
+  const models = cachedCatalog(provider);
+  return async (context, command, rawInput) => {
+    if (context.actor.kind !== 'agent' || command.effect !== 'spend') return false;
+    if (command.estimate === undefined) return false;
+    const { store } = context.runtime;
+    const allowance = await readAllowance(store);
+    if (allowance.project <= 0) return false;
+    const request = await command.estimate(context, rawInput);
+    if (request === null) return false;
+    const parsed = CostRequest.parse(request);
+    const estimate = await priceRequest(parsed, { store, models });
+    // An agent run without a history to go by is priced as a typical short run.
+    const expected =
+      estimate.usd ??
+      (parsed.kind === 'chat' && parsed.maxUsd !== undefined
+        ? Math.min(parsed.maxUsd, TYPICAL.chat.usd * 6)
+        : null);
+    if (expected === null) return false;
+    if (allowance.step > 0 && expected > allowance.step) return false;
+    const open = await store.get(`settings/${CURRENT_PROJECT_SETTING}`);
+    const projectId = typeof open === 'string' ? open : null;
+    const spent = (await readEntries(store))
+      .filter((entry) => entry.projectId === projectId)
+      .reduce((sum, entry) => sum + entry.usd, 0);
+    return spent + expected <= allowance.project;
+  };
+}
+
 const Totals = z.object({
   usd: z.number(),
   calls: z.number().int(),
@@ -374,19 +457,7 @@ export function createSpendCommands(options: {
   readonly registry: CommandRegistry;
   readonly provider: GenerationProvider;
 }): readonly Command[] {
-  let catalog: { at: number; models: Promise<readonly ModelInfo[]> } | undefined;
-  // Prices change rarely and the catalog is large, so it is read at most every ten minutes.
-  const models = (): Promise<readonly ModelInfo[]> => {
-    const now = Date.now();
-    if (catalog === undefined || now - catalog.at > 600_000) {
-      const loading = options.provider.listModels();
-      loading.catch(() => {
-        catalog = undefined;
-      });
-      catalog = { at: now, models: loading };
-    }
-    return catalog.models;
-  };
+  const models = cachedCatalog(options.provider);
 
   const estimate = defineCommand({
     id: 'spend.estimate',
@@ -500,5 +571,71 @@ export function createSpendCommands(options: {
     },
   });
 
-  return [estimate, quote, summary];
+  const allowanceGet = defineCommand({
+    id: 'spend.allowance.get',
+    title: 'Show the spending budget',
+    keywords: ['budget', 'approval', 'ask', 'autonomous', 'without asking', 'limit'],
+    description:
+      'Returns the budget agents may spend on one project without asking the person ("project", in US dollars), how much of it the open project has used and has left, and the optional most one step may cost ("step", 0 for no limit). Steps that would go over it, steps whose price is unknown, and anything that deletes are still put to the person.',
+    effect: 'read',
+    input: z.object({}),
+    output: Allowance.extend({ projectSpentUsd: z.number(), projectLeftUsd: z.number() }),
+    handler: async ({ runtime }) => {
+      const allowance = await readAllowance(runtime.store);
+      const open = await runtime.store.get(`settings/${CURRENT_PROJECT_SETTING}`);
+      const projectId = typeof open === 'string' ? open : null;
+      const spent = (await readEntries(runtime.store))
+        .filter((entry) => entry.projectId === projectId)
+        .reduce((sum, entry) => sum + entry.usd, 0);
+      return {
+        ...allowance,
+        projectSpentUsd: spent,
+        projectLeftUsd: Math.max(0, allowance.project - spent),
+      };
+    },
+  });
+
+  const allowanceSet = defineCommand({
+    id: 'spend.allowance.set',
+    title: 'Set the spending budget',
+    keywords: ['budget', 'approval', 'ask', 'autonomous', 'without asking', 'limit'],
+    description:
+      'Sets the budget agents may spend on one project without asking ("project", in US dollars; 0 makes them ask before every paid step) and, optionally, the most one step may cost without asking ("step"; 0 for no limit). Only the person can change it.',
+    effect: 'write',
+    input: Allowance.partial(),
+    output: Allowance,
+    handler: async ({ actor, runtime }, input) => {
+      if (actor.kind !== 'user') {
+        // An agent that could raise its own allowance would need no approval at all.
+        throw new CommandError(
+          'denied',
+          'spend.allowance.set',
+          'Only the person can change what agents may spend without asking.',
+        );
+      }
+      await runtime.store.batch([
+        ...(input.step === undefined
+          ? []
+          : [
+              {
+                type: 'put' as const,
+                key: `settings/${ALLOWANCE_STEP_SETTING}`,
+                value: input.step,
+              },
+            ]),
+        ...(input.project === undefined
+          ? []
+          : [
+              {
+                type: 'put' as const,
+                key: `settings/${ALLOWANCE_PROJECT_SETTING}`,
+                value: input.project,
+              },
+            ]),
+      ]);
+      return readAllowance(runtime.store);
+    },
+  });
+
+  return [estimate, quote, summary, allowanceGet, allowanceSet];
 }

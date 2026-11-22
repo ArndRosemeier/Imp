@@ -23,6 +23,12 @@ import {
 import { readCrewMember } from './crew.js';
 import type { RoleCatalog } from './role.js';
 import { runAgent } from './run.js';
+import {
+  createWorkCommands,
+  releaseInterruptedWork,
+  startWork,
+  type WorkDescriber,
+} from './work.js';
 
 const ToolCallSchema = z.object({
   id: z.string(),
@@ -284,6 +290,7 @@ async function moveConversationsIntoProjects(store: KeyValueStore): Promise<void
  */
 export async function releaseInterruptedRuns(store: KeyValueStore): Promise<void> {
   await moveConversationsIntoProjects(store);
+  await releaseInterruptedWork(store, new Date().toISOString());
   for (const prefix of await allConversationPrefixes(store)) {
     const operations: WriteOperation[] = [];
     for (const entry of await store.list(prefix)) {
@@ -299,11 +306,20 @@ export async function releaseInterruptedRuns(store: KeyValueStore): Promise<void
   }
 }
 
+/** Commands with which an agent can open a project: the setting is how project.open works. */
+const OPENS_PROJECT: ReadonlySet<string> = new Set([
+  'project.open',
+  'project.create',
+  'settings.set',
+]);
+
 export interface AgentCommandOptions {
   /** The registry the agents act through. It is also where these commands get registered. */
   readonly registry: CommandRegistry;
   readonly provider: GenerationProvider;
   readonly roles: RoleCatalog;
+  /** What the modes add to the work board: stages and the names of things. */
+  readonly work?: WorkDescriber;
 }
 
 /**
@@ -312,7 +328,7 @@ export interface AgentCommandOptions {
  * and one agent can give work to another.
  */
 export function createAgentCommands(options: AgentCommandOptions): readonly Command[] {
-  const { registry, provider, roles } = options;
+  const { registry, provider, roles, work } = options;
   /**
    * Which project each working agent is working in. An agent works on one
    * thing at a time: while it works in one project it cannot start in another.
@@ -398,6 +414,18 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         );
       }
 
+      // The project the agent works in, always: an agent that is given work by another agent
+      // was once left to guess the project id, and wrote to none.
+      const open = projectId === null ? undefined : await readProject(store, projectId);
+      const facts =
+        open === undefined
+          ? undefined
+          : `Open project: "${open.name}" (projectId "${open.id}", mode ${open.mode}).`;
+      const runContext =
+        facts === undefined || input.context?.includes(open?.id ?? '') === true
+          ? input.context
+          : [input.context, facts].filter((part) => part !== undefined).join('\n');
+
       let conversation: Conversation = {
         ...before,
         roleId: member.roleId,
@@ -405,6 +433,42 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         lastError: null,
       };
       working.set(member.id, projectId);
+      const tracker = await startWork(
+        {
+          store,
+          registry,
+          describer: work,
+          now: () => runtime.now().toISOString(),
+          newId: runtime.newId,
+        },
+        { member, role, projectId, task: input.task ?? null, actor, maxSteps: input.maxSteps },
+      );
+      let finished = false;
+      // Where the conversation is kept. A run that opens a project itself, such as a whole film
+      // made from one prompt on the start screen, moves there with it, so that the chat and what
+      // waits for approval are where the person now looks. When the person opens another
+      // project meanwhile, the run stays where it began.
+      let home = projectId;
+      let opened = false;
+      const save = async (next: Conversation): Promise<void> => {
+        const from = home;
+        const now = opened ? await currentConversationProject(store) : home;
+        if (
+          now !== null &&
+          now !== home &&
+          (await store.get(conversationKey(member.id, now))) === undefined
+        ) {
+          home = now;
+          working.set(member.id, now);
+          await tracker.moveTo(now);
+        }
+        await store.batch([
+          ...(from === home
+            ? []
+            : [{ type: 'delete' as const, key: conversationKey(member.id, from) }]),
+          { type: 'put', key: conversationKey(member.id, home), value: storedValue(next) },
+        ]);
+      };
       try {
         const result = await runAgent({
           registry,
@@ -413,14 +477,26 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           role,
           blobs: runtime.blobs,
           language: await readLanguage(store),
+          onCommand: (id) => {
+            if (OPENS_PROJECT.has(id)) opened = true;
+          },
           history: toChatMessages(before.messages),
           maxSteps: input.maxSteps,
           ...(input.task === undefined ? {} : { task: input.task }),
-          ...(input.context === undefined ? {} : { context: input.context }),
+          ...(runContext === undefined ? {} : { context: runContext }),
           onProgress: async (messages) => {
             conversation = { ...conversation, messages: toStored(messages) };
-            await writeConversation(store, conversation, projectId);
+            await save(conversation);
           },
+          onStep: (step) => tracker.step(step),
+        });
+        finished = true;
+        await tracker.finish({
+          status: result.status,
+          summary: result.finalText,
+          error: result.error,
+          costUsd: result.costUsd,
+          steps: result.steps,
         });
         const pendingApprovals = result.pendingApprovals.map((pending) => ({
           id: runtime.newId(),
@@ -454,7 +530,14 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
       } finally {
         // Also after an unexpected failure, so the agent is never left marked as working.
         working.delete(member.id);
-        await writeConversation(store, { ...conversation, running: false }, projectId);
+        await save({ ...conversation, running: false });
+        if (!finished) {
+          await tracker.finish({
+            status: 'failed',
+            summary: null,
+            error: 'The run stopped unexpectedly.',
+          });
+        }
       }
     },
   });
@@ -600,5 +683,5 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     },
   });
 
-  return [ask, approve, conversationGet, conversationClear];
+  return [ask, approve, conversationGet, conversationClear, ...createWorkCommands()];
 }

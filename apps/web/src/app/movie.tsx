@@ -21,6 +21,7 @@ import {
 import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
+import { WorkingOn } from './work.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { ScenePlace, useWorld } from './place.js';
 import { useLibraryDrop } from './library/drag.js';
@@ -293,6 +294,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             <span>
               {candidate.position} · {shortSceneTitle(candidate.heading)}
             </span>
+            <WorkingOn kind="scene" id={candidate.id} compact />
           </button>
         ))}
         <button className="chip add" onClick={add}>
@@ -317,6 +319,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
           className="card stack page"
           aria-label={t('Scene {position}', { position: String(scene.position) })}
         >
+          <WorkingOn kind="scene" id={scene.id} />
           <EditableField
             label={t('Scene heading')}
             hideLabel
@@ -860,6 +863,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                   act('movie.character.update', { characterId: character.id, name })
                 }
               />
+              <WorkingOn kind="character" id={character.id} />
             </div>
             <CharacterImages character={character} model={images.model} act={act} />
             {CHARACTER_FIELDS.map(({ key, label, rows, placeholder }) => (

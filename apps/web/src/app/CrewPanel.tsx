@@ -5,9 +5,10 @@ import {
   type AgentRun,
   type CrewMember,
 } from '@imp/agents';
-import { fromToolName } from '@imp/core';
+import { fromToolName, READY_REPORT_KEY, ReadyReport } from '@imp/core';
 import {
   BroomIcon,
+  BugIcon,
   CheckIcon,
   PaperclipIcon,
   PaperPlaneRightIcon,
@@ -160,6 +161,16 @@ export function CrewPanel({
     setShownProject(liveProject);
     setClearing(false);
   }
+  // A problem report this agent prepared opens from a button: retold, its long link gets cut.
+  const ready = useLive([READY_REPORT_KEY], async (current) =>
+    z
+      .object({ report: ReadyReport.nullable() })
+      .parse(await runCommand(current, 'support.report.ready', {})),
+  );
+  const report = ready.data?.report?.memberId === member.id ? ready.data.report : null;
+  const dismissReport = (): void => {
+    runCommand(imp, 'support.report.dismiss', {}).catch(() => undefined);
+  };
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -448,6 +459,26 @@ export function CrewPanel({
               </div>
             </section>
           ))}
+        {report !== null && (
+          <section className="approval" aria-label="Problem report">
+            <span className="eyebrow">Problem report ready</span>
+            <p>{report.title}</p>
+            <div className="row">
+              <a
+                className="button primary"
+                href={report.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={dismissReport}
+              >
+                <BugIcon aria-hidden="true" /> Check and submit on GitHub
+              </a>
+              <button className="button" onClick={dismissReport}>
+                <XIcon aria-hidden="true" /> Dismiss
+              </button>
+            </div>
+          </section>
+        )}
         {!working && note !== null && (
           <p className="error" role="status">
             {note}

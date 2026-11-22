@@ -21,6 +21,7 @@ import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEv
 import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
+import { WorkingOn } from './work.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
@@ -462,6 +463,7 @@ export function SceneTabs({
           <span>
             {candidate.position} · {shortSceneTitle(candidate.heading)}
           </span>
+          <WorkingOn kind="scene" id={candidate.id} compact />
         </button>
       ))}
     </div>
@@ -614,6 +616,7 @@ function ShotCard({
               {t('Pickup')}
             </span>
           )}
+          <WorkingOn kind="shot" id={shot.id} />
         </h3>
         <ConfirmButton
           label={t('Delete shot')}

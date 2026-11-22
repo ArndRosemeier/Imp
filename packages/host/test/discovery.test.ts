@@ -49,6 +49,8 @@ const ASKS: readonly (readonly [string, string])[] = [
   ['what is new in this version', 'app.changelog'],
   ['turn off tips', 'help.set'],
   ['report a problem', 'support.report.prepare'],
+  ['set a budget so agents spend without asking', 'spend.allowance.set'],
+  ['how much budget is left without approval', 'spend.allowance.get'],
 ];
 
 describe('finding commands by what people call them', () => {

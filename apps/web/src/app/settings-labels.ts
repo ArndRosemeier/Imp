@@ -47,6 +47,12 @@ export const SETTING_LABELS: Readonly<Record<string, string>> = {
   get 'budget.daily'(): string {
     return t('Daily budget');
   },
+  get 'spend.allowance.project'(): string {
+    return t('Budget without approval, per project');
+  },
+  get 'spend.allowance.step'(): string {
+    return t('Most per step without approval');
+  },
 };
 
 /** A setting's name in words: "video.model" reads as "Video model". */
