@@ -1119,6 +1119,70 @@ describe('App', () => {
     });
   });
 
+  it('keeps crews in the library under a name and loads them back', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    const actor = { actor: { kind: 'user', id: 't' } } as const;
+    await imp.registry.executeById(
+      'crew.hire',
+      { roleId: 'screenwriter', model: 'm/a', name: 'Ada' },
+      actor,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    await user.click(within(library).getByRole('tab', { name: 'Crews, 0' }));
+    expect(await within(library).findByText(/No saved crews yet/)).toBeTruthy();
+    await user.type(within(library).getByLabelText(/Save the current crew/), 'Core team');
+    await user.click(within(library).getByRole('button', { name: /Save/ }));
+    const cards = await within(library).findByRole('list', { name: 'Saved crews' });
+    expect(await within(cards).findByRole('heading', { name: 'Core team' })).toBeTruthy();
+    expect(within(library).getByRole('tab', { name: 'Crews, 1' })).toBeTruthy();
+
+    const crew = async () =>
+      (
+        (await imp.registry.executeById('crew.list', {}, actor)) as {
+          output: { crew: { name: string }[] };
+        }
+      ).output.crew
+        .map((member) => member.name)
+        .sort();
+    const before = await crew();
+    await imp.registry.executeById(
+      'crew.hire',
+      { roleId: 'screenwriter', model: 'm/b', name: 'Bo' },
+      actor,
+    );
+    await user.click(within(cards).getByRole('button', { name: /Load/ }));
+    const confirm = await within(cards).findByRole('group', { name: 'Replace the crew' });
+    expect(within(confirm).getByText(/Dismiss Bo, Ada/)).toBeTruthy();
+    await user.click(within(confirm).getByRole('button', { name: 'Replace' }));
+    await vi.waitFor(async () => {
+      expect(await crew()).toEqual(before);
+    });
+
+    await user.click(within(cards).getByRole('button', { name: 'Rename Core team' }));
+    const name = within(cards).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Drama team');
+    await user.click(within(cards).getByRole('button', { name: 'Save' }));
+    expect(await within(cards).findByRole('heading', { name: 'Drama team' })).toBeTruthy();
+    await user.click(within(cards).getByRole('button', { name: /Add to crew/ }));
+    await vi.waitFor(async () => {
+      expect(await crew()).toHaveLength(before.length * 2 - 1);
+    });
+    await user.click(
+      within(cards).getByRole('button', { name: 'Update Drama team with the current crew' }),
+    );
+    await user.click(within(cards).getByRole('button', { name: 'Delete Drama team' }));
+    await user.click(within(cards).getByRole('button', { name: 'Delete' }));
+    expect(await within(library).findByText(/No saved crews yet/)).toBeTruthy();
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);

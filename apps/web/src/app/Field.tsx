@@ -76,9 +76,12 @@ export function ConfirmButton({
   question,
   onConfirm,
   children,
+  ariaLabel,
 }: {
   label: string;
   question: string;
+  /** The button's name for assistive technology, when the label alone is too short. */
+  ariaLabel?: string;
   onConfirm: () => void;
   children: ReactElement;
 }): ReactElement {
@@ -88,6 +91,7 @@ export function ConfirmButton({
       <button
         type="button"
         className="button quiet"
+        aria-label={ariaLabel}
         onClick={() => {
           setAsking(true);
         }}
