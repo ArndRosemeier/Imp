@@ -1,0 +1,3 @@
+# Modellmixe
+
+- Bewahre jedes Modell, das du nutzt (Agenten, Video, Stimmen, Bilder, Soundeffekte, Musik, Transkripte), unter einem Namen auf, etwa einen günstigen Mix für Entwürfe und einen besseren für den Endschnitt, und wechsle den ganzen Satz auf einmal. Jede Phase zeigt ihre Modelle jetzt als einen kleinen Chip: Tippe darauf, um den Mix zu wechseln, ein einzelnes Modell zu ändern oder die Modelle als Mix zu speichern. Die Bibliothek hat einen neuen Reiter Mixe, um sie zu verwenden, umzubenennen, zu aktualisieren und zu löschen, und Agenten können das alles auch. Mixe gehören zu deinem Arbeitsbereich und funktionieren so in jedem Projekt.

@@ -12,7 +12,8 @@ import { Fragment, useEffect, useRef, useState, type PointerEvent, type ReactEle
 import { z } from 'zod';
 import { messageOf, runCommand } from './context.js';
 import { ModelPicker, useModelSetting, type Act } from './movie.js';
-import { Price } from './spend.js';
+import { formatUsd, Price } from './spend.js';
+import { fixed, t } from '../i18n/i18n.js';
 
 const Word = z.object({
   index: z.number(),
@@ -184,8 +185,10 @@ export function WordsPanel({
       );
       setNote(
         done.written === 0
-          ? 'Everything here was written down already.'
-          : `Written down${done.costUsd === null ? '' : ` for $${done.costUsd.toFixed(4)}`}.`,
+          ? t('Everything here was written down already.')
+          : done.costUsd === null
+            ? t('Written down.')
+            : t('Written down for {cost}.', { cost: formatUsd(done.costUsd, 4) }),
       );
       setRead((value) => value + 1);
     } catch (reason) {
@@ -224,21 +227,21 @@ export function WordsPanel({
           .join(' ');
 
   return (
-    <section className="words-panel" aria-label="Dialogue as text">
+    <section className="words-panel" aria-label={t('Dialogue as text')}>
       <header className="words-head">
         <div>
-          <p className="eyebrow">Words</p>
+          <p className="eyebrow">{t('Words')}</p>
           <p className="muted small">
-            Tap a word, then another to take in everything between (with a mouse, drag or
-            Shift-click). The words are selected on the timeline too, so Ctrl+X and Ctrl+V move
-            them.
+            {t(
+              'Tap a word, then another to take in everything between (with a mouse, drag or Shift-click). The words are selected on the timeline too, so Ctrl+X and Ctrl+V move them.',
+            )}
           </p>
         </div>
         <div className="words-write">
           <ModelPicker
             id="transcription-model"
-            label="Transcription model"
-            empty="Choose a model that gives word times"
+            label={t('Transcription model')}
+            empty={t('Choose a model that gives word times')}
             setting={TRANSCRIPTION_MODEL_SETTING}
             choice={model}
             act={act}
@@ -249,8 +252,8 @@ export function WordsPanel({
             disabled={writing || model.model === null || shown.length === 0}
             title={
               model.model === null
-                ? 'Choose a transcription model first'
-                : 'Costs a fraction of a cent a minute'
+                ? t('Choose a transcription model first')
+                : t('Costs a fraction of a cent a minute')
             }
             onClick={() => {
               void write();
@@ -262,10 +265,12 @@ export function WordsPanel({
               <TextTIcon aria-hidden="true" />
             )}
             {writing
-              ? 'Listening…'
+              ? t('Listening…')
               : missing === 0 && shown.length > 0
-                ? 'Check for new sound'
-                : `Write down what is said${missing > 1 ? ` (${String(missing)} regions)` : ''}`}
+                ? t('Check for new sound')
+                : missing > 1
+                  ? t('Write down what is said ({count} regions)', { count: missing })
+                  : t('Write down what is said')}
             {!writing && missing > 0 && (
               <Price command="audio.transcribe" input={{ projectId: project.id, docId }} />
             )}
@@ -280,7 +285,7 @@ export function WordsPanel({
       {note !== null && error === null && <p className="muted small">{note}</p>}
 
       {current !== null && span !== null && (
-        <div className="words-actions" role="toolbar" aria-label="Picked words">
+        <div className="words-actions" role="toolbar" aria-label={t('Picked words')}>
           <span className="words-chosen">“{chosenText}”</span>
           <button
             type="button"
@@ -289,27 +294,27 @@ export function WordsPanel({
               onPlay(span.from, span.to);
             }}
           >
-            <PlayIcon aria-hidden="true" weight="fill" /> Play
+            <PlayIcon aria-hidden="true" weight="fill" /> {t('Play')}
           </button>
           <button
             type="button"
             className="button small"
-            title="Removes the words and closes the gap"
+            title={t('Removes the words and closes the gap')}
             onClick={() => {
               void remove(false);
             }}
           >
-            <TrashIcon aria-hidden="true" /> Delete
+            <TrashIcon aria-hidden="true" /> {t('Delete')}
           </button>
           <button
             type="button"
             className="button small"
-            title="Removes the words and leaves the pause, so nothing moves"
+            title={t('Removes the words and leaves the pause, so nothing moves')}
             onClick={() => {
               void remove(true);
             }}
           >
-            <SpeakerSlashIcon aria-hidden="true" /> Silence
+            <SpeakerSlashIcon aria-hidden="true" /> {t('Silence')}
           </button>
         </div>
       )}
@@ -325,9 +330,9 @@ export function WordsPanel({
           setSweeping(false);
         }}
       >
-        {texts === null && <p className="muted small">Reading…</p>}
+        {texts === null && <p className="muted small">{t('Reading…')}</p>}
         {texts !== null && shown.length === 0 && (
-          <p className="muted small">No sound on the tracks yet.</p>
+          <p className="muted small">{t('No sound on the tracks yet.')}</p>
         )}
         {shown.map((text) => {
           const region = bounds.get(text.regionId);
@@ -336,11 +341,11 @@ export function WordsPanel({
               <p className="words-label mono small">
                 {trackNames.get(text.trackId) ?? ''}
                 {text.label === '' ? '' : ` · ${text.label}`}
-                {region === undefined ? '' : ` · ${region.startSeconds.toFixed(2)} s`}
+                {region === undefined ? '' : ` · ${fixed(region.startSeconds, 2)} s`}
               </p>
-              {!text.transcribed && <p className="muted small">Not written down yet.</p>}
+              {!text.transcribed && <p className="muted small">{t('Not written down yet.')}</p>}
               {text.transcribed && text.words.length === 0 && (
-                <p className="muted small">No words here.</p>
+                <p className="muted small">{t('No words here.')}</p>
               )}
               <p className="words-line">
                 {text.words.map((word) => {
@@ -361,7 +366,7 @@ export function WordsPanel({
                         // Some models note sounds that are not words, such as [laughs].
                         data-event={/^[[(].*[\])]$/.test(word.text)}
                         aria-pressed={inPick}
-                        title={`${word.startSeconds.toFixed(2)} s`}
+                        title={t('{value} s', { value: fixed(word.startSeconds, 2) })}
                         onPointerDown={(event) => {
                           onDown(event, text, word.index);
                         }}

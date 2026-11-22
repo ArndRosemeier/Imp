@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { z } from 'zod';
+import { t } from '../i18n/i18n.js';
 
 type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
@@ -17,14 +18,29 @@ export type MarkerView = z.infer<typeof MarkerView>;
 export const MarkerList = z.object({ markers: z.array(MarkerView) });
 
 export const MARKER_KINDS: readonly { kind: MarkerView['kind']; label: string }[] = [
-  { kind: 'note', label: 'Note' },
-  { kind: 'todo', label: 'To do' },
-  { kind: 'problem', label: 'Problem' },
+  {
+    kind: 'note',
+    get label(): string {
+      return t('Note');
+    },
+  },
+  {
+    kind: 'todo',
+    get label(): string {
+      return t('To do');
+    },
+  },
+  {
+    kind: 'problem',
+    get label(): string {
+      return t('Problem');
+    },
+  },
 ];
 
 /** Who left a marker, in words: you, or the crew member's role. */
 export function markerAuthor(by: string): string {
-  if (by === 'person') return 'You';
+  if (by === 'person') return t('You');
   const words = by.replace(/[-_]/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -46,15 +62,15 @@ export function MarkerLane({
   onSelect: (marker: MarkerView) => void;
 }): ReactElement {
   return (
-    <div className="lane lane-markers" aria-label="Markers">
-      <span className="lane-name">Markers</span>
+    <div className="lane lane-markers" aria-label={t('Markers')}>
+      <span className="lane-name">{t('Markers')}</span>
       {markers.map((marker) => (
         <button
           key={marker.id}
           className={`marker-flag marker-${marker.kind}${marker.done ? ' done' : ''}${marker.id === selectedId ? ' selected' : ''}`}
           style={{ left: marker.atSeconds * scale }}
           aria-pressed={marker.id === selectedId}
-          aria-label={`${MARKER_KINDS.find((kind) => kind.kind === marker.kind)?.label ?? 'Note'}${marker.done ? ', done' : ''}: ${marker.text}`}
+          aria-label={`${MARKER_KINDS.find((kind) => kind.kind === marker.kind)?.label ?? t('Note')}${marker.done ? `, ${t('done')}` : ''}: ${marker.text}`}
           title={`${marker.text} (${markerAuthor(marker.by)})`}
           onPointerDown={(event) => {
             event.stopPropagation();
@@ -89,12 +105,12 @@ export function MarkerInspector({
     void run('movie.edit.marker.set', { markerId: marker.id, ...fields });
   };
   return (
-    <section className="stack marker-inspector" aria-label="Marker">
+    <section className="stack marker-inspector" aria-label={t('Marker')}>
       <div className="row spread wrap">
-        <h4>Marker</h4>
-        <span className="muted small">by {markerAuthor(marker.by)}</span>
+        <h4>{t('Marker')}</h4>
+        <span className="muted small">{t('by {by}', { by: markerAuthor(marker.by) })}</span>
       </div>
-      <span className="segmented" role="group" aria-label="Kind of marker">
+      <span className="segmented" role="group" aria-label={t('Kind of marker')}>
         {MARKER_KINDS.map((choice) => (
           <button
             key={choice.kind}
@@ -108,7 +124,7 @@ export function MarkerInspector({
         ))}
       </span>
       <label className="field compact">
-        <span>What it says</span>
+        <span>{t('What it says')}</span>
         <textarea
           className="input"
           rows={3}
@@ -133,7 +149,7 @@ export function MarkerInspector({
               set({ done: event.target.checked });
             }}
           />
-          <span>Done</span>
+          <span>{t('Done')}</span>
         </label>
         <button
           className="button small"
@@ -141,7 +157,7 @@ export function MarkerInspector({
             set({ atSeconds: Math.round(playheadSeconds * 1000) / 1000 });
           }}
         >
-          Move to playhead
+          {t('Move to playhead')}
         </button>
         <button
           className="button small quiet"
@@ -149,7 +165,7 @@ export function MarkerInspector({
             void run('movie.edit.marker.remove', { markerId: marker.id }).then(onRemoved);
           }}
         >
-          Remove
+          {t('Remove')}
         </button>
       </div>
     </section>

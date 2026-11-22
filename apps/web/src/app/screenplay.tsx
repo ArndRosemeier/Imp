@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { runCommand, useImp, useLive, type Live } from './context.js';
 import { moviePrefix, type Act } from './movie.js';
 import { fileSafe, saveFileAs } from './save-file.js';
+import { t } from '../i18n/i18n.js';
 
 /**
  * The script as a screenplay: a page set the way scripts are set, and a
@@ -170,12 +171,12 @@ export function ScreenplayPage({
             className={`sp-shots${shots.length === 0 ? ' none' : ''}`}
             title={
               shots.length === 0
-                ? 'No shot speaks this line yet'
-                : `Spoken in shot ${shots.join(', ')}`
+                ? t('No shot speaks this line yet')
+                : t('Spoken in shot {value}', { value: shots.join(', ') })
             }
           >
             {shots.length === 0 ? (
-              'no shot'
+              t('no shot')
             ) : (
               <>
                 <FilmSlateIcon aria-hidden="true" /> {shots.join(', ')}
@@ -190,10 +191,10 @@ export function ScreenplayPage({
     // A tap on the page opens it for writing, as a tap on paper would.
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div className="screenplay" onClick={onWrite}>
-      <div className="screenplay-page" aria-label="The scene as a screenplay page">
+      <div className="screenplay-page" aria-label={t('The scene as a screenplay page')}>
         {heading.trim() !== '' && <p className="sp sp-heading">{heading.toUpperCase()}</p>}
         {elements.length === 0 && (
-          <p className="sp sp-empty">Nothing written yet. Tap to write the scene.</p>
+          <p className="sp sp-empty">{t('Nothing written yet. Tap to write the scene.')}</p>
         )}
         {groupDual(elements).map((group) => {
           if (typeof group === 'number') return renderAt(group);
@@ -276,7 +277,9 @@ export function makeLine(
   if (type === 'character') line = bare.toUpperCase();
   if (type === 'parenthetical') line = `(${bare})`;
   if (type === 'transition')
-    line = /:$|\.$/.test(bare) ? bare.toUpperCase() : `${bare.toUpperCase()} TO:`;
+    line = /:$|\.$/.test(bare)
+      ? bare.toUpperCase()
+      : t('{value} TO:', { value: bare.toUpperCase() });
   if (type === 'action' && bare !== '' && bare === bare.toUpperCase() && /\p{Lu}/u.test(bare)) {
     line = `!${bare}`;
   }
@@ -302,11 +305,21 @@ export function makeLine(
 }
 
 const TYPE_NAMES: Partial<Record<ScriptElementType, string>> = {
-  action: 'Action',
-  character: 'Character',
-  parenthetical: 'Direction',
-  dialogue: 'Dialogue',
-  transition: 'Transition',
+  get action(): string {
+    return t('Action');
+  },
+  get character(): string {
+    return t('Character');
+  },
+  get parenthetical(): string {
+    return t('Direction');
+  },
+  get dialogue(): string {
+    return t('Dialogue');
+  },
+  get transition(): string {
+    return t('Transition');
+  },
 };
 
 /**
@@ -369,7 +382,7 @@ export function ScreenplayWriter({
   };
   return (
     <div className="screenplay-writer">
-      <div className="sp-tools" role="toolbar" aria-label="Parts of a screenplay">
+      <div className="sp-tools" role="toolbar" aria-label={t('Parts of a screenplay')}>
         {CYCLE.map((type) => (
           <button
             key={type}
@@ -392,7 +405,7 @@ export function ScreenplayWriter({
             key={name}
             type="button"
             className="button quiet sp-tool sp-name"
-            title={`${name} speaks`}
+            title={t('{name} speaks', { name })}
             onPointerDown={(event) => {
               event.preventDefault();
             }}
@@ -407,11 +420,11 @@ export function ScreenplayWriter({
       <textarea
         ref={area}
         className="input script sp-text"
-        aria-label="Scene text, in Fountain"
+        aria-label={t('Scene text, in Fountain')}
         rows={18}
         value={draft}
         spellCheck
-        placeholder={'Rain hammers the glass.\n\nMARA\n(shouting)\nHold the light!'}
+        placeholder={t('Rain hammers the glass.\n\nMARA\n(shouting)\nHold the light!')}
         onChange={(event) => {
           setDraft(event.target.value);
           look(event.target.value, event.target.selectionStart);
@@ -447,8 +460,9 @@ export function ScreenplayWriter({
         }}
       />
       <p className="muted small">
-        Tab turns a line into the next part, Shift+Tab the one before. A name in capitals on its own
-        line speaks the lines under it; *italic* and **bold** mark emphasis.
+        {t(
+          'Tab turns a line into the next part, Shift+Tab the one before. A name in capitals on its own line speaks the lines under it; *italic* and **bold** mark emphasis.',
+        )}
       </p>
     </div>
   );
@@ -480,7 +494,7 @@ export function SceneScript({
   return (
     <div className="scene-script">
       <div className="row spread wrap">
-        <div className="segmented" role="group" aria-label="Show the scene as">
+        <div className="segmented" role="group" aria-label={t('Show the scene as')}>
           <button
             type="button"
             aria-pressed={!writing}
@@ -488,7 +502,7 @@ export function SceneScript({
               setWriting(false);
             }}
           >
-            <ArticleIcon aria-hidden="true" /> Page
+            <ArticleIcon aria-hidden="true" /> {t('Page')}
           </button>
           <button
             type="button"
@@ -497,7 +511,7 @@ export function SceneScript({
               setWriting(true);
             }}
           >
-            <PencilSimpleLineIcon aria-hidden="true" /> Write
+            <PencilSimpleLineIcon aria-hidden="true" /> {t('Write')}
           </button>
         </div>
       </div>
@@ -519,12 +533,12 @@ export function SceneScript({
       </div>
       {unscripted.length > 0 && (
         <div className="unscripted">
-          <h3>Spoken in shots, not in the script</h3>
+          <h3>{t('Spoken in shots, not in the script')}</h3>
           <ul>
             {unscripted.map((line) => (
               <li key={line.shotId} className="row spread wrap">
                 <span>
-                  <span className="muted">Shot {line.position}</span>
+                  <span className="muted">{t('Shot {position}', { position: line.position })}</span>
                   {line.speaker === null ? ' ' : ` · ${line.speaker}: `}
                   <q>{line.words}</q>
                 </span>
@@ -537,7 +551,7 @@ export function SceneScript({
                     void commit(next.trimStart());
                   }}
                 >
-                  <PlusIcon aria-hidden="true" /> Add to the script
+                  <PlusIcon aria-hidden="true" /> {t('Add to the script')}
                 </button>
               </li>
             ))}
@@ -567,9 +581,9 @@ export function ScriptFiles({
     setBusy(format);
     setError(null);
     const types = {
-      pdf: { mediaType: 'application/pdf', description: 'Screenplay PDF' },
-      fountain: { mediaType: 'text/plain', description: 'Fountain screenplay' },
-      fdx: { mediaType: 'application/xml', description: 'Final Draft screenplay' },
+      pdf: { mediaType: 'application/pdf', description: t('Screenplay PDF') },
+      fountain: { mediaType: 'text/plain', description: t('Fountain screenplay') },
+      fdx: { mediaType: 'application/xml', description: t('Final Draft screenplay') },
     } as const;
     void (async () => {
       try {
@@ -580,7 +594,7 @@ export function ScriptFiles({
               await runCommand(imp, 'movie.script.export', { projectId: project.id, format }),
             );
             const blob = await imp.blob(file.blobKey);
-            if (blob === undefined) throw new Error('The file went missing.');
+            if (blob === undefined) throw new Error(t('The file went missing.'));
             return blob.bytes;
           },
         );
@@ -592,7 +606,7 @@ export function ScriptFiles({
     })();
   };
   return (
-    <div className="script-files row wrap" role="group" aria-label="Script files">
+    <div className="script-files row wrap" role="group" aria-label={t('Script files')}>
       <button
         type="button"
         className="button quiet"
@@ -601,7 +615,7 @@ export function ScriptFiles({
           input.current?.click();
         }}
       >
-        <UploadSimpleIcon aria-hidden="true" /> Import
+        <UploadSimpleIcon aria-hidden="true" /> {t('Import')}
       </button>
       <input
         ref={input}
@@ -633,12 +647,12 @@ export function ScriptFiles({
           })();
         }}
       />
-      <span className="muted small">Download</span>
+      <span className="muted small">{t('Download')}</span>
       {(
         [
           ['pdf', 'PDF'],
           ['fountain', 'Fountain'],
-          ['fdx', 'Final Draft'],
+          ['fdx', t('Final Draft')],
         ] as const
       ).map(([format, name]) => (
         <button
@@ -648,16 +662,16 @@ export function ScriptFiles({
           disabled={busy !== null}
           title={
             format === 'pdf'
-              ? 'The script in the standard screenplay layout, to read, print or send'
+              ? t('The script in the standard screenplay layout, to read, print or send')
               : format === 'fountain'
-                ? 'Plain text that screenwriting apps open'
-                : 'For Final Draft and most production software'
+                ? t('Plain text that screenwriting apps open')
+                : t('For Final Draft and most production software')
           }
           onClick={() => {
             download(format);
           }}
         >
-          <DownloadSimpleIcon aria-hidden="true" /> {busy === format ? 'Writing…' : name}
+          <DownloadSimpleIcon aria-hidden="true" /> {busy === format ? t('Writing…') : name}
         </button>
       ))}
       {error !== null && (

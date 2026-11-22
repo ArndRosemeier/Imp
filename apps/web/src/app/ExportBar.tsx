@@ -11,6 +11,7 @@ import { saveFileAs } from './save-file.js';
 import { moviePrefix } from './movie.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
 import { FFMPEG_STATE_KEY } from '@imp/host';
+import { fixed, t, tn } from '../i18n/i18n.js';
 
 const Exports = z.object({
   canRender: z.boolean(),
@@ -22,9 +23,9 @@ const Exports = z.object({
 const SHOWN = 5;
 
 function size(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  if (bytes >= 1024 ** 3) return t('{value} GB', { value: fixed(bytes / 1024 ** 3, 1) });
+  if (bytes >= 1024 ** 2) return t('{value} MB', { value: fixed(bytes / 1024 ** 2, 1) });
+  return t('{value} KB', { value: String(Math.max(1, Math.round(bytes / 1024))) });
 }
 
 /** The stored parts of a rendered film, in order, written to the file one at a time. */
@@ -35,7 +36,7 @@ async function* filmParts(
 ): AsyncGenerator<Uint8Array> {
   for (let index = 0; index < film.parts; index++) {
     const part = await imp.blob(filmPartKey(projectId, film.id, index));
-    if (part === undefined) throw new Error('Part of the file is missing; render it again.');
+    if (part === undefined) throw new Error(t('Part of the file is missing; render it again.'));
     yield part.bytes;
   }
 }
@@ -94,7 +95,7 @@ function RenderedExports({
   const status =
     rendering === undefined
       ? starting
-        ? 'Starting'
+        ? t('Starting')
         : null
       : `${String(Math.floor((rendering.progressSeconds / Math.max(1, rendering.durationSeconds)) * 100))}%`;
   useEffect(() => {
@@ -130,7 +131,7 @@ function RenderedExports({
   const save = (film: FilmExport): void => {
     setSaving(film.id);
     saveFileAs(
-      { suggestedName: film.fileName, mediaType: film.mediaType, description: 'Film' },
+      { suggestedName: film.fileName, mediaType: film.mediaType, description: t('Film') },
       () => filmParts(imp, project.id, film),
     )
       .catch((cause: unknown) => {
@@ -142,7 +143,9 @@ function RenderedExports({
   };
   const speed = (film: FilmExport): string =>
     film.renderSeconds > 0 && film.progressSeconds > 0
-      ? ` · ${(film.progressSeconds / film.renderSeconds).toFixed(1)}× real time`
+      ? t(' · {value}× real time', {
+          value: fixed(film.progressSeconds / film.renderSeconds, 1),
+        })
       : '';
   const shown = exports.filter((film) => film.status !== 'rendering').slice(0, SHOWN);
 
@@ -156,7 +159,7 @@ function RenderedExports({
             if (sceneId !== undefined) start([sceneId]);
           }}
         >
-          <DownloadSimpleIcon aria-hidden="true" /> Export scene
+          <DownloadSimpleIcon aria-hidden="true" /> {t('Export scene')}
         </button>
         <button
           className="button"
@@ -165,7 +168,7 @@ function RenderedExports({
             start(undefined);
           }}
         >
-          <FilmStripIcon aria-hidden="true" /> Export film
+          <FilmStripIcon aria-hidden="true" /> {t('Export film')}
         </button>
         {rendering !== undefined && (
           <>
@@ -175,25 +178,29 @@ function RenderedExports({
                 act('movie.edit.export.cancel', { exportId: rendering.id });
               }}
             >
-              <StopIcon aria-hidden="true" /> Cancel
+              <StopIcon aria-hidden="true" /> {t('Cancel')}
             </button>
             <progress
-              aria-label="Export progress"
+              aria-label={t('Export progress')}
               max={Math.max(1, rendering.durationSeconds)}
               value={rendering.progressSeconds}
             />
             <span className="muted mono" role="status">
-              Rendering {rendering.label} · {clock(rendering.progressSeconds)} /{' '}
-              {clock(rendering.durationSeconds)}
-              {speed(rendering)}
-              {rendering.by === 'you' ? '' : ` · by ${rendering.by}`}
+              {t('Rendering {label} · {progressSeconds} / {durationSeconds}{rendering}', {
+                label: rendering.label,
+                progressSeconds: clock(rendering.progressSeconds),
+                durationSeconds: clock(rendering.durationSeconds),
+                rendering: speed(rendering),
+              })}
+              {rendering.by === 'you' ? '' : ` · ${t('by {name}', { name: rendering.by })}`}
             </span>
           </>
         )}
       </div>
       <p className="muted">
-        Films are rendered to MP4 in the background, faster than real time. You can keep working or
-        switch tabs while it runs, and the Film Editor can export too.
+        {t(
+          'Films are rendered to MP4 in the background, faster than real time. You can keep working or switch tabs while it runs, and the Film Editor can export too.',
+        )}
       </p>
       {error !== null && (
         <p role="alert" className="error">
@@ -201,23 +208,30 @@ function RenderedExports({
         </p>
       )}
       {shown.length > 0 && (
-        <ul className="film-exports" aria-label="Rendered films">
+        <ul className="film-exports" aria-label={t('Rendered films')}>
           {shown.map((film) => (
             <li key={film.id} className="film-export">
               <span className="film-export-name">{film.fileName}</span>
               <span className="muted mono">
                 {film.status === 'ready'
-                  ? `${clock(film.durationSeconds)} · ${String(film.width)}×${String(film.height)} ${String(film.fps)} fps · ${size(film.sizeBytes)}`
+                  ? t('{durationSeconds} · {width}×{height} {fps} fps · {sizeBytes}', {
+                      durationSeconds: clock(film.durationSeconds),
+                      width: String(film.width),
+                      height: String(film.height),
+                      fps: String(film.fps),
+                      sizeBytes: size(film.sizeBytes),
+                    })
                   : film.status === 'cancelled'
-                    ? 'Cancelled'
-                    : `Failed: ${film.error}`}
-                {film.by === 'you' ? '' : ` · by ${film.by}`}
+                    ? t('Cancelled')
+                    : t('Failed: {error}', { error: film.error })}
+                {film.by === 'you' ? '' : ` · ${t('by {name}', { name: film.by })}`}
               </span>
               {film.status === 'ready' && (film.notReady.length > 0 || film.unheard.length > 0) && (
                 <span className="muted film-export-note">
                   {film.notReady.length > 0 &&
-                    `${String(film.notReady.length)} item${film.notReady.length === 1 ? '' : 's'} not ready. `}
-                  {film.unheard.length > 0 && `Silent: ${film.unheard.join(', ')}.`}
+                    `${tn(film.notReady.length, '{count} item not ready.', '{count} items not ready.')} `}
+                  {film.unheard.length > 0 &&
+                    t('Silent: {value}.', { value: film.unheard.join(', ') })}
                 </span>
               )}
               <span className="row film-export-actions">
@@ -230,13 +244,13 @@ function RenderedExports({
                     }}
                   >
                     <DownloadSimpleIcon aria-hidden="true" />{' '}
-                    {saving === film.id ? 'Preparing…' : 'Download'}
+                    {saving === film.id ? t('Preparing…') : t('Download')}
                   </button>
                 )}
                 <button
                   className="button small icon danger-quiet"
-                  aria-label={`Delete ${film.fileName}`}
-                  title="Delete"
+                  aria-label={t('Delete {fileName}', { fileName: film.fileName })}
+                  title={t('Delete')}
                   onClick={() => {
                     act('movie.edit.export.delete', { exportId: film.id });
                   }}
@@ -297,7 +311,7 @@ function RecordedExport({
       {
         suggestedName: `${project.name.replace(/[^\w.-]+/g, '-')}-${label}.${extension}`,
         mediaType: format?.mimeType.split(';')[0] ?? 'video/webm',
-        description: 'Film',
+        description: t('Film'),
       },
       async () => {
         const recording = await recordScenes(imp, project.id, ids, setProgress, controller.signal);
@@ -306,7 +320,8 @@ function RecordedExport({
       },
     )
       .then((outcome) => {
-        if (outcome.saved) setDone(`Saved ${outcome.name} (${clock(seconds)}).`);
+        if (outcome.saved)
+          setDone(t('Saved {name} ({seconds}).', { name: outcome.name, seconds: clock(seconds) }));
       })
       .catch((cause: unknown) => {
         setError(messageOf(cause));
@@ -326,7 +341,7 @@ function RecordedExport({
             if (sceneId !== undefined) start([sceneId], 'scene');
           }}
         >
-          <DownloadSimpleIcon aria-hidden="true" /> Export scene
+          <DownloadSimpleIcon aria-hidden="true" /> {t('Export scene')}
         </button>
         <button
           className="button"
@@ -335,7 +350,7 @@ function RecordedExport({
             start(sceneIds, 'film');
           }}
         >
-          <FilmStripIcon aria-hidden="true" /> Export film
+          <FilmStripIcon aria-hidden="true" /> {t('Export film')}
         </button>
         {running && (
           <>
@@ -345,16 +360,20 @@ function RecordedExport({
                 abort.current?.abort();
               }}
             >
-              <StopIcon aria-hidden="true" /> Cancel
+              <StopIcon aria-hidden="true" /> {t('Cancel')}
             </button>
             <progress
-              aria-label="Export progress"
+              aria-label={t('Export progress')}
               max={Math.max(1, progress.totalSeconds)}
               value={progress.seconds}
             />
             <span className="muted mono" role="status">
-              Scene {String(progress.scene)} of {String(progress.scenes)} ·{' '}
-              {clock(progress.seconds)} / {clock(progress.totalSeconds)}
+              {t('Scene {scene} of {scenes} · {seconds} / {totalSeconds}', {
+                scene: String(progress.scene),
+                scenes: String(progress.scenes),
+                seconds: clock(progress.seconds),
+                totalSeconds: clock(progress.totalSeconds),
+              })}
             </span>
           </>
         )}
@@ -362,8 +381,11 @@ function RecordedExport({
       <FfmpegOffer compact />
       <p className="muted">
         {format === null
-          ? 'This browser cannot record video. Try a current Chrome, Edge or Safari.'
-          : `Films cannot be rendered in the background here, so the cut is played through once in real time and recorded as ${format.extension.toUpperCase()}. Keep this tab visible until it finishes.`}
+          ? t('This browser cannot record video. Try a current Chrome, Edge or Safari.')
+          : t(
+              'Films cannot be rendered in the background here, so the cut is played through once in real time and recorded as {value}. Keep this tab visible until it finishes.',
+              { value: format.extension.toUpperCase() },
+            )}
       </p>
       {done !== null && <p role="status">{done}</p>}
       {error !== null && (

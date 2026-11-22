@@ -8,8 +8,9 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
 import { SceneTabs } from './shots.js';
-import { Price } from './spend.js';
+import { formatUsd, Price } from './spend.js';
 import { EmptyState } from './help/EmptyState.js';
+import { t, tn } from '../i18n/i18n.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true })),
@@ -18,16 +19,26 @@ const Sounds = z.object({ sounds: z.array(Sound) });
 
 const KIND = {
   effect: {
-    label: 'Sound effect',
+    get label(): string {
+      return t('Sound effect');
+    },
     icon: WaveformIcon,
-    placeholder:
-      'The source, its character, how it starts and ends. A heavy wooden door slamming shut in a stone hall, long echo.',
+    get placeholder(): string {
+      return t(
+        'The source, its character, how it starts and ends. A heavy wooden door slamming shut in a stone hall, long echo.',
+      );
+    },
   },
   music: {
-    label: 'Music',
+    get label(): string {
+      return t('Music');
+    },
     icon: MusicNotesIcon,
-    placeholder:
-      'Instruments, tempo, mood and how it develops. Low strings, slow, uneasy, swelling towards the end.',
+    get placeholder(): string {
+      return t(
+        'Instruments, tempo, mood and how it develops. Low strings, slow, uneasy, swelling towards the end.',
+      );
+    },
   },
 } as const;
 
@@ -53,8 +64,8 @@ function SoundCard({
           <kind.icon aria-hidden="true" size={16} /> {kind.label}
         </span>
         <ConfirmButton
-          label="Delete sound"
-          question="Delete this sound for good?"
+          label={t('Delete sound')}
+          question={t('Delete this sound for good?')}
           onConfirm={() => {
             void act('movie.sound.delete', at);
           }}
@@ -63,13 +74,13 @@ function SoundCard({
         </ConfirmButton>
       </div>
       <EditableField
-        label="Name"
+        label={t('Name')}
         value={sound.name}
-        placeholder={sound.kind === 'music' ? 'Storm theme' : 'Wind on the gallery'}
+        placeholder={sound.kind === 'music' ? t('Storm theme') : t('Wind on the gallery')}
         onCommit={(name) => act('movie.sound.update', { ...at, name })}
       />
       <EditableField
-        label="What is heard"
+        label={t('What is heard')}
         rows={3}
         value={sound.description}
         placeholder={kind.placeholder}
@@ -77,20 +88,20 @@ function SoundCard({
       />
       {making ? (
         <div className="sound-empty" role="status" aria-busy="true">
-          Being made…
+          {t('Being made…')}
         </div>
       ) : sound.take === null ? (
-        <div className="sound-empty">Not made yet</div>
+        <div className="sound-empty">{t('Not made yet')}</div>
       ) : (
         <figure className="sound-take">
           {url !== null && (
             // There are no words in it to caption.
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <audio controls src={url} aria-label={`Recording of ${title}`} />
+            <audio controls src={url} aria-label={t('Recording of {title}', { title })} />
           )}
           <figcaption className="muted">
             {sound.take.model}
-            {sound.take.costUsd === null ? '' : ` · $${sound.take.costUsd.toFixed(2)}`}
+            {sound.take.costUsd === null ? '' : ` · ${formatUsd(sound.take.costUsd)}`}
           </figcaption>
         </figure>
       )}
@@ -100,8 +111,10 @@ function SoundCard({
           disabled={making || model === null || sound.description.trim() === ''}
           title={
             model === null
-              ? `Choose a model for ${sound.kind === 'music' ? 'music' : 'sound effects'} first.`
-              : `Made with ${model}.`
+              ? sound.kind === 'music'
+                ? t('Choose a music model first.')
+                : t('Choose a sound effects model first.')
+              : t('Made with {model}.', { model })
           }
           onClick={() => {
             setMaking(true);
@@ -110,7 +123,8 @@ function SoundCard({
             });
           }}
         >
-          <kind.icon aria-hidden="true" /> {sound.take === null ? 'Generate' : 'Generate again'}
+          <kind.icon aria-hidden="true" />{' '}
+          {sound.take === null ? t('Generate') : t('Generate again')}
           <Price command="movie.sound.generate" input={at} />
         </button>
       </div>
@@ -142,9 +156,9 @@ export function SoundView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Sound</h1>
+        <h1>{t('Sound')}</h1>
         <span className="muted">
-          {sounds.length === 1 ? '1 sound' : `${String(sounds.length)} sounds`} in this scene
+          {tn(sounds.length, '{count} sound in this scene', '{count} sounds in this scene')}
         </span>
       </div>
       <ModelBar
@@ -152,20 +166,22 @@ export function SoundView({ project }: { project: Project }): ReactElement {
         models={[
           {
             id: 'effects-model',
-            label: 'Sound effects',
-            empty: 'Choose a model to make effects',
+            label: t('Sound effects'),
+            empty: t('Choose a model to make effects'),
             setting: EFFECT_MODEL_SETTING,
             choice: effects,
           },
           {
             id: 'music-model',
-            label: 'Music',
-            empty: 'Choose a model to make music',
+            label: t('Music'),
+            empty: t('Choose a model to make music'),
             setting: MUSIC_MODEL_SETTING,
             choice: music,
           },
         ]}
-        note="Effects are made by speech models, and not every one of them can: a model that cannot reads the description aloud instead."
+        note={t(
+          'Effects are made by speech models, and not every one of them can: a model that cannot reads the description aloud instead.',
+        )}
       />
       <Problem
         text={outline.error ?? listed.error ?? error ?? effects.error ?? music.error}
@@ -176,10 +192,12 @@ export function SoundView({ project }: { project: Project }): ReactElement {
         outline.data !== undefined && (
           <EmptyState
             icon={WaveformIcon}
-            title="Write a scene first"
-            quip="Even an imp can’t score a scene nobody has written."
-            body="Sounds belong to scenes, and there are no scenes yet. Write the script first."
-            go={{ stage: 'script', label: 'Go to Script' }}
+            title={t('Write a scene first')}
+            quip={t('Even an imp can’t score a scene nobody has written.')}
+            body={t(
+              'Sounds belong to scenes, and there are no scenes yet. Write the script first.',
+            )}
+            go={{ stage: 'script', label: t('Go to Script') }}
           />
         )
       ) : (
@@ -187,10 +205,14 @@ export function SoundView({ project }: { project: Project }): ReactElement {
           {listed.data !== undefined && sounds.length === 0 && (
             <EmptyState
               icon={WaveformIcon}
-              title="Nothing to hear yet"
-              quip="Suspiciously quiet in here."
-              body="This scene is silent so far. Add an effect or music, or have the sound of the scene worked out for you."
-              ask="Work out what the scene I am looking at sounds like: ambience, effects and music. Tell me the price before making them."
+              title={t('Nothing to hear yet')}
+              quip={t('Suspiciously quiet in here.')}
+              body={t(
+                'This scene is silent so far. Add an effect or music, or have the sound of the scene worked out for you.',
+              )}
+              ask={t(
+                'Work out what the scene I am looking at sounds like: ambience, effects and music. Tell me the price before making them.',
+              )}
             />
           )}
           <div className="grid sounds">
@@ -210,7 +232,7 @@ export function SoundView({ project }: { project: Project }): ReactElement {
                 add('effect');
               }}
             >
-              <PlusIcon aria-hidden="true" /> Add sound effect
+              <PlusIcon aria-hidden="true" /> {t('Add sound effect')}
             </button>
             <button
               className="button"
@@ -218,7 +240,7 @@ export function SoundView({ project }: { project: Project }): ReactElement {
                 add('music');
               }}
             >
-              <PlusIcon aria-hidden="true" /> Add music
+              <PlusIcon aria-hidden="true" /> {t('Add music')}
             </button>
           </div>
         </>

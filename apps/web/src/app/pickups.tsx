@@ -1,5 +1,7 @@
 import { useId, useState, type ReactElement } from 'react';
 import type { Item } from './cut-player.js';
+import { fixed, t } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
@@ -9,15 +11,22 @@ export function PickupNote({ item }: { item: Item }): ReactElement | null {
   return (
     <div className="pickup-note stack">
       <p>
-        <strong>Pickup to come.</strong> It stands here as a slate of{' '}
-        {item.durationSeconds.toFixed(1)} s until its clip is ready, then the clip takes its place.
+        <Marked
+          text={t(
+            '**Pickup to come.** It stands here as a slate of {value} s until its clip is ready, then the clip takes its place.',
+            { value: fixed(item.durationSeconds, 1) },
+          )}
+        />
       </p>
       {item.pickupReason !== null && item.pickupReason !== '' && (
-        <p className="muted">Needed for: {item.pickupReason}</p>
+        <p className="muted">
+          {t('Needed for: {pickupReason}', { pickupReason: item.pickupReason })}
+        </p>
       )}
       <p className="muted small">
-        Make its clip on the Shots screen, or ask the Clip Designer, who finds it with the open
-        pickups.
+        {t(
+          'Make its clip on the Shots screen, or ask the Clip Designer, who finds it with the open pickups.',
+        )}
       </p>
     </div>
   );
@@ -50,7 +59,7 @@ export function PickupRequest({
           setOpen(true);
         }}
       >
-        Ask for a shot after this
+        {t('Ask for a shot after this')}
       </button>
     );
   }
@@ -79,35 +88,35 @@ export function PickupRequest({
   const ready = description.trim() !== '' && reason.trim() !== '' && !busy;
   return (
     <section className="stack pickup-request" aria-labelledby={titleId}>
-      <h4 id={titleId}>Pickup shot</h4>
+      <h4 id={titleId}>{t('Pickup shot')}</h4>
       <p className="muted small">
-        A shot the cut needs and does not have. It goes in as a slate until its clip is made.
+        {t('A shot the cut needs and does not have. It goes in as a slate until its clip is made.')}
       </p>
       <label className="field compact">
-        <span>What the camera shows</span>
+        <span>{t('What the camera shows')}</span>
         <textarea
           className="input"
           rows={3}
           value={description}
-          placeholder="Close-up of Mara's hands tightening on the rail"
+          placeholder={t("Close-up of Mara's hands tightening on the rail")}
           onChange={(event) => {
             setDescription(event.target.value);
           }}
         />
       </label>
       <label className="field compact">
-        <span>What the cut needs it for</span>
+        <span>{t('What the cut needs it for')}</span>
         <input
           className="input"
           value={reason}
-          placeholder="Covers the jump in her answer"
+          placeholder={t('Covers the jump in her answer')}
           onChange={(event) => {
             setReason(event.target.value);
           }}
         />
       </label>
       <label className="field compact">
-        <span>How long (s)</span>
+        <span>{t('How long (s)')}</span>
         <input
           className="input"
           type="number"
@@ -123,7 +132,7 @@ export function PickupRequest({
       </label>
       <div className="row wrap">
         <button className="button primary small" disabled={!ready} onClick={send}>
-          {busy ? 'Asking…' : 'Put it in the cut'}
+          {busy ? t('Asking…') : t('Put it in the cut')}
         </button>
         <button
           className="button small quiet"
@@ -131,7 +140,7 @@ export function PickupRequest({
             setOpen(false);
           }}
         >
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
       {problem !== '' && <p className="problem small">{problem}</p>}

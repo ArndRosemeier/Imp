@@ -3,11 +3,12 @@ import { DownloadSimpleIcon } from '@phosphor-icons/react';
 import { useState, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
+import { t } from '../i18n/i18n.js';
 
 const DISMISSED = 'imp.ffmpeg-offer.dismissed';
 
 function megabytes(bytes: number): string {
-  return `${String(Math.round(bytes / 1024 ** 2))} MB`;
+  return t('{value} MB', { value: String(Math.round(bytes / 1024 ** 2)) });
 }
 
 /** ffmpeg on the local server as it is now; undefined in the browser or while loading. */
@@ -42,8 +43,12 @@ export function FfmpegOffer({ compact = false }: { compact?: boolean }): ReactEl
     return compact ? null : (
       <p className="muted">
         {status.source === 'system'
-          ? 'ffmpeg is installed on this computer, so films render in the background and clip sound can be heard.'
-          : 'Imp downloaded ffmpeg into its data folder, so films render in the background and clip sound can be heard.'}
+          ? t(
+              'ffmpeg is installed on this computer, so films render in the background and clip sound can be heard.',
+            )
+          : t(
+              'Imp downloaded ffmpeg into its data folder, so films render in the background and clip sound can be heard.',
+            )}
       </p>
     );
   }
@@ -64,27 +69,36 @@ export function FfmpegOffer({ compact = false }: { compact?: boolean }): ReactEl
     <div className={compact ? 'callout stack' : 'stack'} role="group" aria-label="ffmpeg">
       <p className={compact ? undefined : 'muted'}>
         {status.canDownload
-          ? `Export films faster: Imp can download ffmpeg${status.downloadBytes === null ? '' : ` (${megabytes(status.downloadBytes)})`}, free software that renders films in the background and lets you hear the sound inside video clips. Without it, films are recorded in the browser in real time.`
-          : 'Install ffmpeg from ffmpeg.org and start Imp again to render films in the background and hear the sound inside video clips. Without it, films are recorded in the browser in real time.'}
+          ? t(
+              'Export films faster: Imp can download ffmpeg{value}, free software that renders films in the background and lets you hear the sound inside video clips. Without it, films are recorded in the browser in real time.',
+              {
+                value: status.downloadBytes === null ? '' : ` (${megabytes(status.downloadBytes)})`,
+              },
+            )
+          : t(
+              'Install ffmpeg from ffmpeg.org and start Imp again to render films in the background and hear the sound inside video clips. Without it, films are recorded in the browser in real time.',
+            )}
       </p>
       {status.canDownload && (
         <div className="row wrap">
           {downloading === null ? (
             <button type="button" className="button" onClick={install}>
-              <DownloadSimpleIcon aria-hidden="true" /> Download ffmpeg
+              <DownloadSimpleIcon aria-hidden="true" /> {t('Download ffmpeg')}
             </button>
           ) : (
             <>
               <progress
-                aria-label="ffmpeg download"
+                aria-label={t('ffmpeg download')}
                 max={Math.max(1, downloading.totalBytes)}
                 value={downloading.receivedBytes}
               />
               <span className="muted mono" role="status">
-                Downloading ffmpeg
                 {downloading.receivedBytes > 0
-                  ? `, ${megabytes(downloading.receivedBytes)} of ${megabytes(downloading.totalBytes)}`
-                  : ''}
+                  ? t('Downloading ffmpeg, {received} of {total}', {
+                      received: megabytes(downloading.receivedBytes),
+                      total: megabytes(downloading.totalBytes),
+                    })
+                  : t('Downloading ffmpeg')}
               </span>
             </>
           )}
@@ -101,7 +115,7 @@ export function FfmpegOffer({ compact = false }: { compact?: boolean }): ReactEl
                 }
               }}
             >
-              Not now
+              {t('Not now')}
             </button>
           )}
         </div>

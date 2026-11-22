@@ -1,20 +1,57 @@
 import { useId, type ReactElement } from 'react';
 import type { Item } from './cut-player.js';
 import { NumberField } from './NumberField.js';
+import { t } from '../i18n/i18n.js';
 
 type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
 /** The transitions offered, in the words of an editor. */
 export const TRANSITIONS: readonly { kind: Item['transition']; label: string; hint: string }[] = [
-  { kind: 'cut', label: 'Cut', hint: 'Straight cut, no transition' },
-  { kind: 'dissolve', label: 'Dissolve', hint: 'Fades over the shot before' },
+  {
+    kind: 'cut',
+    get label(): string {
+      return t('Cut');
+    },
+    get hint(): string {
+      return t('Straight cut, no transition');
+    },
+  },
+  {
+    kind: 'dissolve',
+    get label(): string {
+      return t('Dissolve');
+    },
+    get hint(): string {
+      return t('Fades over the shot before');
+    },
+  },
   {
     kind: 'dip-black',
-    label: 'Dip to black',
-    hint: 'The shot before fades to black, this one fades up',
+    get label(): string {
+      return t('Dip to black');
+    },
+    get hint(): string {
+      return t('The shot before fades to black, this one fades up');
+    },
   },
-  { kind: 'dip-white', label: 'Dip to white', hint: 'Through a flash of white' },
-  { kind: 'wipe', label: 'Wipe', hint: 'Wipes across the shot before, left to right' },
+  {
+    kind: 'dip-white',
+    get label(): string {
+      return t('Dip to white');
+    },
+    get hint(): string {
+      return t('Through a flash of white');
+    },
+  },
+  {
+    kind: 'wipe',
+    get label(): string {
+      return t('Wipe');
+    },
+    get hint(): string {
+      return t('Wipes across the shot before, left to right');
+    },
+  },
 ];
 
 /** What a transition does to the scene, said plainly. */
@@ -22,10 +59,12 @@ export function transitionNote(item: Pick<Item, 'transition' | 'overlapSeconds'>
   if (item.transition === 'cut') return '';
   if (item.transition === 'dissolve' || item.transition === 'wipe') {
     return item.overlapSeconds > 0
-      ? `Lies over the shot before for ${String(item.overlapSeconds)} s, so the scene is that much shorter.`
-      : 'There is no room to overlap the piece before.';
+      ? t('Lies over the shot before for {overlapSeconds} s, so the scene is that much shorter.', {
+          overlapSeconds: String(item.overlapSeconds),
+        })
+      : t('There is no room to overlap the piece before.');
   }
-  return 'Fades out and in at the cut; the scene keeps its length.';
+  return t('Fades out and in at the cut; the scene keeps its length.');
 }
 
 /**
@@ -41,8 +80,8 @@ export function TransitionPicker({ item, run }: { item: Item; run: Run }): React
   const note = transitionNote(item);
   return (
     <section className="stack transition-picker" aria-labelledby={titleId}>
-      <h4 id={titleId}>Comes in with</h4>
-      <span className="segmented wrap" role="group" aria-label="Transition">
+      <h4 id={titleId}>{t('Comes in with')}</h4>
+      <span className="segmented wrap" role="group" aria-label={t('Transition')}>
         {TRANSITIONS.map((choice) => (
           <button
             key={choice.kind}
@@ -58,7 +97,7 @@ export function TransitionPicker({ item, run }: { item: Item; run: Run }): React
       </span>
       {item.transition !== 'cut' && (
         <NumberField
-          label="Length (s)"
+          label={t('Length (s)')}
           value={item.transitionSeconds}
           step={0.25}
           min={0.1}

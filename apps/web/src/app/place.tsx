@@ -3,6 +3,7 @@ import { WorldElement } from '@imp/world';
 import { useId, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
+import { t } from '../i18n/i18n.js';
 
 const Items = z.object({ items: z.array(WorldElement) });
 
@@ -44,7 +45,7 @@ export function ScenePlace({
   return (
     <div className="row wrap scene-place">
       <div className="field">
-        <label htmlFor={placeId}>Location</label>
+        <label htmlFor={placeId}>{t('Location')}</label>
         <select
           id={placeId}
           className="select"
@@ -56,7 +57,9 @@ export function ScenePlace({
             });
           }}
         >
-          <option value="">{locations.length === 0 ? 'No locations designed yet' : 'None'}</option>
+          <option value="">
+            {locations.length === 0 ? t('No locations designed yet') : t('None')}
+          </option>
           {locations.map((candidate) => (
             <option key={candidate.id} value={candidate.id}>
               {candidate.name}
@@ -66,7 +69,7 @@ export function ScenePlace({
       </div>
       {place !== undefined && place.states.length > 0 && (
         <div className="field">
-          <label htmlFor={stateFieldId}>State</label>
+          <label htmlFor={stateFieldId}>{t('State')}</label>
           <select
             id={stateFieldId}
             className="select"
@@ -78,7 +81,7 @@ export function ScenePlace({
               });
             }}
           >
-            <option value="">Usual look</option>
+            <option value="">{t('Usual look')}</option>
             {place.states.map((state) => (
               <option key={state.id} value={state.id}>
                 {state.name}
@@ -119,7 +122,7 @@ export function ShotPlace({
     <>
       {place !== undefined && (
         <div className="field">
-          <label htmlFor={viewFieldId}>Filmed from ({place.name})</label>
+          <label htmlFor={viewFieldId}>{t('Filmed from ({name})', { name: place.name })}</label>
           <select
             id={viewFieldId}
             className="select"
@@ -128,7 +131,9 @@ export function ShotPlace({
               void change({ viewId: event.target.value === '' ? null : event.target.value });
             }}
           >
-            <option value="">{place.views[0]?.name ?? 'First view'} (master)</option>
+            <option value="">
+              {place.views[0]?.name ?? t('First view')} {t('(master)')}
+            </option>
             {place.views.slice(1).map((view) => (
               <option key={view.id} value={view.id}>
                 {view.name}
@@ -139,7 +144,7 @@ export function ShotPlace({
       )}
       {objects.length > 0 && (
         <fieldset className="choices">
-          <legend>Objects seen</legend>
+          <legend>{t('Objects seen')}</legend>
           {objects.map((object) => (
             <label key={object.id} className="choice">
               <input

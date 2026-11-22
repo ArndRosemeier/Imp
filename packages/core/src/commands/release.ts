@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineCommand, type Command } from '../command.js';
+import { Language, readLanguage } from '../language.js';
 
 const Version = z
   .string()
@@ -15,6 +16,10 @@ export const ReleaseEntry = z.object({
   title: z.string(),
   pr: z.number().int().optional().describe('The pull request that brought it.'),
   notes: z.array(z.string()).describe('One plain-language line per change people will notice.'),
+  translations: z
+    .record(z.string(), z.object({ title: z.string(), notes: z.array(z.string()) }))
+    .optional()
+    .describe('The title and notes in other languages, by language id.'),
 });
 export type ReleaseEntry = z.infer<typeof ReleaseEntry>;
 
@@ -69,6 +74,9 @@ export function createReleaseCommands(release: ReleaseNotes): readonly Command[]
     input: z.object({
       since: Version.optional().describe('Only versions newer than this one.'),
       limit: z.number().int().min(1).optional().describe('At most this many versions.'),
+      language: Language.optional().describe(
+        'The language to tell it in; the interface language when left out. Versions not translated stay in English.',
+      ),
     }),
     output: z.object({
       version: Version,
@@ -76,16 +84,19 @@ export function createReleaseCommands(release: ReleaseNotes): readonly Command[]
       releases: z.array(ReleaseEntry),
       more: z.number().int().describe('How many more versions match but were left out by `limit`.'),
     }),
-    handler: (_context, { since, limit }) => {
+    handler: async ({ runtime }, { since, limit, language }) => {
+      const told = language ?? (await readLanguage(runtime.store));
       const after = since === undefined ? -1 : versionNumber(since);
       const matching = notes.releases.filter((release) => versionNumber(release.version) > after);
-      const releases = limit === undefined ? matching : matching.slice(0, limit);
-      return Promise.resolve({
+      const releases = (limit === undefined ? matching : matching.slice(0, limit)).map(
+        ({ translations, ...release }) => ({ ...release, ...translations?.[told] }),
+      );
+      return {
         version: notes.version,
         preview: notes.preview,
         releases,
         more: matching.length - releases.length,
-      });
+      };
     },
   });
 

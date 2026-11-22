@@ -3,6 +3,7 @@ import type { ImpClient } from '@imp/host';
 import { RecordIcon, StopIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { messageOf, runCommand } from './context.js';
+import { fixed, t } from '../i18n/i18n.js';
 
 /**
  * Collects what the microphone hears, sample by sample, off the main thread.
@@ -129,8 +130,8 @@ export function RecordControl({
       setState('idle');
       onError(
         reason instanceof DOMException && reason.name === 'NotAllowedError'
-          ? 'The microphone is blocked. Allow it for this site in the browser, then try again.'
-          : `The microphone could not start: ${messageOf(reason)}`,
+          ? t('The microphone is blocked. Allow it for this site in the browser, then try again.')
+          : t('The microphone could not start: {reason}', { reason: messageOf(reason) }),
       );
       return;
     }
@@ -148,7 +149,7 @@ export function RecordControl({
     try {
       const bytes = await mic.stop();
       if (bytes === null) {
-        onError('Nothing was heard from the microphone.');
+        onError(t('Nothing was heard from the microphone.'));
         return;
       }
       const uploadKey = await imp.upload(bytes, 'audio/wav');
@@ -171,8 +172,8 @@ export function RecordControl({
     return (
       <div className="recording" role="status" aria-live="polite">
         <span className="rec-dot" aria-hidden="true" />
-        <span className="mono">{elapsed.toFixed(1)} s</span>
-        <span className="rec-meter" aria-label="Input level">
+        <span className="mono">{t('{value} s', { value: fixed(elapsed, 1) })}</span>
+        <span className="rec-meter" aria-label={t('Input level')}>
           <span style={{ width: `${String(Math.min(100, Math.round(level * 100)))}%` }} />
         </span>
         <button
@@ -183,7 +184,8 @@ export function RecordControl({
             void stop();
           }}
         >
-          <StopIcon aria-hidden="true" weight="fill" /> {state === 'saving' ? 'Saving…' : 'Stop'}
+          <StopIcon aria-hidden="true" weight="fill" />{' '}
+          {state === 'saving' ? t('Saving…') : t('Stop')}
         </button>
       </div>
     );
@@ -192,9 +194,9 @@ export function RecordControl({
     <button
       type="button"
       className="tool record"
-      aria-label="Record"
+      aria-label={t('Record')}
       aria-keyshortcuts="R"
-      title={disabledReason ?? 'Record from the playhead (R)'}
+      title={disabledReason ?? t('Record from the playhead (R)')}
       disabled={disabledReason !== null || state === 'starting'}
       onClick={() => {
         void start();

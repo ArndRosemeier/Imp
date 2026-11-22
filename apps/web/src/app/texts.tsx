@@ -33,6 +33,7 @@ import { moviePrefix, type Act } from './movie.js';
 import { NumberField } from './NumberField.js';
 import { Modal } from './projects.js';
 import { fileSafe, saveFileAs } from './save-file.js';
+import { fixed, t, tx } from '../i18n/i18n.js';
 
 /** A style as the list gives it: built-in ones can be reset, the film's own removed. */
 const StyleEntry = TextStyle.extend({ builtIn: z.boolean() });
@@ -53,29 +54,59 @@ export function useTextStyles(project: Project): readonly StyleEntry[] {
 }
 
 export const KIND_NAMES: Record<TextKind, string> = {
-  title: 'Title',
-  'lower-third': 'Lower third',
-  subtitle: 'Subtitle',
-  caption: 'Caption',
-  credits: 'Credits',
+  get title(): string {
+    return t('Title');
+  },
+  get 'lower-third'(): string {
+    return t('Lower third');
+  },
+  get subtitle(): string {
+    return t('Subtitle');
+  },
+  get caption(): string {
+    return t('Caption');
+  },
+  get credits(): string {
+    return t('Credits');
+  },
 };
 
 /** What a new text says until it is written. */
 const SAMPLE: Record<TextKind, string> = {
-  title: 'Title',
-  'lower-third': 'Name\nWho they are',
-  subtitle: 'Subtitle',
-  caption: 'A place, a time',
-  credits: 'Cast\nName',
+  get title(): string {
+    return t('Title');
+  },
+  get 'lower-third'(): string {
+    return t('Name\nWho they are');
+  },
+  get subtitle(): string {
+    return t('Subtitle');
+  },
+  get caption(): string {
+    return t('A place, a time');
+  },
+  get credits(): string {
+    return t('Cast\nName');
+  },
 };
 
 /** The words a style is shown with in the style editor. */
 const PREVIEW_WORDS: Record<string, string> = {
-  title: 'The Lighthouse Keeper',
-  'lower-third': 'Mara Venn\nKeeper of the light',
-  subtitle: 'Hold the light! The ship is close.',
-  caption: 'Fastnet Rock, 1891',
-  credits: 'Cast\nMara Venn\nJon Hale',
+  get title(): string {
+    return t('The Lighthouse Keeper');
+  },
+  get 'lower-third'(): string {
+    return t('Mara Venn\nKeeper of the light');
+  },
+  get subtitle(): string {
+    return t('Hold the light! The ship is close.');
+  },
+  get caption(): string {
+    return t('Fastnet Rock, 1891');
+  },
+  get credits(): string {
+    return t('Cast\nMara Venn\nJon Hale');
+  },
 };
 
 /** A canvas laid exactly over an element, drawn at the screen's pixel density. */
@@ -362,17 +393,20 @@ export function TextOverlay({
             style={{ left: moved.left, top: moved.top, width: moved.width, height: moved.height }}
             role="slider"
             tabIndex={0}
-            aria-label="Place of the selected text: drag it, or use the arrow keys"
+            aria-label={t('Place of the selected text: drag it, or use the arrow keys')}
             aria-valuenow={placed === null ? 0 : Math.round(placed.x * 100)}
             aria-valuetext={
               placed === null
                 ? undefined
-                : `${String(Math.round(placed.x * 100))}% across, ${String(Math.round(placed.y * 100))}% down`
+                : t('{value}% across, {value2}% down', {
+                    value: String(Math.round(placed.x * 100)),
+                    value2: String(Math.round(placed.y * 100)),
+                  })
             }
             title={
               safe
-                ? 'Drag to place. Double-tap to change the words.'
-                : 'Outside the title-safe area: some screens may cut it off.'
+                ? t('Drag to place. Double-tap to change the words.')
+                : t('Outside the title-safe area: some screens may cut it off.')
             }
             onPointerDown={(event) => {
               if (event.button !== 0) return;
@@ -424,7 +458,7 @@ export function TextOverlay({
               place(by[0] * size.width, by[1] * size.height);
             }}
           >
-            {!safe && <span className="text-frame-note">Outside the safe area</span>}
+            {!safe && <span className="text-frame-note">{t('Outside the safe area')}</span>}
           </div>
         </div>
       )}
@@ -477,8 +511,12 @@ export function TextLane({
   const { rows, count } = laneRows(texts);
   const round = (seconds: number): number => Math.max(0, Math.round(seconds * 10) / 10);
   return (
-    <div className="lane lane-text" aria-label="Text lane" style={{ height: 16 + count * ROW_PX }}>
-      <span className="lane-name">Text</span>
+    <div
+      className="lane lane-text"
+      aria-label={t('Text lane')}
+      style={{ height: 16 + count * ROW_PX }}
+    >
+      <span className="lane-name">{t('Text')}</span>
       {texts.map((text) => {
         const selected = selectedId === text.id;
         const move = moving.dragging?.id === text.id ? moving.dragging.dx / scale : 0;
@@ -500,9 +538,14 @@ export function TextLane({
             aria-label={`${KIND_NAMES[text.kind]}: ${first.slice(0, 40)}`}
             title={
               text.orphaned
-                ? `Not shown: it followed ${text.follows ?? 'a piece'} that is gone`
+                ? t('Not shown: it followed {value} that is gone', {
+                    value: text.follows ?? t('a piece'),
+                  })
                 : fast
-                  ? `Hard to read in time (${String(text.lettersPerSecond)} letters a second): ${plainText(text.text)}`
+                  ? t('Hard to read in time ({lettersPerSecond} letters a second): {text}', {
+                      lettersPerSecond: String(text.lettersPerSecond),
+                      text: plainText(text.text),
+                    })
                   : plainText(text.text)
             }
             onClick={(event) => {
@@ -530,12 +573,12 @@ export function TextLane({
             }}
           >
             {text.anchor !== null && !text.orphaned && (
-              <LinkSimpleIcon className="block-icon" aria-label="Follows the cut" />
+              <LinkSimpleIcon className="block-icon" aria-label={t('Follows the cut')} />
             )}
-            <span className="block-label">{first || 'Empty'}</span>
+            <span className="block-label">{first || t('Empty')}</span>
             <span
               className="handle handle-end"
-              aria-label={`Change how long "${first.slice(0, 20)}" shows`}
+              aria-label={t('Change how long "{value}" shows', { value: first.slice(0, 20) })}
               onPointerDown={(event) => {
                 if (may(event, selected)) edge.start(event, text.id, 'end');
               }}
@@ -657,23 +700,23 @@ function MarkupField({
   );
   return (
     <div className="field markup-field">
-      <label htmlFor={TEXT_WORDS_ID}>Words</label>
-      <div className="markup-tools" role="toolbar" aria-label="Style the selected words">
-        {tool('Bold', '**', '**', <TextBIcon aria-hidden="true" weight="bold" />)}
-        {tool('Italic', '*', '*', <TextItalicIcon aria-hidden="true" />)}
-        {tool('Underline', '_', '_', <TextUnderlineIcon aria-hidden="true" />)}
+      <label htmlFor={TEXT_WORDS_ID}>{t('Words')}</label>
+      <div className="markup-tools" role="toolbar" aria-label={t('Style the selected words')}>
+        {tool(t('Bold'), '**', '**', <TextBIcon aria-hidden="true" weight="bold" />)}
+        {tool(t('Italic'), '*', '*', <TextItalicIcon aria-hidden="true" />)}
+        {tool(t('Underline'), '_', '_', <TextUnderlineIcon aria-hidden="true" />)}
         <span className="markup-sep" aria-hidden="true" />
         {WORD_COLOURS.map((colour) =>
           tool(
-            `Colour ${colour}`,
+            t('Colour {colour}', { colour }),
             `{${colour}|`,
             '}',
             <span className="markup-swatch" style={{ background: colour }} />,
           ),
         )}
         <span className="markup-sep" aria-hidden="true" />
-        {tool('Smaller', '{small|', '}', <span className="markup-size small">A</span>)}
-        {tool('Bigger', '{big|', '}', <span className="markup-size big">A</span>)}
+        {tool(t('Smaller'), '{small|', '}', <span className="markup-size small">A</span>)}
+        {tool(t('Bigger'), '{big|', '}', <span className="markup-size big">A</span>)}
       </div>
       <textarea
         id={TEXT_WORDS_ID}
@@ -681,7 +724,7 @@ function MarkupField({
         className="input"
         rows={3}
         value={draft}
-        placeholder="A new line breaks the line"
+        placeholder={t('A new line breaks the line')}
         onChange={(event) => {
           setDraft(event.target.value);
         }}
@@ -703,8 +746,9 @@ function MarkupField({
         }}
       />
       <p className="muted small">
-        Select words and style them, or write *italic*, **bold**, _underline_, {'{#ffd166|colour}'},{' '}
-        {'{small|smaller}'} or {'{big|bigger}'}.
+        {t(
+          'Select words and style them, or write *italic*, **bold**, _underline_, {#ffd166|colour}, {small|smaller} or {big|bigger}.',
+        )}
       </p>
       {error !== null && (
         <p className="error" role="alert">
@@ -747,25 +791,32 @@ export function TextInspector({
       <h3>
         {KIND_NAMES[text.kind]}{' '}
         <span className="muted">
-          {clock(text.startSeconds)} · {text.durationSeconds.toFixed(1)} s
+          {t('{startSeconds} · {value} s', {
+            startSeconds: clock(text.startSeconds),
+            value: fixed(text.durationSeconds, 1),
+          })}
         </span>
       </h3>
       {text.orphaned && (
         <p className="change-flag">
-          It followed {text.follows ?? 'a piece'}, which is no longer in the cut, so it is not in
-          the film. Give it a time of its own, or remove it.
+          {t(
+            'It followed {piece}, which is no longer in the cut, so it is not in the film. Give it a time of its own, or remove it.',
+            { piece: text.follows ?? t('a piece') },
+          )}
         </p>
       )}
       <MarkupField value={text.text} onCommit={(words) => set({ text: words })} />
       {text.lettersPerSecond !== null && text.lettersPerSecond > FAST_READING && (
         <p className="change-flag">
-          Hard to read in time: {text.lettersPerSecond} letters a second (keep it under{' '}
-          {FAST_READING}). Shorten the words or show it longer.
+          {t(
+            'Hard to read in time: {lettersPerSecond} letters a second (keep it under {FAST_READING}). Shorten the words or show it longer.',
+            { lettersPerSecond: text.lettersPerSecond, FAST_READING },
+          )}
         </p>
       )}
       <div className="row wrap">
         <label className="field compact wide">
-          <span>Kind</span>
+          <span>{t('Kind')}</span>
           <select
             className="select"
             value={text.kind}
@@ -781,7 +832,7 @@ export function TextInspector({
           </select>
         </label>
         <label className="field compact wide">
-          <span>Style</span>
+          <span>{t('Style')}</span>
           <select
             className="select"
             value={text.styleId}
@@ -791,7 +842,7 @@ export function TextInspector({
           >
             {styles.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
-                {candidate.name}
+                {tx(candidate.name)}
               </option>
             ))}
           </select>
@@ -803,12 +854,12 @@ export function TextInspector({
             onStyles(text.styleId);
           }}
         >
-          <PaletteIcon aria-hidden="true" /> Edit style
+          <PaletteIcon aria-hidden="true" /> {t('Edit style')}
         </button>
       </div>
       <div className="row wrap">
         <NumberField
-          label="Starts at (s)"
+          label={t('Starts at (s)')}
           value={text.startSeconds}
           step={0.1}
           max={36000}
@@ -817,7 +868,7 @@ export function TextInspector({
           }}
         />
         <NumberField
-          label="Shows for (s)"
+          label={t('Shows for (s)')}
           value={text.durationSeconds}
           step={0.1}
           min={0.2}
@@ -829,8 +880,10 @@ export function TextInspector({
       </div>
       {text.anchor !== null && !text.orphaned ? (
         <p className="muted small row wrap">
-          <LinkSimpleIcon aria-hidden="true" /> Follows {text.follows}, so it keeps up when the cut
-          changes.
+          <LinkSimpleIcon aria-hidden="true" />{' '}
+          {t('Follows {piece}, so it keeps up when the cut changes.', {
+            piece: text.follows ?? '',
+          })}
           <button
             type="button"
             className="button quiet small"
@@ -838,7 +891,7 @@ export function TextInspector({
               void set({ anchor: null });
             }}
           >
-            <LinkBreakIcon aria-hidden="true" /> Keep its own time
+            <LinkBreakIcon aria-hidden="true" /> {t('Keep its own time')}
           </button>
         </p>
       ) : (
@@ -850,13 +903,13 @@ export function TextInspector({
               void set({ anchor: { on: 'item', id: under.itemId } });
             }}
           >
-            <LinkSimpleIcon aria-hidden="true" /> Follow the piece under it
+            <LinkSimpleIcon aria-hidden="true" /> {t('Follow the piece under it')}
           </button>
         )
       )}
       <div className="row wrap">
         <NumberField
-          label="Across (0 left, 1 right)"
+          label={t('Across (0 left, 1 right)')}
           value={text.x ?? style?.x ?? 0.5}
           step={0.01}
           max={1}
@@ -865,7 +918,7 @@ export function TextInspector({
           }}
         />
         <NumberField
-          label="Down (0 top, 1 bottom)"
+          label={t('Down (0 top, 1 bottom)')}
           value={text.y ?? style?.y ?? 0.5}
           step={0.01}
           max={1}
@@ -881,7 +934,7 @@ export function TextInspector({
               void set({ x: null, y: null });
             }}
           >
-            Back to the style’s place
+            {t('Back to the style’s place')}
           </button>
         )}
       </div>
@@ -892,7 +945,7 @@ export function TextInspector({
           void act('movie.edit.text.remove', { sceneId, textIds: [text.id] }).then(onGone);
         }}
       >
-        <TrashIcon aria-hidden="true" /> Remove text
+        <TrashIcon aria-hidden="true" /> {t('Remove text')}
       </button>
     </>
   );
@@ -931,9 +984,9 @@ export function TextTools({
     setNote('');
     await saveFileAs(
       {
-        suggestedName: `${fileSafe(project.name, 'film')}.srt`,
+        suggestedName: t('{name}.srt', { name: fileSafe(project.name, 'film') }),
         mediaType: 'application/x-subrip',
-        description: 'Subtitles',
+        description: t('Subtitles'),
       },
       async () => {
         const file = z
@@ -950,20 +1003,20 @@ export function TextTools({
             }),
           );
         if (file.subtitles === 0)
-          throw new Error('The film has no subtitles yet: make them first.');
+          throw new Error(t('The film has no subtitles yet: make them first.'));
         const blob = await imp.blob(file.blobKey);
-        if (blob === undefined) throw new Error('The subtitle file went missing.');
+        if (blob === undefined) throw new Error(t('The subtitle file went missing.'));
         return blob.bytes;
       },
     );
   };
   return (
-    <span className="text-tools" role="group" aria-label="Text">
+    <span className="text-tools" role="group" aria-label={t('Text')}>
       <label className="add-text">
         <PlusIcon aria-hidden="true" />
         <select
           className="select"
-          aria-label="Add text at the playhead"
+          aria-label={t('Add text at the playhead')}
           value=""
           disabled={readOnly}
           onChange={(event) => {
@@ -971,49 +1024,51 @@ export function TextTools({
             if (kind !== '') void add(kind);
           }}
         >
-          <option value="">Add text</option>
-          <option value="title">Title</option>
-          <option value="lower-third">Lower third</option>
-          <option value="caption">Caption in the frame</option>
-          <option value="subtitle">Subtitle</option>
+          <option value="">{t('Add text')}</option>
+          <option value="title">{t('Title')}</option>
+          <option value="lower-third">{t('Lower third')}</option>
+          <option value="caption">{t('Caption in the frame')}</option>
+          <option value="subtitle">{t('Subtitle')}</option>
         </select>
       </label>
       <button
         type="button"
         className="button quiet"
         disabled={readOnly}
-        title="Subtitle every line that is heard in this scene; they follow the lines when the cut changes"
+        title={t(
+          'Subtitle every line that is heard in this scene; they follow the lines when the cut changes',
+        )}
         onClick={() => {
           void act('movie.edit.subtitles.generate', { sceneIds: [sceneId] });
         }}
       >
-        <ClosedCaptioningIcon aria-hidden="true" /> Subtitles
+        <ClosedCaptioningIcon aria-hidden="true" /> {t('Subtitles')}
       </button>
       <button
         type="button"
         className="button quiet"
         disabled={readOnly}
-        title="Roll end credits from the cast and crew after the last piece of this scene"
+        title={t('Roll end credits from the cast and crew after the last piece of this scene')}
         onClick={() => {
           void act('movie.edit.credits.generate', { sceneId });
         }}
       >
-        <FilmSlateIcon aria-hidden="true" /> Credits
+        <FilmSlateIcon aria-hidden="true" /> {t('Credits')}
       </button>
       <button type="button" className="button quiet" onClick={onStyles}>
-        <PaletteIcon aria-hidden="true" /> Text styles
+        <PaletteIcon aria-hidden="true" /> {t('Text styles')}
       </button>
       <button
         type="button"
         className="button quiet"
-        title="Save the film’s subtitles as an .srt file, for players and video sites"
+        title={t('Save the film’s subtitles as an .srt file, for players and video sites')}
         onClick={() => {
           void download().catch((reason: unknown) => {
             setNote(reason instanceof Error ? reason.message : String(reason));
           });
         }}
       >
-        <DownloadSimpleIcon aria-hidden="true" /> .srt
+        <DownloadSimpleIcon aria-hidden="true" /> {t('.srt')}
       </button>
       {note !== '' && <span className="muted small">{note}</span>}
     </span>
@@ -1022,7 +1077,7 @@ export function TextTools({
 
 /** A style drawn on a frame, the way the film shows it. */
 function StylePreview({ style }: { style: TextStyle }): ReactElement {
-  const words = PREVIEW_WORDS[style.id] ?? 'The quick brown fox';
+  const words = PREVIEW_WORDS[style.id] ?? t('The quick brown fox');
   const kind: TextKind = (Object.keys(KIND_NAMES) as TextKind[]).includes(style.id as TextKind)
     ? (style.id as TextKind)
     : 'title';
@@ -1043,7 +1098,13 @@ function StylePreview({ style }: { style: TextStyle }): ReactElement {
     );
   });
   useEffect(paint);
-  return <canvas ref={canvas} className="style-preview" aria-label={`How ${style.name} looks`} />;
+  return (
+    <canvas
+      ref={canvas}
+      className="style-preview"
+      aria-label={t('How {name} looks', { name: tx(style.name) })}
+    />
+  );
 }
 
 /** A colour picked in the system's picker, kept until the picker is left. */
@@ -1135,10 +1196,10 @@ export function StyleEditor({
       void act('movie.edit.text.style.set', { styleId: style.id, ...fields });
   };
   return (
-    <Modal open={open} onClose={onClose} label="Text styles" wide>
+    <Modal open={open} onClose={onClose} label={t('Text styles')} wide>
       <div className="style-editor">
-        <nav className="style-list" aria-label="Styles">
-          <h2>Text styles</h2>
+        <nav className="style-list" aria-label={t('Styles')}>
+          <h2>{t('Text styles')}</h2>
           {styles.map((candidate) => (
             <button
               key={candidate.id}
@@ -1149,8 +1210,8 @@ export function StyleEditor({
                 setChosen(candidate.id);
               }}
             >
-              {candidate.name}
-              {!candidate.builtIn && <span className="muted small"> · yours</span>}
+              {candidate.builtIn ? tx(candidate.name) : candidate.name}
+              {!candidate.builtIn && <span className="muted small"> {t('· yours')}</span>}
             </button>
           ))}
           <button
@@ -1159,43 +1220,43 @@ export function StyleEditor({
             onClick={() => {
               void act('movie.edit.text.style.set', {
                 basedOn: style?.id ?? 'title',
-                name: `${style?.name ?? 'Title'} copy`,
+                name: t('{value} copy', { value: style?.name ?? t('Title') }),
               }).then((made) => {
                 const id = (made as { id?: string } | undefined)?.id;
                 if (id !== undefined) setChosen(id);
               });
             }}
           >
-            <PlusIcon aria-hidden="true" /> New style
+            <PlusIcon aria-hidden="true" /> {t('New style')}
           </button>
         </nav>
         {style !== undefined && (
           <div className="stack style-fields">
             <StylePreview style={style} />
             <p className="muted small">
-              Every text in this style changes with it, in every scene of the film.
+              {t('Every text in this style changes with it, in every scene of the film.')}
             </p>
             <EditableField
-              label="Name"
+              label={t('Name')}
               value={style.name}
               onCommit={(name) => act('movie.edit.text.style.set', { styleId: style.id, name })}
             />
             <fieldset className="style-group">
-              <legend>Letters</legend>
+              <legend>{t('Letters')}</legend>
               <Choice
-                label="Font"
+                label={t('Font')}
                 value={style.font}
                 options={[
-                  ['sans', 'Sans (Inter)'],
-                  ['serif', 'Serif (Instrument)'],
-                  ['mono', 'Typewriter (Courier Prime)'],
+                  ['sans', t('Sans (Inter)')],
+                  ['serif', t('Serif (Instrument)')],
+                  ['mono', t('Typewriter (Courier Prime)')],
                 ]}
                 onChange={(font) => {
                   set({ font });
                 }}
               />
               <NumberField
-                label="Size (% of height)"
+                label={t('Size (% of height)')}
                 value={style.size}
                 step={0.2}
                 min={1}
@@ -1205,7 +1266,7 @@ export function StyleEditor({
                 }}
               />
               <NumberField
-                label="Weight"
+                label={t('Weight')}
                 value={style.weight}
                 step={100}
                 min={300}
@@ -1215,7 +1276,7 @@ export function StyleEditor({
                 }}
               />
               <NumberField
-                label="Letter spacing (em)"
+                label={t('Letter spacing (em)')}
                 value={style.tracking}
                 step={0.01}
                 min={-0.1}
@@ -1225,7 +1286,7 @@ export function StyleEditor({
                 }}
               />
               <NumberField
-                label="Line height"
+                label={t('Line height')}
                 value={style.leading}
                 step={0.05}
                 min={0.8}
@@ -1242,7 +1303,7 @@ export function StyleEditor({
                     set({ italic: !style.italic });
                   }}
                 />
-                Italic
+                {t('Italic')}
               </label>
               <label className="choice">
                 <input
@@ -1252,27 +1313,27 @@ export function StyleEditor({
                     set({ uppercase: !style.uppercase });
                   }}
                 />
-                Capitals
+                {t('Capitals')}
               </label>
             </fieldset>
             <fieldset className="style-group">
-              <legend>Colour</legend>
+              <legend>{t('Colour')}</legend>
               <ColorField
-                label="Letters"
+                label={t('Letters')}
                 value={style.color}
                 onCommit={(color) => {
                   set({ color });
                 }}
               />
               <ColorField
-                label="Outline"
+                label={t('Outline')}
                 value={style.outlineColor}
                 onCommit={(outlineColor) => {
                   set({ outlineColor });
                 }}
               />
               <NumberField
-                label="Outline width (%)"
+                label={t('Outline width (%)')}
                 value={style.outline}
                 step={1}
                 max={30}
@@ -1281,7 +1342,7 @@ export function StyleEditor({
                 }}
               />
               <NumberField
-                label="Shadow (0–1)"
+                label={t('Shadow (0–1)')}
                 value={style.shadow}
                 step={0.05}
                 max={1}
@@ -1290,14 +1351,14 @@ export function StyleEditor({
                 }}
               />
               <ColorField
-                label="Box"
+                label={t('Box')}
                 value={style.boxColor}
                 onCommit={(boxColor) => {
                   set({ boxColor });
                 }}
               />
               <NumberField
-                label="Box opacity (0–1)"
+                label={t('Box opacity (0–1)')}
                 value={style.box}
                 step={0.05}
                 max={1}
@@ -1307,21 +1368,21 @@ export function StyleEditor({
               />
             </fieldset>
             <fieldset className="style-group">
-              <legend>Place</legend>
+              <legend>{t('Place')}</legend>
               <Choice
-                label="Align"
+                label={t('Align')}
                 value={style.align}
                 options={[
-                  ['left', 'Left'],
-                  ['center', 'Centre'],
-                  ['right', 'Right'],
+                  ['left', t('Left')],
+                  ['center', t('Centre')],
+                  ['right', t('Right')],
                 ]}
                 onChange={(align) => {
                   set({ align });
                 }}
               />
               <NumberField
-                label="Across (0–1)"
+                label={t('Across (0–1)')}
                 value={style.x}
                 step={0.01}
                 max={1}
@@ -1330,7 +1391,7 @@ export function StyleEditor({
                 }}
               />
               <NumberField
-                label="Down (0–1)"
+                label={t('Down (0–1)')}
                 value={style.y}
                 step={0.01}
                 max={1}
@@ -1339,19 +1400,19 @@ export function StyleEditor({
                 }}
               />
               <Choice
-                label="Hangs from"
+                label={t('Hangs from')}
                 value={style.anchor}
                 options={[
-                  ['top', 'Its top'],
-                  ['middle', 'Its middle'],
-                  ['bottom', 'Its bottom'],
+                  ['top', t('Its top')],
+                  ['middle', t('Its middle')],
+                  ['bottom', t('Its bottom')],
                 ]}
                 onChange={(anchor) => {
                   set({ anchor });
                 }}
               />
               <NumberField
-                label="Widest line (% of width)"
+                label={t('Widest line (% of width)')}
                 value={style.width}
                 step={1}
                 min={10}
@@ -1362,33 +1423,33 @@ export function StyleEditor({
               />
             </fieldset>
             <fieldset className="style-group">
-              <legend>Motion</legend>
+              <legend>{t('Motion')}</legend>
               <Choice
-                label="Comes on"
+                label={t('Comes on')}
                 value={style.enter}
                 options={[
-                  ['cut', 'At once'],
-                  ['fade', 'Fades in'],
-                  ['rise', 'Rises in'],
-                  ['type', 'Typed'],
+                  ['cut', t('At once')],
+                  ['fade', t('Fades in')],
+                  ['rise', t('Rises in')],
+                  ['type', t('Typed')],
                 ]}
                 onChange={(enter) => {
                   set({ enter });
                 }}
               />
               <Choice
-                label="Goes off"
+                label={t('Goes off')}
                 value={style.exit}
                 options={[
-                  ['cut', 'At once'],
-                  ['fade', 'Fades out'],
+                  ['cut', t('At once')],
+                  ['fade', t('Fades out')],
                 ]}
                 onChange={(exit) => {
                   set({ exit });
                 }}
               />
               <NumberField
-                label="Takes (s)"
+                label={t('Takes (s)')}
                 value={style.ease}
                 step={0.05}
                 max={3}
@@ -1404,7 +1465,7 @@ export function StyleEditor({
                     set({ roll: !style.roll });
                   }}
                 />
-                Rolls up through the frame, like end credits
+                {t('Rolls up through the frame, like end credits')}
               </label>
             </fieldset>
             <div className="row wrap">
@@ -1417,10 +1478,10 @@ export function StyleEditor({
                   });
                 }}
               >
-                {style.builtIn ? 'Put back as Imp made it' : 'Delete style'}
+                {style.builtIn ? t('Put back as Imp made it') : t('Delete style')}
               </button>
               <button type="button" className="button primary" onClick={onClose}>
-                Done
+                {t('Done')}
               </button>
             </div>
           </div>

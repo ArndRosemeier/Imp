@@ -1,5 +1,8 @@
 import {
   CommandError,
+  DEFAULT_LANGUAGE,
+  languageInfo,
+  type Language,
   fromToolName,
   isInScope,
   toToolDefinitions,
@@ -86,6 +89,8 @@ export interface AgentRunOptions {
   readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
   /** Where the media that commands show the agent is read from. Without it, nothing is shown. */
   readonly blobs?: BlobStore;
+  /** The language of Imp's interface; the agent writes to the person in it. English when left out. */
+  readonly language?: Language;
   /**
    * Called before each model call and before each command the agent runs, so
    * that what it is doing right now can be shown while it works.
@@ -119,7 +124,13 @@ const TRIMMED_RESULT = JSON.stringify({
  * The instructions hold nothing that changes between requests, so that they
  * and the tool definitions stay cached for the whole conversation.
  */
-function systemPrompt(member: CrewMember, role: Role, hiddenGroups: string | null): string {
+function systemPrompt(
+  member: CrewMember,
+  role: Role,
+  hiddenGroups: string | null,
+  language: Language,
+): string {
+  const { english } = languageInfo(language);
   return [
     `You are ${member.name}, working as ${role.name} in Imp, a content creation toolbox.`,
     role.brief,
@@ -137,6 +148,11 @@ function systemPrompt(member: CrewMember, role: Role, hiddenGroups: string | nul
     'If a tool reports that it needs approval, do not call it again; finish and say what is waiting.',
     'If a tool result says it is retryable, call it once more. If it fails again, stop and say what failed.',
     'When the task is done, reply with a short summary of what you did.',
+    ...(language === DEFAULT_LANGUAGE
+      ? []
+      : [
+          `The person uses Imp in ${english}: its buttons, stages and guide are in ${english}. Write every reply to them in natural ${english}, whatever language the guide or the tools use, and name buttons and stages as the ${english} interface shows them. Tool inputs, command ids and setting keys stay as the tools define them. Write film content (scripts, dialogue, prompts) in the language the person asks for; when they do not say, follow the project's existing content.`,
+        ]),
   ].join('\n\n');
 }
 
@@ -202,7 +218,12 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
   ];
   const system: ChatMessage = {
     role: 'system',
-    content: systemPrompt(member, role, hidden.length > 0 ? describeGroups(hidden) : null),
+    content: systemPrompt(
+      member,
+      role,
+      hidden.length > 0 ? describeGroups(hidden) : null,
+      options.language ?? DEFAULT_LANGUAGE,
+    ),
     cache: true,
   };
 

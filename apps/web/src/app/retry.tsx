@@ -2,13 +2,7 @@ import { isRetryable } from '@imp/core';
 import { ArrowClockwiseIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useState, type ReactElement } from 'react';
 import { ImpSpinner } from './ImpMark.js';
-
-/** The words the retry note uses, in one place so that they can be translated together. */
-export const RETRY_TEXT = {
-  retry: 'Retry',
-  retrying: 'Trying again',
-  failedHeading: 'That did not go through',
-} as const;
+import { t } from '../i18n/i18n.js';
 
 /** Something that failed and can be sent again, with the failure it answers. */
 export interface Retry {
@@ -36,7 +30,7 @@ export function RetryNote({
   text: string;
   /** Left out, the note only explains. */
   onRetry?: (() => Promise<unknown>) | undefined;
-  /** A short line above the text, such as "That did not go through". */
+  /** A short line above the text, such as who did not get a message. */
   heading?: string;
   role?: 'alert' | 'status';
 }): ReactElement {
@@ -70,11 +64,11 @@ export function RetryNote({
       >
         {trying ? (
           <>
-            <ImpSpinner /> {RETRY_TEXT.retrying}
+            <ImpSpinner /> {t('Trying again')}
           </>
         ) : (
           <>
-            <ArrowClockwiseIcon aria-hidden="true" /> {RETRY_TEXT.retry}
+            <ArrowClockwiseIcon aria-hidden="true" /> {t('Retry')}
           </>
         )}
       </button>

@@ -72,7 +72,7 @@ import { moviePrefix, Problem, useAct, type Act } from './movie.js';
 import { ChangeList, ProposalBar } from './proposal.js';
 import { PickupNote, PickupRequest } from './pickups.js';
 import { RescueTools } from './rescue.js';
-import { TransitionPicker } from './transition.js';
+import { TRANSITIONS, TransitionPicker } from './transition.js';
 import { SplitEdit, TakeSwitcher } from './split-edit.js';
 import { useLibraryDrop } from './library/drag.js';
 import { isPlayableSound, soundForScene } from './library/scene.js';
@@ -86,6 +86,8 @@ import {
   useTextStyles,
 } from './texts.js';
 import { EmptyState } from './help/EmptyState.js';
+import { fixed, t, tn } from '../i18n/i18n.js';
+import { formatUsd } from './spend.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -368,11 +370,12 @@ function Timeline({
   const pictureLane = useRef<HTMLDivElement>(null);
   const done = (output: unknown): unknown => {
     // act shows what went wrong under the timeline and answers nothing.
-    if (output === undefined) throw new Error('It was not placed; see the message on the stage.');
+    if (output === undefined)
+      throw new Error(t('It was not placed; see the message on the stage.'));
     return output;
   };
   useLibraryDrop(audioLane, {
-    label: 'Edit stage, audio lane, at the playhead',
+    label: t('Edit stage, audio lane, at the playhead'),
     accepts: (asset) => !readOnly && isPlayableSound(asset),
     onDrop: async (asset, point) => {
       const run = async (id: string, input: Record<string, unknown>) => done(await act(id, input));
@@ -388,7 +391,7 @@ function Timeline({
     },
   });
   useLibraryDrop(pictureLane, {
-    label: 'Edit stage, picture, at the end',
+    label: t('Edit stage, picture, at the end'),
     accepts: (asset) =>
       !readOnly && asset.id.startsWith('movie:clip:') && asset.refs['shotId'] !== undefined,
     onDrop: async (asset, point) => {
@@ -442,7 +445,7 @@ function Timeline({
         });
 
   return (
-    <div className="timeline" role="group" aria-label="Timeline" data-readonly={readOnly}>
+    <div className="timeline" role="group" aria-label={t('Timeline')} data-readonly={readOnly}>
       <div className="timeline-scroll" ref={scroller}>
         <div className="timeline-inner" style={{ width }} ref={inner}>
           <div
@@ -470,7 +473,7 @@ function Timeline({
               if (event.key === 'ArrowRight') onSeek(at + by);
               if (event.key === 'ArrowLeft') onSeek(Math.max(0, at - by));
             }}
-            aria-label="Playhead"
+            aria-label={t('Playhead')}
             style={
               scale >= 200
                 ? {
@@ -478,7 +481,7 @@ function Timeline({
                     backgroundImage: `repeating-linear-gradient(to right, var(--line-strong) 0 1px, transparent 1px ${String(scale / FRAME_RATE)}px)`,
                     backgroundSize: '100% 6px',
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'bottom left',
+                    backgroundPosition: t('bottom left'),
                   }
                 : undefined
             }
@@ -515,8 +518,8 @@ function Timeline({
             may={may}
             marked={marked}
           />
-          <div className="lane lane-picture" aria-label="Picture lane" ref={pictureLane}>
-            <span className="lane-name">Picture</span>
+          <div className="lane lane-picture" aria-label={t('Picture lane')} ref={pictureLane}>
+            <span className="lane-name">{t('Picture')}</span>
             {playing.map((item) => {
               const drag = edges.dragging?.id === item.itemId ? edges.dragging : null;
               const shift = drag === null ? 0 : drag.dx / scale;
@@ -537,7 +540,7 @@ function Timeline({
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
-                  aria-label={`${item.kind === 'title' ? 'Title' : item.placeholder ? 'Pickup to come' : 'Shot'} ${String(item.index)}: ${item.label.slice(0, 40)}`}
+                  aria-label={`${item.kind === 'title' ? t('Title {index}', { index: item.index }) : item.placeholder ? t('Pickup to come {index}', { index: item.index }) : t('Shot {index}', { index: item.index })}: ${item.label.slice(0, 40)}`}
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect({ kind: 'item', id: item.itemId });
@@ -569,7 +572,9 @@ function Timeline({
                   {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-start"
-                      aria-label={`Trim the start of item ${String(item.index)}`}
+                      aria-label={t('Trim the start of item {index}', {
+                        index: String(item.index),
+                      })}
                       onPointerDown={(event) => {
                         if (may(event, selected)) edges.start(event, item.itemId, 'start');
                       }}
@@ -595,19 +600,23 @@ function Timeline({
                     <span
                       className={`transition-mark transition-${item.transition}`}
                       style={{ width: Math.max(10, item.overlapSeconds * scale) }}
-                      title={`${item.transition.replace('-', ' to ')} in`}
+                      title={t('{transition} in', {
+                        transition:
+                          TRANSITIONS.find((choice) => choice.kind === item.transition)?.label ??
+                          item.transition,
+                      })}
                       aria-hidden="true"
                     />
                   )}
                   {thumbFor(item, blockWidth)}
                   <span className="block-label">
-                    {item.index} · {item.placeholder ? 'Pickup · ' : ''}
-                    {item.label || 'Untitled'}
+                    {item.index} · {item.placeholder ? `${t('Pickup')} · ` : ''}
+                    {item.label || t('Untitled')}
                   </span>
                   {item.kind === 'shot' && !item.placeholder && (
                     <span
                       className="handle handle-end"
-                      aria-label={`Trim the end of item ${String(item.index)}`}
+                      aria-label={t('Trim the end of item {index}', { index: String(item.index) })}
                       onPointerDown={(event) => {
                         if (may(event, selected)) edges.start(event, item.itemId, 'end');
                       }}
@@ -633,8 +642,8 @@ function Timeline({
             })}
           </div>
           {removed.length > 0 && (
-            <div className="lane lane-removed" aria-label="Taken out by the proposal">
-              <span className="lane-name">Taken out</span>
+            <div className="lane lane-removed" aria-label={t('Taken out by the proposal')}>
+              <span className="lane-name">{t('Taken out')}</span>
               {removed.map((change) => (
                 <div
                   key={change.id}
@@ -650,8 +659,8 @@ function Timeline({
               ))}
             </div>
           )}
-          <div className="lane lane-audio" aria-label="Audio lane" ref={audioLane}>
-            <span className="lane-name">Audio</span>
+          <div className="lane lane-audio" aria-label={t('Audio lane')} ref={audioLane}>
+            <span className="lane-name">{t('Audio')}</span>
             {cut.sounds.map((placement) => {
               const drag = audioDrag.dragging?.id === placement.id ? audioDrag.dragging : null;
               const start = Math.max(
@@ -670,7 +679,7 @@ function Timeline({
                   role="button"
                   tabIndex={0}
                   aria-pressed={selected}
-                  aria-label={`Audio: ${placement.name}`}
+                  aria-label={t('Audio: {name}', { name: placement.name })}
                   onClick={(event) => {
                     event.stopPropagation();
                     onSelect({ kind: 'sound', id: placement.id });
@@ -927,7 +936,7 @@ function SceneEditor({
   const addMarker = (): void => {
     void runMarker('movie.edit.marker.add', {
       atSeconds: Math.round(playback.at * 1000) / 1000,
-      text: 'Note',
+      text: t('Note'),
     }).then((output) => {
       const id = (output as { marker?: { id?: unknown } } | undefined)?.marker?.id;
       if (typeof id === 'string') setSelection({ kind: 'marker', id });
@@ -1039,13 +1048,13 @@ function SceneEditor({
       .filter((sound) => sound.take !== null)
       .map((sound) => ({
         value: `sound:${sound.id}`,
-        label: sound.name === '' ? 'Untitled sound' : sound.name,
+        label: sound.name === '' ? t('Untitled sound') : sound.name,
       })),
     ...source.shots
       .filter((shot) => shot.sceneId === sceneId && shot.dialogue !== null)
       .map((shot) => ({
         value: `dialogue:${shot.id}`,
-        label: `Dialogue of shot ${String(shot.position)}`,
+        label: t('Dialogue of shot {position}', { position: String(shot.position) }),
       })),
   ];
   const notInFilm = cut.items.filter((candidate) => candidate.durationSeconds === 0);
@@ -1081,12 +1090,14 @@ function SceneEditor({
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
       onKeyDown={keys}
-      aria-label="Cut editor"
+      aria-label={t('Cut editor')}
       ref={editorBox}
       style={
         timelineHeight.height === null
           ? undefined
-          : ({ '--timeline-height': `${String(timelineHeight.height)}px` } as CSSProperties)
+          : ({
+              '--timeline-height': `${String(timelineHeight.height)}px`,
+            } as CSSProperties)
       }
     >
       {cut.draft !== null && (
@@ -1111,7 +1122,7 @@ function SceneEditor({
             <video
               ref={attachVideo}
               className="preview-screen"
-              aria-label="Preview of the scene"
+              aria-label={t('Preview of the scene')}
               playsInline
               style={screenStyle(playback.look.screens?.[0] ?? HIDDEN)}
             />
@@ -1147,17 +1158,17 @@ function SceneEditor({
             />
           </div>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio ref={attachVoice} aria-label="Dialogue of the preview" />
+          <audio ref={attachVoice} aria-label={t('Dialogue of the preview')} />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio ref={attachSecondVoice} aria-hidden="true" />
           {range !== null && (
             <div className="range-note">
-              <span className="chip" aria-label="Marked stretch">
-                {clock(range.from)}–{clock(range.to)} marked
+              <span className="chip" aria-label={t('Marked stretch')}>
+                {t('{from}–{to} marked', { from: clock(range.from), to: clock(range.to) })}
                 <button
                   type="button"
                   className="button quiet icon"
-                  aria-label="Clear the marked stretch"
+                  aria-label={t('Clear the marked stretch')}
                   onClick={() => {
                     setMarksAt({ in: null, out: null });
                   }}
@@ -1167,20 +1178,20 @@ function SceneEditor({
               </span>
               <span className="muted small">
                 {attached === null
-                  ? 'Detached from the crew panel.'
-                  : 'Goes with your next message to the crew.'}
+                  ? t('Detached from the crew panel.')
+                  : t('Goes with your next message to the crew.')}
               </span>
             </div>
           )}
         </figure>
         <div
           className="stack inspector"
-          aria-label={readOnly ? 'Proposed changes' : 'Selected piece'}
+          aria-label={readOnly ? t('Proposed changes') : t('Selected piece')}
         >
           <button
             type="button"
             className="button quiet icon-only inspector-close"
-            aria-label="Close the details"
+            aria-label={t('Close the details')}
             onClick={() => {
               setInspectorOpen(false);
             }}
@@ -1217,39 +1228,50 @@ function SceneEditor({
             marker === undefined &&
             text === undefined && (
               <div className="inspector-empty">
-                <span className="eyebrow">Nothing selected</span>
+                <span className="eyebrow">{t('Nothing selected')}</span>
                 <p className="muted">
-                  {coarse ? 'Tap' : 'Select'} a piece on the timeline to trim, grade, retime or
-                  replace it. Mark in and out to ask the crew about a stretch.
+                  {coarse
+                    ? t(
+                        'Tap a piece on the timeline to trim, grade, retime or replace it. Mark in and out to ask the crew about a stretch.',
+                      )
+                    : t(
+                        'Select a piece on the timeline to trim, grade, retime or replace it. Mark in and out to ask the crew about a stretch.',
+                      )}
                 </p>
                 <button type="button" className="button quiet" onClick={onHelp}>
-                  <QuestionIcon aria-hidden="true" /> {coarse ? 'Gestures' : 'Shortcuts'} and help
+                  <QuestionIcon aria-hidden="true" />{' '}
+                  {coarse ? t('Gestures and help') : t('Shortcuts and help')}
                 </button>
               </div>
             )}
           {!readOnly && item !== undefined && (
             <>
               <h3>
-                {item.kind === 'title' ? 'Title card' : `Shot ${String(item.index)}`}{' '}
+                {item.kind === 'title'
+                  ? t('Title card')
+                  : t('Shot {index}', { index: String(item.index) })}{' '}
                 <span className="muted">
                   {item.placeholder
-                    ? `Pickup to come · ${item.durationSeconds.toFixed(1)} s`
+                    ? t('Pickup to come · {value} s', { value: fixed(item.durationSeconds, 1) })
                     : item.state === 'ready'
-                      ? `${clock(item.startsAtSeconds)} · ${item.durationSeconds.toFixed(1)} s`
+                      ? t('{startsAtSeconds} · {value} s', {
+                          startsAtSeconds: clock(item.startsAtSeconds),
+                          value: fixed(item.durationSeconds, 1),
+                        })
                       : ITEM_STATE_TEXT[item.state]}
                 </span>
               </h3>
               {item.kind === 'title' ? (
                 <>
                   <EditableField
-                    label="Words"
+                    label={t('Words')}
                     rows={2}
                     value={item.text}
-                    placeholder="The words on the card"
+                    placeholder={t('The words on the card')}
                     onCommit={(text) => run('movie.edit.item.set', { itemId: item.itemId, text })}
                   />
                   <NumberField
-                    label="Length (s)"
+                    label={t('Length (s)')}
                     value={item.durationSeconds}
                     step={0.5}
                     max={60}
@@ -1266,7 +1288,7 @@ function SceneEditor({
                 {item.kind === 'shot' && !item.placeholder && (
                   <>
                     <NumberField
-                      label="Trim start (s)"
+                      label={t('Trim start (s)')}
                       value={item.trimStartSeconds}
                       step={0.1}
                       max={600}
@@ -1278,7 +1300,7 @@ function SceneEditor({
                       }}
                     />
                     <NumberField
-                      label="Trim end (s)"
+                      label={t('Trim end (s)')}
                       value={item.trimEndSeconds}
                       step={0.1}
                       max={600}
@@ -1290,7 +1312,7 @@ function SceneEditor({
                       }}
                     />
                     <NumberField
-                      label="Dialogue volume"
+                      label={t('Dialogue volume')}
                       value={item.dialogueVolume}
                       step={0.1}
                       max={1}
@@ -1302,7 +1324,7 @@ function SceneEditor({
                       }}
                     />
                     <NumberField
-                      label="Clip sound volume"
+                      label={t('Clip sound volume')}
                       value={item.clipAudioVolume}
                       step={0.1}
                       max={1}
@@ -1316,7 +1338,7 @@ function SceneEditor({
                   </>
                 )}
                 <NumberField
-                  label="Fade in from black (s)"
+                  label={t('Fade in from black (s)')}
                   value={item.fadeInSeconds}
                   step={0.5}
                   max={30}
@@ -1325,7 +1347,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Fade out to black (s)"
+                  label={t('Fade out to black (s)')}
                   value={item.fadeOutSeconds}
                   step={0.5}
                   max={30}
@@ -1341,7 +1363,7 @@ function SceneEditor({
                     void run('movie.edit.audio.detach', { itemId: item.itemId });
                   }}
                 >
-                  <SpeakerHighIcon aria-hidden="true" /> Take the clip&apos;s sound apart
+                  <SpeakerHighIcon aria-hidden="true" /> {t("Take the clip's sound apart")}
                 </button>
               )}
               {item.kind === 'shot' && (
@@ -1378,7 +1400,9 @@ function SceneEditor({
           {!readOnly && line !== undefined && (
             <LineInspector
               line={line}
-              who={cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? 'Line'}
+              who={
+                cut.lanes.find((lane) => lane.characterId === line.characterId)?.name ?? t('Line')
+              }
               url={urls.get(line.playKey ?? line.take?.blobKey ?? '')}
               sceneId={sceneId}
               act={act}
@@ -1394,7 +1418,7 @@ function SceneEditor({
               </h3>
               <div className="row wrap">
                 <NumberField
-                  label="Starts at (s)"
+                  label={t('Starts at (s)')}
                   value={placement.startSeconds}
                   step={0.5}
                   max={36000}
@@ -1406,7 +1430,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Skip the first (s)"
+                  label={t('Skip the first (s)')}
                   value={placement.trimStartSeconds}
                   step={0.5}
                   max={600}
@@ -1418,7 +1442,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Volume"
+                  label={t('Volume')}
                   value={placement.volume}
                   step={0.1}
                   max={1}
@@ -1430,7 +1454,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Fade in (s)"
+                  label={t('Fade in (s)')}
                   value={placement.fadeInSeconds}
                   step={0.5}
                   max={60}
@@ -1442,7 +1466,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Fade out (s)"
+                  label={t('Fade out (s)')}
                   value={placement.fadeOutSeconds}
                   step={0.5}
                   max={60}
@@ -1454,7 +1478,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Pan (-1 left, 1 right)"
+                  label={t('Pan (-1 left, 1 right)')}
                   value={placement.pan}
                   step={0.1}
                   min={-1}
@@ -1464,7 +1488,7 @@ function SceneEditor({
                   }}
                 />
                 <NumberField
-                  label="Gain (dB)"
+                  label={t('Gain (dB)')}
                   value={placement.gainDb}
                   step={1}
                   min={-60}
@@ -1488,10 +1512,10 @@ function SceneEditor({
                     });
                   }}
                 />
-                Repeat until the scene ends
+                {t('Repeat until the scene ends')}
               </label>
               {!placement.recorded && (
-                <p className="muted">There is no recording for this yet, so it is silent.</p>
+                <p className="muted">{t('There is no recording for this yet, so it is silent.')}</p>
               )}
             </>
           )}
@@ -1518,12 +1542,12 @@ function SceneEditor({
         }}
       />
 
-      <div className="edit-toolbar" role="toolbar" aria-label="Editing">
+      <div className="edit-toolbar" role="toolbar" aria-label={t('Editing')}>
         <button
           type="button"
           className="button primary play-button"
-          aria-label={playback.playing ? 'Pause' : 'Play'}
-          title={`${playback.playing ? 'Pause' : 'Play'} (Space)`}
+          aria-label={playback.playing ? t('Pause') : t('Play')}
+          title={playback.playing ? t('Pause (Space)') : t('Play (Space)')}
           onClick={playback.playing ? playback.pause : playback.play}
           disabled={cut.totalSeconds === 0}
         >
@@ -1533,65 +1557,65 @@ function SceneEditor({
             <PlayIcon aria-hidden="true" weight="fill" />
           )}
         </button>
-        <span className="edit-clock mono" aria-label="Playhead and length of the scene">
+        <span className="edit-clock mono" aria-label={t('Playhead and length of the scene')}>
           <strong>{clock(playback.at)}</strong>
           <span>/ {clock(cut.totalSeconds)}</span>
         </span>
         <div className="edit-tools">
-          <span className="tool-group" role="group" aria-label="History">
+          <span className="tool-group" role="group" aria-label={t('History')}>
             {tool(
-              'Undo',
+              t('Undo'),
               <ArrowCounterClockwiseIcon aria-hidden="true" />,
               () => {
                 void run('movie.edit.undo', {});
               },
               readOnly || !cut.canUndo,
-              'Ctrl+Z',
+              t('Ctrl+Z'),
             )}
             {tool(
-              'Redo',
+              t('Redo'),
               <ArrowClockwiseIcon aria-hidden="true" />,
               () => {
                 void run('movie.edit.redo', {});
               },
               readOnly || !cut.canRedo,
-              'Ctrl+Shift+Z',
+              t('Ctrl+Shift+Z'),
             )}
           </span>
-          <span className="tool-group" role="group" aria-label="Pieces">
+          <span className="tool-group" role="group" aria-label={t('Pieces')}>
             {tool(
-              'Split at the playhead',
+              t('Split at the playhead'),
               <SplitHorizontalIcon aria-hidden="true" />,
               split,
               readOnly || !canSplit,
               'S',
             )}
             {tool(
-              'Copy',
+              t('Copy'),
               <CopyIcon aria-hidden="true" />,
               () => {
                 copy(false);
               },
               readOnly || item === undefined,
-              'Ctrl+C',
+              t('Ctrl+C'),
             )}
             {tool(
-              'Cut',
+              t('Cut'),
               <ScissorsIcon aria-hidden="true" />,
               () => {
                 copy(true);
               },
               readOnly || item === undefined,
-              'Ctrl+X',
+              t('Ctrl+X'),
             )}
             {tool(
-              'Paste',
+              t('Paste'),
               <ClipboardIcon aria-hidden="true" />,
               () => {
                 void paste();
               },
               readOnly || clipboard === null,
-              'Ctrl+V',
+              t('Ctrl+V'),
             )}
             {tool(
               'Delete',
@@ -1604,34 +1628,34 @@ function SceneEditor({
           <span
             className="tool-group mark-range"
             role="group"
-            aria-label="Mark a stretch to ask the crew about"
+            aria-label={t('Mark a stretch to ask the crew about')}
           >
             <button
               type="button"
               className="button quiet mark-button"
-              title="Mark the start of a stretch at the playhead (I)"
+              title={t('Mark the start of a stretch at the playhead (I)')}
               aria-pressed={marksAt.in !== null}
               onClick={() => {
                 setMarksAt((before) => ({ ...before, in: playback.at }));
               }}
             >
-              In
+              {t('In')}
             </button>
             <button
               type="button"
               className="button quiet mark-button"
-              title="Mark the end of a stretch at the playhead (O)"
+              title={t('Mark the end of a stretch at the playhead (O)')}
               aria-pressed={marksAt.out !== null}
               onClick={() => {
                 setMarksAt((before) => ({ ...before, out: playback.at }));
               }}
             >
-              Out
+              {t('Out')}
             </button>
             {item !== undefined &&
               item.durationSeconds > 0 &&
               tool(
-                'Mark the selected piece',
+                t('Mark the selected piece'),
                 <BracketsSquareIcon aria-hidden="true" />,
                 () => {
                   setMarksAt({
@@ -1642,22 +1666,22 @@ function SceneEditor({
                 false,
               )}
             {tool(
-              'Leave a marker at the playhead',
+              t('Leave a marker at the playhead'),
               <FlagIcon aria-hidden="true" />,
               addMarker,
               false,
               'M',
             )}
           </span>
-          <span className="tool-group" role="group" aria-label="Sound">
+          <span className="tool-group" role="group" aria-label={t('Sound')}>
             <OpenInAudioEditor project={project} sceneId={sceneId} />
           </span>
         </div>
         <Popover
-          label="Add to the scene"
-          title="Add to the scene"
+          label={t('Add to the scene')}
+          title={t('Add to the scene')}
           icon={<PlusIcon aria-hidden="true" />}
-          text="Add"
+          text={t('Add')}
           badge={waiting > 0 ? String(waiting) : null}
           side="up"
           wide
@@ -1665,8 +1689,8 @@ function SceneEditor({
         >
           {(close) => (
             <div className="stack edit-add-body">
-              <section className="stack" aria-label="Words">
-                <span className="eyebrow">Words</span>
+              <section className="stack" aria-label={t('Words')}>
+                <span className="eyebrow">{t('Words')}</span>
                 <div className="row wrap">
                   <button
                     type="button"
@@ -1674,13 +1698,13 @@ function SceneEditor({
                     disabled={readOnly}
                     onClick={() => {
                       void run('movie.edit.title.add', {
-                        text: 'Title',
+                        text: t('Title'),
                         toIndex: index < 0 ? undefined : index + 1,
                       });
                       close();
                     }}
                   >
-                    <TextTIcon aria-hidden="true" /> Add title card
+                    <TextTIcon aria-hidden="true" /> {t('Add title card')}
                   </button>
                 </div>
                 <TextTools
@@ -1698,11 +1722,11 @@ function SceneEditor({
                 />
               </section>
               {!readOnly && (
-                <section className="stack" aria-label="Sound">
-                  <span className="eyebrow">Sound at the playhead</span>
+                <section className="stack" aria-label={t('Sound')}>
+                  <span className="eyebrow">{t('Sound at the playhead')}</span>
                   <div className="row edit-add-sound">
                     <label htmlFor="place-sound" className="sr-only">
-                      Lay on the audio lane at the playhead
+                      {t('Lay on the audio lane at the playhead')}
                     </label>
                     <select
                       id="place-sound"
@@ -1712,7 +1736,7 @@ function SceneEditor({
                         setPlacing(event.target.value);
                       }}
                     >
-                      <option value="">Choose a sound or dialogue</option>
+                      <option value="">{t('Choose a sound or dialogue')}</option>
                       {placeable.map((entry) => (
                         <option key={entry.value} value={entry.value}>
                           {entry.label}
@@ -1738,14 +1762,14 @@ function SceneEditor({
                         });
                       }}
                     >
-                      Lay it down
+                      {t('Lay it down')}
                     </button>
                   </div>
                 </section>
               )}
               {waiting > 0 && (
-                <section className="stack" aria-label="Not in the film yet">
-                  <span className="eyebrow">Not in the film yet</span>
+                <section className="stack" aria-label={t('Not in the film yet')}>
+                  <span className="eyebrow">{t('Not in the film yet')}</span>
                   <div className="row wrap">
                     {notInFilm.map((entry) => (
                       <button
@@ -1757,7 +1781,10 @@ function SceneEditor({
                           close();
                         }}
                       >
-                        Shot {entry.index}: {ITEM_STATE_TEXT[entry.state].toLowerCase()}
+                        {t('Shot {index}: {value}', {
+                          index: entry.index,
+                          value: ITEM_STATE_TEXT[entry.state].toLowerCase(),
+                        })}
                       </button>
                     ))}
                     {cut.unplaced.map((entry) => (
@@ -1765,13 +1792,16 @@ function SceneEditor({
                         key={entry.shotId}
                         type="button"
                         className="chip"
-                        title="Add this shot to the cut"
+                        title={t('Add this shot to the cut')}
                         disabled={readOnly}
                         onClick={() => {
                           void run('movie.edit.item.add', { shotId: entry.shotId });
                         }}
                       >
-                        + Shot {entry.position}: {entry.description.slice(0, 40)}
+                        {t('+ Shot {position}: {value}', {
+                          position: entry.position,
+                          value: entry.description.slice(0, 40),
+                        })}
                       </button>
                     ))}
                   </div>
@@ -1783,8 +1813,8 @@ function SceneEditor({
         <button
           type="button"
           className="button quiet icon-only inspector-toggle"
-          aria-label="Details of the selected piece"
-          title="Details of the selected piece"
+          aria-label={t('Details of the selected piece')}
+          title={t('Details of the selected piece')}
           aria-pressed={inspectorOpen}
           onClick={() => {
             setInspectorOpen(!inspectorOpen);
@@ -1792,9 +1822,9 @@ function SceneEditor({
         >
           <SidebarSimpleIcon aria-hidden="true" mirrored />
         </button>
-        <span className="edit-zoom" role="group" aria-label="Zoom the timeline">
+        <span className="edit-zoom" role="group" aria-label={t('Zoom the timeline')}>
           {tool(
-            'Zoom out',
+            t('Zoom out'),
             <MagnifyingGlassMinusIcon aria-hidden="true" />,
             () => {
               zoomBy(1 / 1.5);
@@ -1804,7 +1834,7 @@ function SceneEditor({
           <input
             type="range"
             className="zoom-slider"
-            aria-label={scale >= 200 ? 'Zoom · frames' : 'Zoom'}
+            aria-label={scale >= 200 ? t('Zoom · frames') : t('Zoom')}
             // Even steps of the slider zoom by the same factor, from the whole scene to single frames.
             min={Math.log(MIN_SCALE)}
             max={Math.log(MAX_SCALE)}
@@ -1815,7 +1845,7 @@ function SceneEditor({
             }}
           />
           {tool(
-            'Zoom in',
+            t('Zoom in'),
             <MagnifyingGlassPlusIcon aria-hidden="true" />,
             () => {
               zoomBy(1.5);
@@ -1825,10 +1855,10 @@ function SceneEditor({
           <button
             type="button"
             className="button quiet fit-button"
-            title="Fit the scene to the timeline"
+            title={t('Fit the scene to the timeline')}
             onClick={fit}
           >
-            Fit
+            {t('Fit')}
           </button>
         </span>
       </div>
@@ -1918,24 +1948,30 @@ export function EditView({ project }: { project: Project }): ReactElement {
   return (
     <div className="edit-screen">
       <header className="edit-head">
-        <h1>Edit</h1>
+        <h1>{t('Edit')}</h1>
         {film !== undefined && (
           <span className="muted edit-summary">
-            {String(film.scenes.length)} {film.scenes.length === 1 ? 'scene' : 'scenes'} ·{' '}
-            {String(film.readyItems)} of {String(film.items)} pieces ready ·{' '}
-            {clock(film.totalSeconds)} · ${film.totalCostUsd.toFixed(2)} spent
+            {tn(film.scenes.length, '{count} scene', '{count} scenes')}{' '}
+            {t('· {readyItems} of {items} pieces ready · {totalSeconds} · {cost} spent', {
+              readyItems: String(film.readyItems),
+              items: String(film.items),
+              totalSeconds: clock(film.totalSeconds),
+              cost: formatUsd(film.totalCostUsd),
+            })}
           </span>
         )}
         <span className="edit-head-tools">
           {look !== undefined && (
             <Popover
-              label="Look of the whole film"
-              title="Film look"
+              label={t('Look of the whole film')}
+              title={t('Film look')}
               icon={<PaletteIcon aria-hidden="true" />}
               text={
                 look.look.preset !== null && look.look.preset !== 'none'
-                  ? `Look · ${PRESET_LABELS[look.look.preset] ?? look.look.preset}`
-                  : 'Look'
+                  ? t('Look · {value}', {
+                      value: PRESET_LABELS[look.look.preset] ?? look.look.preset,
+                    })
+                  : t('Look')
               }
               wide
               bare
@@ -1947,10 +1983,10 @@ export function EditView({ project }: { project: Project }): ReactElement {
             </Popover>
           )}
           <Popover
-            label="Export the scene or the film"
-            title="Export"
+            label={t('Export the scene or the film')}
+            title={t('Export')}
             icon={<ExportIcon aria-hidden="true" />}
-            text="Export"
+            text={t('Export')}
             badge={exporting}
             wide
             className="edit-export"
@@ -1965,8 +2001,8 @@ export function EditView({ project }: { project: Project }): ReactElement {
           <button
             type="button"
             className="button quiet icon-only"
-            aria-label="Help with the editor"
-            title="Help with the editor"
+            aria-label={t('Help with the editor')}
+            title={t('Help with the editor')}
             onClick={openHelp}
           >
             <QuestionIcon aria-hidden="true" />
@@ -1999,10 +2035,12 @@ export function EditView({ project }: { project: Project }): ReactElement {
         live.data !== undefined && (
           <EmptyState
             icon={FilmReelIcon}
-            title="Nothing to cut yet"
-            quip="The scissors are getting restless."
-            body="There are no scenes yet. Write the script first, then make clips of its shots; they come together here."
-            go={{ stage: 'script', label: 'Go to Script' }}
+            title={t('Nothing to cut yet')}
+            quip={t('The scissors are getting restless.')}
+            body={t(
+              'There are no scenes yet. Write the script first, then make clips of its shots; they come together here.',
+            )}
+            go={{ stage: 'script', label: t('Go to Script') }}
           />
         )
       ) : (
@@ -2010,7 +2048,9 @@ export function EditView({ project }: { project: Project }): ReactElement {
           key={sceneId}
           project={project}
           sceneId={sceneId}
-          sceneLabel={`Scene ${String(scenes.find((scene) => scene.id === sceneId)?.position ?? '')}`}
+          sceneLabel={t('Scene {value}', {
+            value: String(scenes.find((scene) => scene.id === sceneId)?.position ?? ''),
+          })}
           act={act}
           autoplay={autoplay}
           canMatch={look?.canMatch ?? false}

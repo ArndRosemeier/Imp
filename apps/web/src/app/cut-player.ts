@@ -19,6 +19,7 @@ import {
 } from '@imp/mode-movie';
 import { z } from 'zod';
 import { runCommand } from './context.js';
+import { t } from '../i18n/i18n.js';
 
 export const ItemState = z.enum([
   'ready',
@@ -30,13 +31,27 @@ export const ItemState = z.enum([
   'shot_missing',
 ]);
 export const ITEM_STATE_TEXT: Record<z.infer<typeof ItemState>, string> = {
-  ready: 'Ready',
-  no_clip: 'No clip yet',
-  clip_pending: 'Clip being made',
-  clip_failed: 'Clip failed',
-  dialogue_missing: 'Dialogue not recorded',
-  dialogue_outdated: 'Dialogue is of an earlier line',
-  shot_missing: 'Shot was deleted',
+  get ready(): string {
+    return t('Ready');
+  },
+  get no_clip(): string {
+    return t('No clip yet');
+  },
+  get clip_pending(): string {
+    return t('Clip being made');
+  },
+  get clip_failed(): string {
+    return t('Clip failed');
+  },
+  get dialogue_missing(): string {
+    return t('Dialogue not recorded');
+  },
+  get dialogue_outdated(): string {
+    return t('Dialogue is of an earlier line');
+  },
+  get shot_missing(): string {
+    return t('Shot was deleted');
+  },
 };
 
 export const Film = z.object({

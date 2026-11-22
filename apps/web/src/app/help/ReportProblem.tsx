@@ -2,11 +2,14 @@ import { ProblemReport } from '@imp/core';
 import { ArrowSquareOutIcon, CheckIcon, CopyIcon, PencilSimpleIcon } from '@phosphor-icons/react';
 import { useId, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { messageOf, runCommand, useImp } from '../context.js';
+import { t } from '../../i18n/i18n.js';
+import { Marked } from '../../i18n/Marked.js';
 
 /** The screen and input, which explain most layout problems. */
 function clientLine(): string {
   const touch = navigator.maxTouchPoints > 0 ? 'touch' : 'mouse';
-  return `${String(window.innerWidth)}×${String(window.innerHeight)} at ${String(window.devicePixelRatio)}x, ${touch}`;
+  // For the report, which goes to Imp's makers in English.
+  return `${String(window.innerWidth)}×${String(window.innerHeight)} at ${String(window.devicePixelRatio)}x, ${touch}`; // i18n-ignore
 }
 
 /**
@@ -52,16 +55,18 @@ export function ReportProblem(): ReactElement {
     return (
       <div className="report stack">
         <p className="muted">
-          Here is what the report says. <strong>Open on GitHub</strong> shows it as a new issue,
-          filled in; read it there and press Submit. You need a free GitHub account. Without one,
-          copy the report and send it however you like.
+          <Marked
+            text={t(
+              'Here is what the report says. **Open on GitHub** shows it as a new issue, filled in; read it there and press Submit. You need a free GitHub account. Without one, copy the report and send it however you like.',
+            )}
+          />
         </p>
-        <pre className="report-preview" aria-label="The report">
+        <pre className="report-preview" aria-label={t('The report')}>
           {report.body}
         </pre>
         <div className="row wrap">
           <a className="button primary" href={report.url} target="_blank" rel="noreferrer">
-            <ArrowSquareOutIcon aria-hidden="true" /> Open on GitHub
+            <ArrowSquareOutIcon aria-hidden="true" /> {t('Open on GitHub')}
           </a>
           <button
             className="button"
@@ -77,7 +82,7 @@ export function ReportProblem(): ReactElement {
             }}
           >
             {copied ? <CheckIcon aria-hidden="true" /> : <CopyIcon aria-hidden="true" />}
-            {copied ? 'Copied' : 'Copy the report'}
+            {copied ? t('Copied') : t('Copy the report')}
           </button>
           <button
             className="button quiet"
@@ -85,7 +90,7 @@ export function ReportProblem(): ReactElement {
               setReport(null);
             }}
           >
-            <PencilSimpleIcon aria-hidden="true" /> Change it
+            <PencilSimpleIcon aria-hidden="true" /> {t('Change it')}
           </button>
         </div>
         {error !== null && (
@@ -100,18 +105,18 @@ export function ReportProblem(): ReactElement {
   return (
     <form className="report stack" onSubmit={prepare}>
       <p className="muted">
-        Something broken or confusing? Say what happened and Imp writes a report for its makers,
-        with the version and what failed lately. Your key, prompts and story never go in, and
-        nothing is sent until you submit it yourself.
+        {t(
+          'Something broken or confusing? Say what happened and Imp writes a report for its makers, with the version and what failed lately. Your key, prompts and story never go in, and nothing is sent until you submit it yourself.',
+        )}
       </p>
       <label className="field" htmlFor={titleId}>
-        <span>The problem in a few words</span>
+        <span>{t('The problem in a few words')}</span>
         <input
           id={titleId}
           className="input"
           required
           maxLength={200}
-          placeholder="For example: clips stay on Making forever"
+          placeholder={t('For example: clips stay on Making forever')}
           value={title}
           onChange={(event) => {
             setTitle(event.target.value);
@@ -119,7 +124,7 @@ export function ReportProblem(): ReactElement {
         />
       </label>
       <label className="field" htmlFor={happenedId}>
-        <span>What happened, and what you did just before</span>
+        <span>{t('What happened, and what you did just before')}</span>
         <textarea
           id={happenedId}
           className="input"
@@ -133,7 +138,7 @@ export function ReportProblem(): ReactElement {
         />
       </label>
       <label className="field" htmlFor={expectedId}>
-        <span>What you expected (optional)</span>
+        <span>{t('What you expected (optional)')}</span>
         <textarea
           id={expectedId}
           className="input"
@@ -154,8 +159,8 @@ export function ReportProblem(): ReactElement {
           }}
         />
         <span>
-          Add the last few commands and their errors{' '}
-          <span className="muted">(names and outcomes only, no inputs)</span>
+          {t('Add the last few commands and their errors')}{' '}
+          <span className="muted">{t('(names and outcomes only, no inputs)')}</span>
         </span>
       </label>
       {error !== null && (
@@ -165,7 +170,7 @@ export function ReportProblem(): ReactElement {
       )}
       <div className="row">
         <button className="button primary" disabled={title.trim() === '' || happened.trim() === ''}>
-          Write the report
+          {t('Write the report')}
         </button>
       </div>
     </form>

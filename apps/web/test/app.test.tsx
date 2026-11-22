@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { MemoryKeyValueStore, settingsGet, type JsonValue, type ReleaseNotes } from '@imp/core';
+import { ProviderError } from '@imp/providers';
 import { createFakeProvider } from '@imp/providers/testing';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -87,7 +88,7 @@ describe("What's new", () => {
     const { user } = start([], RELEASE);
     await completeSetup(user);
     const button = await screen.findByRole('button', {
-      name: /What's new in Imp 0\.003, with changes/,
+      name: /What’s new in Imp 0\.003, with changes/,
     });
     expect(button.textContent).toContain('0.003');
     await user.click(button);
@@ -105,13 +106,13 @@ describe("What's new", () => {
     ).toMatch(/\/pull\/41$/);
     expect(localStorage.getItem('imp.whatsNew.seen')).toBe('0.003');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: "What's new in Imp 0.003" })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'What’s new in Imp 0.003' })).toBeTruthy();
   });
 
   it('says so when a build knows no history', async () => {
     const { user } = start();
     await completeSetup(user);
-    await user.click(await screen.findByRole('button', { name: /What's new in Imp 0\.000/ }));
+    await user.click(await screen.findByRole('button', { name: /What’s new in Imp 0\.000/ }));
     expect(screen.getByText(/made without its history/)).toBeTruthy();
     expect(screen.getByText(/A preview build/)).toBeTruthy();
   });
@@ -526,6 +527,30 @@ describe('App: setup and agents', () => {
     await user.click(screen.getByRole('button', { name: 'Continue where Coordinator stopped' }));
     expect(await screen.findByText('Logline written.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Continue where/ })).toBeNull();
+  });
+
+  it('retries a message that did not reach the model, without sending it twice', async () => {
+    const { provider, user } = start([
+      new ProviderError(
+        'network',
+        'openrouter',
+        'Imp could not reach OpenRouter. Check the internet connection, then try again.',
+      ),
+    ]);
+    await completeSetup(user);
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Write the logline.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Coordinator did not get your message')).toBeTruthy();
+    expect(screen.getByText(/could not reach OpenRouter/)).toBeTruthy();
+
+    provider.script({ content: 'Logline written.' });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Logline written.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    // The message is in the conversation once, and the model was sent it once more, not twice.
+    expect(screen.getAllByText('Write the logline.')).toHaveLength(1);
+    const retried = provider.requests.at(-1)?.messages ?? [];
+    expect(retried.filter((message) => message.role === 'user')).toHaveLength(1);
   });
 
   it('keeps the conversation across a restart and resumes after an approval', async () => {

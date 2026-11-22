@@ -1,6 +1,7 @@
 import { useId, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import type { Item } from './cut-player.js';
+import { fixed, t } from '../i18n/i18n.js';
 
 type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
@@ -21,21 +22,100 @@ export const GRADE_CONTROLS: readonly {
   low: string;
   high: string;
 }[] = [
-  { field: 'exposure', label: 'Exposure', min: -3, max: 3, low: 'Darker', high: 'Brighter' },
-  { field: 'contrast', label: 'Contrast', min: -1, max: 1, low: 'Flatter', high: 'Punchier' },
-  { field: 'temperature', label: 'Temperature', min: -1, max: 1, low: 'Cooler', high: 'Warmer' },
-  { field: 'tint', label: 'Tint', min: -1, max: 1, low: 'Green', high: 'Magenta' },
-  { field: 'saturation', label: 'Saturation', min: -1, max: 1, low: 'Grey', high: 'Vivid' },
+  {
+    field: 'exposure',
+    get label(): string {
+      return t('Exposure');
+    },
+    min: -3,
+    max: 3,
+    get low(): string {
+      return t('Darker');
+    },
+    get high(): string {
+      return t('Brighter');
+    },
+  },
+  {
+    field: 'contrast',
+    get label(): string {
+      return t('Contrast');
+    },
+    min: -1,
+    max: 1,
+    get low(): string {
+      return t('Flatter');
+    },
+    get high(): string {
+      return t('Punchier');
+    },
+  },
+  {
+    field: 'temperature',
+    get label(): string {
+      return t('Temperature');
+    },
+    min: -1,
+    max: 1,
+    get low(): string {
+      return t('Cooler');
+    },
+    get high(): string {
+      return t('Warmer');
+    },
+  },
+  {
+    field: 'tint',
+    get label(): string {
+      return t('Tint');
+    },
+    min: -1,
+    max: 1,
+    get low(): string {
+      return t('Green');
+    },
+    get high(): string {
+      return t('Magenta');
+    },
+  },
+  {
+    field: 'saturation',
+    get label(): string {
+      return t('Saturation');
+    },
+    min: -1,
+    max: 1,
+    get low(): string {
+      return t('Grey');
+    },
+    get high(): string {
+      return t('Vivid');
+    },
+  },
 ];
 
 export const PRESET_LABELS: Record<string, string> = {
-  none: 'None',
-  warm: 'Warm',
-  cool: 'Cool',
-  'bleach-bypass': 'Bleach bypass',
-  noir: 'Noir',
-  golden: 'Golden hour',
-  night: 'Night',
+  get none(): string {
+    return t('None');
+  },
+  get warm(): string {
+    return t('Warm');
+  },
+  get cool(): string {
+    return t('Cool');
+  },
+  get 'bleach-bypass'(): string {
+    return t('Bleach bypass');
+  },
+  get noir(): string {
+    return t('Noir');
+  },
+  get golden(): string {
+    return t('Golden hour');
+  },
+  get night(): string {
+    return t('Night');
+  },
 };
 
 export const LookView = z.object({
@@ -56,7 +136,7 @@ export const isNeutralGrade = (grade: GradeValues): boolean =>
   GRADE_CONTROLS.every((control) => Math.abs(grade[control.field]) < 0.005);
 
 const signed = (value: number): string =>
-  `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)}`;
+  `${value > 0 ? '+' : value < 0 ? '−' : ''}${fixed(Math.abs(value), 2)}`;
 
 /**
  * One grade control: dragged freely, sent once when let go, so that a drag is
@@ -148,7 +228,7 @@ export function GradeTools({
   return (
     <section className="stack grade-tools" aria-labelledby={titleId}>
       <div className="row spread wrap">
-        <h4 id={titleId}>Colour</h4>
+        <h4 id={titleId}>{t('Colour')}</h4>
         {!isNeutralGrade(item.grade) && (
           <button
             className="button small quiet"
@@ -156,7 +236,7 @@ export function GradeTools({
               set({ exposure: 0, contrast: 0, temperature: 0, tint: 0, saturation: 0 });
             }}
           >
-            As filmed
+            {t('As filmed')}
           </button>
         )}
       </div>
@@ -178,7 +258,7 @@ export function GradeTools({
       </div>
       {canMatch && others.length > 0 && (
         <label className="field compact">
-          <span>Match colour to</span>
+          <span>{t('Match colour to')}</span>
           <select
             className="input"
             value=""
@@ -197,10 +277,11 @@ export function GradeTools({
                 });
             }}
           >
-            <option value="">{matching ? 'Matching…' : 'Choose a shot'}</option>
+            <option value="">{matching ? t('Matching…') : t('Choose a shot')}</option>
             {others.map((other) => (
               <option key={other.itemId} value={other.itemId}>
-                Shot {other.index} · {other.label.slice(0, 48) || 'Untitled'}
+                {t('Shot {index} ·', { index: other.index })}{' '}
+                {other.label.slice(0, 48) || t('Untitled')}
               </option>
             ))}
           </select>
@@ -226,16 +307,17 @@ export function FilmLookPanel({
   return (
     <section className="stack film-look" aria-labelledby={titleId}>
       <div className="row spread wrap">
-        <h3 id={titleId}>Look of the film</h3>
+        <h3 id={titleId}>{t('Look of the film')}</h3>
         <button className="button small quiet" onClick={onClose}>
-          Done
+          {t('Done')}
         </button>
       </div>
       <p className="muted small">
-        Laid over every shot after its own colour. Make the shots of a scene agree first, then give
-        the film one feel.
+        {t(
+          'Laid over every shot after its own colour. Make the shots of a scene agree first, then give the film one feel.',
+        )}
       </p>
-      <div className="look-presets" role="group" aria-label="Preset looks">
+      <div className="look-presets" role="group" aria-label={t('Preset looks')}>
         {view.presets.map((preset) => (
           <button
             key={preset}

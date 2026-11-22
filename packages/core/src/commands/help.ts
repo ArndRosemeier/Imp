@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { defineCommand, type Command } from '../command.js';
+import { DEFAULT_LANGUAGE, Language, readLanguage } from '../language.js';
 
 /**
  * One page of Imp's own guide. The same pages are the help panel, the first
@@ -22,6 +23,9 @@ export const GuideTopic = z.object({
 });
 export type GuideTopic = z.infer<typeof GuideTopic>;
 
+/** The guide's pages in languages other than English, by language; ids match the English pages. */
+export type GuideTranslations = Partial<Record<Language, readonly GuideTopic[]>>;
+
 /** Settings, so the help layer is as visible to agents as any other choice. */
 export const HELP_ENABLED = 'help.enabled';
 export const HELP_DISMISSED = 'help.dismissed';
@@ -37,7 +41,7 @@ export const HelpState = z.object({
 });
 export type HelpState = z.infer<typeof HelpState>;
 
-const Words = /[a-z0-9]+/g;
+const Words = /[\p{L}\p{N}]+/gu;
 
 function wordsOf(text: string): string[] {
   return text.toLowerCase().match(Words) ?? [];
@@ -63,13 +67,40 @@ function score(topic: GuideTopic, query: readonly string[]): number {
  * guide's pages. Turning help off is one command, so a person who knows Imp
  * (or an agent asked to) silences every tip at once.
  */
-export function createHelpCommands(topics: readonly GuideTopic[]): readonly Command[] {
+export function createHelpCommands(
+  topics: readonly GuideTopic[],
+  translations: GuideTranslations = {},
+): readonly Command[] {
   const pages = topics.map((topic) => GuideTopic.parse(topic));
   const ids = new Set<string>();
   for (const page of pages) {
     if (ids.has(page.id)) throw new TypeError(`Guide page "${page.id}" is defined twice.`);
     ids.add(page.id);
   }
+  // Each language's pages, in the order of the English ones; a page not translated yet reads in English.
+  const byLanguage = new Map<Language, readonly GuideTopic[]>([[DEFAULT_LANGUAGE, pages]]);
+  for (const [language, translated] of Object.entries(translations) as [
+    Language,
+    readonly GuideTopic[],
+  ][]) {
+    const byId = new Map(translated.map((topic) => [topic.id, GuideTopic.parse(topic)]));
+    for (const id of byId.keys()) {
+      if (!ids.has(id))
+        throw new TypeError(`Guide page "${id}" (${language}) has no English page.`);
+    }
+    byLanguage.set(
+      language,
+      pages.map((page) => byId.get(page.id) ?? page),
+    );
+  }
+  const LanguageInput = Language.optional().describe(
+    'The language to read the guide in. Left out, the language of Imp’s interface.',
+  );
+  const pagesIn = async (
+    store: Parameters<typeof readLanguage>[0],
+    language: Language | undefined,
+  ): Promise<readonly GuideTopic[]> =>
+    byLanguage.get(language ?? (await readLanguage(store))) ?? pages;
 
   const helpState = defineCommand({
     id: 'help.state',
@@ -155,10 +186,12 @@ export function createHelpCommands(topics: readonly GuideTopic[]): readonly Comm
     input: z.object({
       query: z.string().max(200).optional().describe('Words to search for; best matches first.'),
       area: z.string().optional().describe('Only pages about this stage id, or "workspace".'),
+      language: LanguageInput,
     }),
     output: z.object({ topics: z.array(TopicListing) }),
-    handler: (_context, { query, area }) => {
-      let found = area === undefined ? pages : pages.filter((page) => page.area === area);
+    handler: async ({ runtime }, { query, area, language }) => {
+      const all = await pagesIn(runtime.store, language);
+      let found = area === undefined ? all : all.filter((page) => page.area === area);
       const words = wordsOf(query ?? '');
       if (words.length > 0) {
         found = found
@@ -167,7 +200,7 @@ export function createHelpCommands(topics: readonly GuideTopic[]): readonly Comm
           .sort((a, b) => b.score - a.score)
           .map((entry) => entry.page);
       }
-      return Promise.resolve({ topics: found.map(listing) });
+      return { topics: found.map(listing) };
     },
   });
 
@@ -177,14 +210,16 @@ export function createHelpCommands(topics: readonly GuideTopic[]): readonly Comm
     description:
       "Returns one page of Imp's own guide in full, with its first-time tip if it has one.",
     effect: 'read',
-    input: z.object({ id: z.string() }),
+    input: z.object({ id: z.string(), language: LanguageInput }),
     output: GuideTopic,
-    handler: (_context, { id }) => {
-      const page = pages.find((candidate) => candidate.id === id);
+    handler: async ({ runtime }, { id, language }) => {
+      const page = (await pagesIn(runtime.store, language)).find(
+        (candidate) => candidate.id === id,
+      );
       if (page === undefined) {
-        return Promise.reject(new Error(`No guide page "${id}". See help.topics for the list.`));
+        throw new Error(`No guide page "${id}". See help.topics for the list.`);
       }
-      return Promise.resolve(page);
+      return page;
     },
   });
 
