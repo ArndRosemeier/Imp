@@ -695,13 +695,22 @@ describe('shots and clips', () => {
         'Mara: Seventy, grey braid.',
         'Performance: Mara lunges and drags Tomas back by the collar.',
         'Mara says, Screaming over the wind, "Tomas! Get away from the rail!"',
+        'Sound: the voice and the natural sounds of the scene, no music.',
         'Visual style: Cold sea light.',
       ].join('\n'),
     );
-    const silent = Shot.parse(await add({ description: 'The lamp turns.' }));
-    expect(clipPrompt(silent, [], '')).toBe('The lamp turns.\nNobody speaks.');
+    const quiet = Shot.parse(await add({ description: 'The lamp turns.' }));
+    expect(clipPrompt(quiet, [], '')).toBe(
+      'The lamp turns.\nNobody speaks.\nSound: only the natural sounds of the scene, no speech and no music.',
+    );
+    // Silence only when it is asked for.
+    expect(clipPrompt(quiet, [], '', false, { objects: [] }, false)).toBe(
+      'The lamp turns.\nNobody speaks.',
+    );
     const offscreen = Shot.parse(await add({ description: 'Dark stairs.', line: 'Hello?' }));
-    expect(clipPrompt(offscreen, [], '')).toBe('Dark stairs.\nA voice says "Hello?"');
+    expect(clipPrompt(offscreen, [], '')).toBe(
+      'Dark stairs.\nA voice says "Hello?"\nSound: the voice and the natural sounds of the scene, no music.',
+    );
   });
 
   it('keeps a voice-only narrator out of the prompt and the picture', async () => {
@@ -723,7 +732,7 @@ describe('shots and clips', () => {
     );
     const narrated = { ...shot, speakerId: narrator.id };
     expect(clipPrompt(narrated, [Character.parse(mara), narrator], '')).toBe(
-      'The lamp turns.\nMara: Seventy, grey braid.\nNobody in the picture speaks; a voice-over is added later.',
+      'The lamp turns.\nMara: Seventy, grey braid.\nNobody in the picture speaks; a voice-over is added later.\nSound: only the natural sounds of the scene, no speech and no music.',
     );
     const unset = Character.parse(
       await run('movie.character.update', {
@@ -782,6 +791,43 @@ describe('shots and clips', () => {
     });
   });
 
+  it('asks for sound by default, also for shots where nobody speaks', async () => {
+    const { run, provider, at, add } = await withScene();
+    const quiet = await add({ description: 'The lamp turns.' });
+    await run('movie.shot.clip.generate', at(quiet.id));
+    expect(provider.videoRequests[0]).toMatchObject({ audio: true });
+    expect(provider.videoRequests[0]?.prompt).toContain('natural sounds of the scene');
+    expect(await run('movie.shot.get', at(quiet.id))).toMatchObject({
+      clip: { silent: false, voiceApart: false },
+    });
+  });
+
+  it('refuses a model that makes no sound before anything is spent', async () => {
+    const { run, provider, at, storm } = await withScene({
+      models: [
+        {
+          id: 'vendor/clips',
+          name: 'Clips',
+          inputModalities: ['text'],
+          outputModalities: ['video'],
+          video: {
+            durationsSeconds: [4, 6, 8],
+            resolutions: ['720p'],
+            aspectRatios: ['16:9'],
+            frameImages: [],
+            nativeAudio: false,
+          },
+          contextLength: null,
+          supportsTools: false,
+          pricing: { promptUsdPerToken: null, completionUsdPerToken: null },
+        },
+      ],
+    });
+    const shot = await storm();
+    await expect(run('movie.shot.clip.generate', at(shot.id))).rejects.toThrow();
+    expect(provider.videoRequests).toHaveLength(0);
+  });
+
   it('makes the clip from the words alone when the model takes no portraits', async () => {
     const { run, registry, provider, mara, at, storm } = await withScene({
       videoRefusesReferences: true,
@@ -800,7 +846,7 @@ describe('shots and clips', () => {
     expect(provider.videoRequests[1]).not.toHaveProperty('references');
   });
 
-  it('records the line in the voice of the speaker and makes the clip silent and long enough', async () => {
+  it('records the line in the voice of the speaker and lays it only over clips of a voice-only speaker', async () => {
     const video = {
       durationsSeconds: [4, 6, 8],
       resolutions: ['480p', '720p'],
@@ -808,7 +854,7 @@ describe('shots and clips', () => {
       frameImages: [],
       nativeAudio: true,
     };
-    const { run, runtime, registry, provider, at, storm } = await withScene({
+    const { run, runtime, registry, provider, at, storm, mara } = await withScene({
       models: [
         {
           id: 'vendor/clips',
@@ -854,14 +900,25 @@ describe('shots and clips', () => {
       ...at(shot.id),
       resolution: '1080p',
     })) as unknown as WithClip;
-    expect(started.clip).toMatchObject({ silent: true, durationSeconds: 4 });
+    // Mara is on screen: the clip speaks the line itself, so it matches her lips.
+    expect(started.clip).toMatchObject({ silent: false, voiceApart: false, durationSeconds: 4 });
     expect(provider.videoRequests[0]).toMatchObject({
       durationSeconds: 4,
       resolution: '720p',
-      audio: false,
-      prompt: expect.stringContaining('no sound is heard') as string,
+      audio: true,
+      prompt: expect.stringContaining('"Tomas! Get away from the rail!"') as string,
     });
-    expect(provider.videoRequests[0]?.prompt).not.toContain('"Tomas! Get away');
+
+    // Heard and not seen, her recorded voice is laid over a clip long enough for it.
+    await run('movie.character.update', { characterId: mara.id, voiceOnly: true });
+    const narrated = (await run('movie.shot.clip.generate', at(shot.id))) as unknown as WithClip;
+    expect(narrated.clip).toMatchObject({ silent: false, voiceApart: true });
+    expect(provider.videoRequests[1]).toMatchObject({
+      audio: true,
+      prompt: expect.stringContaining('a voice-over is added later') as string,
+    });
+    expect(provider.videoRequests[1]?.prompt).toContain('no speech');
+    expect(provider.videoRequests[1]?.prompt).not.toContain('"Tomas! Get away');
 
     // A new recording replaces the file of the old one; deleting it leaves the line.
     await run('movie.shot.dialogue.generate', at(shot.id));
@@ -1504,7 +1561,7 @@ describe('shots and clips', () => {
     );
     const talk = await add({ description: 'Mara speaks.', speakerId: mara.id, line: 'Hold it.' });
     await run('movie.shot.dialogue.generate', at(talk.id));
-    await run('movie.shot.clip.generate', { ...at(talk.id), durationSeconds: 4 });
+    await run('movie.shot.clip.generate', { ...at(talk.id), durationSeconds: 4, audio: false });
     await run('movie.shot.clip.check', at(talk.id));
     await run('movie.shot.clip.check', at(talk.id));
     const next = await add({ description: 'The door.' });
@@ -1526,6 +1583,31 @@ describe('shots and clips', () => {
     expect((await cutOf()).sounds).toEqual([
       expect.objectContaining({ kind: 'dialogue', recorded: true }),
     ]);
+  });
+
+  it('takes the scene sound of a clip apart and leaves the voice-over recorded over it', async () => {
+    const { run, registry, at, add, cutOf, edit, mara } = await withCuts();
+    await registry.executeById(
+      'settings.set',
+      { key: 'speech.model', value: 'vendor/speaker' },
+      { actor: user },
+    );
+    await run('movie.character.update', { characterId: mara.id, voiceOnly: true });
+    const talk = await add({ description: 'The sea.', speakerId: mara.id, line: 'It was calm.' });
+    await run('movie.shot.dialogue.generate', at(talk.id));
+    await run('movie.shot.clip.generate', { ...at(talk.id), durationSeconds: 4 });
+    await run('movie.shot.clip.check', at(talk.id));
+    await run('movie.shot.clip.check', at(talk.id));
+    expect(await run('movie.shot.get', at(talk.id))).toMatchObject({
+      clip: { silent: false, voiceApart: true },
+    });
+    const detached = (await edit('audio.detach', { itemId: talk.id })) as unknown as {
+      source: string;
+    };
+    expect(detached.source).toBe('clip');
+    const sounds = (await cutOf()).sounds as { kind: string }[];
+    // The recorded voice stays with the picture.
+    expect(sounds.map((sound) => sound.kind)).toEqual(['clip']);
   });
 
   it('places sounds, takes the sound of a clip apart, and drops it all with the scene', async () => {
@@ -2046,6 +2128,7 @@ describe('locations and objects in scenes and shots', () => {
         'Location: Lamp room, seen from "From the stairs": Low, looking up at the lamp. Round iron room under a glass dome. Night: Only the lamp lights the room.',
         'Pocket watch: Brass (Cracked)',
         'Nobody speaks.',
+        'Sound: only the natural sounds of the scene, no speech and no music.',
       ].join('\n'),
     );
     // What was deleted from the world is left out.

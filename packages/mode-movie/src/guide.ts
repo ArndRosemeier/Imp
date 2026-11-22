@@ -71,7 +71,7 @@ On the page, each line of dialogue shows the shot that speaks it, or "no shot". 
 ## How scenes are used later
 
 - Casting finds the characters who speak.
-- Shots splits each scene into shots, and dialogue is spoken in each character's voice.
+- Shots splits each scene into shots, and the clips speak each line with matching lips.
 - Edit lays each scene out as its own timeline and joins them into the film.
 
 ## Let the crew do it
@@ -150,8 +150,9 @@ export const shotsGuide: GuideTopic = {
 1. Pick a scene from the tabs.
 2. Add shots: framing (wide, close-up), what happens, who is in it, how long.
 3. Optionally make a **key frame**, a still picture the clip starts on. It is cheap and lets you check the look before paying for video.
-4. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it.
-5. Add **dialogue**: lines are spoken in the character's voice over the clip.
+4. Give a speaking shot its **line** and delivery. The clip speaks it itself, so the lips match, along with the sounds of the scene.
+5. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it. Clips always have sound; video models that make none are not offered.
+6. For a narrator or a voice off screen, **record the dialogue** in that character's voice; it plays over the clip.
 
 ## Takes
 

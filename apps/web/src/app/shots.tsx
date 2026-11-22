@@ -1,6 +1,7 @@
 import type { Project } from '@imp/core';
 import {
   Character,
+  dialogueOver,
   IMAGE_MODEL_SETTING,
   Scene,
   Shot,
@@ -33,7 +34,9 @@ import { EmptyState } from './help/EmptyState.js';
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
 });
-const Cast = z.object({ characters: z.array(Character.pick({ id: true, name: true })) });
+const Cast = z.object({
+  characters: z.array(Character.pick({ id: true, name: true, voiceOnly: true })),
+});
 const Shots = z.object({ shots: z.array(Shot) });
 
 /** How often a clip that is being made is looked at again. */
@@ -67,13 +70,14 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
       </div>
     );
   }
-  const overlaid = clip.silent && shot.dialogue !== null;
+  const overlaid = dialogueOver(clip) && shot.dialogue !== null;
   return (
     <figure className="clip">
       {url !== null &&
         (overlaid ? (
           <DubbedVideo
             src={url}
+            silent={clip.silent}
             dialogueKey={shot.dialogue?.blobKey}
             label={`Clip of shot ${String(shot.position)}`}
           />
@@ -93,7 +97,13 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
             : clip.guides.length === 0
               ? ' · made from the words alone, without pictures'
               : ` · guided by ${clip.guides.join(', ')}`}
-        {overlaid ? ' · silent, the recorded dialogue plays over it' : ''}
+        {overlaid
+          ? clip.silent
+            ? ' · silent, the recorded voice plays over it'
+            : ' · the recorded voice plays over its sound'
+          : clip.silent
+            ? ' · silent, as asked'
+            : ''}
       </figcaption>
     </figure>
   );
@@ -165,6 +175,7 @@ function TakeCard({
       <span className="muted small take-info" title={take.prompt}>
         {take.model === 'file' ? 'From a file' : take.model.split('/').at(-1)}
         {take.durationSeconds === null ? '' : ` · ${seconds(take.durationSeconds)}`}
+        {take.silent ? ' · silent' : ''}
       </span>
       <div className="row take-actions">
         <button
@@ -363,15 +374,18 @@ function KeyFrames({
 }
 
 /**
- * A silent clip with the dialogue laid over it: the two start, stop and seek
+ * A clip with the dialogue laid over it: the two start, stop and seek
  * together. The sound is a second element kept in step, not mixed into the file.
  */
 function DubbedVideo({
   src,
+  silent,
   dialogueKey,
   label,
 }: {
   src: string;
+  /** Whether the clip has no sound of its own; otherwise it plays under the voice. */
+  silent: boolean;
   dialogueKey: string | undefined;
   label: string;
 }): ReactElement {
@@ -382,9 +396,11 @@ function DubbedVideo({
   };
   return (
     <>
+      {/* The line spoken is shown in the field below; a generated clip has no caption track. */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
         controls
-        muted
+        muted={silent}
         src={src}
         aria-label={label}
         onPlay={(event) => {
@@ -449,10 +465,13 @@ export function SceneTabs({
 /** The recorded voice of a shot's line, and the means to record it. */
 function Dialogue({
   shot,
+  voiceOnly,
   speechModel,
   act,
 }: {
   shot: Shot;
+  /** Whether the speaker is heard and not seen, so a recording can be laid over the clip. */
+  voiceOnly: boolean;
   speechModel: string | null;
   act: Act;
 }): ReactElement | null {
@@ -462,6 +481,8 @@ function Dialogue({
   const at = { sceneId: shot.sceneId, shotId: shot.id };
   const ready = shot.speakerId !== null && shot.line.trim() !== '';
   if (!ready && take === null) return null;
+  // Someone on screen speaks in the clip itself, so the voice matches the lips.
+  if (!voiceOnly && take === null) return null;
   const outdated = take !== null && take.line !== shot.line;
   return (
     <div className="stack dialogue">
@@ -513,10 +534,15 @@ function Dialogue({
           The recording is of an earlier line or delivery. Record it again.
         </p>
       )}
-      {take !== null && shot.clip !== null && !shot.clip.silent && (
+      {take !== null && !voiceOnly && (
         <p className="muted" role="status">
-          This clip has a voice of its own. Generate it again to play the recording over a silent
-          one.
+          The speaker is on screen, so the clip speaks the line itself to match the lips. This
+          recording is not laid over it; use it on the audio lane if you like.
+        </p>
+      )}
+      {take !== null && voiceOnly && shot.clip !== null && !dialogueOver(shot.clip) && (
+        <p className="muted" role="status">
+          Generate the clip again to play this recording over it.
         </p>
       )}
     </div>
@@ -535,7 +561,7 @@ function ShotCard({
   act,
 }: {
   shot: Shot;
-  cast: readonly { id: string; name: string }[];
+  cast: readonly { id: string; name: string; voiceOnly?: boolean }[];
   world: ReturnType<typeof useWorld>;
   sceneLocationId: string | null;
   model: string | null;
@@ -710,7 +736,14 @@ function ShotCard({
           onCommit={(delivery) => change({ delivery })}
         />
       </div>
-      <Dialogue shot={shot} speechModel={speechModel} act={act} />
+      <Dialogue
+        shot={shot}
+        voiceOnly={cast.some(
+          (character) => character.id === shot.speakerId && character.voiceOnly === true,
+        )}
+        speechModel={speechModel}
+        act={act}
+      />
       <KeyFrames shot={shot} imageModel={imageModel} act={act} />
       <div className="row wrap">
         <button

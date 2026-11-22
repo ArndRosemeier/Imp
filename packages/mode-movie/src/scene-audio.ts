@@ -3,7 +3,7 @@ import { CommandError, type CoreRuntime, type KeyValueStore } from '@imp/core';
 import { characterPrefix, editHistoryKey, editKey, shotPrefix, soundPrefix } from './commands.js';
 import { itemTimes, itemsOf, readCut, requireScene, save } from './edit.js';
 import type { CutItem, CutLine } from './schema.js';
-import { Character, CutHistory, SceneCut, Shot, Sound } from './schema.js';
+import { Character, CutHistory, dialogueOver, SceneCut, Shot, Sound } from './schema.js';
 
 /**
  * The tracks a scene's sound is shown on in the audio editor. The Edit stage
@@ -88,7 +88,7 @@ async function readScene(
   const pieces = await scenePieces(runtime.store, projectId, sceneId);
   const regions = new Map<TrackId, SoundPlacement[]>(TRACKS.map((track) => [track.id, []]));
 
-  // The sound items play with their picture: recorded dialogue over a silent clip, or the clip's own.
+  // The sound items play with their picture: the clip's own, and the recorded dialogue over it.
   for (const [index, item] of items.entries()) {
     const at = laid.items[index];
     const shot = pieces.shots.get(item.shotId);
@@ -137,7 +137,7 @@ async function readScene(
         }),
       );
     };
-    if (shot.clip?.silent === true && shot.dialogue !== null) {
+    if (shot.clip !== null && dialogueOver(shot.clip) && shot.dialogue !== null) {
       attached(
         'dialogue',
         shot.dialogue.blobKey,

@@ -37,6 +37,7 @@ import {
   Scene,
   SceneCut,
   Shot,
+  dialogueOver,
   Sound,
   SoundPlacement,
   TextItem,
@@ -82,7 +83,7 @@ function stateOf(shot: Shot | undefined): ItemState {
   if (shot.clip.status === 'pending') return 'clip_pending';
   if (shot.clip.status === 'failed') return 'clip_failed';
   const speaks = shot.speakerId !== null && shot.line.trim() !== '';
-  if (speaks && shot.dialogue === null && shot.clip.silent) return 'dialogue_missing';
+  if (speaks && shot.dialogue === null && dialogueOver(shot.clip)) return 'dialogue_missing';
   if (shot.dialogue !== null && shot.dialogue.line !== shot.line) return 'dialogue_outdated';
   return 'ready';
 }
@@ -507,7 +508,7 @@ export async function viewOf(
     }
     const shot = await shotOf(item.sceneId, item.shotId);
     if (shot === undefined || shot.speakerId === null || shot.line.trim() === '') continue;
-    const overDialogue = shot.clip?.silent === true;
+    const overDialogue = shot.clip !== null && dialogueOver(shot.clip);
     const volume = overDialogue ? item.dialogueVolume : item.clipAudioVolume;
     if (volume <= 0) continue;
     const recordedLength = shot.dialogue?.durationSeconds;
@@ -777,28 +778,27 @@ function takeApart(
       fadeOutSeconds: 0,
       loop: false,
     });
+  let next = item;
+  let clipSound: SoundPlacement | null = null;
+  let spoken: SoundPlacement | null = null;
   if (!shot.clip.silent && item.clipAudioVolume > 0) {
-    const sound = lay('clip', item.clipAudioVolume, laid.movingSeconds);
-    return {
-      item: { ...item, clipAudioVolume: 0 },
-      sounds: [sound],
-      voice: speaks ? sound.id : null,
-    };
+    clipSound = lay('clip', item.clipAudioVolume, laid.movingSeconds);
+    next = { ...next, clipAudioVolume: 0 };
   }
-  if (shot.clip.silent && shot.dialogue !== null && item.dialogueVolume > 0) {
+  if (dialogueOver(shot.clip) && shot.dialogue !== null && item.dialogueVolume > 0) {
     const heard = Math.min(
       laid.movingSeconds,
       (shot.dialogue.durationSeconds ?? laid.movingSeconds) - item.trimStartSeconds,
     );
-    if (heard <= 0) return { item, sounds: [], voice: null };
-    const sound = lay('dialogue', item.dialogueVolume, heard);
-    return {
-      item: { ...item, dialogueVolume: 0 },
-      sounds: [sound],
-      voice: speaks ? sound.id : null,
-    };
+    if (heard > 0) {
+      spoken = lay('dialogue', item.dialogueVolume, heard);
+      next = { ...next, dialogueVolume: 0 };
+    }
   }
-  return { item, sounds: [], voice: null };
+  const sounds = [clipSound, spoken].filter((sound) => sound !== null);
+  // The line follows the recorded voice where there is one, else the clip's own.
+  const voice = speaks ? ((spoken ?? clipSound)?.id ?? null) : null;
+  return { item: next, sounds, voice };
 }
 
 /** Texts that followed the line an item spoke follow it where it was laid on the lane. */
@@ -1289,13 +1289,15 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       if (item.kind !== 'shot' || laid?.hasClipAudio !== true) return refuse();
       const shot = await loadShot(runtime.store, projectId, item.sceneId, item.shotId);
       const apart = takeApart(runtime, item, laid, shot);
-      const placement = apart.sounds[0];
-      if (placement?.source !== 'clip') return refuse();
+      // Only the clip's own sound: a voice recorded over it stays with the picture.
+      const placement = apart.sounds.find((sound) => sound.source === 'clip');
+      if (placement === undefined) return refuse();
+      const kept = { ...item, clipAudioVolume: 0 };
       await commitCut({ runtime, actor }, projectId, cut, {
         ...cut,
-        items: items.map((candidate, at) => (at === index ? apart.item : candidate)),
+        items: items.map((candidate, at) => (at === index ? kept : candidate)),
         sounds: [...cut.sounds, placement],
-        texts: followVoice(cut.texts, item.id, apart.voice),
+        texts: followVoice(cut.texts, item.id, apart.voice === placement.id ? placement.id : null),
       });
       return placement;
     },

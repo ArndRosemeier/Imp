@@ -107,7 +107,7 @@ describe('models.list', () => {
     const all = await list({ output: 'video', all: true });
     expect(all.total).toBe(3);
     expect(all.models.find((entry) => entry['id'] === 'v/avatar')).toMatchObject({
-      abilities: ['silent'],
+      abilities: ['no sound'],
       unsuitable: expect.stringContaining('photo or an existing video') as string,
     });
   });

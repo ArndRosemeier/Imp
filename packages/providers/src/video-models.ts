@@ -35,7 +35,11 @@ export function describeVideoModel(model: ModelInfo): VideoModelNotes {
   if (video === undefined) return { fits: true, problem: null, notes: [] };
   const notes = [
     ...(video.durationsSeconds.length === 0 ? [] : [lengths(video.durationsSeconds)]),
-    ...(video.nativeAudio === true ? ['own sound'] : video.nativeAudio === false ? ['silent'] : []),
+    ...(video.nativeAudio === true
+      ? ['own sound']
+      : video.nativeAudio === false
+        ? ['no sound']
+        : []),
     ...(video.frameImages.includes('first_frame') ? ['start picture'] : []),
   ];
   if (video.durationsSeconds.length === 0) {
@@ -43,6 +47,14 @@ export function describeVideoModel(model: ModelInfo): VideoModelNotes {
       fits: false,
       problem:
         'It works on a photo or an existing video, and makes no clips of a chosen length from a description.',
+      notes,
+    };
+  }
+  if (video.nativeAudio === false) {
+    return {
+      fits: false,
+      problem:
+        'It makes no sound. Clips need their own sound, and spoken lines must come from the clip to match the lips.',
       notes,
     };
   }
