@@ -1414,8 +1414,9 @@ export const de: Readonly<Record<string, string>> = {
   ' · starts on the key frame': ' · beginnt mit dem Keyframe',
   ' · made from the words alone, without pictures': ' · nur aus Worten erstellt, ohne Bilder',
   ' · guided by {value}': ' · gestützt auf {value}',
-  ' · silent, the recorded dialogue plays over it':
-    ' · stumm, der aufgenommene Dialog läuft darüber',
+  ' · silent, the recorded voice plays over it': ' · stumm, die aufgenommene Stimme läuft darüber',
+  ' · the recorded voice plays over its sound': ' · die aufgenommene Stimme läuft über seinem Ton',
+  ' · silent, as asked': ' · stumm, wie gewünscht',
   'Take {number} of shot {shotPosition}': 'Take {number} von Einstellung {shotPosition}',
   'Stop {label}': '{label} stoppen',
   'Play {label}': '{label} abspielen',
@@ -1454,8 +1455,10 @@ export const de: Readonly<Record<string, string>> = {
   '{value} s · ': '{value} s · ',
   'The recording is of an earlier line or delivery. Record it again.':
     'Die Aufnahme gehört zu einer älteren Zeile oder Vortragsweise. Nimm sie neu auf.',
-  'This clip has a voice of its own. Generate it again to play the recording over a silent one.':
-    'Dieser Clip hat eine eigene Stimme. Erstelle ihn neu, damit die Aufnahme über einem stummen Clip läuft.',
+  'The speaker is on screen, so the clip speaks the line itself to match the lips. This recording is not laid over it; use it on the audio lane if you like.':
+    'Die sprechende Figur ist im Bild, deshalb spricht der Clip die Zeile selbst, passend zu den Lippen. Diese Aufnahme wird nicht darübergelegt; nutze sie auf der Audiospur, wenn du willst.',
+  'Generate the clip again to play this recording over it.':
+    'Erstelle den Clip neu, damit diese Aufnahme darüber läuft.',
   'Shot {position}, clip': 'Einstellung {position}, Clip',
   'Asked for from the edit: {reason}': 'Vom Schnitt angefordert: {reason}',
   'Delete shot': 'Einstellung löschen',

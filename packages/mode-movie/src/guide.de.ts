@@ -70,7 +70,7 @@ Auf der Seite zeigt jede Dialogzeile die Einstellung, die sie spricht, oder „k
 ## Wie Szenen später genutzt werden
 
 - Das Casting findet die Figuren, die sprechen.
-- Die Einstellungen teilen jede Szene in Einstellungen auf, und der Dialog wird mit der Stimme jeder Figur gesprochen.
+- Die Einstellungen teilen jede Szene in Einstellungen auf, und die Clips sprechen jede Zeile lippensynchron.
 - Der Schnitt legt jede Szene als eigene Zeitleiste an und fügt sie zum Film zusammen.
 
 ## Lass die Crew ran
@@ -146,8 +146,9 @@ Videomodelle vergessen zwischen zwei Clips, wie ein Raum aussah. Gibst du jeder 
 1. Wähle über die Reiter eine Szene.
 2. Füg Einstellungen hinzu: Bildausschnitt (Totale, Großaufnahme), was passiert, wer darin ist, wie lange.
 3. Erstelle wahlweise einen **Keyframe**, ein Standbild, mit dem der Clip beginnt. Er ist günstig und lässt dich den Look prüfen, bevor du für Video bezahlst.
-4. Erstelle den **Clip**. Das dauert ein, zwei Minuten. Die Porträts der Figuren in der Einstellung und die Ortsbilder gehen mit.
-5. Füg **Dialog** hinzu: Zeilen werden mit der Stimme der Figur über den Clip gesprochen.
+4. Gib einer Einstellung mit Sprechrolle ihre **Zeile** und den Vortrag. Der Clip spricht sie selbst, lippensynchron, zusammen mit den Geräuschen der Szene.
+5. Erstelle den **Clip**. Das dauert ein, zwei Minuten. Die Porträts der Figuren in der Einstellung und die Ortsbilder gehen mit. Clips haben immer Ton; Videomodelle ohne Ton werden nicht angeboten.
+6. Für einen Erzähler oder eine Stimme aus dem Off **nimm den Dialog** mit der Stimme dieser Figur auf; er läuft über den Clip.
 
 ## Takes
 
