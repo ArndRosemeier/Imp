@@ -1,5 +1,4 @@
-import { styleOf, textMotion, type FilmText, type TextStyle } from '@imp/mode-movie';
-import { TEXT_FAMILIES } from './text-fonts.js';
+import { styleOf, textMotion, type FilmText, type TextFont, type TextStyle } from '@imp/mode-movie';
 import { wrapLines } from './title-lines.js';
 
 /**
@@ -36,6 +35,17 @@ export type TextCanvas = Pick<
 
 /** A text of the lane, in film or scene time, with the style it is drawn in. */
 export type DrawnText = Omit<FilmText, 'style'> & { readonly style: TextStyle };
+
+/**
+ * The font families texts are drawn in, under names of their own. Each host
+ * loads the faces behind them: the browser from the bundled web fonts, the
+ * local server from the same fonts as files.
+ */
+export const TEXT_FAMILIES: Record<TextFont, string> = {
+  sans: '"Imp Sans", "Inter Variable", system-ui, sans-serif',
+  serif: '"Imp Serif", "Instrument Serif", Georgia, serif',
+  mono: '"Imp Mono", "Courier Prime", "Courier New", monospace',
+};
 
 const rgba = (hex: string, alpha: number): string => {
   const value = Number.parseInt(hex.slice(1), 16);

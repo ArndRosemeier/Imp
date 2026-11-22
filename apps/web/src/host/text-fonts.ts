@@ -1,4 +1,4 @@
-import type { TextFont } from '@imp/mode-movie';
+import { TEXT_FAMILIES } from '@imp/host/film';
 import interItalic from '@fontsource-variable/inter/files/inter-latin-wght-italic.woff2?url';
 import interItalicExt from '@fontsource-variable/inter/files/inter-latin-ext-wght-italic.woff2?url';
 import inter from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
@@ -11,17 +11,6 @@ import monoExt from '@fontsource/courier-prime/files/courier-prime-latin-ext-400
 import serif from '@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2?url';
 import serifItalic from '@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2?url';
 import serifExt from '@fontsource/instrument-serif/files/instrument-serif-latin-ext-400-normal.woff2?url';
-
-/**
- * The fonts texts are drawn in, under names of their own, loaded the same way
- * on the page (for the preview) and in the worker (for the film), so that the
- * two draw the same letters. They ship with Imp: nothing is fetched from elsewhere.
- */
-export const TEXT_FAMILIES: Record<TextFont, string> = {
-  sans: '"Imp Sans", "Inter Variable", system-ui, sans-serif',
-  serif: '"Imp Serif", "Instrument Serif", Georgia, serif',
-  mono: '"Imp Mono", "Courier Prime", "Courier New", monospace',
-};
 
 const LATIN =
   'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD';
@@ -90,3 +79,5 @@ export function loadTextFonts(scope: FontScope = globalThis): Promise<boolean> {
   loaded.set(scope, loading);
   return loading;
 }
+
+export { TEXT_FAMILIES };

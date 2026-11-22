@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createImp } from '@imp/host';
 import release from 'virtual:imp-release';
 import { createFfmpegMp4Decoder, hasFfmpeg } from './ffmpeg-audio.js';
+import { createFfmpegFilmRenderer } from './ffmpeg-film.js';
 import { createFfmpegColorSampler, createFfmpegFrameGrabber } from './ffmpeg-frames.js';
 import { FileBlobStore, FileKeyValueStore } from './file-store.js';
 import { createImpServer } from './server.js';
@@ -33,6 +35,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 // The sound inside video clips is AAC, which only a native decoder reads.
 const ffmpeg = await hasFfmpeg();
 
+// Films are put together here and encoded by ffmpeg; their texts use the fonts shipped beside imp.mjs.
+const filmRenderer = createFfmpegFilmRenderer({
+  installed: ffmpeg,
+  font: (file) => {
+    try {
+      return new Uint8Array(readFileSync(join(here, 'fonts', file)));
+    } catch {
+      return undefined;
+    }
+  },
+});
+
 const server = createImpServer({
   webDir: join(here, 'web'),
   open: async (secrets) =>
@@ -41,6 +55,7 @@ const server = createImpServer({
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
       release,
+      filmRenderer,
       ...(ffmpeg
         ? {
             mp4Audio: createFfmpegMp4Decoder(),
@@ -66,7 +81,7 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`Your projects are kept in ${dataDir}`);
   if (!ffmpeg) {
     console.log(
-      'ffmpeg was not found, so the sound inside video clips stays silent and agents see no stills of the cut. Install it for both.',
+      'ffmpeg was not found, so films cannot be exported here, the sound inside video clips stays silent and agents see no stills of the cut. Install it for all three.',
     );
   }
   console.log('Press Ctrl+C to stop.');
