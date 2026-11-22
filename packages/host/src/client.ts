@@ -10,7 +10,7 @@ import {
   type Request,
   type StoredFile,
 } from './protocol.js';
-import type { SecretStore } from './secrets.js';
+import type { KeyAccess, SecretStore } from './secrets.js';
 
 /**
  * Everything the interface needs from the running core. The interface talks to
@@ -35,9 +35,26 @@ export interface ImpClient {
   listModels(): Promise<readonly ModelInfo[]>;
   /** Resolves when the stored key is accepted. */
   verifyCredentials(): Promise<void>;
-  /** The key is kept on this side and handed to the core. */
-  readonly secrets: SecretStore;
+  /**
+   * The OpenRouter key: whether the core has one, and giving or forgetting
+   * it. Known after start.
+   */
+  readonly secrets: KeyAccess;
 }
+
+/**
+ * Where the key is kept. `page`: by the page, in `store`, and handed to the
+ * core on every start (the core in a worker keeps nothing). `core`: by the
+ * core itself (the local server), so the page only passes a new key on and
+ * never holds it; a key an older version left in the page is moved over
+ * once with `leftover` and then forgotten here.
+ */
+export type KeyKeeping =
+  | { readonly by: 'page'; readonly store: SecretStore }
+  | {
+      readonly by: 'core';
+      readonly leftover?: { readonly key: string | null; readonly forget: () => void };
+    };
 
 /** Bytes per upload part: base64 makes 4 MiB about 5.3 MB, under the local server's 8 MB. */
 const UPLOAD_PART = 4 * 1024 * 1024;
@@ -48,7 +65,7 @@ function newUploadId(): string {
 
 export function connectImp(
   port: Port,
-  stored: SecretStore,
+  keeping: SecretStore | KeyKeeping,
   /** Rejects when the other end is lost, for example a worker that failed to load. */
   lost?: Promise<never>,
 ): ImpClient {
@@ -84,17 +101,31 @@ export function connectImp(
       post({ call, op, args } as Request);
     });
 
+  const keys: KeyKeeping = 'by' in keeping ? keeping : { by: 'page', store: keeping };
+  const stored = keys.by === 'page' ? keys.store : null;
   let described: { commands: readonly CommandInfo[]; modes: readonly ModeInfo[] } = {
     commands: [],
     modes: [],
   };
+  let keyHeld = (stored?.getKey() ?? null) !== null;
   // Messages keep their order, so the core has the key before anything that needs it.
-  post({ op: 'key', key: stored.getKey() });
+  if (stored !== null) post({ op: 'key', key: stored.getKey() });
 
   return {
     start: async () => {
       const asked = ask('start');
-      described = await (lost === undefined ? asked : Promise.race([asked, lost]));
+      const reply = await (lost === undefined ? asked : Promise.race([asked, lost]));
+      described = { commands: reply.commands, modes: reply.modes };
+      keyHeld = reply.keyHeld;
+      if (keys.by === 'core' && keys.leftover !== undefined) {
+        const { key, forget } = keys.leftover;
+        // A key from before the core kept its own: hand it over unless the core has one.
+        if (!keyHeld && key !== null && key !== '') {
+          post({ op: 'key', key });
+          keyHeld = true;
+        }
+        forget();
+      }
     },
     get commands() {
       return described.commands;
@@ -129,13 +160,15 @@ export function connectImp(
       };
     },
     secrets: {
-      getKey: () => stored.getKey(),
+      hasKey: () => keyHeld,
       setKey: (key) => {
-        stored.setKey(key);
+        stored?.setKey(key);
+        keyHeld = true;
         post({ op: 'key', key });
       },
       clearKey: () => {
-        stored.clearKey();
+        stored?.clearKey();
+        keyHeld = false;
         post({ op: 'key', key: null });
       },
     },

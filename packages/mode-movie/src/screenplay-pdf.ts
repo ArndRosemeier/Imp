@@ -38,13 +38,27 @@ export interface PageLine {
   readonly x: number;
   readonly align: 'left' | 'right' | 'center';
   readonly bold?: boolean;
+  /** A scene heading's number, set in both margins as shooting scripts do. */
+  readonly sceneNumber?: string;
+  /** Dual dialogue: what the second speaker says on the same line, in the right column. */
+  readonly beside?: PageLine;
 }
+
+/**
+ * Dual dialogue sits in two columns: the first speaker on the left, the
+ * second on the right, each about half as wide as ordinary dialogue.
+ */
+const DUAL = {
+  left: { character: 2.4, parenthetical: 1.8, dialogue: 1.5 },
+  right: { character: 5.4, parenthetical: 4.8, dialogue: 4.5 },
+  columns: { character: 24, parenthetical: 22, dialogue: 28 },
+} as const;
 
 /** One line of a page; null is an empty line. */
 export type Page = readonly (PageLine | null)[];
 
 interface Block {
-  readonly type: ScriptElementType;
+  readonly type: ScriptElementType | 'dual';
   readonly lines: PageLine[];
   /** Blank lines before it. */
   readonly space: number;
@@ -58,21 +72,89 @@ function linesOf(element: ScriptElement): PageLine[] {
     element.type === 'heading' || element.type === 'character' || element.type === 'transition'
       ? element.text.toUpperCase()
       : element.text;
-  return wrapColumns(text, COLUMNS[element.type]).map((line) => ({
+  return wrapColumns(text, COLUMNS[element.type]).map((line, index) => ({
     text: line,
     x: element.type === 'transition' ? 7.5 : element.type === 'centered' ? 4.25 : x,
     align:
       element.type === 'transition' ? 'right' : element.type === 'centered' ? 'center' : 'left',
     ...(element.type === 'heading' ? { bold: true } : {}),
+    ...(element.type === 'heading' && index === 0 && element.sceneNumber !== undefined
+      ? { sceneNumber: element.sceneNumber }
+      : {}),
   }));
 }
 
+/** One speaker's part of dual dialogue, set in a narrow column on one side. */
+function columnLines(speech: readonly ScriptElement[], side: 'left' | 'right'): PageLine[] {
+  const at = DUAL[side];
+  return speech.flatMap((element) => {
+    const part =
+      element.type === 'character'
+        ? 'character'
+        : element.type === 'parenthetical'
+          ? 'parenthetical'
+          : 'dialogue';
+    const text = element.type === 'character' ? element.text.toUpperCase() : element.text;
+    return wrapColumns(text, DUAL.columns[part]).map((line): PageLine => ({
+      text: line,
+      x: at[part],
+      align: 'left',
+    }));
+  });
+}
+
+/** Two speeches side by side, row by row. */
+function dualLines(first: readonly ScriptElement[], second: readonly ScriptElement[]): PageLine[] {
+  const left = columnLines(first, 'left');
+  const right = columnLines(second, 'right');
+  const rows: PageLine[] = [];
+  for (let row = 0; row < Math.max(left.length, right.length); row += 1) {
+    const l = left[row];
+    const r = right[row];
+    if (l !== undefined) rows.push(r === undefined ? l : { ...l, beside: r });
+    else if (r !== undefined) rows.push(r);
+  }
+  return rows;
+}
+
+const SPOKEN = new Set<ScriptElementType>(['parenthetical', 'dialogue', 'lyric']);
+
+/** The elements of one speech starting at `from`: the name and what follows it. */
+function speechAt(elements: readonly ScriptElement[], from: number): ScriptElement[] {
+  const speech: ScriptElement[] = [];
+  for (let at = from; at < elements.length; at += 1) {
+    const element = elements[at];
+    if (element === undefined) break;
+    if (at === from ? element.type !== 'character' : !SPOKEN.has(element.type)) break;
+    speech.push(element);
+  }
+  return speech;
+}
+
 /** The screenplay's parts as blocks of lines, with the space between them. */
-function blocksOf(elements: readonly ScriptElement[]): (Block | 'break')[] {
+function blocksOf(all: readonly ScriptElement[]): (Block | 'break')[] {
   const blocks: (Block | 'break')[] = [];
+  const elements = all.filter((element) => !hidden(element.type));
   let previous: ScriptElementType | null = null;
-  for (const element of elements) {
-    if (hidden(element.type)) continue;
+  for (let index = 0; index < elements.length; index += 1) {
+    const element = elements[index];
+    if (element === undefined) continue;
+    if (element.type === 'character') {
+      const first = speechAt(elements, index);
+      const next = elements[index + first.length];
+      // A name marked ^ right after a speech: the two are said at once, side by side.
+      if (next?.type === 'character' && next.dual === true) {
+        const second = speechAt(elements, index + first.length);
+        blocks.push({
+          type: 'dual',
+          lines: dualLines(first, second),
+          space: previous === null ? 0 : 1,
+        });
+        previous = 'dialogue';
+        index += first.length + second.length - 1;
+        continue;
+      }
+    }
     if (element.type === 'page-break') {
       blocks.push('break');
       previous = null;
@@ -242,27 +324,43 @@ function pageContent(page: Page, number: number): string {
   }
   for (const [row, line] of page.entries()) {
     if (line === null) continue;
-    const runs = parseMarkup(line.text);
-    const letters = runs.reduce((sum, run) => sum + Array.from(run.text).length, 0);
-    const width = letters * ADVANCE;
-    let x =
-      line.align === 'right'
-        ? line.x * POINTS - width
-        : line.align === 'center'
-          ? line.x * POINTS - width / 2
-          : line.x * POINTS;
     const y = top - (row + 1) * SIZE;
-    for (const run of runs) {
-      const font = fontFor(run.bold || line.bold === true, run.italic);
+    for (const part of line.beside === undefined ? [line] : [line, line.beside]) {
+      ops.push(...lineOps(part, y));
+    }
+    if (line.sceneNumber !== undefined) {
+      const label = pdfString(line.sceneNumber);
+      const width = Array.from(line.sceneNumber).length * ADVANCE;
+      // In both margins: the left one ends before the text, the right one past the right margin.
       ops.push(
-        `BT /${font} ${String(SIZE)} Tf ${num(x)} ${num(y)} Td ${pdfString(run.text)} Tj ET`,
+        `BT /F2 ${String(SIZE)} Tf ${num(1.25 * POINTS - width)} ${num(y)} Td ${label} Tj ET`,
+        `BT /F2 ${String(SIZE)} Tf ${num(7.75 * POINTS - width)} ${num(y)} Td ${label} Tj ET`,
       );
-      const runWidth = Array.from(run.text).length * ADVANCE;
-      if (run.underline) ops.push(`${num(x)} ${num(y - 1.5)} ${num(runWidth)} 0.6 re f`);
-      x += runWidth;
     }
   }
   return ops.join('\n');
+}
+
+/** The drawing of one line, run by run, with its emphasis. */
+function lineOps(line: PageLine, y: number): string[] {
+  const ops: string[] = [];
+  const runs = parseMarkup(line.text);
+  const letters = runs.reduce((sum, run) => sum + Array.from(run.text).length, 0);
+  const width = letters * ADVANCE;
+  let x =
+    line.align === 'right'
+      ? line.x * POINTS - width
+      : line.align === 'center'
+        ? line.x * POINTS - width / 2
+        : line.x * POINTS;
+  for (const run of runs) {
+    const font = fontFor(run.bold || line.bold === true, run.italic);
+    ops.push(`BT /${font} ${String(SIZE)} Tf ${num(x)} ${num(y)} Td ${pdfString(run.text)} Tj ET`);
+    const runWidth = Array.from(run.text).length * ADVANCE;
+    if (run.underline) ops.push(`${num(x)} ${num(y - 1.5)} ${num(runWidth)} 0.6 re f`);
+    x += runWidth;
+  }
+  return ops;
 }
 
 /** A title page: the title in the middle, the credit and author under it, the rest at the foot. */

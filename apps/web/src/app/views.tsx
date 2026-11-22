@@ -15,12 +15,20 @@ import { ConfirmButton } from './Field.js';
 import { useModelMixes } from './model-bar.js';
 import { TipsSwitch } from './help/HelpPanel.js';
 import { openHelp } from './help/help.js';
+import { FfmpegOffer } from './FfmpegOffer.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
   roles: z.array(
-    z.object({ id: z.string(), name: z.string(), summary: z.string(), custom: z.boolean() }),
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      summary: z.string(),
+      custom: z.boolean(),
+      extra: z.boolean().optional(),
+    }),
   ),
+  extras: z.array(z.object({ id: z.string(), name: z.string(), summary: z.string() })),
 });
 const ActivityList = z.object({ entries: z.array(ActivityEntry) });
 const SettingList = z.object({ settings: z.array(z.object({ key: z.string(), value: z.json() })) });
@@ -30,7 +38,7 @@ export function CrewView(): ReactElement {
   const crew = useLive(['crew/'], async (current) =>
     CrewList.parse(await runCommand(current, 'crew.list', {})),
   );
-  const roles = useLive(['roles/'], async (current) =>
+  const roles = useLive(['roles/', 'roles-added/', 'crew/'], async (current) =>
     RoleList.parse(await runCommand(current, 'crew.roles', {})),
   );
   const coordinator = useLive(['settings/'], async (current) => {
@@ -155,6 +163,20 @@ export function CrewView(): ReactElement {
                     <UserPlusIcon aria-hidden="true" /> Hire {role.name}
                   </button>
                 )}
+                {role.extra === true && !hiredRoles.has(role.id) && (
+                  <button
+                    className="button quiet"
+                    onClick={() => {
+                      runCommand(imp, 'crew.role.remove', { id: role.id }).catch(
+                        (error: unknown) => {
+                          setHireError(messageOf(error));
+                        },
+                      );
+                    }}
+                  >
+                    Put away
+                  </button>
+                )}
                 {role.custom && !hiredRoles.has(role.id) && (
                   <ConfirmButton
                     label="Delete role"
@@ -174,6 +196,38 @@ export function CrewView(): ReactElement {
             </article>
           ))}
         </div>
+        {(roles.data?.extras.length ?? 0) > 0 && (
+          <section className="stack" aria-labelledby="extra-roles-heading">
+            <h3 id="extra-roles-heading">More roles</h3>
+            <p className="muted">
+              Built-in roles that are not part of the usual crew. Add one to hire it here; the
+              coordinator can add them too.
+            </p>
+            <div className="grid">
+              {(roles.data?.extras ?? []).map((role) => (
+                <article key={role.id} className="card stack">
+                  <h3>{role.name}</h3>
+                  <p className="muted">{role.summary}</p>
+                  <div className="row">
+                    <button
+                      className="button"
+                      onClick={() => {
+                        setHireError(null);
+                        runCommand(imp, 'crew.role.add', { id: role.id }).catch(
+                          (error: unknown) => {
+                            setHireError(messageOf(error));
+                          },
+                        );
+                      }}
+                    >
+                      <PlusIcon aria-hidden="true" /> Add {role.name}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </section>
     </>
   );
@@ -419,21 +473,28 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
       <section className="card stack" aria-labelledby="key-heading">
         <h3 id="key-heading">OpenRouter key</h3>
         <p className="muted">
-          The key is kept in this browser, outside the data that commands and agents can read.
+          {servedByLocalServer()
+            ? 'Imp on this computer keeps the key in its own file beside your projects, readable only by your user account. The browser never holds it, and no command or agent can read it.'
+            : 'The key is kept encrypted in this browser, outside the data that commands and agents can read. The browser holds the encryption key in a form no page script can export.'}
         </p>
         <div className="row">
           <button className="button" onClick={onForgetKey}>
-            Remove the key from this browser
+            {servedByLocalServer()
+              ? 'Remove the key from this computer'
+              : 'Remove the key from this browser'}
           </button>
         </div>
       </section>
       <section className="card stack" aria-labelledby="host-heading">
         <h3 id="host-heading">Where Imp runs</h3>
         {servedByLocalServer() ? (
-          <p className="muted">
-            Imp runs on this computer. Your projects and media are files in its data folder, and
-            every browser window you open here shows the same work.
-          </p>
+          <>
+            <p className="muted">
+              Imp runs on this computer. Your projects and media are files in its data folder, and
+              every browser window you open here shows the same work.
+            </p>
+            <FfmpegOffer />
+          </>
         ) : (
           <>
             <p className="muted">
@@ -449,6 +510,20 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
             <p className="muted">
               Unzip it, run <span className="mono">node imp.mjs</span> in the folder and open the
               address it prints. Work done in the browser does not move over by itself.
+            </p>
+            <p className="muted">
+              The download is not signed. If your computer warns about it, confirm once: on a Mac in
+              System Settings, Privacy &amp; Security, Open Anyway; on Windows with More info, Run
+              anyway.{' '}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  openHelp('where-imp-runs');
+                }}
+              >
+                How to open it
+              </button>
             </p>
           </>
         )}

@@ -92,6 +92,42 @@ function lineIndexes(elements: readonly ScriptElement[]): Map<number, number> {
   return indexes;
 }
 
+/**
+ * The elements as they sit on the page: one at a time, except dual dialogue,
+ * where a speech and the one marked ^ after it go side by side.
+ */
+function groupDual(
+  elements: readonly ScriptElement[],
+): (number | [readonly number[], readonly number[]])[] {
+  const speechFrom = (from: number): number[] => {
+    const picked: number[] = [];
+    for (let at = from; at < elements.length; at += 1) {
+      const type = elements[at]?.type;
+      if (
+        at === from
+          ? type !== 'character'
+          : type !== 'parenthetical' && type !== 'dialogue' && type !== 'lyric'
+      )
+        break;
+      picked.push(at);
+    }
+    return picked;
+  };
+  const groups: (number | [readonly number[], readonly number[]])[] = [];
+  for (let at = 0; at < elements.length; at += 1) {
+    const first = speechFrom(at);
+    const next = elements[at + first.length];
+    if (first.length > 0 && next?.type === 'character' && next.dual === true) {
+      const second = speechFrom(at + first.length);
+      groups.push([first, second]);
+      at += first.length + second.length - 1;
+    } else {
+      groups.push(at);
+    }
+  }
+  return groups;
+}
+
 /** The scene set as a screenplay page, with the shots that speak each line in the margin. */
 export function ScreenplayPage({
   heading,
@@ -109,6 +145,47 @@ export function ScreenplayPage({
 }): ReactElement {
   const elements = parseFountain(body);
   const indexes = lineIndexes(elements);
+  const renderAt = (at: number): ReactElement | null => {
+    const element = elements[at];
+    if (element === undefined) return null;
+    if (element.type === 'page-break') return <hr key={at} className="sp-break" />;
+    const index = indexes.get(at);
+    const line = index === undefined ? undefined : lines[index];
+    const shots = line?.shotIds.flatMap((id) => {
+      const number = shotNumbers.get(id);
+      return number === undefined ? [] : [number];
+    });
+    const text =
+      element.type === 'character' || element.type === 'transition'
+        ? element.text.toUpperCase()
+        : element.text;
+    return (
+      <p key={at} className={`sp sp-${element.type}${element.dual === true ? ' sp-dual' : ''}`}>
+        {element.type === 'section' && (
+          <span className="sp-mark">{'#'.repeat(element.depth ?? 1)} </span>
+        )}
+        <RichWords text={text} />
+        {shots !== undefined && line !== undefined && (
+          <span
+            className={`sp-shots${shots.length === 0 ? ' none' : ''}`}
+            title={
+              shots.length === 0
+                ? 'No shot speaks this line yet'
+                : `Spoken in shot ${shots.join(', ')}`
+            }
+          >
+            {shots.length === 0 ? (
+              'no shot'
+            ) : (
+              <>
+                <FilmSlateIcon aria-hidden="true" /> {shots.join(', ')}
+              </>
+            )}
+          </span>
+        )}
+      </p>
+    );
+  };
   return (
     // A tap on the page opens it for writing, as a tap on paper would.
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
@@ -118,46 +195,16 @@ export function ScreenplayPage({
         {elements.length === 0 && (
           <p className="sp sp-empty">Nothing written yet. Tap to write the scene.</p>
         )}
-        {elements.map((element, at) => {
-          if (element.type === 'page-break') return <hr key={at} className="sp-break" />;
-          const index = indexes.get(at);
-          const line = index === undefined ? undefined : lines[index];
-          const shots = line?.shotIds.flatMap((id) => {
-            const number = shotNumbers.get(id);
-            return number === undefined ? [] : [number];
-          });
-          const text =
-            element.type === 'character' || element.type === 'transition'
-              ? element.text.toUpperCase()
-              : element.text;
+        {groupDual(elements).map((group) => {
+          if (typeof group === 'number') return renderAt(group);
           return (
-            <p
-              key={at}
-              className={`sp sp-${element.type}${element.dual === true ? ' sp-dual' : ''}`}
-            >
-              {element.type === 'section' && (
-                <span className="sp-mark">{'#'.repeat(element.depth ?? 1)} </span>
-              )}
-              <RichWords text={text} />
-              {shots !== undefined && line !== undefined && (
-                <span
-                  className={`sp-shots${shots.length === 0 ? ' none' : ''}`}
-                  title={
-                    shots.length === 0
-                      ? 'No shot speaks this line yet'
-                      : `Spoken in shot ${shots.join(', ')}`
-                  }
-                >
-                  {shots.length === 0 ? (
-                    'no shot'
-                  ) : (
-                    <>
-                      <FilmSlateIcon aria-hidden="true" /> {shots.join(', ')}
-                    </>
-                  )}
-                </span>
-              )}
-            </p>
+            <div key={group[0][0]} className="sp-dual-pair">
+              {group.map((side, column) => (
+                <div key={column} className="sp-dual-side">
+                  {side.map(renderAt)}
+                </div>
+              ))}
+            </div>
           );
         })}
       </div>

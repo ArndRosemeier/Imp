@@ -8,6 +8,8 @@ import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { clock } from './cut-player.js';
 import { download, recordingFormat, recordScenes, type Progress } from './export.js';
 import { moviePrefix } from './movie.js';
+import { FfmpegOffer } from './FfmpegOffer.js';
+import { FFMPEG_STATE_KEY } from '@imp/host';
 
 const Exports = z.object({
   canRender: z.boolean(),
@@ -52,7 +54,8 @@ export function ExportBar({
   /** What is being exported right now, in a few words, or null while nothing is. */
   onStatus?: ((status: string | null) => void) | undefined;
 }): ReactElement {
-  const live = useLive([`${moviePrefix(project)}exports/`], async (imp) =>
+  // ffmpeg arriving on the local server lets it render, so its state is watched too.
+  const live = useLive([`${moviePrefix(project)}exports/`, FFMPEG_STATE_KEY], async (imp) =>
     Exports.parse(await runCommand(imp, 'movie.edit.export.list', { projectId: project.id })),
   );
   if (live.data === undefined) return <div className="stack export-bar" />;
@@ -342,6 +345,7 @@ function RecordedExport({
           </>
         )}
       </div>
+      <FfmpegOffer compact />
       <p className="muted">
         {format === null
           ? 'This browser cannot record video. Try a current Chrome, Edge or Safari.'

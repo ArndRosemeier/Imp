@@ -47,6 +47,7 @@ export function serveImp(
           summary,
           stages: stages.map((stage) => ({ id: stage.id, name: stage.name })),
         })),
+        keyHeld: secrets.getKey() !== null,
       };
     },
     run: async (commandId, input) =>

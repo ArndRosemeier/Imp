@@ -228,7 +228,7 @@ export const editGuide: GuideTopic = {
 
 ## Working with the Film Editor
 
-The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic** watches the film and leaves markers.
+The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic**, an extra role you add on the Crew page under More roles, watches the film and leaves markers.
 
 ## Export
 

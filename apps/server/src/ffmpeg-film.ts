@@ -307,9 +307,10 @@ function writeTo(child: ChildProcess, bytes: Uint8Array): Promise<void> {
 }
 
 export interface FfmpegFilmOptions {
-  readonly command?: string;
-  /** Whether ffmpeg is installed; the renderer says how to get it when not. */
-  readonly installed: boolean;
+  /** The ffmpeg to run, or a function that says which one now, or null while there is none. */
+  readonly command?: string | (() => string | null);
+  /** Whether ffmpeg is installed; the renderer says how to get it when not. Default true. */
+  readonly installed?: boolean;
   /** Reads one of the font files Imp ships, by name. */
   readonly font: (file: string) => Uint8Array | undefined;
 }
@@ -326,10 +327,19 @@ async function videoEncoder(command: string): Promise<{ args: string[]; codec: s
 }
 
 export function createFfmpegFilmRenderer(options: FfmpegFilmOptions): FilmRenderer {
-  const command = options.command ?? 'ffmpeg';
+  const current = (): string | null =>
+    options.installed === false
+      ? null
+      : typeof options.command === 'function'
+        ? options.command()
+        : (options.command ?? 'ffmpeg');
   const book = new FontBook(options.font);
+  const missing =
+    'Imp on this computer renders films with ffmpeg, which it does not have yet. Download it under Settings, Where Imp runs (or with system.ffmpeg.install), or install it from https://ffmpeg.org/. Until then the Edit screen records films in the browser instead.';
 
   async function render(job: FilmRenderJob): Promise<FilmRendered> {
+    const command = current();
+    if (command === null) throw new Error(missing);
     const { plan } = job;
     const pictures = [...plan.pictures].sort((a, b) => a.startSeconds - b.startSeconds);
     const folder = await mkdtemp(join(tmpdir(), 'imp-film-'));
@@ -587,10 +597,7 @@ export function createFfmpegFilmRenderer(options: FfmpegFilmOptions): FilmRender
   }
 
   return {
-    unavailable: () =>
-      options.installed
-        ? null
-        : 'Imp on this computer renders films with ffmpeg, which is not installed. Install it from https://ffmpeg.org/ so that the command "ffmpeg" works, then start Imp again.',
+    unavailable: () => (current() === null ? missing : null),
     render,
   };
 }

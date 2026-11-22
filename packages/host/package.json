@@ -17,6 +17,7 @@
     "@imp/core": "workspace:*",
     "@imp/mode-movie": "workspace:*",
     "@imp/world": "workspace:*",
-    "@imp/providers": "workspace:*"
+    "@imp/providers": "workspace:*",
+    "zod": "^4.6.7"
   }
 }

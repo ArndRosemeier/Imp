@@ -8,7 +8,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App.js';
 import { connectImp, createHttpPort, type EventStream, type ImpClient, type Port } from '@imp/host';
-import { createLocalSecretStore } from './host/secrets.js';
+import { LEGACY_KEY_NAME, openBrowserSecretStore } from './host/secrets.js';
 import { servedByLocalServer } from './host/served.js';
 import { followVisualViewport } from './app/viewport.js';
 import './styles/tokens.css';
@@ -25,10 +25,9 @@ if (matchMedia('(pointer: coarse)').matches) followVisualViewport();
 
 // Ask the browser not to evict the data under storage pressure.
 void navigator.storage.persist();
-const secrets = createLocalSecretStore();
 
 /** The core is either the local server that delivered this page, or a worker of this page. */
-function connect(): ImpClient {
+async function connect(): Promise<ImpClient> {
   if (servedByLocalServer()) {
     const { port, lost } = createHttpPort({
       base: new URL('./', location.href).href,
@@ -39,8 +38,22 @@ function connect(): ImpClient {
       },
       newId: () => crypto.randomUUID(),
     });
-    return connectImp(port, secrets, lost);
+    // The server keeps the key; one an older version left in this browser is handed over once.
+    return connectImp(
+      port,
+      {
+        by: 'core',
+        leftover: {
+          key: localStorage.getItem(LEGACY_KEY_NAME),
+          forget: () => {
+            localStorage.removeItem(LEGACY_KEY_NAME);
+          },
+        },
+      },
+      lost,
+    );
   }
+  const secrets = await openBrowserSecretStore();
   // A worker, so long agent runs and large files never stall the interface.
   const worker = new Worker(new URL('./host/worker.ts', import.meta.url), { type: 'module' });
   const lost = new Promise<never>((_, reject) => {
@@ -52,7 +65,7 @@ function connect(): ImpClient {
   });
   return connectImp(worker as unknown as Port, secrets, lost);
 }
-const imp = connect();
+const imp = await connect();
 
 createRoot(root).render(
   <StrictMode>

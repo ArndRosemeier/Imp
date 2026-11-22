@@ -57,6 +57,9 @@ The coordinator is the agent in the panel on the right. Talk to it like a produc
 - **Sound Designer**: sound effects and music.
 - **Film Editor**: cuts scenes; its changes arrive as proposals you keep or reject.
 - **Sound Editor**: mixes and cleans sound.
+
+Under **More roles** on the **Crew** page are extras that are not part of the usual crew until you add them:
+
 - **Critic**: watches the film and leaves notes on the timeline.
 
 Define roles of your own on the **Crew** page, such as an advisor or a second critic, and save a whole crew to the library to load it into another project.
@@ -143,7 +146,23 @@ Nothing to install. Your projects are kept in the browser's own storage on this 
 
 Download Imp from **Settings** and run it with Node.js 22 or newer: unzip it, run \`node imp.mjs\` in the folder and open the address it prints. Your work is then kept as files in a folder of yours, with room for large media, and agents keep working when the browser is closed.
 
-Work done in the browser does not move over by itself: export the project and import it there.`,
+Work done in the browser does not move over by itself: export the project and import it there.
+
+## Your OpenRouter key
+
+In the browser, the key is kept encrypted in the browser's storage, with an encryption key the browser holds and never lets any script read. On your computer, Imp keeps the key in its own file beside your projects, readable only by your user account, and the browser never holds it. Either way no command or agent can read it, and it is sent only to OpenRouter.
+
+## ffmpeg
+
+On your computer Imp uses **ffmpeg**, free software, to render films in the background, to hear the sound inside video clips and to show agents stills of a cut. If ffmpeg is not installed, Imp offers to download it (about 20 to 30 MB) on the Edit stage's export bar and under **Settings**, checks the download and uses it at once. Until then, films are recorded in the browser in real time.
+
+## The download is not signed
+
+Imp's download is not signed with a paid developer certificate. Started with \`node imp.mjs\` from a terminal, nothing asks. If your system does warn about a file from the download:
+
+- **macOS**: "cannot be opened because the developer cannot be verified". Open **System Settings**, then **Privacy & Security**, scroll down and press **Open Anyway** next to the file's name. Or right-click (Control-click) the file in Finder, choose **Open**, and confirm. You do this once.
+- **Windows**: "Windows protected your PC" (SmartScreen). Press **More info**, then **Run anyway**. Or right-click the zip before unzipping, choose **Properties** and tick **Unblock**.
+- **Linux**: nothing to confirm. If a file will not start, make it runnable with \`chmod +x\`.`,
   },
   {
     id: 'tablet-and-keys',

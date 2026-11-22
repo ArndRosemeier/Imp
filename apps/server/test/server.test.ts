@@ -10,6 +10,7 @@ import {
   createImp,
   createMemorySecretStore,
   type EventStream,
+  type KeyKeeping,
   type SecretStore,
 } from '@imp/host';
 import { createFakeProvider } from '@imp/providers/testing';
@@ -81,7 +82,7 @@ afterEach(async () => {
   }
 });
 
-async function start(forgetAfterMs?: number) {
+async function start(forgetAfterMs?: number, secrets?: SecretStore) {
   const store = new MemoryKeyValueStore();
   const blobs = new MemoryBlobStore();
   const held: { secrets?: SecretStore } = {};
@@ -93,13 +94,14 @@ async function start(forgetAfterMs?: number) {
     open,
     webDir,
     ...(forgetAfterMs === undefined ? {} : { forgetAfterMs }),
+    ...(secrets === undefined ? {} : { secrets }),
   });
   servers.push(server);
   await new Promise<void>((done) => {
     server.listen(0, '127.0.0.1', done);
   });
   const base = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/`;
-  const connect = (id: string = crypto.randomUUID()) => {
+  const connect = (id: string = crypto.randomUUID(), keeping?: KeyKeeping) => {
     const onForgotten = vi.fn();
     const { port, lost } = createHttpPort({
       base,
@@ -112,7 +114,11 @@ async function start(forgetAfterMs?: number) {
       onForgotten,
       newId: () => id,
     });
-    return { client: connectImp(port, createMemorySecretStore(), lost), onForgotten, id };
+    return {
+      client: connectImp(port, keeping ?? createMemorySecretStore(), lost),
+      onForgotten,
+      id,
+    };
   };
   return { base, store, blobs, held, open, connect };
 }
@@ -130,6 +136,21 @@ function raw(base: string, path: string, headers: Record<string, string>): Promi
 }
 
 describe('the local server', () => {
+  it('keeps the key itself, so a new browser window starts with it and never holds it', async () => {
+    const kept = createMemorySecretStore();
+    const { connect } = await start(undefined, kept);
+    const { client: first } = connect(undefined, { by: 'core' });
+    await first.start();
+    expect(first.secrets.hasKey()).toBe(false);
+    first.secrets.setKey('sk-kept');
+    await first.verifyCredentials();
+    expect(kept.getKey()).toBe('sk-kept');
+
+    const { client: second } = connect(undefined, { by: 'core' });
+    await second.start();
+    expect(second.secrets.hasKey()).toBe(true);
+  });
+
   it('answers the interface over HTTP as a worker would', async () => {
     const { blobs, held, connect } = await start();
     const { client } = connect();

@@ -8,7 +8,7 @@ import { Shell } from './Shell.js';
 type Stage = 'loading' | 'setup' | 'ready';
 
 async function isSetUp(imp: ImpClient): Promise<boolean> {
-  if (imp.secrets.getKey() === null) return false;
+  if (!imp.secrets.hasKey()) return false;
   const coordinator = (await runCommand(imp, 'settings.get', { key: 'coordinator.member' })) as {
     value: unknown;
   };

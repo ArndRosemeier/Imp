@@ -6,6 +6,7 @@ import {
   fountainTitlePage,
   headingLine,
   looseWords,
+  numberScenes,
   parseFountain,
   screenplayPages,
   screenplayPdf,
@@ -210,5 +211,37 @@ describe('pages', () => {
     expect(pdf).toContain('/BaseFont /Courier-Bold');
     expect(pdf).toContain('/Count 2');
     expect(pdf.trimEnd().endsWith('%%EOF')).toBe(true);
+  });
+
+  it('sets dual dialogue side by side, the first speaker on the left', () => {
+    const elements = parseFountain(
+      'Waves.\n\nMARA\n(shouting)\nGet down!\n\nTOM ^\nThe lamp! The lamp is out and the boats are coming in, all of them, right now.\n\nThey duck.',
+    );
+    const page = screenplayPages(elements)[0] ?? [];
+    const rows = page.filter((line) => line !== null);
+    const names = rows.find((line) => line.text === 'MARA');
+    expect(names).toMatchObject({ x: 2.4, beside: { text: 'TOM', x: 5.4 } });
+    expect(rows.find((line) => line.text === '(shouting)')?.beside?.x).toBe(4.5);
+    // The right column is longer, so it goes on alone under the left one.
+    const tomOnly = rows.filter((line) => line.x === 4.5 && line.beside === undefined);
+    expect(tomOnly.length).toBeGreaterThan(0);
+    expect(rows.at(-1)?.text).toBe('They duck.');
+    const pdf = decodeUtf8(screenplayPdf({}, elements));
+    expect(pdf).toContain(`${String(5.4 * 72)} `);
+  });
+
+  it('numbers scenes in both margins, keeping a number the writer gave', () => {
+    const elements = numberScenes([
+      { type: 'heading', text: 'INT. LAMP ROOM - NIGHT' },
+      { type: 'action', text: 'Rain.' },
+      { type: 'heading', text: 'EXT. CLIFF - DAWN', sceneNumber: '7' },
+      { type: 'heading', text: 'EXT. SEA - DAY' },
+    ]);
+    expect(elements.flatMap((element) => element.sceneNumber ?? [])).toEqual(['1', '7', '8']);
+    const page = screenplayPages(elements)[0] ?? [];
+    expect(page[0]).toMatchObject({ text: 'INT. LAMP ROOM - NIGHT', sceneNumber: '1' });
+    const pdf = decodeUtf8(screenplayPdf({}, elements));
+    // "1" (hex 31) in the left margin and in the right one.
+    expect(pdf.match(/Td <31> Tj/g)?.length).toBe(2);
   });
 });
