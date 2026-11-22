@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { defineCommand, type Command } from '../command.js';
 import { copyTree, removeTree } from '../projects/tree.js';
-import { ProjectSummary, type ModeProjectSupport } from '../projects/support.js';
+import { PathStep, ProjectSummary, type ModeProjectSupport } from '../projects/support.js';
 import {
   addProject,
   CURRENT_PROJECT_SETTING,
@@ -183,6 +183,33 @@ export function createProjectCommandSet(support: readonly ModeProjectSupport[] =
     },
   });
 
+  const path = defineCommand({
+    id: 'project.path',
+    title: 'Guided path',
+    description:
+      'Returns the guided way to a first film for a project: the steps in order, which are done, and the next one. Use it to tell a newcomer what to do next, or to do that step for them.',
+    effect: 'read',
+    input: z.object({
+      projectId: ProjectId.optional().describe('Leave out for the open project.'),
+    }),
+    output: z.object({
+      projectId: z.string().nullable(),
+      steps: z.array(PathStep.extend({ done: z.boolean() })),
+      next: z.string().nullable().describe('The first step not done yet, or null when all are.'),
+    }),
+    handler: async ({ runtime }, input) => {
+      const current = await runtime.store.get(`settings/${CURRENT_PROJECT_SETTING}`);
+      const projectId = input.projectId ?? (typeof current === 'string' ? current : null);
+      if (projectId === null) return { projectId: null, steps: [], next: null };
+      const project = await requireProject(runtime.store, 'project.path', projectId);
+      const guided = modeOf(project.mode)?.path;
+      if (guided === undefined) return { projectId, steps: [], next: null };
+      const done = await guided.done(runtime, projectId);
+      const steps = guided.steps.map((step) => ({ ...step, done: done.has(step.id) }));
+      return { projectId, steps, next: steps.find((step) => !step.done)?.id ?? null };
+    },
+  });
+
   return {
     create,
     list,
@@ -191,6 +218,7 @@ export function createProjectCommandSet(support: readonly ModeProjectSupport[] =
     remove,
     duplicate,
     overview,
+    path,
     ...createFileCommands(support),
     ...createTemplateCommands(support),
     ...createCopyCommands(support),

@@ -21,6 +21,7 @@ import {
 import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
+import { ASK_COORDINATOR } from './help/help.js';
 import { RichText } from './RichText.js';
 import { servedByLocalServer } from '../host/served.js';
 import { Price } from './spend.js';
@@ -109,6 +110,7 @@ export function CrewPanel({
   context,
   hidden = false,
   intro,
+  takesSuggestions = false,
 }: {
   member: CrewMember;
   /** What the agent should know about where the user is, sent with every message. */
@@ -116,6 +118,8 @@ export function CrewPanel({
   hidden?: boolean;
   /** Shown before the first message, in place of the usual words. It can fill in the message box. */
   intro?: (suggest: (text: string) => void) => ReactNode;
+  /** Fills the message box when another view suggests what to ask, as the guided path does. */
+  takesSuggestions?: boolean;
 }): ReactElement {
   const imp = useImp();
   const live = useLive([`conversations/${member.id}`], async (current) =>
@@ -151,6 +155,23 @@ export function CrewPanel({
     approvals.length === 0 &&
     CONTINUABLE.has(conversation?.lastStatus ?? '') &&
     (lastRole === 'user' || lastRole === 'tool');
+
+  useEffect(() => {
+    if (!takesSuggestions) return;
+    const onSuggest = (event: Event): void => {
+      const text = (event as CustomEvent<unknown>).detail;
+      if (typeof text !== 'string') return;
+      setDraft(text);
+      // After the panel has been shown, so the focus lands.
+      window.setTimeout(() => {
+        document.getElementById(inputId)?.focus();
+      }, 0);
+    };
+    window.addEventListener(ASK_COORDINATOR, onSuggest);
+    return () => {
+      window.removeEventListener(ASK_COORDINATOR, onSuggest);
+    };
+  }, [takesSuggestions, inputId]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });

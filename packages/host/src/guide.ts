@@ -27,7 +27,15 @@ The stages on the left follow the way films are made. Visit them in any order:
 
 ## The fastest way to a first film
 
-Tell the **coordinator** (the panel on the right) your story in one sentence, for example "a lighthouse keeper finds a message in a bottle addressed to her". It plans the work, hires the crew it needs and walks you through each stage. It asks before anything costs money.`,
+Tell the **coordinator** (the panel on the right) your story in one sentence, for example "a lighthouse keeper finds a message in a bottle addressed to her". It plans the work, hires the crew it needs and walks you through each stage. It asks before anything costs money.
+
+## Your first film, step by step
+
+While tips are on, a slim bar above each stage shows the six steps to a first film: say what the film is, write a scene, cast a character, plan the shots, make one clip, and cut it together. Steps tick themselves off from what the project holds. Open the bar to see them all; **Go to** takes you to the stage, and **Ask the coordinator** puts the request in its message box for you to send. The × hides the bar for good.
+
+## Learn from the sample film
+
+On the **Projects** screen, **Open the sample film** makes a copy of "The Last Light", a three-scene short written down to every shot, line and sound. Nothing in it is generated yet, so opening it is free. Walk through the stages to see what a finished plan looks like, then make one shot's picture or clip to see the next step; the price is on the button. The copy is yours to change or delete. (Agents open it with project.create and the template movie.sample-last-light.)`,
   },
   {
     id: 'crew-and-agents',

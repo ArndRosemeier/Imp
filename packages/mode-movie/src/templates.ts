@@ -1,4 +1,5 @@
 import type { JsonValue, ProjectTemplate } from '@imp/core';
+import { sampleFilm } from './sample.js';
 import type { Character, Development, Scene } from './schema.js';
 
 /** Keys relative to the project, as templates give them. */
@@ -152,4 +153,5 @@ export const movieTemplates: readonly ProjectTemplate[] = [
       ],
     }),
   },
+  sampleFilm,
 ];

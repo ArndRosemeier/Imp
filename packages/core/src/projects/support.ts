@@ -15,6 +15,24 @@ export interface ProjectSupport {
   readonly summarize?: (runtime: CoreRuntime, projectId: string) => Promise<ProjectSummary>;
   /** What can be copied from one project into another, and how. */
   readonly resources?: ResourceCopier;
+  /** The guided way to a first finished piece, step by step, and which steps a project has done. */
+  readonly path?: GuidedPath;
+}
+
+/** One step of the guided way to a first film (or whatever a mode makes). */
+export const PathStep = z.object({
+  id: z.string(),
+  title: z.string().describe('What to do, as an instruction: "Cast a character".'),
+  body: z.string().describe('Why and how, in a sentence or two, with the price when it costs.'),
+  stage: z.string().describe('The stage where it is done.'),
+  ask: z.string().describe('What to tell the coordinator to have it done for you.'),
+});
+export type PathStep = z.infer<typeof PathStep>;
+
+export interface GuidedPath {
+  readonly steps: readonly PathStep[];
+  /** The ids of the steps a project has done. */
+  readonly done: (runtime: CoreRuntime, projectId: string) => Promise<ReadonlySet<string>>;
 }
 
 /** `ProjectSupport` together with the mode it belongs to. */
@@ -27,6 +45,8 @@ export interface ProjectTemplate {
   readonly id: string;
   readonly name: string;
   readonly summary: string;
+  /** A finished example to open and take apart, offered to newcomers, rather than a structure to fill. */
+  readonly sample?: boolean;
   /**
    * The records a new project starts with, keys relative to the project's
    * prefix. `newId` gives fresh ids, so two projects from one template never

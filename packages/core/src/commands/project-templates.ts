@@ -17,6 +17,8 @@ export const Template = z.object({
   mode: z.string(),
   /** Shipped with a mode, or saved by someone from a project. Shipped ones cannot be deleted. */
   builtIn: z.boolean(),
+  /** A finished example to open and take apart, rather than a structure to fill. */
+  sample: z.boolean().default(false),
   /** For saved ones: when, and from which project. */
   createdAt: z.iso.datetime().nullable(),
   sourceProjectName: z.string().nullable(),
@@ -76,6 +78,7 @@ export function createTemplateCommands(support: readonly ModeProjectSupport[]) {
         summary: template.summary,
         mode: mode.mode,
         builtIn: true,
+        sample: template.sample ?? false,
         createdAt: null,
         sourceProjectName: null,
       })),
@@ -121,6 +124,7 @@ export function createTemplateCommands(support: readonly ModeProjectSupport[]) {
         summary: input.summary,
         mode: project.mode,
         builtIn: false,
+        sample: false,
         createdAt: runtime.now().toISOString(),
         sourceProjectName: project.name,
       };

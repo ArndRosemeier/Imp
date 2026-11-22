@@ -37,6 +37,8 @@ import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { WhatsNew } from './WhatsNew.js';
 import { HelpPanel } from './help/HelpPanel.js';
+import { FirstFilm } from './help/FirstFilm.js';
+import { ASK_COORDINATOR } from './help/help.js';
 import { StageTip } from './help/StageTip.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
@@ -214,6 +216,19 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       window.removeEventListener(OPEN_VIEW, onOpen);
     };
   }, []);
+
+  // A suggestion for the coordinator, such as a step of the guided path, brings its panel up.
+  const coordinatorId = state.data?.coordinator?.id;
+  useEffect(() => {
+    const onSuggest = (): void => {
+      if (coordinatorId !== undefined) setTalkingTo(coordinatorId);
+      if (!crewOpen) switchCrew();
+    };
+    window.addEventListener(ASK_COORDINATOR, onSuggest);
+    return () => {
+      window.removeEventListener(ASK_COORDINATOR, onSuggest);
+    };
+  });
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -420,6 +435,10 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               startMovie
             ) : (
               <>
+                <FirstFilm
+                  stage={view}
+                  stageNames={Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))}
+                />
                 <StageTip key={view} stage={view} />
                 <StageView stage={view} project={project} />
               </>
@@ -474,6 +493,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               member={member}
               context={context}
               hidden={member.id !== active?.id}
+              takesSuggestions={member.id === state.data?.coordinator?.id}
             />
           ))}
           {crew.length === 0 && (

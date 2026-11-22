@@ -135,6 +135,7 @@ describe('movie templates', () => {
       'movie.music-video',
       'movie.trailer',
       'movie.two-hander',
+      'movie.sample-last-light',
     ]);
     const a = await project('A', 'movie.short-film');
     const b = await project('B', 'movie.short-film');
@@ -157,6 +158,38 @@ describe('movie templates', () => {
       const made = await project(template.name, template.id);
       expect((await scenesOf(made.id)).length).toBeGreaterThan(0);
     }
+  });
+
+  it('ship a sample film written down to its shots, sounds and speakers', async () => {
+    const { run, project } = setup();
+    const made = await project('The Last Light', 'movie.sample-last-light');
+    const scenes = (await run('movie.scene.list', { projectId: made.id })).scenes;
+    expect(scenes).toHaveLength(3);
+    const cast = (await run('movie.character.list', { projectId: made.id })).characters;
+    expect(cast.map((c: { name: string }) => c.name)).toEqual(['Mara', 'Tomas']);
+    const ids = new Set(cast.map((c: { id: string }) => c.id));
+    for (const scene of scenes) {
+      const shots = (
+        await run('movie.shot.list', { projectId: made.id, sceneId: scene.id, full: true })
+      ).shots;
+      expect(shots.length).toBeGreaterThan(3);
+      for (const shot of shots) {
+        for (const id of shot.characterIds) expect(ids.has(id)).toBe(true);
+        if (shot.speakerId !== null) expect(shot.line).not.toBe('');
+      }
+      const sounds = (await run('movie.sound.list', { projectId: made.id, sceneId: scene.id }))
+        .sounds;
+      expect(sounds.length).toBeGreaterThan(0);
+    }
+
+    // The guided path sees what the sample already has: the next step is casting.
+    const path = await run('project.path', { projectId: made.id });
+    expect(
+      path.steps.filter((step: { done: boolean }) => step.done).map((s: { id: string }) => s.id),
+    ).toEqual(['idea', 'scene', 'shots']);
+    expect(path.next).toBe('cast');
+    const empty = await project('Empty');
+    expect((await run('project.path', { projectId: empty.id })).next).toBe('idea');
   });
 });
 
