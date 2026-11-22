@@ -38,6 +38,7 @@ import {
 } from './Approvals.js';
 import { ImpSpinner } from './ImpMark.js';
 import { RichText } from './RichText.js';
+import { formatUsd } from './spend.js';
 import { servedByLocalServer } from '../host/served.js';
 import { t, tx } from '../i18n/i18n.js';
 
