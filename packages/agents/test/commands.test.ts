@@ -204,6 +204,31 @@ describe('crew.ask', () => {
     });
   });
 
+  it('continues a run that was cut off after a command ran', async () => {
+    const { run, hire, runtime, conversation } = setup([{ content: 'Done with the rest.' }]);
+    const coordinator = await hire('coordinator');
+    const cut = {
+      ...(await conversation(coordinator.id)),
+      running: true,
+      messages: [
+        { role: 'user', content: 'Make two pictures.' },
+        {
+          role: 'assistant',
+          content: null,
+          toolCalls: [toolCall('c1', 'settings_get', { key: 'x' })],
+        },
+        { role: 'tool', toolCallId: 'c1', content: '{"status":"ok"}' },
+      ],
+    };
+    await runtime.store.batch([
+      { type: 'put', key: `conversations/${coordinator.id}`, value: json(cut) },
+    ]);
+    await releaseInterruptedRuns(runtime.store);
+    const result = (await run('crew.ask', { memberId: coordinator.id })) as { finalText: string };
+    expect(result.finalText).toBe('Done with the rest.');
+    expect(await conversation(coordinator.id)).toMatchObject({ lastStatus: 'completed' });
+  });
+
   it('is a spending command, so an agent cannot start another agent unasked', async () => {
     const { registry, hire } = setup([]);
     const coordinator = await hire('coordinator');

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { MemoryKeyValueStore, settingsGet, type ReleaseNotes } from '@imp/core';
+import { MemoryKeyValueStore, settingsGet, type JsonValue, type ReleaseNotes } from '@imp/core';
 import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -283,7 +283,7 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: /Add scene/ }));
     await user.type(await screen.findByLabelText('Scene heading'), 'INT. LAMP ROOM - NIGHT');
     await user.tab();
-    expect(await screen.findByRole('tab', { name: /1 · INT\. LAMP ROOM - NIGHT/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: '1 · Lamp Room, night' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Delete scene/ }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText(/There are no scenes yet/)).toBeTruthy();
@@ -410,7 +410,7 @@ describe('App', () => {
       context: expect.stringContaining(`projectId "${projectId}"`) as string,
     });
     await user.click(screen.getByRole('button', { name: 'Script' }));
-    expect(await screen.findByRole('tab', { name: /1 · EXT\. HARBOUR - DUSK/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: '1 · Harbour, dusk' })).toBeTruthy();
   });
 
   it('resizes the side panels with the keyboard and remembers the widths', async () => {
@@ -455,6 +455,37 @@ describe('App', () => {
     expect(localStorage.getItem('imp.crew.open')).toBe('false');
     await user.click(toggle);
     expect(screen.getByRole('separator', { name: 'Resize the crew panel' })).toBeTruthy();
+  });
+
+  it('continues an agent run that was cut off', async () => {
+    const { imp, provider, user } = start([{ content: 'Hello.' }]);
+    await completeSetup(user);
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Hi.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Hello.')).toBeTruthy();
+
+    // The tab closed part way: the task was saved, the answer never came.
+    const memberId = (await imp.store.get('settings/coordinator.member')) as string;
+    const key = `conversations/${memberId}`;
+    const saved = (await imp.store.get(key)) as { messages: JsonValue[] };
+    await imp.store.batch([
+      {
+        type: 'put',
+        key,
+        value: {
+          ...saved,
+          messages: [...saved.messages, { role: 'user', content: 'Write the logline.' }],
+          lastStatus: 'cancelled',
+        },
+      },
+    ]);
+    cleanup();
+    render(<App imp={connect(imp)} />);
+    expect(await screen.findByText(/The last run was interrupted/)).toBeTruthy();
+    provider.script({ content: 'Logline written.' });
+    await user.click(screen.getByRole('button', { name: 'Continue where Coordinator stopped' }));
+    expect(await screen.findByText('Logline written.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Continue where/ })).toBeNull();
   });
 
   it('keeps the conversation across a restart and resumes after an approval', async () => {

@@ -5,6 +5,7 @@ import {
   CheckIcon,
   PaperclipIcon,
   PaperPlaneRightIcon,
+  PlayIcon,
   WrenchIcon,
   XIcon,
 } from '@phosphor-icons/react';
@@ -13,12 +14,16 @@ import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { RichText } from './RichText.js';
+import { servedByLocalServer } from '../host/served.js';
 
 const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
-  'step-limit': 'Stopped at the step limit. Say "continue" to go on.',
+  'step-limit': 'Stopped at the step limit.',
   'budget-exhausted': 'Stopped because the budget for one run is used up.',
-  cancelled: 'The last run was interrupted.',
+  cancelled: 'The last run was interrupted, for example because the tab was closed or reloaded.',
 };
+
+/** Runs that stopped part way, which Continue picks up where they left off. */
+const CONTINUABLE: ReadonlySet<string> = new Set(['step-limit', 'cancelled']);
 
 function outcomeOf(content: string): string {
   try {
@@ -121,9 +126,29 @@ export function CrewPanel({
         ? (STATUS_NOTE[conversation.lastStatus] ?? null)
         : null);
 
+  // In the browser the agents run in this tab, so leaving it stops them.
+  const inTab = !servedByLocalServer();
+  const lastRole = messages.at(-1)?.role;
+  const canContinue =
+    !working &&
+    approvals.length === 0 &&
+    CONTINUABLE.has(conversation?.lastStatus ?? '') &&
+    (lastRole === 'user' || lastRole === 'tool');
+
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
   }, [messages.length, approvals.length, working]);
+
+  useEffect(() => {
+    if (!working || !inTab) return;
+    const warn = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      window.removeEventListener('beforeunload', warn);
+    };
+  }, [working, inTab]);
 
   const ask = (task?: string, about?: string): void => {
     setBusy(true);
@@ -262,7 +287,18 @@ export function CrewPanel({
           }
           return null;
         })}
-        {working && <p className="muted">Working</p>}
+        {working && (
+          <p className="muted">
+            Working
+            {inTab && (
+              <span className="small">
+                {' '}
+                · Keep this tab open while {member.name} works. Closing or reloading it stops the
+                run, and you can continue it afterwards.
+              </span>
+            )}
+          </p>
+        )}
         {!working &&
           approvals.map((approval) => (
             <section key={approval.id} className="approval" aria-label="Needs your approval">
@@ -292,6 +328,17 @@ export function CrewPanel({
           <p className="error" role="status">
             {note}
           </p>
+        )}
+        {canContinue && (
+          <button
+            type="button"
+            className="button small continue-run"
+            onClick={() => {
+              ask();
+            }}
+          >
+            <PlayIcon aria-hidden="true" /> Continue where {member.name} stopped
+          </button>
         )}
         <div ref={end} />
       </div>

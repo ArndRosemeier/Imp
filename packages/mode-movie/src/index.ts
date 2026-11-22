@@ -54,6 +54,7 @@ export {
 } from './schema.js';
 export { AGENT_DRAFTS_SETTING, createEditCommands, CutView, SpokenLine, TextView } from './edit.js';
 export { createTextCommands, filmTexts, readStyles } from './text.js';
+export { shortSceneTitle } from './scene-title.js';
 export {
   applyMatrix,
   colorStats,
