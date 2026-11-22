@@ -84,6 +84,13 @@ export {
   ReleaseNotes,
   UNKNOWN_RELEASE,
 } from './commands/release.js';
+export {
+  createSupportCommands,
+  ISSUES_URL,
+  ProblemReport,
+  redactSecrets,
+  type SupportOptions,
+} from './commands/support.js';
 export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
 export { chosenModel, CostRequest } from './cost.js';
 export { CommandError, type CommandErrorCode } from './errors.js';

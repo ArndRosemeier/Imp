@@ -172,7 +172,7 @@ Work done in the browser does not move over by itself: export the project and im
     id: 'help-and-support',
     area: 'workspace',
     title: 'Help and support',
-    summary: 'Tips, Ask Imp, and this guide.',
+    summary: 'Tips, Ask Imp, this guide, and reporting a problem.',
     body: `## Tips
 
 The first time you open a stage, a short tip says what it is for. Close one with **Got it**. If you know your way around, **Turn off all tips** removes every tip at once; the help panel and Ask Imp stay. Turn them back on in **Settings** or in this panel.
@@ -181,6 +181,14 @@ The first time you open a stage, a short tip says what it is for. Close one with
 
 The **Help** button opens **Ask Imp**. Ask anything in plain words, such as "how do I make a dissolve?" or "what will this scene cost?". Imp answers from this guide and can see your project. Ask it to do the step and it does it for you, with the same buttons you have; it asks before spending money or deleting anything. Imp runs on the coordinator's model and counts toward your spending like any agent.
 
-The coordinator can answer questions about Imp too.`,
+The coordinator can answer questions about Imp too.
+
+## Report a problem
+
+Something broken or confusing? In the Help panel, open **Report a problem**, say what happened and press **Write the report**. Imp adds its version, where it runs, your screen size and the last few commands with their errors. Your key, prompts and story never go in. **Open on GitHub** shows the report as a new issue, filled in; read it and press Submit (you need a free GitHub account). Or **Copy the report** and send it another way. Ask Imp can write the report for you too.
+
+## The guide on the web
+
+This guide is also a website, beside the app: **The guide on the web** at the bottom of the Help panel opens it.`,
   },
 ];

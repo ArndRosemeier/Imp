@@ -24,6 +24,7 @@ import {
   activityCommands,
   CommandRegistry,
   createHelpCommands,
+  createSupportCommands,
   createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
@@ -107,6 +108,8 @@ export interface ImpOptions {
    * the repository's history when the app was built. Defaults to version 0.000.
    */
   readonly release?: ReleaseNotes;
+  /** Where this copy runs, for problem reports: "browser" or the local server and its system. */
+  readonly runsOn?: string;
   /** Renders films to video files. The browser host encodes with WebCodecs; without one, films cannot be exported. */
   readonly filmRenderer?: FilmRenderer;
   /** Takes stills from clips so that agents can see a cut: mediabunny in the browser, ffmpeg on the server. */
@@ -163,6 +166,10 @@ export function createImp(options: ImpOptions): Imp {
   registry.register(
     ...settingsCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
+    ...createSupportCommands({
+      release: options.release ?? UNKNOWN_RELEASE,
+      runsOn: options.runsOn ?? 'unknown',
+    }),
     ...activityCommands,
     // The guide: Imp's pages about itself, and the stages' pages from each mode.
     ...createHelpCommands([

@@ -19,6 +19,7 @@ serveImp(
       secrets,
       frameImage: toJpeg,
       release,
+      runsOn: `browser: ${navigator.userAgent}`,
       filmRenderer: createFilmRenderer(),
       ...(frameGrabber === undefined ? {} : { frameGrabber }),
       ...(colorSampler === undefined ? {} : { colorSampler }),

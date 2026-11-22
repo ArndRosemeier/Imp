@@ -55,6 +55,7 @@ const server = createImpServer({
       blobs: await FileBlobStore.open(join(dataDir, 'media')),
       secrets,
       release,
+      runsOn: `local server, Node ${process.version} on ${process.platform}${ffmpeg ? ', with ffmpeg' : ', without ffmpeg'}`,
       filmRenderer,
       ...(ffmpeg
         ? {
