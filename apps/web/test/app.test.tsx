@@ -663,7 +663,17 @@ describe('App', () => {
     expect(screen.getByText('Approved: crew.ask')).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Needs your approval' })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: /Start over/ }));
+    // Clearing asks first; keeping changes nothing.
+    await user.click(screen.getByRole('button', { name: /Clear chat/ }));
+    const asking = screen.getByRole('group', { name: 'Clear this chat?' });
+    await user.click(within(asking).getByRole('button', { name: 'Keep' }));
+    expect(screen.getByText('The Screenwriter is done.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: /Clear chat/ }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'Clear this chat?' })).getByRole('button', {
+        name: 'Clear',
+      }),
+    );
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
   });
 
@@ -1000,6 +1010,35 @@ describe('App', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Projects' }));
     expect(await screen.findByRole('heading', { name: 'The Last Light' })).toBeTruthy();
+  });
+
+  it('shows each project its own chat with the coordinator', async () => {
+    const { imp, user } = start([{ content: 'Keeper it is.' }, { content: 'Tide it is.' }]);
+    await completeSetup(user);
+    const call = async (id: string, input: unknown) =>
+      (
+        (await imp.registry.executeById(id, input, {
+          actor: { kind: 'user', id: 'local' },
+        })) as { output: Record<string, unknown> }
+      ).output;
+    const a = await call('project.create', { name: 'Keeper', mode: 'movie' });
+    const b = await call('project.create', { name: 'Tide', mode: 'movie' });
+
+    await call('project.open', { projectId: a['id'] });
+    await user.type(await screen.findByLabelText('Message to Coordinator'), 'About Keeper.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Keeper it is.')).toBeTruthy();
+
+    await call('project.open', { projectId: b['id'] });
+    expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
+    expect(screen.queryByText('About Keeper.')).toBeNull();
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'About Tide.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Tide it is.')).toBeTruthy();
+
+    await call('project.open', { projectId: a['id'] });
+    expect(await screen.findByText('About Keeper.')).toBeTruthy();
+    expect(screen.queryByText('About Tide.')).toBeNull();
   });
 
   it('copies between projects and puts collisions to the person, also when an agent copies', async () => {

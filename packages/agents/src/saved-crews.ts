@@ -1,6 +1,7 @@
 import { CommandError, defineCommand, type Command, type KeyValueStore } from '@imp/core';
 import { z } from 'zod';
-import { CONVERSATION_PREFIX, CrewMember } from './crew.js';
+import { forgetConversations } from './conversations.js';
+import { CrewMember } from './crew.js';
 import { CUSTOM_ROLE_PREFIX, StoredRole, type RoleCatalog } from './role.js';
 
 const CREW_PREFIX = 'crew/';
@@ -227,10 +228,14 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
         });
       }
       await runtime.store.batch([
-        ...leaving.flatMap((member) => [
-          { type: 'delete' as const, key: `${CREW_PREFIX}${member.id}` },
-          { type: 'delete' as const, key: `${CONVERSATION_PREFIX}${member.id}` },
-        ]),
+        ...leaving.map((member) => ({
+          type: 'delete' as const,
+          key: `${CREW_PREFIX}${member.id}`,
+        })),
+        ...(await forgetConversations(
+          runtime.store,
+          leaving.map((member) => member.id),
+        )),
         ...rolesRestored.map((role) => ({
           type: 'put' as const,
           key: `${CUSTOM_ROLE_PREFIX}${role.id}`,

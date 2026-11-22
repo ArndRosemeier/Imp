@@ -2,13 +2,24 @@ import {
   CommandError,
   defineCommand,
   isInScope,
+  listProjects,
+  readProject,
+  type WriteOperation,
   type Command,
   type CommandRegistry,
   type KeyValueStore,
 } from '@imp/core';
 import type { ChatMessage, GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
-import { CONVERSATION_PREFIX, readCrewMember } from './crew.js';
+import {
+  allConversationPrefixes,
+  CONVERSATION_MIGRATION_KEY,
+  CONVERSATION_PREFIX,
+  conversationKey,
+  conversationPrefix,
+  currentConversationProject,
+} from './conversations.js';
+import { readCrewMember } from './crew.js';
 import type { RoleCatalog } from './role.js';
 import { runAgent } from './run.js';
 
@@ -75,6 +86,12 @@ export type AgentRun = z.infer<typeof AgentRunSchema>;
 /** Everything said and done with one crew member, kept until it is cleared. */
 export const ConversationSchema = z.object({
   memberId: z.string(),
+  /**
+   * The role of the member it was held with. A project moved to another Imp
+   * finds its crew under other ids; the member there with the same role takes
+   * the conversation over.
+   */
+  roleId: z.string().optional(),
   messages: z.array(ChatMessageSchema),
   /** What the agent asked for and the user has not decided yet. */
   pendingApprovals: z.array(PendingApprovalSchema),
@@ -99,18 +116,79 @@ const emptyConversation = (memberId: string): Conversation => ({
   usage: { promptTokens: 0, cachedPromptTokens: 0, completionTokens: 0 },
 });
 
-async function readConversation(store: KeyValueStore, memberId: string): Promise<Conversation> {
-  const stored = await store.get(`${CONVERSATION_PREFIX}${memberId}`);
-  return stored === undefined ? emptyConversation(memberId) : ConversationSchema.parse(stored);
+const storedValue = (conversation: Conversation) =>
+  // Through JSON, so optional fields that are undefined are left out.
+  z.json().parse(JSON.parse(JSON.stringify(conversation)));
+
+/**
+ * A conversation in this project that was held with an agent no longer on the
+ * crew, in the same role as `memberId`: what an imported project brings along
+ * from the Imp it was exported from. Never one another member already took.
+ */
+async function orphanFor(
+  store: KeyValueStore,
+  memberId: string,
+  projectId: string | null,
+): Promise<{ key: string; conversation: Conversation } | undefined> {
+  if (projectId === null) return undefined;
+  const member = await readCrewMember(store, memberId);
+  if (member === undefined) return undefined;
+  for (const entry of await store.list(conversationPrefix(projectId))) {
+    const parsed = ConversationSchema.safeParse(entry.value);
+    if (!parsed.success || parsed.data.roleId !== member.roleId) continue;
+    if (parsed.data.memberId === memberId) continue;
+    if ((await readCrewMember(store, parsed.data.memberId)) !== undefined) continue;
+    return { key: entry.key, conversation: { ...parsed.data, memberId, running: false } };
+  }
+  return undefined;
 }
 
-async function writeConversation(store: KeyValueStore, conversation: Conversation): Promise<void> {
+/** The conversation with a member in a project, or in no project for null. */
+async function readConversation(
+  store: KeyValueStore,
+  memberId: string,
+  projectId: string | null,
+): Promise<Conversation> {
+  const stored = await store.get(conversationKey(memberId, projectId));
+  if (stored !== undefined) return ConversationSchema.parse(stored);
+  return (await orphanFor(store, memberId, projectId))?.conversation ?? emptyConversation(memberId);
+}
+
+/**
+ * Like readConversation, for a command that goes on to change it: a
+ * conversation taken over from an agent of another Imp is moved to this
+ * member's place first, so it is only ever taken over once.
+ */
+async function claimConversation(
+  store: KeyValueStore,
+  memberId: string,
+  projectId: string | null,
+): Promise<Conversation> {
+  const stored = await store.get(conversationKey(memberId, projectId));
+  if (stored !== undefined) return ConversationSchema.parse(stored);
+  const orphan = await orphanFor(store, memberId, projectId);
+  if (orphan === undefined) return emptyConversation(memberId);
+  await store.batch([
+    { type: 'delete', key: orphan.key },
+    {
+      type: 'put',
+      key: conversationKey(memberId, projectId),
+      value: storedValue(orphan.conversation),
+    },
+  ]);
+  return orphan.conversation;
+}
+
+async function writeConversation(
+  store: KeyValueStore,
+  conversation: Conversation,
+  projectId: string | null,
+): Promise<void> {
   await store.batch([
     {
       type: 'put',
-      key: `${CONVERSATION_PREFIX}${conversation.memberId}`,
-      // Through JSON, so optional fields that are undefined are left out.
-      value: z.json().parse(JSON.parse(JSON.stringify(conversation))),
+      key: conversationKey(conversation.memberId, projectId),
+      value: storedValue(conversation),
     },
   ]);
 }
@@ -152,19 +230,71 @@ const toStored = (messages: readonly ChatMessage[]): Conversation['messages'] =>
   z.array(ChatMessageSchema).parse(JSON.parse(JSON.stringify(messages)));
 
 /**
- * Clears the "working" mark of every conversation. A host calls this once at
- * start-up: a run that was going on when the host stopped is not going on any more.
+ * Before conversations were kept per project, every conversation was kept
+ * workspace-wide. They were held about the project that was open, so they
+ * move into it: the open one, else the one last opened. Without any project
+ * they stay workspace-wide. Runs once; a backup from before brings back the
+ * old layout without the mark, so loading one moves them again.
+ */
+async function moveConversationsIntoProjects(store: KeyValueStore): Promise<void> {
+  if ((await store.get(CONVERSATION_MIGRATION_KEY)) !== undefined) return;
+  let target = await currentConversationProject(store);
+  if (target === null) {
+    const recent = (await listProjects(store)).sort((a, b) =>
+      (b.openedAt ?? b.createdAt).localeCompare(a.openedAt ?? a.createdAt),
+    )[0];
+    target = recent?.id ?? null;
+  }
+  const operations: WriteOperation[] = [];
+  let moved = 0;
+  if (target !== null) {
+    for (const entry of await store.list(CONVERSATION_PREFIX)) {
+      const parsed = ConversationSchema.safeParse(entry.value);
+      if (!parsed.success) continue;
+      const member = await readCrewMember(store, parsed.data.memberId);
+      const key = conversationKey(parsed.data.memberId, target);
+      if ((await store.get(key)) === undefined) {
+        operations.push({
+          type: 'put',
+          key,
+          value: storedValue({
+            ...parsed.data,
+            ...(member === undefined ? {} : { roleId: member.roleId }),
+          }),
+        });
+        moved += 1;
+      }
+      operations.push({ type: 'delete', key: entry.key });
+    }
+  }
+  operations.push({
+    type: 'put',
+    key: CONVERSATION_MIGRATION_KEY,
+    value: { projectId: target, moved },
+  });
+  await store.batch(operations);
+}
+
+/**
+ * Gets conversations ready when a host starts or a backup was loaded: moves
+ * those from before conversations were per project, and clears the "working"
+ * mark of every conversation, since a run that was going on when the host
+ * stopped is not going on any more.
  */
 export async function releaseInterruptedRuns(store: KeyValueStore): Promise<void> {
-  const stale = (await store.list(CONVERSATION_PREFIX))
-    .map((entry) => ConversationSchema.parse(entry.value))
-    .filter((conversation) => conversation.running);
-  for (const conversation of stale) {
-    await writeConversation(store, {
-      ...conversation,
-      running: false,
-      lastStatus: 'cancelled',
-    });
+  await moveConversationsIntoProjects(store);
+  for (const prefix of await allConversationPrefixes(store)) {
+    const operations: WriteOperation[] = [];
+    for (const entry of await store.list(prefix)) {
+      const parsed = ConversationSchema.safeParse(entry.value);
+      if (!parsed.success || !parsed.data.running) continue;
+      operations.push({
+        type: 'put',
+        key: entry.key,
+        value: storedValue({ ...parsed.data, running: false, lastStatus: 'cancelled' }),
+      });
+    }
+    if (operations.length > 0) await store.batch(operations);
   }
 }
 
@@ -182,6 +312,11 @@ export interface AgentCommandOptions {
  */
 export function createAgentCommands(options: AgentCommandOptions): readonly Command[] {
   const { registry, provider, roles } = options;
+  /**
+   * Which project each working agent is working in. An agent works on one
+   * thing at a time: while it works in one project it cannot start in another.
+   */
+  const working = new Map<string, string | null>();
 
   async function resolve(commandId: string, store: KeyValueStore, memberId: string) {
     const member = await readCrewMember(store, memberId);
@@ -230,7 +365,18 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         throw new CommandError('invalid_input', 'crew.ask', 'An agent cannot give itself a task.');
       }
       const { member, role } = await resolve('crew.ask', store, input.memberId);
-      const before = await readConversation(store, member.id);
+      // Fixed for the whole run: the person may open another project meanwhile.
+      const projectId = await currentConversationProject(store);
+      const elsewhere = working.get(member.id);
+      if (elsewhere !== undefined && elsewhere !== projectId) {
+        const project = elsewhere === null ? undefined : await readProject(store, elsewhere);
+        throw new CommandError(
+          'invalid_input',
+          'crew.ask',
+          `${member.name} is still working ${project === undefined ? 'outside any project' : `in "${project.name}"`}. Wait until it is done.`,
+        );
+      }
+      const before = await claimConversation(store, member.id, projectId);
       if (before.running) {
         throw new CommandError('invalid_input', 'crew.ask', `${member.name} is already working.`);
       }
@@ -251,7 +397,13 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         );
       }
 
-      let conversation: Conversation = { ...before, running: true, lastError: null };
+      let conversation: Conversation = {
+        ...before,
+        roleId: member.roleId,
+        running: true,
+        lastError: null,
+      };
+      working.set(member.id, projectId);
       try {
         const result = await runAgent({
           registry,
@@ -265,7 +417,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           ...(input.context === undefined ? {} : { context: input.context }),
           onProgress: async (messages) => {
             conversation = { ...conversation, messages: toStored(messages) };
-            await writeConversation(store, conversation);
+            await writeConversation(store, conversation, projectId);
           },
         });
         const pendingApprovals = result.pendingApprovals.map((pending) => ({
@@ -275,6 +427,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         }));
         conversation = {
           memberId: member.id,
+          roleId: member.roleId,
           messages: toStored(result.messages),
           pendingApprovals,
           running: false,
@@ -298,7 +451,8 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         };
       } finally {
         // Also after an unexpected failure, so the agent is never left marked as working.
-        await writeConversation(store, { ...conversation, running: false });
+        working.delete(member.id);
+        await writeConversation(store, { ...conversation, running: false }, projectId);
       }
     },
   });
@@ -307,24 +461,46 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.conversation.get',
     title: 'Read conversation',
     description:
-      'Returns the conversation with a crew member: the messages, what is waiting for approval and what it has cost.',
+      'Returns the conversation with a crew member in the open project: the messages, what is waiting for approval and what it has cost. Every project has its own conversations; with no project open, agents talk in a workspace-wide one.',
     effect: 'read',
     input: z.object({ memberId: z.string() }),
-    output: ConversationSchema,
-    handler: ({ runtime }, { memberId }) => readConversation(runtime.store, memberId),
+    output: ConversationSchema.extend({
+      projectId: z
+        .string()
+        .nullable()
+        .describe('The project the conversation belongs to, or null for the workspace-wide one.'),
+    }),
+    handler: async ({ runtime }, { memberId }) => {
+      const projectId = await currentConversationProject(runtime.store);
+      return { ...(await readConversation(runtime.store, memberId, projectId)), projectId };
+    },
   });
 
   const conversationClear = defineCommand({
     id: 'crew.conversation.clear',
-    title: 'Clear conversation',
+    title: 'Clear chat',
     description:
-      'Forgets the conversation with a crew member, so the next task starts fresh. What the agent made is kept.',
+      'Forgets the conversation with a crew member (the coordinator included) in the open project, so its next task there starts fresh. Conversations in other projects and what the agent made are kept. Not while the agent is working.',
     effect: 'destructive',
     input: z.object({ memberId: z.string() }),
-    output: z.object({ memberId: z.string() }),
+    output: z.object({ memberId: z.string(), projectId: z.string().nullable() }),
     handler: async ({ runtime }, { memberId }) => {
-      await runtime.store.batch([{ type: 'delete', key: `${CONVERSATION_PREFIX}${memberId}` }]);
-      return { memberId };
+      const { store } = runtime;
+      const projectId = await currentConversationProject(store);
+      const conversation = await readConversation(store, memberId, projectId);
+      if (conversation.running) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.conversation.clear',
+          'The agent is working. Stop it or wait until it is done.',
+        );
+      }
+      const orphan = await orphanFor(store, memberId, projectId);
+      await store.batch([
+        { type: 'delete', key: conversationKey(memberId, projectId) },
+        ...(orphan === undefined ? [] : [{ type: 'delete' as const, key: orphan.key }]),
+      ]);
+      return { memberId, projectId };
     },
   });
 
@@ -353,7 +529,8 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
       }
       const { store } = runtime;
       const { member, role } = await resolve('crew.approve', store, input.memberId);
-      const conversation = await readConversation(store, member.id);
+      const projectId = await currentConversationProject(store);
+      const conversation = await claimConversation(store, member.id, projectId);
       const pending = conversation.pendingApprovals.find(({ id }) => id === input.approvalId);
       if (pending === undefined) {
         throw new CommandError(
@@ -394,20 +571,24 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
       }
 
       // Read again: the approved command may itself have changed this conversation.
-      const latest = await readConversation(store, member.id);
+      const latest = await readConversation(store, member.id, projectId);
       const remaining = latest.pendingApprovals.filter(({ id }) => id !== pending.id);
-      await writeConversation(store, {
-        ...latest,
-        pendingApprovals: remaining,
-        messages: [
-          ...latest.messages,
-          {
-            role: 'user',
-            content: `${input.approve ? 'Approved' : 'Declined'}: ${pending.commandId}`,
-            context: `This is about your request to run ${pending.commandId} with ${JSON.stringify(pending.input)}. ${outcome}`,
-          },
-        ],
-      });
+      await writeConversation(
+        store,
+        {
+          ...latest,
+          pendingApprovals: remaining,
+          messages: [
+            ...latest.messages,
+            {
+              role: 'user',
+              content: `${input.approve ? 'Approved' : 'Declined'}: ${pending.commandId}`,
+              context: `This is about your request to run ${pending.commandId} with ${JSON.stringify(pending.input)}. ${outcome}`,
+            },
+          ],
+        },
+        projectId,
+      );
       return {
         commandId: pending.commandId,
         approved: input.approve,

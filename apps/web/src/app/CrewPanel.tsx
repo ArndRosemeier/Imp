@@ -1,4 +1,10 @@
-import { AgentRunSchema, ConversationSchema, type AgentRun, type CrewMember } from '@imp/agents';
+import {
+  AgentRunSchema,
+  conversationKey,
+  ConversationSchema,
+  type AgentRun,
+  type CrewMember,
+} from '@imp/agents';
 import { fromToolName } from '@imp/core';
 import {
   BroomIcon,
@@ -34,6 +40,9 @@ const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
 };
 
 /** Runs that stopped part way, which Continue picks up where they left off. */
+/** The conversation shown, with the project it belongs to (null outside projects). */
+const ConversationWhere = ConversationSchema.extend({ projectId: z.string().nullable() });
+
 const CONTINUABLE: ReadonlySet<string> = new Set(['step-limit', 'cancelled']);
 
 function outcomeOf(content: string): string {
@@ -123,11 +132,27 @@ export function CrewPanel({
   takesSuggestions?: boolean;
 }): ReactElement {
   const imp = useImp();
-  const live = useLive([`conversations/${member.id}`], async (current) =>
-    ConversationSchema.parse(
-      await runCommand(current, 'crew.conversation.get', { memberId: member.id }),
-    ),
+  // Every project has its own conversation with each agent. The one shown
+  // follows the open project; the core says which project that is.
+  const [shownProject, setShownProject] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const live = useLive(
+    [
+      'settings/project.current',
+      conversationKey(member.id, null),
+      ...(shownProject === null ? [] : [conversationKey(member.id, shownProject)]),
+    ],
+    async (current) =>
+      ConversationWhere.parse(
+        await runCommand(current, 'crew.conversation.get', { memberId: member.id }),
+      ),
   );
+  const liveProject = live.data?.projectId ?? null;
+  if (liveProject !== shownProject) {
+    // Another project was opened: follow its conversation, and drop a question about the last one.
+    setShownProject(liveProject);
+    setClearing(false);
+  }
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -269,11 +294,37 @@ export function CrewPanel({
         </div>
         <div className="row spread">
           <span className="mono muted">{member.model}</span>
-          {messages.length > 0 && (
+          {messages.length > 0 && !clearing && (
             <button
+              type="button"
               className="button quiet small"
               disabled={working}
+              title={
+                liveProject === null
+                  ? 'Forget this chat. Chats in projects are kept.'
+                  : 'Forget this chat in this project. Chats in other projects are kept.'
+              }
               onClick={() => {
+                setClearing(true);
+              }}
+            >
+              <BroomIcon aria-hidden="true" /> Clear chat
+            </button>
+          )}
+        </div>
+        {clearing && (
+          <div className="row clear-chat" role="group" aria-label="Clear this chat?">
+            <span className="muted">
+              {liveProject === null
+                ? `Forget everything said with ${member.name} outside projects?`
+                : `Forget everything said with ${member.name} in this project?`}
+            </span>
+            <button
+              type="button"
+              className="button danger small"
+              disabled={working}
+              onClick={() => {
+                setClearing(false);
                 runCommand(imp, 'crew.conversation.clear', { memberId: member.id }).catch(
                   (reason: unknown) => {
                     setProblem(messageOf(reason));
@@ -281,10 +332,19 @@ export function CrewPanel({
                 );
               }}
             >
-              <BroomIcon aria-hidden="true" /> Start over
+              Clear
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              className="button quiet small"
+              onClick={() => {
+                setClearing(false);
+              }}
+            >
+              Keep
+            </button>
+          </div>
+        )}
       </div>
       <div className="thread" aria-live="polite">
         {messages.length === 0 &&

@@ -424,6 +424,13 @@ kbd {
 .crew-head {
   padding: 28px 22px var(--space-3);
 }
+.clear-chat {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.clear-chat > .muted {
+  flex: 1 1 100%;
+}
 .thread {
   flex: 1;
   overflow-y: auto;
