@@ -4,6 +4,7 @@ import {
   Development,
   IMAGE_MODEL_SETTING,
   Scene,
+  shortSceneTitle,
   SPEECH_MODEL_SETTING,
 } from '@imp/mode-movie';
 import {
@@ -190,13 +191,14 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             key={candidate.id}
             role="tab"
             className="chip"
+            title={candidate.heading || undefined}
             aria-selected={candidate.id === scene?.id}
             onClick={() => {
               setSelectedId(candidate.id);
             }}
           >
             <span>
-              {candidate.position} · {candidate.heading === '' ? 'Untitled' : candidate.heading}
+              {candidate.position} · {shortSceneTitle(candidate.heading)}
             </span>
           </button>
         ))}

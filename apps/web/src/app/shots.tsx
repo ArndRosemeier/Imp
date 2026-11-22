@@ -4,6 +4,7 @@ import {
   IMAGE_MODEL_SETTING,
   Scene,
   Shot,
+  shortSceneTitle,
   SPEECH_MODEL_SETTING,
   VIDEO_MODEL_SETTING,
 } from '@imp/mode-movie';
@@ -416,13 +417,14 @@ export function SceneTabs({
           key={candidate.id}
           role="tab"
           className="chip"
+          title={candidate.heading || undefined}
           aria-selected={candidate.id === sceneId}
           onClick={() => {
             onSelect(candidate.id);
           }}
         >
           <span>
-            {candidate.position} · {candidate.heading === '' ? 'Untitled' : candidate.heading}
+            {candidate.position} · {shortSceneTitle(candidate.heading)}
           </span>
         </button>
       ))}

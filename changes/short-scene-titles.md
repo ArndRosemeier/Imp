@@ -1,0 +1,1 @@
+**Short scene names.** Scene tabs and the film strip show a short name such as "Kitchen, night" instead of the full slug line, so more scenes fit and they are easier to tell apart. Hover a tab to see the whole heading.

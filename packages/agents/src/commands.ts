@@ -203,7 +203,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.ask',
     title: 'Give an agent a task',
     description:
-      'Runs a crew member on a task and returns what it said and what is waiting for approval. The agent remembers the earlier conversation with it. Without a task, it continues where it stopped. Costs model usage.',
+      'Runs a crew member on a task and returns what it said and what is waiting for approval. The agent remembers the earlier conversation with it. Without a task, it continues where it stopped, such as after a run that was interrupted or reached its step limit. Costs model usage.',
     effect: 'spend',
     input: z.object({
       memberId: z.string().describe('The id of a crew member from crew.list.'),
@@ -236,7 +236,9 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           `${member.name} is waiting for a decision on what it asked for.`,
         );
       }
-      if (input.task === undefined && before.messages.at(-1)?.role !== 'user') {
+      // A run that was cut off ends on the task or on results the model has not seen yet.
+      const last = before.messages.at(-1)?.role;
+      if (input.task === undefined && last !== 'user' && last !== 'tool') {
         throw new CommandError(
           'invalid_input',
           'crew.ask',

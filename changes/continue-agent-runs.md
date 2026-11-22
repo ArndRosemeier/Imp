@@ -1,0 +1,1 @@
+**Continue an interrupted agent.** When Imp runs in the browser, the crew panel now reminds you to keep the tab open while an agent works, and the browser asks before you close or reload it mid-run. If a run was cut off anyway, or stopped at its step limit, a Continue button picks it up where it stopped.

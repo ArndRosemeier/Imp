@@ -4838,3 +4838,8 @@ dialog.whats-new-dialog {
     min-width: var(--hit);
   }
 }
+
+/* Picks up an agent run that stopped part way. */
+.continue-run {
+  align-self: flex-start;
+}
