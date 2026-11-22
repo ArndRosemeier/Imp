@@ -7,14 +7,7 @@ import {
   WarningIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactElement,
-  type SyntheticEvent,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { HornedBadge, ImpSpinner } from './ImpMark.js';
@@ -291,6 +284,8 @@ export function Approvals(): ReactElement {
   const [phase, setPhase] = useState<'review' | 'working' | 'done'>('review');
   const [problem, setProblem] = useState<string | null>(null);
   const seen = useRef<ReadonlySet<string> | null>(null);
+  // Decisions go on after the dialog is closed; closing must not forget them.
+  const working = useRef(false);
 
   const shown = batch ?? live;
   const latest = useRef(live);
@@ -365,6 +360,9 @@ export function Approvals(): ReactElement {
     setBatch(items);
     setPhase('working');
     setProblem(null);
+    // Out of the way at once: an approved step can take minutes, such as an agent given a task.
+    working.current = true;
+    close();
     if (mode !== 'picked') {
       setDeclined(mode === 'all' ? new Set() : new Set(items.map((item) => item.approvalId)));
     }
@@ -372,6 +370,7 @@ export function Approvals(): ReactElement {
       setOutcomes((current) => new Map(current).set(id, outcome));
     };
 
+    const tally = { failed: false };
     // What the user said to always allow counts from now on, these requests included.
     const allowed = [
       ...new Set(
@@ -384,6 +383,7 @@ export function Approvals(): ReactElement {
       try {
         await runCommand(imp, 'crew.approvals.always.set', { commandId, allow: true });
       } catch (reason) {
+        tally.failed = true;
         setProblem(messageOf(reason));
       }
     }
@@ -393,7 +393,6 @@ export function Approvals(): ReactElement {
     for (const choice of choices) {
       byMember.set(choice.item.memberId, [...(byMember.get(choice.item.memberId) ?? []), choice]);
     }
-    const tally = { failed: false };
     const finished: string[] = [];
     await Promise.all(
       [...byMember].map(async ([memberId, list]) => {
@@ -422,15 +421,18 @@ export function Approvals(): ReactElement {
     for (const memberId of finished) {
       window.dispatchEvent(new CustomEvent(CONTINUE_AGENT, { detail: memberId }));
     }
-    setPhase('done');
-    if (!tally.failed) {
-      window.setTimeout(() => {
-        // What agents asked for meanwhile, such as one given a task just now, is shown next.
-        const decided = new Set(items.map((item) => item.approvalId));
-        if (latest.current.some((item) => !decided.has(item.approvalId))) reset();
-        else close();
-      }, 900);
+    working.current = false;
+    if (tally.failed) {
+      // Something went wrong: show what, rather than leave it unseen.
+      setPhase('done');
+      show();
+      return;
     }
+    reset();
+    close();
+    // Several requests that arrived meanwhile, such as from an agent given a task just now, come next.
+    const decided = new Set(items.map((item) => item.approvalId));
+    if (latest.current.filter((item) => !decided.has(item.approvalId)).length >= 2) show();
   };
 
   const toggleAll = (): void => {
@@ -474,14 +476,10 @@ export function Approvals(): ReactElement {
       className="modal approvals-dialog"
       aria-labelledby="approvals-title"
       onClick={(event) => {
-        if (event.target === event.currentTarget && phase !== 'working') close();
-      }}
-      onCancel={(event: SyntheticEvent) => {
-        // Decisions under way finish first.
-        if (phase === 'working') event.preventDefault();
+        if (event.target === event.currentTarget) close();
       }}
       onClose={() => {
-        if (phase !== 'working') reset();
+        if (!working.current) reset();
       }}
     >
       <header className="approvals-head">
@@ -503,12 +501,7 @@ export function Approvals(): ReactElement {
             </span>
           )}
         </div>
-        <button
-          className="button quiet icon"
-          aria-label={t('Close')}
-          disabled={phase === 'working'}
-          onClick={close}
-        >
+        <button className="button quiet icon" aria-label={t('Close')} onClick={close}>
           <XIcon aria-hidden="true" size={18} />
         </button>
       </header>
@@ -639,7 +632,7 @@ export function Approvals(): ReactElement {
               </button>
             </div>
           ) : (
-            <button type="button" className="button" disabled={phase === 'working'} onClick={close}>
+            <button type="button" className="button" onClick={close}>
               {t('Close')}
             </button>
           )}
