@@ -180,6 +180,7 @@ const SAME_IN = new Set<string>([
   'Serif (Instrument)',
   'In',
   'Out',
+  'Look',
   'Clip',
   'Clips',
   'Trailer',

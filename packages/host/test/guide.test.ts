@@ -2,7 +2,8 @@ import { LANGUAGES, MemoryBlobStore, MemoryKeyValueStore, type GuideTopic } from
 import { createFakeProvider } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
 import { createImp, createMemorySecretStore } from '../src/index.js';
-import { guideTranslations, workspaceGuides } from '../src/guide.js';
+import { workspaceGuides } from '../src/guide.js';
+import { guideTranslations } from '../src/guide-translations.js';
 
 const imp = createImp({
   store: new MemoryKeyValueStore(),

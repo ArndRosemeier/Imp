@@ -58,7 +58,8 @@ import {
 } from '@imp/mode-movie';
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
-import { guideTranslations, workspaceGuides } from './guide.js';
+import { workspaceGuides } from './guide.js';
+import { guideTranslations } from './guide-translations.js';
 import type { SecretStore } from './secrets.js';
 import { createFfmpegCommands, type FfmpegService } from './ffmpeg-commands.js';
 

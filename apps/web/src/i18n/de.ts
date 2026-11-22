@@ -364,7 +364,7 @@ export const de: Readonly<Record<string, string>> = {
   Clear: 'Leeren',
   Keep: 'Behalten',
   'Tell {name} what you want to make or set up. It acts through the same commands you have, and asks before spending or deleting.':
-    'Sag {name}, was du machen oder einrichten möchtest. Es arbeitet mit denselben Befehlen wie du und fragt, bevor es Geld ausgibt oder etwas löscht.',
+    'Sag hier, was du machen oder einrichten möchtest. {name} arbeitet mit denselben Befehlen wie du und fragt, bevor Geld ausgegeben oder etwas gelöscht wird.',
   '{name} is on it': '{name} ist dran',
   '· Keep this tab open while {name} works. Closing or reloading it stops the run, and you can continue it afterwards.':
     '· Lass diesen Tab offen, solange {name} arbeitet. Schließen oder Neuladen hält den Durchlauf an; du kannst ihn danach fortsetzen.',
@@ -461,7 +461,7 @@ export const de: Readonly<Record<string, string>> = {
   Description: 'Beschreibung',
   'What it is': 'Was es ist',
   'What it is and what it means in the story.': 'Was es ist und was es in der Geschichte bedeutet.',
-  Look: 'Aussehen',
+  Look: 'Look',
   'Architecture, materials, colours, wear, light. Precise enough to draw from.':
     'Architektur, Materialien, Farben, Abnutzung, Licht. Genau genug, um danach zu zeichnen.',
   'Shape, size, materials, colours, wear. Precise enough to draw from.':
@@ -520,7 +520,7 @@ export const de: Readonly<Record<string, string>> = {
   'Using the editor': 'So benutzt du den Editor',
   'Close the help': 'Hilfe schließen',
   'Select a piece on the timeline to change it in the panel beside the picture. Mark in and out to send a stretch with your next message to the crew. Exports run in the background from the Export menu, and the Film Editor can do all of this too.':
-    'Wähle ein Stück in der Zeitleiste, um es im Bereich neben dem Bild zu ändern. Markiere Ein- und Ausstieg, um einen Abschnitt mit deiner nächsten Nachricht an die Crew zu schicken. Exporte laufen im Hintergrund über das Menü Exportieren, und der Cutter kann all das auch.',
+    'Wähle ein Stück in der Zeitleiste, um es im Bereich neben dem Bild zu ändern. Setz In- und Out-Punkt, um einen Abschnitt mit deiner nächsten Nachricht an die Crew zu schicken. Exporte laufen im Hintergrund über das Menü Exportieren, und der Cutter kann all das auch.',
   Touch: 'Touch',
   Keys: 'Tasten',
   'With a keyboard': 'Mit Tastatur',
@@ -558,9 +558,9 @@ export const de: Readonly<Record<string, string>> = {
   'Close the details': 'Details schließen',
   'Nothing selected': 'Nichts ausgewählt',
   'Tap a piece on the timeline to trim, grade, retime or replace it. Mark in and out to ask the crew about a stretch.':
-    'Tippe auf ein Stück in der Zeitleiste, um es zu trimmen, zu graden, sein Tempo zu ändern oder es zu ersetzen. Markiere Ein- und Ausstieg, um die Crew zu einem Abschnitt zu fragen.',
+    'Tippe auf ein Stück in der Zeitleiste, um es zu kürzen, die Farbe zu korrigieren, sein Tempo zu ändern oder es zu ersetzen. Setz In- und Out-Punkt, um die Crew zu einem Abschnitt zu fragen.',
   'Select a piece on the timeline to trim, grade, retime or replace it. Mark in and out to ask the crew about a stretch.':
-    'Wähle ein Stück in der Zeitleiste, um es zu trimmen, zu graden, sein Tempo zu ändern oder es zu ersetzen. Markiere Ein- und Ausstieg, um die Crew zu einem Abschnitt zu fragen.',
+    'Wähle ein Stück in der Zeitleiste, um es zu kürzen, die Farbe zu korrigieren, sein Tempo zu ändern oder es zu ersetzen. Setz In- und Out-Punkt, um die Crew zu einem Abschnitt zu fragen.',
   'Gestures and help': 'Gesten und Hilfe',
   'Shortcuts and help': 'Tastenkürzel und Hilfe',
   'Title card': 'Titelkarte',
@@ -1386,7 +1386,7 @@ export const de: Readonly<Record<string, string>> = {
   'Imp: {alias}': 'Imp: {alias}',
   Project: 'Projekt',
   'New project': 'Neues Projekt',
-  'Run a command': 'Einen Befehl ausführen',
+  'Run a command': 'Befehl ausführen',
   'Ctrl K': 'Strg K',
   Library: 'Bibliothek',
   'Hide the library (Ctrl Shift L)': 'Bibliothek ausblenden (Strg Umschalt L)',
@@ -1820,6 +1820,7 @@ export const de: Readonly<Record<string, string>> = {
   'The download is not signed. If your computer warns about it, confirm once: on a Mac in System Settings, Privacy & Security, Open Anyway; on Windows with More info, Run anyway.':
     'Der Download ist nicht signiert. Wenn dein Computer davor warnt, bestätige einmal: auf dem Mac unter Systemeinstellungen, Datenschutz & Sicherheit, Dennoch öffnen; unter Windows mit Weitere Informationen, Trotzdem ausführen.',
   'How to open it': 'So öffnest du es',
+  you: 'du',
   Activity: 'Aktivität',
   'Nothing has happened yet. Every command will be listed here with who ran it.':
     'Noch ist nichts passiert. Jeder Befehl erscheint hier, mit dem, der ihn ausgeführt hat.',
@@ -1849,7 +1850,7 @@ export const de: Readonly<Record<string, string>> = {
   'Step limit': 'Schrittgrenze',
   'Budget used up': 'Budget aufgebraucht',
   Interrupted: 'Unterbrochen',
-  'The crew is free': 'Die Crew hat frei',
+  'The crew is free': 'Crew hat frei',
   '{name} is working': '{name} arbeitet',
   '{count} at work': '{count} bei der Arbeit',
   '{label}, {waiting} waiting for you. Show who is working on what':

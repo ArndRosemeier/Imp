@@ -1300,7 +1300,7 @@ export function ProjectsView({
               <span>{t('Open the sample film')}</span>
               <span className="muted small">
                 {t('“{name}”: written down to every shot. Free to open; take it apart.', {
-                  name: template.name,
+                  name: tx(template.name),
                 })}
               </span>
             </button>

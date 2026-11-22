@@ -576,7 +576,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
 /** One command in the activity strip: when, who, what, and how it went. */
 function activityLine(entry: z.infer<typeof ActivityEntry>): string {
   return `${new Date(entry.at).toLocaleTimeString(currentLanguage())} · ${
-    entry.actor.kind === 'user' ? 'you' : entry.actor.role
+    entry.actor.kind === 'user' ? t('you') : entry.actor.role
   } · ${entry.commandId} · ${entry.outcome}`;
 }
 
