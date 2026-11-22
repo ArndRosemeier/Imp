@@ -219,6 +219,11 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
       maxSteps: z.number().int().positive().max(50).default(20),
     }),
     output: AgentRunSchema,
+    estimate: async ({ runtime }, input) => {
+      const member = await readCrewMember(runtime.store, input.memberId);
+      if (member === undefined) return null;
+      return { kind: 'chat', model: member.model, maxUsd: member.budgetUsdPerRun };
+    },
     handler: async ({ actor, runtime }, input) => {
       const { store } = runtime;
       if (actor.kind === 'agent' && actor.id === input.memberId) {

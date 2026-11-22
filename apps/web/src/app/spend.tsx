@@ -1,0 +1,223 @@
+import { CoinsIcon, XIcon } from '@phosphor-icons/react';
+import { useRef, type ReactElement } from 'react';
+import { z } from 'zod';
+import { runCommand, useLive } from './context.js';
+
+const Kind = z.enum(['chat', 'image', 'speech', 'sound', 'music', 'video', 'transcription']);
+const Estimate = z.object({
+  usd: z.number().nullable(),
+  maxUsd: z.number().optional(),
+  basis: z.enum(['price list', 'your history', 'typical', 'budget', 'unknown']),
+  model: z.string().nullable(),
+  kind: Kind,
+});
+export type Estimate = z.infer<typeof Estimate>;
+const EstimateResult = z.object({ estimate: Estimate.nullable() });
+
+const Totals = z.object({ usd: z.number(), calls: z.number() });
+const Summary = z.object({
+  today: Totals,
+  project: Totals.extend({ projectId: z.string().nullable() }),
+  all: Totals,
+  estimatedUsd: z.number(),
+  byKind: z.array(z.object({ kind: Kind, usd: z.number(), calls: z.number() })),
+  latest: z.array(
+    z.object({
+      id: z.string(),
+      at: z.string(),
+      kind: Kind,
+      model: z.string(),
+      usd: z.number(),
+      estimated: z.boolean(),
+    }),
+  ),
+});
+
+const KIND_NAMES: Readonly<Record<z.infer<typeof Kind>, string>> = {
+  chat: 'Agents',
+  image: 'Pictures',
+  speech: 'Voices',
+  sound: 'Sound effects',
+  music: 'Music',
+  video: 'Video clips',
+  transcription: 'Transcripts',
+};
+
+/** Dollars as people read them: cents below a dollar keep two places, tiny amounts say so. */
+export function formatUsd(usd: number): string {
+  if (usd === 0) return '$0.00';
+  if (usd < 0.01) return '< $0.01';
+  return `$${usd.toFixed(2)}`;
+}
+
+/** The words for an estimate on a button: "≈ $0.20", "up to $0.50". Empty when nothing is known. */
+export function priceLabel(estimate: Estimate | null | undefined): string {
+  if (estimate === null || estimate === undefined) return '';
+  if (estimate.basis === 'budget' && estimate.maxUsd !== undefined) {
+    return `up to ${formatUsd(estimate.maxUsd)}`;
+  }
+  if (estimate.usd === null) return '';
+  return `≈ ${formatUsd(estimate.usd)}`;
+}
+
+const BASIS: Readonly<Record<Estimate['basis'], string>> = {
+  'price list': "from the model's price list",
+  'your history': 'from what this model cost you before',
+  typical: 'a rough typical price; it gets exact once this model has been used',
+  budget: "the agent's budget per run; a run usually costs less",
+  unknown: 'no price is known',
+};
+
+export function priceTitle(estimate: Estimate | null | undefined): string {
+  if (estimate === null || estimate === undefined) return '';
+  return `${priceLabel(estimate)}: ${BASIS[estimate.basis]}${estimate.model === null ? '' : ` (${estimate.model})`}.`;
+}
+
+/**
+ * What running a command would cost, worked out by the core before it runs.
+ * The open project is filled in, as the stages' own actions do.
+ */
+export function useEstimate(
+  command: string,
+  input: Readonly<Record<string, unknown>>,
+): Estimate | null {
+  const key = JSON.stringify(input);
+  const live = useLive(['settings/', 'spend/', `estimate:${command}:${key}`], async (imp) => {
+    const current = z
+      .object({ value: z.json() })
+      .parse(await runCommand(imp, 'settings.get', { key: 'project.current' })).value;
+    const full = typeof current === 'string' ? { projectId: current, ...input } : input;
+    return EstimateResult.parse(
+      await runCommand(imp, 'spend.estimate', { commandId: command, input: full }),
+    ).estimate;
+  });
+  return live.data ?? null;
+}
+
+/** The expected price inside a button that spends, such as "Generate clip ≈ $0.20". */
+export function Price({
+  command,
+  input,
+}: {
+  command: string;
+  input: Readonly<Record<string, unknown>>;
+}): ReactElement | null {
+  const estimate = useEstimate(command, input);
+  const label = priceLabel(estimate);
+  if (label === '') return null;
+  return (
+    <span className="price" title={priceTitle(estimate)} data-basis={estimate?.basis}>
+      {label}
+    </span>
+  );
+}
+
+/** The running total in the top bar, and the breakdown it opens. */
+export function SpendTotal(): ReactElement | null {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const summary = useLive(['spend/', 'settings/project.current'], async (imp) =>
+    Summary.parse(await runCommand(imp, 'spend.summary', { latest: 12 })),
+  );
+  const data = summary.data;
+  if (data === undefined) return null;
+  const shown = data.project.projectId === null ? data.all : data.project;
+  return (
+    <>
+      <button
+        className="button quiet spend-total"
+        aria-haspopup="dialog"
+        aria-label={`Spent ${formatUsd(shown.usd)}${data.project.projectId === null ? ' in all' : ' on this project'}. Show what was spent`}
+        title="What has been spent at OpenRouter"
+        onClick={() => dialog.current?.showModal()}
+      >
+        <CoinsIcon aria-hidden="true" size={18} />
+        <span className="spend-amount">{formatUsd(shown.usd)}</span>
+      </button>
+      {/* A tap on the dimmed backdrop closes the panel, as Escape does; a tablet has no Escape key. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
+      <dialog
+        ref={dialog}
+        className="modal spend-dialog"
+        aria-labelledby="spend-title"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) dialog.current?.close();
+        }}
+      >
+        <header className="spend-head">
+          <div className="stack">
+            <span className="eyebrow">Spending</span>
+            <h2 id="spend-title">What Imp has spent</h2>
+          </div>
+          <button
+            className="button quiet icon"
+            aria-label="Close"
+            onClick={() => dialog.current?.close()}
+          >
+            <XIcon aria-hidden="true" size={18} />
+          </button>
+        </header>
+        <div className="spend-body stack">
+          <dl className="spend-totals">
+            <div>
+              <dt>This project</dt>
+              <dd>{formatUsd(data.project.usd)}</dd>
+            </div>
+            <div>
+              <dt>Today</dt>
+              <dd>{formatUsd(data.today.usd)}</dd>
+            </div>
+            <div>
+              <dt>In all</dt>
+              <dd>{formatUsd(data.all.usd)}</dd>
+            </div>
+          </dl>
+          {data.byKind.length > 0 && (
+            <section className="stack spend-kinds" aria-label="By kind">
+              {data.byKind.map((kind) => (
+                <div key={kind.kind} className="spend-kind">
+                  <span>{KIND_NAMES[kind.kind]}</span>
+                  <span
+                    className="spend-bar"
+                    aria-hidden="true"
+                    style={{ width: `${String(Math.max(2, (kind.usd / data.all.usd) * 100))}%` }}
+                  />
+                  <span className="mono">
+                    {formatUsd(kind.usd)} · {kind.calls}
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
+          {data.latest.length > 0 ? (
+            <section className="stack" aria-labelledby="spend-latest">
+              <h3 id="spend-latest" className="eyebrow">
+                Latest
+              </h3>
+              <ol className="spend-latest">
+                {data.latest.map((entry) => (
+                  <li key={entry.id}>
+                    <span className="muted">{new Date(entry.at).toLocaleTimeString()}</span>
+                    <span>{KIND_NAMES[entry.kind]}</span>
+                    <span className="mono muted spend-model">{entry.model}</span>
+                    <span className="mono">
+                      {entry.estimated ? '≈ ' : ''}
+                      {formatUsd(entry.usd)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : (
+            <p className="muted">Nothing has been spent yet.</p>
+          )}
+          <p className="muted small">
+            Imp itself is free; this is what OpenRouter charges your key. Amounts marked ≈ were not
+            reported by the model and are estimates
+            {data.estimatedUsd > 0 ? ` (${formatUsd(data.estimatedUsd)} in all)` : ''}. Your
+            OpenRouter account has the exact bill.
+          </p>
+        </div>
+      </dialog>
+    </>
+  );
+}

@@ -5,6 +5,9 @@ import {
   createModelCommands,
   createModelMixCommands,
   createSavedCrewCommands,
+  createSpendCommands,
+  createSpendLedger,
+  withSpendLedger,
   releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
@@ -124,13 +127,16 @@ export function createImp(options: ImpOptions): Imp {
     now: () => new Date(),
     newId: () => crypto.randomUUID(),
   };
-  const provider =
+  // Every paid call goes through here and is written down, whichever command made it.
+  const provider = withSpendLedger(
     options.provider ??
-    createOpenRouterProvider({
-      fetch: browserFetch,
-      appName: 'Imp',
-      apiKey: () => options.secrets.getKey() ?? '',
-    });
+      createOpenRouterProvider({
+        fetch: browserFetch,
+        appName: 'Imp',
+        apiKey: () => options.secrets.getKey() ?? '',
+      }),
+    createSpendLedger(runtime),
+  );
   // Adding a working mode to the app is adding it to this list.
   const codec = createDefaultAudioCodec(
     options.mp4Audio === undefined ? {} : { mp4: options.mp4Audio },
@@ -195,6 +201,7 @@ export function createImp(options: ImpOptions): Imp {
       { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
     ]),
     ...createAgentCommands({ registry, provider, roles }),
+    ...createSpendCommands({ registry, provider }),
   );
   let started: Promise<void> | undefined;
   return {

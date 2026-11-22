@@ -4,6 +4,7 @@ import type { Cut, Line } from './cut-player.js';
 import { EditableField } from './Field.js';
 import type { Act } from './movie.js';
 import { NumberField } from './NumberField.js';
+import { Price } from './spend.js';
 
 /** A piece must be at least this wide to be grabbed with a finger. */
 const MIN_BLOCK_PX = 22;
@@ -202,6 +203,7 @@ export function LineInspector({
           title="Speaks the line in the voice of the character. Costs a cent or less."
         >
           <MicrophoneIcon aria-hidden="true" /> {line.recorded ? 'Record again' : 'Record'}
+          <Price command="movie.edit.line.record" input={{ sceneId, lineId: line.id }} />
         </button>
         <button
           className="button quiet"

@@ -24,6 +24,7 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
+import { Price } from './spend.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
@@ -330,6 +331,7 @@ function KeyFrames({
           title={imageModel === null ? 'Choose an image model first.' : `Painted by ${imageModel}`}
         >
           <SparkleIcon aria-hidden="true" /> {shot.frames.length === 0 ? 'Paint frame' : 'Another'}
+          <Price command="movie.shot.frame.generate" input={at} />
         </button>
       </form>
       {chosen !== undefined && (
@@ -469,6 +471,7 @@ function Dialogue({
         >
           <MicrophoneIcon aria-hidden="true" />{' '}
           {take === null ? 'Record dialogue' : 'Record dialogue again'}
+          <Price command="movie.shot.dialogue.generate" input={at} />
         </button>
         {take !== null && (
           <ConfirmButton
@@ -678,6 +681,7 @@ function ShotCard({
         >
           <FilmStripIcon aria-hidden="true" />{' '}
           {shot.clip === null ? 'Generate clip' : 'Generate again'}
+          <Price command="movie.shot.clip.generate" input={at} />
         </button>
         {shot.clip !== null && !pending && (
           <ConfirmButton

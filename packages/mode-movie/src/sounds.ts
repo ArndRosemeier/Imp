@@ -5,6 +5,7 @@ import {
   type Command,
   type KeyValueStore,
   patchOf,
+  chosenModel,
 } from '@imp/core';
 import { ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
@@ -160,6 +161,18 @@ export function createSoundCommands(provider: GenerationProvider): readonly Comm
         ),
     }),
     output: z.object({ sound: Sound, costUsd: z.number().nullable() }),
+    estimate: async ({ runtime }, { model: chosen, ...at }) => {
+      const { sound } = await loadSound(runtime.store, 'movie.sound.generate', at);
+      const music = sound.kind === 'music';
+      return {
+        kind: music ? 'music' : 'sound',
+        model: await chosenModel(
+          runtime.store,
+          music ? MUSIC_MODEL_SETTING : EFFECT_MODEL_SETTING,
+          chosen,
+        ),
+      };
+    },
     handler: async ({ runtime }, { model: chosen, ...at }) => {
       const id = 'movie.sound.generate';
       const { key, sound } = await loadSound(runtime.store, id, at);

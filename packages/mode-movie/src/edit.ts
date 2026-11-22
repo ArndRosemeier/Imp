@@ -7,6 +7,7 @@ import {
   type CoreRuntime,
   type KeyValueStore,
   patchOf,
+  chosenModel,
 } from '@imp/core';
 import { mp3DurationSeconds, ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
@@ -1640,6 +1641,20 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
         .describe('A speech model from models.list. Defaults to the setting speech.model.'),
     }),
     output: LineView,
+    estimate: async ({ runtime, actor }, { projectId, sceneId, lineId, model: chosen }) => {
+      const { cut } = await openCut(
+        { runtime, actor },
+        'movie.edit.line.record',
+        projectId,
+        sceneId,
+      );
+      const text = cut.lines.find((line) => line.id === lineId)?.text ?? '';
+      return {
+        kind: 'speech',
+        model: await chosenModel(runtime.store, SPEECH_MODEL_SETTING, chosen),
+        characters: text.trim().length,
+      };
+    },
     handler: async ({ runtime, actor }, { projectId, sceneId, lineId, model: chosen }) => {
       const id = 'movie.edit.line.record';
       const { cut } = await openCut({ runtime, actor }, id, projectId, sceneId);

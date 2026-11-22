@@ -1,4 +1,4 @@
-import { CommandError, defineCommand, requireProject, type Command } from '@imp/core';
+import { CommandError, defineCommand, requireProject, type Command, chosenModel } from '@imp/core';
 import { ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
 import { characterPrefix } from './commands.js';
@@ -70,6 +70,11 @@ export function createCharacterVoiceCommands(provider: GenerationProvider): read
         ),
     }),
     output: z.object({ voiceSample: VoiceSample, costUsd: z.number().nullable() }),
+    estimate: async ({ runtime }, input) => ({
+      kind: 'speech',
+      model: await chosenModel(runtime.store, SPEECH_MODEL_SETTING, input.model),
+      characters: input.line?.length ?? 40,
+    }),
     handler: async ({ runtime }, input) => {
       const id = 'movie.character.voice.generate';
       const { key, character } = await load(runtime.store, id, input.projectId, input.characterId);

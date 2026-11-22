@@ -15,6 +15,7 @@ import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { RichText } from './RichText.js';
 import { servedByLocalServer } from '../host/served.js';
+import { Price } from './spend.js';
 
 const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
   'step-limit': 'Stopped at the step limit.',
@@ -70,8 +71,13 @@ function ApprovalRequest({
   };
   return (
     <>
-      <div>
-        <strong>{title}</strong> <span className="mono muted">{commandId}</span>
+      <div className="row spread wrap">
+        <span>
+          <strong>{title}</strong> <span className="mono muted">{commandId}</span>
+        </span>
+        {typeof input === 'object' && input !== null && !Array.isArray(input) && (
+          <Price command={commandId} input={input as Record<string, unknown>} />
+        )}
       </div>
       <dl className="request">
         {fields.map(([key, value]) => (

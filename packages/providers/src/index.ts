@@ -25,6 +25,8 @@ export {
   type MediaInput,
   type ModelInfo,
   type VideoAbilities,
+  type VideoPrice,
+  type VideoPricing,
   type VideoJob,
   type VideoRequest,
   type SoundRequest,
@@ -43,3 +45,4 @@ export {
   fitResolution,
   type VideoModelNotes,
 } from './video-models.js';
+export { parseVideoPricing } from './openrouter/video-pricing.js';

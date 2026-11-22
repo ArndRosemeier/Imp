@@ -65,7 +65,8 @@ Agents ask before they spend money or delete something: an approval card appears
     id: 'costs',
     area: 'workspace',
     title: 'What things cost',
-    summary: 'Where money is spent, how prices are shown, and how to keep costs low.',
+    summary:
+      'Where money is spent, prices before you press, the running total, and keeping costs low.',
     body: `Imp is free. Generation is paid to **OpenRouter** with your own key, at OpenRouter's prices. Nothing is charged by Imp itself.
 
 ## Rough prices with the starter models
@@ -78,8 +79,9 @@ Agents ask before they spend money or delete something: an approval card appears
 
 ## Before and after
 
-- Agents ask for approval before they spend, and stop at their budget per run.
-- The Edit stage shows what the film has cost so far.
+- Every button that spends money shows the expected price on it, for example **Generate clip ≈ $0.20**. A video price comes from the model's own price list; other prices come from what the same model cost you before. A dashed price is a rough typical one, used until the model has been tried once.
+- Agents ask for approval before they spend; the approval card shows the price too. An agent stops at its budget per run.
+- The **total** in the top bar shows what this project has cost. Open it for today, all projects, a breakdown by kind and the latest calls. Asking an agent "what has this cost so far?" works too.
 
 ## Keeping costs low
 
