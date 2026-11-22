@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import type { ImpClient } from '@imp/host';
 import { ImpContext, messageOf, runCommand } from './context.js';
 import { OrientationNotice } from './OrientationNotice.js';
+import { UpdateNotice } from './UpdateNotice.js';
 import { Setup } from './Setup.js';
 import { Shell } from './Shell.js';
 
@@ -15,7 +16,14 @@ async function isSetUp(imp: ImpClient): Promise<boolean> {
   return coordinator.value !== null;
 }
 
-export function App({ imp }: { imp: ImpClient }): ReactElement {
+export function App({
+  imp,
+  published,
+}: {
+  imp: ImpClient;
+  /** This build's version when it is a published one, so Imp can say when a newer one is out. */
+  published?: string;
+}): ReactElement {
   const [stage, setStage] = useState<Stage>('loading');
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +53,7 @@ export function App({ imp }: { imp: ImpClient }): ReactElement {
   return (
     <ImpContext value={imp}>
       <OrientationNotice />
+      {published !== undefined && <UpdateNotice running={published} />}
       {stage === 'setup' && (
         <Setup
           onDone={() => {
