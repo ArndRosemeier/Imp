@@ -8,6 +8,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app/App.js';
 import { fieldsOf, toInput } from '../src/app/CommandPalette.js';
 import { agentModels } from '../src/app/Setup.js';
+import { starterMixes } from '../src/app/onboarding/presets.js';
 import { unseenVersions } from '../src/app/WhatsNew.js';
 import { connectImp, createImp, createLocalPorts, serveImp, type Imp } from '@imp/host';
 import { createLocalSecretStore } from '../src/host/secrets.js';
@@ -207,6 +208,77 @@ describe('App', () => {
     // The setup itself went through commands, so it shows in the activity strip.
     const strip = screen.getByRole('contentinfo', { name: 'Activity' });
     expect(await within(strip).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+  });
+
+  it('starts with a model mix and no tips, for someone who knows their way around', async () => {
+    const provider = createFakeProvider({
+      models: [
+        model('~anthropic/claude-haiku-latest'),
+        model('~anthropic/claude-sonnet-latest'),
+        model('meta/muse-image', { outputModalities: ['image'], supportsTools: false }),
+        model('bytedance-seed/seed-audio-1-0', {
+          outputModalities: ['speech'],
+          supportsTools: false,
+        }),
+        model('google/veo-3.1-lite', {
+          outputModalities: ['video'],
+          supportsTools: false,
+          video: {
+            durationsSeconds: [4, 6, 8],
+            resolutions: ['720p'],
+            aspectRatios: ['16:9'],
+            frameImages: [],
+            nativeAudio: true,
+            pricing: { perSecond: [{ resolution: '720p', audio: true, usd: 0.05 }], perToken: [] },
+          },
+        }),
+      ],
+    });
+    const imp = createImp({
+      store: new MemoryKeyValueStore(),
+      secrets: createLocalSecretStore(),
+      provider,
+    });
+    render(<App imp={connect(imp)} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('OpenRouter API key'), 'sk-test');
+    await user.click(screen.getByRole('button', { name: /Continue/ }));
+
+    const balanced = await screen.findByRole('radio', { name: /Balanced/ });
+    // The clip price on the card comes from the video model's price list.
+    expect(balanced.closest('label')?.textContent).toContain('≈ $0.20');
+    await user.click(balanced);
+    await user.click(screen.getByRole('radio', { name: /I know my way around/ }));
+    await user.click(screen.getByRole('button', { name: /Start with Balanced/ }));
+    await screen.findByRole('heading', { name: 'Projects' });
+
+    expect(await imp.store.get('settings/coordinator.model')).toBe(
+      '~anthropic/claude-sonnet-latest',
+    );
+    expect(await imp.store.get('settings/video.model')).toBe('google/veo-3.1-lite');
+    expect(await imp.store.get('settings/speech.model')).toBe('bytedance-seed/seed-audio-1-0');
+    expect(await imp.store.get('settings/help.enabled')).toBe(false);
+    // All three mixes are kept, so the final film is one switch away.
+    expect((await imp.store.list('model-mixes/')).length).toBe(3);
+  });
+
+  it('fills the starter mixes from the catalog, newest versions first', () => {
+    const mixes = starterMixes([
+      model('~anthropic/claude-haiku-latest'),
+      model('bytedance/seedance-2.0-mini', { outputModalities: ['video'] }),
+      model('bytedance/seedance-2.10-mini', { outputModalities: ['video'] }),
+      model('google/lyria-3-clip-preview', { outputModalities: ['audio'] }),
+      model('elevenlabs/scribe-v2', { outputModalities: ['transcription'] }),
+    ]);
+    expect(mixes[0]?.models).toMatchObject({
+      'coordinator.model': '~anthropic/claude-haiku-latest',
+      'video.model': 'bytedance/seedance-2.10-mini',
+      'music.model': 'google/lyria-3-clip-preview',
+      'transcription.model': 'elevenlabs/scribe-v2',
+    });
+    // Nothing is guessed: a slot the catalog cannot fill is left out.
+    expect(mixes[0]?.models['images.model']).toBeUndefined();
+    expect(mixes[2]?.models['coordinator.model']).toBeUndefined();
   });
 
   it('does not accept a model that is not in the catalog', async () => {
