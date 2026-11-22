@@ -14,6 +14,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:slow": "pnpm --filter @imp/web test:browser",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage"
   },
   "devDependencies": {
