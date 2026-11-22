@@ -3,6 +3,7 @@ import {
   fromToolName,
   isInScope,
   toToolDefinitions,
+  toToolName,
   type Actor,
   type BlobStore,
   type CommandRegistry,
@@ -282,7 +283,13 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       const given = call.arguments as { query?: unknown; id?: unknown; input?: unknown } | null;
       const text = (value: unknown): string => (typeof value === 'string' ? value : '');
       if (call.name === FIND_TOOL) {
-        return { content: JSON.stringify(findCommands(hidden, text(given?.query))) };
+        return {
+          content: JSON.stringify(
+            findCommands(inScope, text(given?.query), (command) =>
+              isDirect(command, role.direct) ? toToolName(command.id) : undefined,
+            ),
+          ),
+        };
       }
       return run(text(given?.id), given?.input ?? {});
     }

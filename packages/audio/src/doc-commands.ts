@@ -640,7 +640,7 @@ export function createAudioDocCommands(options: AudioDocCommandOptions): readonl
 
   const regionInsert = defineCommand({
     id: 'audio.region.insert',
-    title: 'Place sound',
+    title: 'Place sound on audio track',
     description:
       'Places a stored sound (by its blob key) on a track at a time. By default the whole sound plays from its start; trimStartSeconds skips into it and durationSeconds shortens it. It may overlap other regions; overlaps mix.',
     effect: 'write',
