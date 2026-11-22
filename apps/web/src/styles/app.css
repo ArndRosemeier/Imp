@@ -172,13 +172,25 @@ textarea.input {
   gap: var(--space-5);
 }
 .wordmark {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
   font-family: var(--font-display);
   font-size: 28px;
   color: var(--accent);
   line-height: 1;
 }
+.imp-mark {
+  flex: none;
+  /* The glyph's baseline sits a little above its tail; this lines it up with the word. */
+  margin-bottom: -2px;
+}
 .setup-panel .wordmark {
   font-size: 40px;
+}
+.setup-panel .imp-mark {
+  height: 44px;
+  width: 22px;
 }
 .steps {
   display: flex;
