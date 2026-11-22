@@ -40,3 +40,15 @@ show what the exported film shows.
 
 - A server-side renderer must draw texts the same way; it does not exist yet.
 - One subtitle language for now; a language field on texts can come later.
+
+## Addendum (2026-11-22): styled words
+
+Words carry a small markup (`packages/mode-movie/src/text-markup.ts`):
+`*italic*`, `**bold**`, `_underline_` (the marks Fountain screenplays use),
+and `{#rrggbb small big|…}` spans. It stays plain text, so agents and people
+write it alike and nothing in storage changes. The drawer lays out runs of
+one look and draws them on one baseline; weights a family does not have are
+thickened by the drawer itself (`FAMILY_WEIGHTS`), never by the browser, so
+the local server's rasterizer draws the same letters. Generated subtitles and
+credits escape the words they take from elsewhere (`escapeMarkup`); subtitle
+files turn the marks into `<i>`, `<b>`, `<u>` and (SubRip) `<font color>`.

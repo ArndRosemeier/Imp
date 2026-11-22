@@ -283,7 +283,7 @@ describe('subtitle files', () => {
   });
   it('writes WebVTT', () => {
     expect(toVtt(cues)).toBe(
-      'WEBVTT\n\n00:00:01.500 --> 00:00:03.000\nHold the light!\n\n01:01:01.004 --> 01:01:02.000\nA → B\n',
+      'WEBVTT\n\n00:00:01.500 --> 00:00:03.000\nHold the light!\n\n01:01:01.004 --> 01:01:02.000\nA --&gt; B\n',
     );
   });
   it('encodes text as UTF-8', () => {
@@ -463,7 +463,9 @@ describe('the text lane', () => {
     const read = await run('movie.edit.get', { projectId, sceneId: other.id });
     const card = read.items.at(-1);
     expect(card).toMatchObject({ itemId: first.itemId, kind: 'title', text: '' });
-    expect(first.text.text).toBe('Keeper\n\nCast\nMara\nJon\n\nMade with Imp');
+    expect(first.text.text).toBe(
+      '{big|Keeper}\n\n{small|CAST}\nMara\nJon\n\n{small|Made with Imp}',
+    );
     expect(first.text).toMatchObject({
       kind: 'credits',
       startSeconds: 4,
@@ -491,7 +493,7 @@ describe('the text lane', () => {
       { type: 'put', key: 'crew/sd', value: { name: 'Sound Designer', roleId: 'sound-designer' } },
     ]);
     const made = await run('movie.edit.credits.generate', { projectId });
-    expect(made.text.text).toContain('Crew\nFilm Editor · Edith\nSound Designer\n');
+    expect(made.text.text).toContain('{small|CREW}\n{small|Film Editor}\nEdith\nSound Designer\n');
     expect(made.text.text).not.toContain('Coordinator');
   });
 

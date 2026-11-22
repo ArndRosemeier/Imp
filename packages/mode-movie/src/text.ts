@@ -41,6 +41,7 @@ import {
   toVtt,
   type TimedCue,
 } from './text-layout.js';
+import { escapeMarkup } from './text-markup.js';
 
 /**
  * The text lane: titles, lower thirds, subtitles, captions and credits over
@@ -96,6 +97,10 @@ const AnchorInput = z
   );
 
 const Words = z.string().min(1).max(4000);
+
+/** How the words of a text are written, for agents. */
+const MARKUP_HELP =
+  'A new line breaks the line. Words can be styled apart from the rest: *italic*, **bold**, ***bold italic***, _underlined_, {#ffd166|a colour}, {small|smaller} or {big|bigger} (tags combine: {#ffd166 big|…}). A backslash keeps a mark as it is (\\*). Subtitles use italic for voices off screen, songs and emphasis.';
 
 const PlaceFields = {
   x: z
@@ -187,13 +192,16 @@ async function credits(runtime: CoreRuntime, projectId: string, title: string): 
     // The coordinator runs the crew; it is not one of the people who made the film.
     return parsed.success && parsed.data.roleId !== 'coordinator' ? [parsed.data] : [];
   });
-  const blocks: string[] = [title];
+  // Headings and roles are set small over the names, as end credits are.
+  const blocks: string[] = [`{big|${escapeMarkup(title)}}`];
   if (characters.length > 0) {
     blocks.push(
       [
-        'Cast',
+        '{small|CAST}',
         ...characters.map((character) =>
-          character.voiceOnly ? `${character.name} (voice)` : character.name,
+          character.voiceOnly
+            ? `${escapeMarkup(character.name)} {small|(voice)}`
+            : escapeMarkup(character.name),
         ),
       ].join('\n'),
     );
@@ -201,15 +209,17 @@ async function credits(runtime: CoreRuntime, projectId: string, title: string): 
   if (crew.length > 0) {
     blocks.push(
       [
-        'Crew',
+        '{small|CREW}',
         ...crew.map((member) => {
           const role = roleName(member.roleId);
-          return member.name === role ? role : `${role} · ${member.name}`;
+          return member.name === role
+            ? escapeMarkup(role)
+            : `{small|${escapeMarkup(role)}}\n${escapeMarkup(member.name)}`;
         }),
       ].join('\n'),
     );
   }
-  blocks.push('Made with Imp');
+  blocks.push('{small|Made with Imp}');
   return blocks.join('\n\n');
 }
 
@@ -224,7 +234,7 @@ export function createTextCommands(): readonly Command[] {
       projectId: ProjectId,
       sceneId: SceneId,
       kind: TextKind,
-      text: Words.describe('The words. A new line breaks the line.'),
+      text: Words.describe(`The words. ${MARKUP_HELP}`),
       startSeconds: z
         .number()
         .min(0)
@@ -280,7 +290,7 @@ export function createTextCommands(): readonly Command[] {
       projectId: ProjectId,
       sceneId: SceneId,
       textId: TextId,
-      text: Words.optional(),
+      text: Words.optional().describe(`The words. ${MARKUP_HELP}`),
       kind: TextKind.optional(),
       styleId: z.string().optional(),
       startSeconds: z.number().min(0).max(36000).optional(),
@@ -494,8 +504,8 @@ export function createTextCommands(): readonly Command[] {
               kind: 'subtitle',
               text:
                 names && line.who !== 'Someone'
-                  ? `${line.who.toUpperCase()}: ${cue.text}`
-                  : cue.text,
+                  ? `${escapeMarkup(line.who.toUpperCase())}: ${escapeMarkup(cue.text)}`
+                  : escapeMarkup(cue.text),
               startSeconds:
                 Math.round((line.startsAtSeconds + line.durationSeconds * cue.from) * 1000) / 1000,
               durationSeconds: Math.max(0.2, line.durationSeconds * (cue.to - cue.from)),
