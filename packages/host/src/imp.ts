@@ -36,6 +36,7 @@ import {
   createReleaseCommands,
   readProject,
   settingsCommands,
+  languageCommands,
   type BlobStore,
   type CoreRuntime,
   type KeyValueStore,
@@ -58,6 +59,7 @@ import {
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
 import { workspaceGuides } from './guide.js';
+import { guideTranslations } from './guide-translations.js';
 import type { SecretStore } from './secrets.js';
 import { createFfmpegCommands, type FfmpegService } from './ffmpeg-commands.js';
 
@@ -179,6 +181,7 @@ export function createImp(options: ImpOptions): Imp {
   });
   registry.register(
     ...settingsCommands,
+    ...languageCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
     ...createSupportCommands({
       release: options.release ?? UNKNOWN_RELEASE,
@@ -186,10 +189,13 @@ export function createImp(options: ImpOptions): Imp {
     }),
     ...activityCommands,
     // The guide: Imp's pages about itself, and the stages' pages from each mode.
-    ...createHelpCommands([
-      ...workspaceGuides,
-      ...modes.flatMap((mode) => mode.stages.flatMap((stage) => stage.guide ?? [])),
-    ]),
+    ...createHelpCommands(
+      [
+        ...workspaceGuides,
+        ...modes.flatMap((mode) => mode.stages.flatMap((stage) => stage.guide ?? [])),
+      ],
+      guideTranslations(modes),
+    ),
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createLibraryCommands([

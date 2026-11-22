@@ -5,6 +5,8 @@ import { OrientationNotice } from './OrientationNotice.js';
 import { UpdateNotice } from './UpdateNotice.js';
 import { Setup } from './Setup.js';
 import { Shell } from './Shell.js';
+import { FollowLanguage } from '../i18n/LanguagePicker.js';
+import { t } from '../i18n/i18n.js';
 
 type Stage = 'loading' | 'setup' | 'ready';
 
@@ -45,29 +47,37 @@ export function App({
     return (
       <main className="setup">
         <p className="error" role="alert">
-          Imp could not start: {error}
+          {t('Imp could not start: {error}', { error })}
         </p>
       </main>
     );
   }
   return (
     <ImpContext value={imp}>
-      <OrientationNotice />
-      {published !== undefined && <UpdateNotice running={published} />}
-      {stage === 'setup' && (
-        <Setup
-          onDone={() => {
-            setStage('ready');
-          }}
-        />
-      )}
-      {stage === 'ready' && (
-        <Shell
-          onForgetKey={() => {
-            imp.secrets.clearKey();
-            setStage('setup');
-          }}
-        />
+      {stage === 'loading' ? (
+        <OrientationNotice />
+      ) : (
+        <FollowLanguage>
+          <>
+            <OrientationNotice />
+            {published !== undefined && <UpdateNotice running={published} />}
+            {stage === 'setup' && (
+              <Setup
+                onDone={() => {
+                  setStage('ready');
+                }}
+              />
+            )}
+            {stage === 'ready' && (
+              <Shell
+                onForgetKey={() => {
+                  imp.secrets.clearKey();
+                  setStage('setup');
+                }}
+              />
+            )}
+          </>
+        </FollowLanguage>
       )}
     </ImpContext>
   );

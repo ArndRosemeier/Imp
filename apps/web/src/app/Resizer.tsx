@@ -1,4 +1,5 @@
 import { useState, type PointerEvent, type ReactElement } from 'react';
+import { t } from '../i18n/i18n.js';
 
 export interface PanelWidth {
   readonly value: number;
@@ -86,7 +87,7 @@ export function Resizer({
       data-side={side}
       data-panel={panel}
       data-dragging={drag !== null}
-      title="Drag to resize. Double click to reset."
+      title={t('Drag to resize. Double click to reset.')}
       onPointerDown={(event) => {
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);

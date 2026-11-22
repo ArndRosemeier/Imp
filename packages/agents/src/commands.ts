@@ -3,6 +3,7 @@ import {
   defineCommand,
   isInScope,
   listProjects,
+  readLanguage,
   readProject,
   type AutoApproval,
   type WriteOperation,
@@ -504,6 +505,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           member,
           role,
           blobs: runtime.blobs,
+          language: await readLanguage(store),
           onCommand: (id) => {
             if (OPENS_PROJECT.has(id)) opened = true;
           },

@@ -1,6 +1,7 @@
 import type { Actor } from '@imp/core';
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ImpClient } from '@imp/host';
+import { t } from '../i18n/i18n.js';
 
 export const USER: Actor = { kind: 'user', id: 'local' };
 
@@ -9,7 +10,7 @@ export const ImpContext = createContext<ImpClient | null>(null);
 export function useImp(): ImpClient {
   const imp = useContext(ImpContext);
   if (imp === null) {
-    throw new Error('useImp must be used inside ImpContext.');
+    throw new Error(t('useImp must be used inside ImpContext.'));
   }
   return imp;
 }
@@ -21,7 +22,7 @@ export function useImp(): ImpClient {
 export async function runCommand(imp: ImpClient, id: string, input: unknown): Promise<unknown> {
   const result = await imp.run(id, input);
   if (result.status !== 'ok') {
-    throw new Error(`"${id}" was not run: ${result.status}`);
+    throw new Error(t('"{id}" was not run: {status}', { id, status: result.status }));
   }
   return result.output;
 }

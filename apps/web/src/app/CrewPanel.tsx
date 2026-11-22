@@ -38,12 +38,20 @@ import {
 } from './Approvals.js';
 import { ImpSpinner } from './ImpMark.js';
 import { RichText } from './RichText.js';
+import { formatUsd } from './spend.js';
 import { servedByLocalServer } from '../host/served.js';
+import { t, tx } from '../i18n/i18n.js';
 
 const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
-  'step-limit': 'Stopped at the step limit.',
-  'budget-exhausted': 'Stopped because the budget for one run is used up.',
-  cancelled: 'The last run was interrupted, for example because the tab was closed or reloaded.',
+  get 'step-limit'(): string {
+    return t('Stopped at the step limit.');
+  },
+  get 'budget-exhausted'(): string {
+    return t('Stopped because the budget for one run is used up.');
+  },
+  get cancelled(): string {
+    return t('The last run was interrupted, for example because the tab was closed or reloaded.');
+  },
 };
 
 /** Runs that stopped part way, which Continue picks up where they left off. */
@@ -67,7 +75,7 @@ function actionOf(call: { name: string; arguments?: unknown }): string {
     const id = (call.arguments as { id?: unknown } | null)?.id;
     return typeof id === 'string' ? id : 'run_command';
   }
-  return call.name === 'find_commands' ? 'looked up commands' : fromToolName(call.name);
+  return call.name === 'find_commands' ? t('looked up commands') : fromToolName(call.name);
 }
 
 /**
@@ -270,15 +278,21 @@ export function CrewPanel({
       : 0;
 
   return (
-    <aside className="crew-panel" aria-label={`Conversation with ${member.name}`} hidden={hidden}>
+    <aside
+      className="crew-panel"
+      aria-label={t('Conversation with {name}', { name: tx(member.name) })}
+      hidden={hidden}
+    >
       <div className="crew-head stack">
         <div className="row spread">
-          <h2>{member.name}</h2>
+          <h2>{tx(member.name)}</h2>
           <span
             className="mono muted"
-            title={`Spent in this conversation. ${String(cached)}% of what was sent came from cache.`}
+            title={t('Spent in this conversation. {cached}% of what was sent came from cache.', {
+              cached: String(cached),
+            })}
           >
-            ${(conversation?.costUsd ?? 0).toFixed(4)}
+            {formatUsd(conversation?.costUsd ?? 0, 4)}
           </span>
         </div>
         <div className="row spread">
@@ -290,23 +304,27 @@ export function CrewPanel({
               disabled={working}
               title={
                 liveProject === null
-                  ? 'Forget this chat. Chats in projects are kept.'
-                  : 'Forget this chat in this project. Chats in other projects are kept.'
+                  ? t('Forget this chat. Chats in projects are kept.')
+                  : t('Forget this chat in this project. Chats in other projects are kept.')
               }
               onClick={() => {
                 setClearing(true);
               }}
             >
-              <BroomIcon aria-hidden="true" /> Clear chat
+              <BroomIcon aria-hidden="true" /> {t('Clear chat')}
             </button>
           )}
         </div>
         {clearing && (
-          <div className="row clear-chat" role="group" aria-label="Clear this chat?">
+          <div className="row clear-chat" role="group" aria-label={t('Clear this chat?')}>
             <span className="muted">
               {liveProject === null
-                ? `Forget everything said with ${member.name} outside projects?`
-                : `Forget everything said with ${member.name} in this project?`}
+                ? t('Forget everything said with {name} outside projects?', {
+                    name: tx(member.name),
+                  })
+                : t('Forget everything said with {name} in this project?', {
+                    name: tx(member.name),
+                  })}
             </span>
             <button
               type="button"
@@ -321,7 +339,7 @@ export function CrewPanel({
                 );
               }}
             >
-              Clear
+              {t('Clear')}
             </button>
             <button
               type="button"
@@ -330,7 +348,7 @@ export function CrewPanel({
                 setClearing(false);
               }}
             >
-              Keep
+              {t('Keep')}
             </button>
           </div>
         )}
@@ -342,8 +360,10 @@ export function CrewPanel({
             document.getElementById(inputId)?.focus();
           }) ?? (
             <p className="muted">
-              Tell {member.name} what you want to make or set up. It acts through the same commands
-              you have, and asks before spending or deleting.
+              {t(
+                'Tell {name} what you want to make or set up. It acts through the same commands you have, and asks before spending or deleting.',
+                { name: tx(member.name) },
+              )}
             </p>
           ))}
         {messages.map((message, index) => {
@@ -381,26 +401,28 @@ export function CrewPanel({
         })}
         {working && (
           <p className="muted crew-working" role="status">
-            <ImpSpinner /> {member.name} is on it
+            <ImpSpinner /> {t('{name} is on it', { name: tx(member.name) })}
             {inTab && (
               <span className="small">
                 {' '}
-                · Keep this tab open while {member.name} works. Closing or reloading it stops the
-                run, and you can continue it afterwards.
+                {t(
+                  '· Keep this tab open while {name} works. Closing or reloading it stops the run, and you can continue it afterwards.',
+                  { name: tx(member.name) },
+                )}
               </span>
             )}
           </p>
         )}
         {!working &&
           approvals.map((approval) => (
-            <section key={approval.id} className="approval" aria-label="Needs your approval">
-              <span className="eyebrow">Needs your approval</span>
+            <section key={approval.id} className="approval" aria-label={t('Needs your approval')}>
+              <span className="eyebrow">{t('Needs your approval')}</span>
               <ApprovalRequest
                 commandId={approval.commandId}
-                title={
+                title={tx(
                   imp.commands.find((command) => command.id === approval.commandId)?.title ??
-                  approval.commandId
-                }
+                    approval.commandId,
+                )}
                 input={approval.input}
               />
               <div className="row">
@@ -410,7 +432,7 @@ export function CrewPanel({
                     settle(approval.id, true);
                   }}
                 >
-                  <CheckIcon aria-hidden="true" /> Approve
+                  <CheckIcon aria-hidden="true" /> {t('Approve')}
                 </button>
                 <button
                   className="button"
@@ -418,14 +440,14 @@ export function CrewPanel({
                     settle(approval.id, false);
                   }}
                 >
-                  <XIcon aria-hidden="true" /> Decline
+                  <XIcon aria-hidden="true" /> {t('Decline')}
                 </button>
               </div>
             </section>
           ))}
         {report !== null && (
-          <section className="approval" aria-label="Problem report">
-            <span className="eyebrow">Problem report ready</span>
+          <section className="approval" aria-label={t('Problem report')}>
+            <span className="eyebrow">{t('Problem report ready')}</span>
             <p>{report.title}</p>
             <div className="row">
               <a
@@ -435,10 +457,10 @@ export function CrewPanel({
                 rel="noreferrer"
                 onClick={dismissReport}
               >
-                <BugIcon aria-hidden="true" /> Check and submit on GitHub
+                <BugIcon aria-hidden="true" /> {t('Check and submit on GitHub')}
               </a>
               <button className="button" onClick={dismissReport}>
-                <XIcon aria-hidden="true" /> Dismiss
+                <XIcon aria-hidden="true" /> {t('Dismiss')}
               </button>
             </div>
           </section>
@@ -456,7 +478,8 @@ export function CrewPanel({
               ask();
             }}
           >
-            <PlayIcon aria-hidden="true" /> Continue where {member.name} stopped
+            <PlayIcon aria-hidden="true" />{' '}
+            {t('Continue where {name} stopped', { name: tx(member.name) })}
           </button>
         )}
         <div ref={end} />
@@ -470,13 +493,15 @@ export function CrewPanel({
         >
           <StampIcon aria-hidden="true" size={20} />
           <span className="stack">
-            <strong>Review all {everyone.length} requests at once</strong>
+            <strong>{t('Review all {count} requests at once', { count: everyone.length })}</strong>
             <span className="muted small">
               {elsewhere > 0 && approvals.length === 0
-                ? `Other crew members are waiting on you.`
+                ? t('Other crew members are waiting on you.')
                 : elsewhere > 0
-                  ? `${String(elsewhere)} of them from other crew members.`
-                  : 'Approve or decline them together.'}
+                  ? t('{elsewhere} of them from other crew members.', {
+                      elsewhere: String(elsewhere),
+                    })
+                  : t('Approve or decline them together.')}
             </span>
           </span>
         </button>
@@ -486,12 +511,12 @@ export function CrewPanel({
           <div className="attached">
             <PaperclipIcon aria-hidden="true" />
             <span>
-              About <strong>{attachment.label}</strong>
+              {t('About')} <strong>{attachment.label}</strong>
             </span>
             <button
               type="button"
               className="button quiet icon"
-              aria-label="Do not attach the marked stretch"
+              aria-label={t('Do not attach the marked stretch')}
               onClick={() => {
                 setAttachment(null);
               }}
@@ -501,7 +526,7 @@ export function CrewPanel({
           </div>
         )}
         <label className="sr-only" htmlFor={inputId}>
-          Message to {member.name}
+          {t('Message to {name}', { name: tx(member.name) })}
         </label>
         <textarea
           id={inputId}
@@ -509,10 +534,10 @@ export function CrewPanel({
           rows={3}
           placeholder={
             approvals.length > 0
-              ? 'Decide on the request above first'
+              ? t('Decide on the request above first')
               : attachment !== null
-                ? `What should ${member.name} do with this stretch?`
-                : `Ask ${member.name}`
+                ? t('What should {name} do with this stretch?', { name: tx(member.name) })
+                : t('Ask {name}', { name: tx(member.name) })
           }
           value={draft}
           onChange={(event) => {
@@ -529,7 +554,7 @@ export function CrewPanel({
           className="button primary"
           disabled={working || approvals.length > 0 || draft.trim() === ''}
         >
-          Send <PaperPlaneRightIcon aria-hidden="true" />
+          {t('Send')} <PaperPlaneRightIcon aria-hidden="true" />
         </button>
       </form>
     </aside>

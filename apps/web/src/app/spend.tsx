@@ -3,6 +3,8 @@ import { useRef, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useImp, useLive } from './context.js';
 import { NumberField } from './NumberField.js';
+import { currentLanguage, formatNumber, t } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 const Kind = z.enum(['chat', 'image', 'speech', 'sound', 'music', 'video', 'transcription']);
 const Estimate = z.object({
@@ -55,11 +57,11 @@ function AllowanceFields(): ReactElement | null {
   return (
     <section className="stack spend-allowance" aria-labelledby="spend-allowance">
       <h3 id="spend-allowance" className="eyebrow">
-        Budget without approval
+        {t('Budget without approval')}
       </h3>
       <div className="row">
         <NumberField
-          label="Per project, $"
+          label={t('Per project, $')}
           value={data.project}
           step={0.5}
           max={1000}
@@ -68,7 +70,7 @@ function AllowanceFields(): ReactElement | null {
           }}
         />
         <NumberField
-          label="Most per step, $ (0: no limit)"
+          label={t('Most per step, $ (0: no limit)')}
           value={data.step}
           step={0.05}
           max={100}
@@ -78,51 +80,90 @@ function AllowanceFields(): ReactElement | null {
         />
       </div>
       <p className="spend-left">
-        <strong>{formatUsd(data.projectLeftUsd)}</strong> left of {formatUsd(data.project)}
-        <span className="muted"> · {formatUsd(data.projectSpentUsd)} spent here</span>
+        <Marked
+          text={t('**{left}** left of {project}', {
+            left: formatUsd(data.projectLeftUsd),
+            project: formatUsd(data.project),
+          })}
+        />
+        <span className="muted">
+          {' '}
+          {t('· {spent} spent here', { spent: formatUsd(data.projectSpentUsd) })}
+        </span>
       </p>
       <p className="muted small">
-        Agents spend without asking until this budget is used up; then every paid step asks again.
-        Steps whose price is unknown still ask, and so does anything that deletes. Set the budget to
-        0 to approve every paid step yourself.
+        {t(
+          'Agents spend without asking until this budget is used up; then every paid step asks again. Steps whose price is unknown still ask, and so does anything that deletes. Set the budget to 0 to approve every paid step yourself.',
+        )}
       </p>
     </section>
   );
 }
 
 const KIND_NAMES: Readonly<Record<z.infer<typeof Kind>, string>> = {
-  chat: 'Agents',
-  image: 'Pictures',
-  speech: 'Voices',
-  sound: 'Sound effects',
-  music: 'Music',
-  video: 'Video clips',
-  transcription: 'Transcripts',
+  get chat(): string {
+    return t('Agents');
+  },
+  get image(): string {
+    return t('Pictures');
+  },
+  get speech(): string {
+    return t('Voices');
+  },
+  get sound(): string {
+    return t('Sound effects');
+  },
+  get music(): string {
+    return t('Music');
+  },
+  get video(): string {
+    return t('Video clips');
+  },
+  get transcription(): string {
+    return t('Transcripts');
+  },
 };
 
 /** Dollars as people read them: cents below a dollar keep two places, tiny amounts say so. */
-export function formatUsd(usd: number): string {
-  if (usd === 0) return '$0.00';
-  if (usd < 0.01) return '< $0.01';
-  return `$${usd.toFixed(2)}`;
+export function formatUsd(usd: number, digits = 2): string {
+  // US dollars, written the way the interface's language writes money: $0.25, or 0,25 $ in German.
+  const money = (value: number): string =>
+    formatNumber(value, {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+  if (usd > 0 && usd < 0.01) return `< ${money(0.01)}`;
+  return money(usd);
 }
 
 /** The words for an estimate on a button: "≈ $0.20", "up to $0.50". Empty when nothing is known. */
 export function priceLabel(estimate: Estimate | null | undefined): string {
   if (estimate === null || estimate === undefined) return '';
   if (estimate.basis === 'budget' && estimate.maxUsd !== undefined) {
-    return `up to ${formatUsd(estimate.maxUsd)}`;
+    return t('up to {maxUsd}', { maxUsd: formatUsd(estimate.maxUsd) });
   }
   if (estimate.usd === null) return '';
   return `≈ ${formatUsd(estimate.usd)}`;
 }
 
 const BASIS: Readonly<Record<Estimate['basis'], string>> = {
-  'price list': "from the model's price list",
-  'your history': 'from what this model cost you before',
-  typical: 'a rough typical price; it gets exact once this model has been used',
-  budget: "the agent's budget per run; a run usually costs less",
-  unknown: 'no price is known',
+  get 'price list'(): string {
+    return t("from the model's price list");
+  },
+  get 'your history'(): string {
+    return t('from what this model cost you before');
+  },
+  get typical(): string {
+    return t('a rough typical price; it gets exact once this model has been used');
+  },
+  get budget(): string {
+    return t("the agent's budget per run; a run usually costs less");
+  },
+  get unknown(): string {
+    return t('no price is known');
+  },
 };
 
 export function priceTitle(estimate: Estimate | null | undefined): string {
@@ -183,8 +224,12 @@ export function SpendTotal(): ReactElement | null {
       <button
         className="button quiet spend-total"
         aria-haspopup="dialog"
-        aria-label={`Spent ${formatUsd(shown.usd)}${data.project.projectId === null ? ' in all' : ' on this project'}. Show what was spent`}
-        title="What has been spent at OpenRouter"
+        aria-label={
+          data.project.projectId === null
+            ? t('Spent {usd} in all. Show what was spent', { usd: formatUsd(shown.usd) })
+            : t('Spent {usd} on this project. Show what was spent', { usd: formatUsd(shown.usd) })
+        }
+        title={t('What has been spent at OpenRouter')}
         onClick={() => dialog.current?.showModal()}
       >
         <CoinsIcon aria-hidden="true" size={18} />
@@ -202,12 +247,12 @@ export function SpendTotal(): ReactElement | null {
       >
         <header className="spend-head">
           <div className="stack">
-            <span className="eyebrow">Spending</span>
-            <h2 id="spend-title">What Imp has spent</h2>
+            <span className="eyebrow">{t('Spending')}</span>
+            <h2 id="spend-title">{t('What Imp has spent')}</h2>
           </div>
           <button
             className="button quiet icon"
-            aria-label="Close"
+            aria-label={t('Close')}
             onClick={() => dialog.current?.close()}
           >
             <XIcon aria-hidden="true" size={18} />
@@ -216,20 +261,20 @@ export function SpendTotal(): ReactElement | null {
         <div className="spend-body stack">
           <dl className="spend-totals">
             <div>
-              <dt>This project</dt>
+              <dt>{t('This project')}</dt>
               <dd>{formatUsd(data.project.usd)}</dd>
             </div>
             <div>
-              <dt>Today</dt>
+              <dt>{t('Today')}</dt>
               <dd>{formatUsd(data.today.usd)}</dd>
             </div>
             <div>
-              <dt>In all</dt>
+              <dt>{t('In all')}</dt>
               <dd>{formatUsd(data.all.usd)}</dd>
             </div>
           </dl>
           {data.byKind.length > 0 && (
-            <section className="stack spend-kinds" aria-label="By kind">
+            <section className="stack spend-kinds" aria-label={t('By kind')}>
               {data.byKind.map((kind) => (
                 <div key={kind.kind} className="spend-kind">
                   <span>{KIND_NAMES[kind.kind]}</span>
@@ -248,12 +293,14 @@ export function SpendTotal(): ReactElement | null {
           {data.latest.length > 0 ? (
             <section className="stack" aria-labelledby="spend-latest">
               <h3 id="spend-latest" className="eyebrow">
-                Latest
+                {t('Latest')}
               </h3>
               <ol className="spend-latest">
                 {data.latest.map((entry) => (
                   <li key={entry.id}>
-                    <span className="muted">{new Date(entry.at).toLocaleTimeString()}</span>
+                    <span className="muted">
+                      {new Date(entry.at).toLocaleTimeString(currentLanguage())}
+                    </span>
                     <span>{KIND_NAMES[entry.kind]}</span>
                     <span className="mono muted spend-model">{entry.model}</span>
                     <span className="mono">
@@ -265,14 +312,18 @@ export function SpendTotal(): ReactElement | null {
               </ol>
             </section>
           ) : (
-            <p className="muted">Nothing has been spent yet.</p>
+            <p className="muted">{t('Nothing has been spent yet.')}</p>
           )}
           <AllowanceFields />
           <p className="muted small">
-            Imp itself is free; this is what OpenRouter charges your key. Amounts marked ≈ were not
-            reported by the model and are estimates
-            {data.estimatedUsd > 0 ? ` (${formatUsd(data.estimatedUsd)} in all)` : ''}. Your
-            OpenRouter account has the exact bill.
+            {data.estimatedUsd > 0
+              ? t(
+                  'Imp itself is free; this is what OpenRouter charges your key. Amounts marked ≈ were not reported by the model and are estimates ({estimatedUsd} in all). Your OpenRouter account has the exact bill.',
+                  { estimatedUsd: formatUsd(data.estimatedUsd) },
+                )
+              : t(
+                  'Imp itself is free; this is what OpenRouter charges your key. Amounts marked ≈ were not reported by the model and are estimates. Your OpenRouter account has the exact bill.',
+                )}
           </p>
         </div>
       </dialog>

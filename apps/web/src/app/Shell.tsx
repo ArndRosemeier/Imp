@@ -41,12 +41,31 @@ import { LibraryDragProvider } from './library/drag.js';
 import { LibraryPanel } from './library/LibraryPanel.js';
 import { SpendTotal } from './spend.js';
 import { STAGE_ICONS } from './stage-icons.js';
+import { t, tx } from '../i18n/i18n.js';
 import { StageWorkers, TALK_TO, WorkIndicator, WorkProvider } from './work.js';
 
 const WORKSPACE: readonly { id: string; label: string; icon: Icon }[] = [
-  { id: 'projects', label: 'Projects', icon: SquaresFourIcon },
-  { id: 'crew', label: 'Crew', icon: UsersThreeIcon },
-  { id: 'settings', label: 'Settings', icon: GearSixIcon },
+  {
+    id: 'projects',
+    get label(): string {
+      return t('Projects');
+    },
+    icon: SquaresFourIcon,
+  },
+  {
+    id: 'crew',
+    get label(): string {
+      return t('Crew');
+    },
+    icon: UsersThreeIcon,
+  },
+  {
+    id: 'settings',
+    get label(): string {
+      return t('Settings');
+    },
+    icon: GearSixIcon,
+  },
 ];
 /** The setting that says which project is open. Agents can read and change it too. */
 const CURRENT_PROJECT = 'project.current';
@@ -251,14 +270,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     };
   }, []);
 
-  const viewLabel =
-    [...WORKSPACE, ...stages.map((stage) => ({ id: stage.id, label: stage.name }))].find(
-      (candidate) => candidate.id === view,
-    )?.label ?? 'Projects';
+  // For agents, which read English: where the person is, by the stage's English name or the view's id.
+  const viewLabel = stages.find((stage) => stage.id === view)?.name ?? view;
   const context =
     project === null
-      ? `No project is open. A new one is made with project.create and opened with project.open; the setting "${CURRENT_PROJECT}" holds the id of the open project.`
-      : `Open project: "${project.name}" (projectId "${project.id}", mode ${project.mode}). The user is looking at: ${viewLabel}.`;
+      ? // i18n-ignore
+        `No project is open. A new one is made with project.create and opened with project.open; the setting "${CURRENT_PROJECT}" holds the id of the open project.`
+      : // i18n-ignore
+        `Open project: "${project.name}" (projectId "${project.id}", mode ${project.mode}). The user is looking at: ${viewLabel}.`;
 
   const isStage = stages.some((stage) => stage.id === view);
   const startMovie = (
@@ -286,14 +305,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           }
         >
           <header className="topbar">
-            <div className="wordmark" title={`Imp: ${aliasOfTheVisit}`}>
+            <div className="wordmark" title={t('Imp: {alias}', { alias: aliasOfTheVisit() })}>
               <ImpMark />
               Imp
             </div>
             {projects.length > 0 && (
               <div className="row project-switch">
                 <label className="sr-only" htmlFor="project-select">
-                  Project
+                  {t('Project')}
                 </label>
                 <select
                   id="project-select"
@@ -311,8 +330,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                 </select>
                 <button
                   className="button quiet"
-                  aria-label="New project"
-                  title="New project"
+                  aria-label={t('New project')}
+                  title={t('New project')}
                   onClick={() => {
                     setView('projects');
                     setCreating(true);
@@ -330,20 +349,20 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             >
               <span className="row">
                 <MagnifyingGlassIcon aria-hidden="true" />{' '}
-                <span className="label">Run a command</span>
+                <span className="label">{t('Run a command')}</span>
               </span>
-              <kbd>Ctrl K</kbd>
+              <kbd>{t('Ctrl K')}</kbd>
             </button>
             {project !== null && (
               <button
                 className="button quiet library-toggle"
-                aria-label="Library"
+                aria-label={t('Library')}
                 aria-pressed={showLibrary}
                 aria-controls="library-panel"
                 title={
                   showLibrary
-                    ? 'Hide the library (Ctrl Shift L)'
-                    : 'Show the library (Ctrl Shift L)'
+                    ? t('Hide the library (Ctrl Shift L)')
+                    : t('Show the library (Ctrl Shift L)')
                 }
                 onClick={() => {
                   if (view === 'projects') {
@@ -355,18 +374,20 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                   }
                 }}
               >
-                <BooksIcon aria-hidden="true" size={18} /> <span className="label">Library</span>
+                <BooksIcon aria-hidden="true" size={18} />{' '}
+                <span className="label">{t('Library')}</span>
               </button>
             )}
             <button
               className="button quiet crew-toggle"
-              aria-label="Crew panel"
+              aria-label={t('Crew panel')}
               aria-pressed={crewOpen}
               aria-controls="crew-panel"
-              title={crewOpen ? 'Hide the crew panel' : 'Show the crew panel'}
+              title={crewOpen ? t('Hide the crew panel') : t('Show the crew panel')}
               onClick={switchCrew}
             >
-              <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
+              <ChatsCircleIcon aria-hidden="true" size={18} />{' '}
+              <span className="label">{t('Crew')}</span>
             </button>
             <WorkIndicator />
             <SpendTotal />
@@ -374,14 +395,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             <WhatsNew />
             <button
               className="button quiet"
-              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')}
               onClick={toggleTheme}
             >
               {theme === 'dark' ? <SunIcon aria-hidden="true" /> : <MoonIcon aria-hidden="true" />}
             </button>
           </header>
-          <nav className="nav" aria-label="Workspace">
-            <div className="eyebrow">{mode?.name ?? 'Project'}</div>
+          <nav className="nav" aria-label={t('Workspace')}>
+            <div className="eyebrow">{mode === undefined ? t('Project') : tx(mode.name)}</div>
             {stages.map((stage) => {
               const StageIcon = STAGE_ICONS[stage.id] ?? FilmSlateIcon;
               return (
@@ -394,12 +415,12 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                   }}
                 >
                   <StageIcon aria-hidden="true" size={18} />
-                  <span>{stage.name}</span>
+                  <span>{tx(stage.name)}</span>
                   <StageWorkers stage={stage.id} />
                 </button>
               );
             })}
-            <div className="eyebrow">Workspace</div>
+            <div className="eyebrow">{t('Workspace')}</div>
             {WORKSPACE.map(({ id, label, icon: IconComponent }) => (
               <button
                 key={id}
@@ -438,7 +459,9 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                 <>
                   <FirstFilm
                     stage={view}
-                    stageNames={Object.fromEntries(stages.map((stage) => [stage.id, stage.name]))}
+                    stageNames={Object.fromEntries(
+                      stages.map((stage) => [stage.id, tx(stage.name)]),
+                    )}
                   />
                   <StageTip key={view} stage={view} />
                   <StageView stage={view} project={project} />
@@ -461,18 +484,28 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             </div>
           )}
           {showLibrary && !libraryWide && (
-            <Resizer label="Resize the library" side="right" panel="library" width={libraryWidth} />
+            <Resizer
+              label={t('Resize the library')}
+              side="right"
+              panel="library"
+              width={libraryWidth}
+            />
           )}
           <ActivityStrip />
           <BackupWatcher />
-          <Resizer label="Resize the navigation" side="left" width={navWidth} />
+          <Resizer label={t('Resize the navigation')} side="left" width={navWidth} />
           {crewOpen && (
-            <Resizer label="Resize the crew panel" side="right" panel="crew" width={crewWidth} />
+            <Resizer
+              label={t('Resize the crew panel')}
+              side="right"
+              panel="crew"
+              width={crewWidth}
+            />
           )}
           <div className="crew" id="crew-panel">
             {crew.length > 1 && (
               <div className="field crew-switch">
-                <label htmlFor="talking-to">Talking to</label>
+                <label htmlFor="talking-to">{t('Talking to')}</label>
                 <select
                   id="talking-to"
                   className="select"
@@ -501,7 +534,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             {crew.length === 0 && (
               <div className="crew-head">
                 <p className="muted">
-                  {state.error ?? 'Nobody is on the crew. Hire someone from the Crew view.'}
+                  {state.error ?? t('Nobody is on the crew. Hire someone from the Crew view.')}
                 </p>
               </div>
             )}

@@ -10,6 +10,7 @@ import { useId, useState, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp } from '../context.js';
 import { ConfirmButton } from '../Field.js';
 import { useModelMixes, type ModelMixes } from '../model-bar.js';
+import { t, tx } from '../../i18n/i18n.js';
 
 type Mix = ModelMixes['mixes'][number];
 type Slot = ModelMixes['slots'][number];
@@ -58,7 +59,7 @@ function MixCard({
           }}
         >
           <label className="sr-only" htmlFor={nameId}>
-            Name
+            {t('Name')}
           </label>
           <input
             id={nameId}
@@ -71,8 +72,8 @@ function MixCard({
           />
           <textarea
             className="input"
-            aria-label="Notes"
-            placeholder="What this mix is for, such as cheap drafts"
+            aria-label={t('Notes')}
+            placeholder={t('What this mix is for, such as cheap drafts')}
             rows={2}
             value={notes}
             onChange={(event) => {
@@ -81,7 +82,7 @@ function MixCard({
           />
           <div className="row">
             <button type="submit" className="button small" disabled={name.trim() === ''}>
-              Save
+              {t('Save')}
             </button>
             <button
               type="button"
@@ -92,7 +93,7 @@ function MixCard({
                 setNotes(mix.notes);
               }}
             >
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
         </form>
@@ -103,7 +104,9 @@ function MixCard({
             <h3>
               {mix.name}
               {active && (
-                <span className="mix-card-badge">{changed ? 'in use, changed' : 'in use'}</span>
+                <span className="mix-card-badge">
+                  {changed ? t('in use, changed') : t('in use')}
+                </span>
               )}
             </h3>
             {mix.notes !== '' && <p className="muted small">{mix.notes}</p>}
@@ -111,8 +114,8 @@ function MixCard({
           <button
             type="button"
             className="button quiet small"
-            aria-label={`Rename ${mix.name}`}
-            title="Rename"
+            aria-label={t('Rename {name}', { name: mix.name })}
+            title={t('Rename')}
             onClick={() => {
               setEditing(true);
             }}
@@ -121,14 +124,14 @@ function MixCard({
           </button>
         </div>
       )}
-      <ul className="crew-card-members" aria-label={`Models in ${mix.name}`}>
+      <ul className="crew-card-members" aria-label={t('Models in {name}', { name: mix.name })}>
         {slots
           .filter((slot) => mix.models[slot.setting] !== undefined)
           .map((slot) => {
             const model = mix.models[slot.setting] ?? '';
             return (
               <li key={slot.setting} title={model}>
-                <span className="crew-card-name">{slot.label}</span>
+                <span className="crew-card-name">{tx(slot.label)}</span>
                 <span className="muted">{shortModel(model)}</span>
               </li>
             );
@@ -139,23 +142,23 @@ function MixCard({
           type="button"
           className="button small"
           disabled={active && !changed}
-          aria-label={`Use ${mix.name}`}
+          aria-label={t('Use {name}', { name: mix.name })}
           onClick={() => {
             run('models.mix.apply', { id: mix.id }, () => {
-              onStatus(`Using ${mix.name}.`);
+              onStatus(t('Using {name}.', { name: mix.name }));
             });
           }}
         >
-          <CheckIcon aria-hidden="true" /> {active && changed ? 'Use again' : 'Use'}
+          <CheckIcon aria-hidden="true" /> {active && changed ? t('Use again') : t('Use')}
         </button>
         <button
           type="button"
           className="button quiet small"
-          title="Save the models in use under this name instead"
-          aria-label={`Update ${mix.name} with the models in use`}
+          title={t('Save the models in use under this name instead')}
+          aria-label={t('Update {name} with the models in use', { name: mix.name })}
           onClick={() => {
             run('models.mix.save', { id: mix.id }, () => {
-              onStatus(`${mix.name} now holds the models in use.`);
+              onStatus(t('{name} now holds the models in use.', { name: mix.name }));
             });
           }}
         >
@@ -163,11 +166,11 @@ function MixCard({
         </button>
         <ConfirmButton
           label=""
-          ariaLabel={`Delete ${mix.name}`}
-          question={`Delete “${mix.name}”? The models in use stay.`}
+          ariaLabel={t('Delete {name}', { name: mix.name })}
+          question={t('Delete “{name}”? The models in use stay.', { name: mix.name })}
           onConfirm={() => {
             run('models.mix.delete', { id: mix.id }, () => {
-              onStatus(`Deleted ${mix.name}.`);
+              onStatus(t('Deleted {name}.', { name: mix.name }));
             });
           }}
         >
@@ -212,7 +215,7 @@ export function MixShelf({
           event.preventDefault();
           runCommand(imp, 'models.mix.save', { name: name.trim() }).then(
             () => {
-              onStatus(`Saved the models as ${name.trim()}.`);
+              onStatus(t('Saved the models as {value}.', { value: name.trim() }));
               setName('');
             },
             (reason: unknown) => {
@@ -222,14 +225,15 @@ export function MixShelf({
         }}
       >
         <label htmlFor={nameId} className="eyebrow">
-          Save the models in use
-          {data !== undefined && ` (${String(chosen)} of ${String(data.slots.length)} chosen)`}
+          {t('Save the models in use')}
+          {data !== undefined &&
+            ` ${t('({chosen} of {total} chosen)', { chosen, total: data.slots.length })}`}
         </label>
         <div className="row">
           <input
             id={nameId}
             className="input"
-            placeholder="Name, for example Cheap drafts"
+            placeholder={t('Name, for example Cheap drafts')}
             value={name}
             onChange={(event) => {
               setName(event.target.value);
@@ -240,7 +244,7 @@ export function MixShelf({
             className="button small"
             disabled={name.trim() === '' || chosen === 0}
           >
-            <FloppyDiskIcon aria-hidden="true" /> Save
+            <FloppyDiskIcon aria-hidden="true" /> {t('Save')}
           </button>
         </div>
       </form>
@@ -250,12 +254,14 @@ export function MixShelf({
           <SlidersHorizontalIcon aria-hidden="true" size={36} weight="light" />
           <p>
             {words === ''
-              ? 'No model mixes yet. Save the models in use under a name, such as a cheap mix for drafts and a better one for the final cut, and switch between them here or from the models chip on any stage.'
-              : 'No model mix matches.'}
+              ? t(
+                  'No model mixes yet. Save the models in use under a name, such as a cheap mix for drafts and a better one for the final cut, and switch between them here or from the models chip on any stage.',
+                )
+              : t('No model mix matches.')}
           </p>
         </div>
       )}
-      <ul className="crew-cards" aria-label="Model mixes">
+      <ul className="crew-cards" aria-label={t('Model mixes')}>
         {mixes.map((mix) => (
           <MixCard
             key={mix.id}

@@ -55,6 +55,35 @@ export interface ProjectTemplate {
   readonly build: (newId: () => string) => readonly { key: string; value: JsonValue }[];
 }
 
+/**
+ * Words for people that hold numbers, kept apart from the numbers so the
+ * interface can say them in its own language: the English `text` is the key
+ * of the translation, and `{placeholders}` are filled from `values`. The text
+ * already has the English plural that fits the number.
+ */
+export const PhrasePart = z.object({
+  text: z.string(),
+  values: z.record(z.string(), z.union([z.string(), z.number()])),
+});
+export type PhrasePart = z.infer<typeof PhrasePart>;
+
+/** One part of a phrase; `phrase('{count} scenes', { count })`. */
+export function phrase(text: string, values: PhrasePart['values'] = {}): PhrasePart {
+  return { text, values };
+}
+
+/** A phrase in English, its parts joined with commas. */
+export function phraseText(parts: readonly PhrasePart[]): string {
+  return parts
+    .map(({ text, values }) =>
+      text.replace(/\{(\w+)\}/g, (whole, name: string) => {
+        const value = values[name];
+        return value === undefined ? whole : String(value);
+      }),
+    )
+    .join(', ');
+}
+
 export const StageProgress = z.object({
   id: z.string(),
   name: z.string(),
@@ -62,6 +91,8 @@ export const StageProgress = z.object({
   total: z.number().int().min(0),
   /** One short line, for example "4 of 6 clips ready". */
   note: z.string(),
+  /** The same line in parts, for the interface to translate. */
+  phrase: z.array(PhrasePart).optional(),
 });
 export type StageProgress = z.infer<typeof StageProgress>;
 

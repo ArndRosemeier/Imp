@@ -1,5 +1,6 @@
 import { useId, useState, type ReactElement } from 'react';
 import { messageOf } from './context.js';
+import { t } from '../i18n/i18n.js';
 
 /**
  * A text field bound to stored data. It saves when the user leaves it, and
@@ -114,7 +115,7 @@ export function ConfirmButton({
           onConfirm();
         }}
       >
-        Delete
+        {t('Delete')}
       </button>
       <button
         type="button"
@@ -123,7 +124,7 @@ export function ConfirmButton({
           setAsking(false);
         }}
       >
-        Keep
+        {t('Keep')}
       </button>
     </span>
   );

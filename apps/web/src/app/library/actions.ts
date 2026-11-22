@@ -4,6 +4,7 @@ import { WaveformIcon, type Icon } from '@phosphor-icons/react';
 import { z } from 'zod';
 import { runCommand } from '../context.js';
 import { openWhereMade, type Asset } from './model.js';
+import { t } from '../../i18n/i18n.js';
 
 export interface ActionContext {
   readonly imp: ImpClient;
@@ -41,13 +42,15 @@ export const audioDocSetting = (projectId: string): string => `imp.audio.doc.${p
 
 registerLibraryAction({
   id: 'audio.open',
-  label: 'Open in audio editor',
+  get label(): string {
+    return t('Open in audio editor');
+  },
   icon: WaveformIcon,
   appliesTo: (asset) => asset.modality === 'sound' && asset.blobKey !== null,
   run: async (asset, { imp, project }) => {
     const output = await runCommand(imp, 'audio.doc.create', {
       projectId: project.id,
-      name: asset.title.slice(0, 120) || 'Untitled sound',
+      name: asset.title.slice(0, 120) || t('Untitled sound'),
       sources: [{ key: asset.blobKey, label: asset.title.slice(0, 120) }],
     });
     const docId = Created.parse(output).document.id;

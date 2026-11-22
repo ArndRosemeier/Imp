@@ -21,6 +21,7 @@ import { messageOf, runCommand, useImp, useLive, type Live } from './context.js'
 import { Problem } from './movie.js';
 import { ago, Modal } from './projects.js';
 import { canPickWhereToSave, saveFileAs } from './save-file.js';
+import { fixed, t, tn, tx } from '../i18n/i18n.js';
 
 /**
  * Save all and Load all: everything in Imp as one .zip file, and back. The
@@ -47,9 +48,9 @@ export function useBackupStatus(): Live<Status> {
 }
 
 export function sizeLabel(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  if (bytes >= 1024 ** 3) return t('{value} GB', { value: fixed(bytes / 1024 ** 3, 2) });
+  if (bytes >= 1024 ** 2) return t('{value} MB', { value: fixed(bytes / 1024 ** 2, 1) });
+  return t('{value} KB', { value: String(Math.max(1, Math.round(bytes / 1024))) });
 }
 
 /** Page preferences worth carrying: Imp's own, never anything that looks like a credential. */
@@ -96,7 +97,7 @@ function reloadAfterLoad(restored: { savedAt: string; projects: number }): void 
 async function* backupParts(imp: ImpClient, parts: readonly string[]): AsyncGenerator<Uint8Array> {
   for (const key of parts) {
     const part = await imp.blob(key, true);
-    if (part === undefined) throw new Error('Part of the backup is missing. Save all again.');
+    if (part === undefined) throw new Error(t('Part of the backup is missing. Save all again.'));
     yield part.bytes;
   }
 }
@@ -149,17 +150,17 @@ function useBackupActions() {
       {
         suggestedName: pending?.fileName ?? backupName(),
         mediaType: 'application/zip',
-        description: 'Imp backup',
+        description: t('Imp backup'),
       },
       async () => {
         let ready = pending;
         if (ready === null) {
-          setWork({ label: 'Packing everything' });
+          setWork({ label: t('Packing everything') });
           ready = BackupPending.parse(
             await runCommand(imp, 'backup.save', { interface: pagePreferences() }),
           );
         }
-        setWork({ label: `Writing ${sizeLabel(ready.sizeBytes)}` });
+        setWork({ label: t('Writing {sizeBytes}', { sizeBytes: sizeLabel(ready.sizeBytes) }) });
         return backupParts(imp, ready.parts);
       },
     );
@@ -168,8 +169,8 @@ function useBackupActions() {
     if (outcome.saved) {
       setDone(
         outcome.where === 'picked'
-          ? `Saved everything to ${outcome.name}.`
-          : `Saved everything to ${outcome.name} in your downloads.`,
+          ? t('Saved everything to {name}.', { name: outcome.name })
+          : t('Saved everything to {name} in your downloads.', { name: outcome.name }),
       );
     }
     return outcome.saved;
@@ -200,11 +201,11 @@ function useBackupActions() {
     discardPending: () => run(() => runCommand(imp, 'backup.discard', {})),
     loadAll: (file: File) =>
       run(async () => {
-        setWork({ label: 'Reading the file', done: 0, total: file.size });
+        setWork({ label: t('Reading the file'), done: 0, total: file.size });
         const fileKey = await imp.uploadFile(file, (sent) => {
-          setWork({ label: 'Reading the file', done: sent, total: file.size });
+          setWork({ label: t('Reading the file'), done: sent, total: file.size });
         });
-        setWork({ label: 'Checking the file' });
+        setWork({ label: t('Checking the file') });
         const loaded = z
           .object({
             savedAt: z.string(),
@@ -220,7 +221,8 @@ function useBackupActions() {
 
 function WorkLine({ work, progress }: { work: Work | null; progress: BackupProgress | null }) {
   // The core's progress is the more exact one while it packs or restores.
-  const label = progress?.phase ?? work?.label;
+  // The core names its phases in English, like every command; the catalog has their translations.
+  const label = progress === null ? work?.label : tx(progress.phase);
   if (label === undefined) return null;
   const done = progress?.doneBytes ?? work?.done;
   const total = progress?.totalBytes ?? work?.total;
@@ -237,22 +239,23 @@ function WorkLine({ work, progress }: { work: Work | null; progress: BackupProgr
         {label}
         {measured &&
           (counting
-            ? ` · ${String(done)} of ${String(total)} files`
-            : ` · ${sizeLabel(done)} of ${sizeLabel(total)}`)}
+            ? ` · ${t('{done} of {total} files', { done, total })}`
+            : ` · ${t('{done} of {total}', { done: sizeLabel(done), total: sizeLabel(total) })}`)}
         …
       </span>
     </div>
   );
 }
 
-const CONTENTS = [
-  'Projects, media and films',
-  'Library',
-  'Saved crews',
-  'Model mixes',
-  'Roles',
-  'Conversations',
-  'Settings and help choices',
+/** What Save all covers, as the panel lists it. */
+const contents = (): string[] => [
+  t('Projects, media and films'),
+  t('Library'),
+  t('Saved crews'),
+  t('Model mixes'),
+  t('Roles'),
+  t('Conversations'),
+  t('Settings and help choices'),
 ];
 
 /** Save all and Load all, with what they cover and how the last one went. */
@@ -271,17 +274,19 @@ export function BackupPanel(): ReactElement {
           <ArchiveIcon size={22} weight="duotone" />
         </span>
         <p className="muted">
-          One .zip file with everything in Imp, to keep as a backup or to move your work between
-          browsers, computers and the local server.
+          {t(
+            'One .zip file with everything in Imp, to keep as a backup or to move your work between browsers, computers and the local server.',
+          )}
         </p>
       </div>
-      <ul className="backup-contents" aria-label="What a backup holds">
-        {CONTENTS.map((item) => (
+      <ul className="backup-contents" aria-label={t('What a backup holds')}>
+        {contents().map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
       <p className="backup-key">
-        <LockKeyIcon aria-hidden="true" weight="fill" /> Your OpenRouter key is never in the file.
+        <LockKeyIcon aria-hidden="true" weight="fill" />{' '}
+        {t('Your OpenRouter key is never in the file.')}
       </p>
       <div className="row wrap backup-actions">
         <button
@@ -291,7 +296,7 @@ export function BackupPanel(): ReactElement {
             void actions.saveAll();
           }}
         >
-          <DownloadSimpleIcon aria-hidden="true" /> Save all
+          <DownloadSimpleIcon aria-hidden="true" /> {t('Save all')}
         </button>
         <button
           className="button"
@@ -300,14 +305,14 @@ export function BackupPanel(): ReactElement {
             picker.current?.click();
           }}
         >
-          <UploadSimpleIcon aria-hidden="true" /> Load all…
+          <UploadSimpleIcon aria-hidden="true" /> {t('Load all…')}
         </button>
         <input
           ref={picker}
           type="file"
           accept=".zip,application/zip"
           hidden
-          aria-label="Backup file to load"
+          aria-label={t('Backup file to load')}
           onChange={(event) => {
             const file = event.target.files?.[0];
             event.target.value = '';
@@ -316,8 +321,11 @@ export function BackupPanel(): ReactElement {
         />
         <span className="muted small">
           {lastSaved === null
-            ? 'Not saved yet.'
-            : `Last saved ${ago(lastSaved.savedAt)} · ${sizeLabel(lastSaved.sizeBytes)}`}
+            ? t('Not saved yet.')
+            : t('Last saved {savedAt} · {sizeBytes}', {
+                savedAt: ago(lastSaved.savedAt),
+                sizeBytes: sizeLabel(lastSaved.sizeBytes),
+              })}
         </span>
       </div>
       <WorkLine work={actions.work} progress={data?.progress ?? null} />
@@ -329,7 +337,7 @@ export function BackupPanel(): ReactElement {
       <Problem text={actions.error ?? status.error} />
       {!canPickWhereToSave() && (
         <p className="muted small">
-          This browser saves files to its downloads; Chrome and Edge on a computer ask where.
+          {t('This browser saves files to its downloads; Chrome and Edge on a computer ask where.')}
         </p>
       )}
       <ConfirmLoad
@@ -363,29 +371,29 @@ function ConfirmLoad({
   const [savedFor, setSavedFor] = useState<File | null>(null);
   const savedFirst = savedFor !== null && savedFor === file;
   return (
-    <Modal open={file !== null} onClose={onClose} label="Load all">
+    <Modal open={file !== null} onClose={onClose} label={t('Load all')}>
       <div className="modal-body stack">
-        <div className="eyebrow">Load all</div>
-        <h2>Replace everything with this backup?</h2>
+        <div className="eyebrow">{t('Load all')}</div>
+        <h2>{t('Replace everything with this backup?')}</h2>
         <p className="backup-file mono">
           {file?.name} · {sizeLabel(file?.size ?? 0)}
         </p>
         <p className="muted">
-          Imp will hold exactly what the file holds. Projects, library items, crews and settings
-          that are here now and not in the file will be gone. Your OpenRouter key stays as it is.
-          The file is checked in full first: if it is damaged, nothing changes.
+          {t(
+            'Imp will hold exactly what the file holds. Projects, library items, crews and settings that are here now and not in the file will be gone. Your OpenRouter key stays as it is. The file is checked in full first: if it is damaged, nothing changes.',
+          )}
         </p>
         <div className="backup-warning">
           <WarningIcon aria-hidden="true" weight="fill" />
           <span>
             {savedFirst
-              ? 'Your current work is saved. You can load the backup now.'
-              : 'Save all first if you may want your current work back.'}
+              ? t('Your current work is saved. You can load the backup now.')
+              : t('Save all first if you may want your current work back.')}
           </span>
         </div>
         <div className="row spread wrap">
           <button className="button quiet" onClick={onClose}>
-            Cancel
+            {t('Cancel')}
           </button>
           <div className="row wrap">
             <button
@@ -402,7 +410,8 @@ function ConfirmLoad({
                   });
               }}
             >
-              <DownloadSimpleIcon aria-hidden="true" /> {savingFirst ? 'Saving…' : 'Save all first'}
+              <DownloadSimpleIcon aria-hidden="true" />{' '}
+              {savingFirst ? t('Saving…') : t('Save all first')}
             </button>
             <button
               className="button danger"
@@ -411,7 +420,7 @@ function ConfirmLoad({
                 if (file !== null) onLoad(file);
               }}
             >
-              <UploadSimpleIcon aria-hidden="true" /> Replace everything
+              <UploadSimpleIcon aria-hidden="true" /> {t('Replace everything')}
             </button>
           </div>
         </div>
@@ -427,26 +436,26 @@ export function BackupButton(): ReactElement {
     <>
       <button
         className="button"
-        title="Save everything to one file, or load it back"
+        title={t('Save everything to one file, or load it back')}
         onClick={() => {
           setOpen(true);
         }}
       >
-        <ArchiveIcon aria-hidden="true" /> Save all / Load all
+        <ArchiveIcon aria-hidden="true" /> {t('Save all / Load all')}
       </button>
       <Modal
         open={open}
         onClose={() => {
           setOpen(false);
         }}
-        label="Save all and Load all"
+        label={t('Save all and Load all')}
       >
         <div className="modal-body stack">
           <div className="row spread">
-            <div className="eyebrow">Backup</div>
+            <div className="eyebrow">{t('Backup')}</div>
             <button
               className="icon-button"
-              aria-label="Close"
+              aria-label={t('Close')}
               onClick={() => {
                 setOpen(false);
               }}
@@ -454,7 +463,7 @@ export function BackupButton(): ReactElement {
               <XIcon aria-hidden="true" />
             </button>
           </div>
-          <h2>Save all and Load all</h2>
+          <h2>{t('Save all and Load all')}</h2>
           <BackupPanel />
         </div>
       </Modal>
@@ -477,7 +486,12 @@ export function BackupWatcher(): ReactElement | null {
       if (raw === null) return null;
       sessionStorage.removeItem(LOADED_NOTE);
       const loaded = z.object({ savedAt: z.string(), projects: z.number() }).parse(JSON.parse(raw));
-      return `Loaded everything from the backup saved ${ago(loaded.savedAt)}: ${String(loaded.projects)} ${loaded.projects === 1 ? 'project' : 'projects'}.`;
+      return tn(
+        loaded.projects,
+        'Loaded everything from the backup saved {savedAt}: {count} project.',
+        'Loaded everything from the backup saved {savedAt}: {count} projects.',
+        { savedAt: ago(loaded.savedAt) },
+      );
     } catch {
       return null;
     }
@@ -520,7 +534,9 @@ export function BackupWatcher(): ReactElement | null {
         <>
           <ArchiveIcon aria-hidden="true" size={20} weight="duotone" />
           <span>
-            Everything is packed into one file ({sizeLabel(pending.sizeBytes)}), ready to keep.
+            {t('Everything is packed into one file ({sizeBytes}), ready to keep.', {
+              sizeBytes: sizeLabel(pending.sizeBytes),
+            })}
           </span>
           <button
             className="button primary small"
@@ -528,7 +544,7 @@ export function BackupWatcher(): ReactElement | null {
               void actions.keepPending(pending);
             }}
           >
-            <DownloadSimpleIcon aria-hidden="true" /> Save…
+            <DownloadSimpleIcon aria-hidden="true" /> {t('Save…')}
           </button>
           <button
             className="button quiet small"
@@ -536,7 +552,7 @@ export function BackupWatcher(): ReactElement | null {
               void actions.discardPending();
             }}
           >
-            Discard
+            {t('Discard')}
           </button>
         </>
       ) : (
@@ -544,7 +560,7 @@ export function BackupWatcher(): ReactElement | null {
           <span>{actions.error ?? note}</span>
           <button
             className="icon-button"
-            aria-label="Dismiss"
+            aria-label={t('Dismiss')}
             onClick={() => {
               setNote(null);
             }}

@@ -5,6 +5,7 @@ import { drawLane, wrapLines, type LaneText } from '@imp/host/film';
 import { loadTextFonts } from '../host/text-fonts.js';
 import { runCommand } from './context.js';
 import { blobKeys, CutPlayer, HIDDEN, loadCut, type Look, type ScreenLook } from './cut-player.js';
+import { t } from '../i18n/i18n.js';
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -159,11 +160,11 @@ export async function recordScenes(
   signal: AbortSignal,
 ): Promise<Recording> {
   const format = recordingFormat();
-  if (format === null) throw new Error('This browser cannot record video.');
+  if (format === null) throw new Error(t('This browser cannot record video.'));
   const loaded = (
     await Promise.all(sceneIds.map(async (sceneId) => loadCut(imp, projectId, sceneId)))
   ).filter((scene) => scene.cut.totalSeconds > 0);
-  if (loaded.length === 0) throw new Error('There is nothing in the cut to export yet.');
+  if (loaded.length === 0) throw new Error(t('There is nothing in the cut to export yet.'));
   const totalSeconds = loaded.reduce((sum, scene) => sum + scene.cut.totalSeconds, 0);
 
   const made: string[] = [];
@@ -181,7 +182,7 @@ export async function recordScenes(
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const g = canvas.getContext('2d');
-  if (g === null) throw new Error('This browser cannot draw the picture for the video.');
+  if (g === null) throw new Error(t('This browser cannot draw the picture for the video.'));
   // Two screens and two voices, as in the preview, for pieces that dissolve or wipe into each other.
   const screen = (): HTMLVideoElement => {
     const element = document.createElement('video');
@@ -280,7 +281,7 @@ export async function recordScenes(
     await audio.close();
     for (const url of made) URL.revokeObjectURL(url);
   }
-  if (signal.aborted) throw new Error('Export cancelled.');
+  if (signal.aborted) throw new Error(t('Export cancelled.'));
   return {
     blob: new Blob(chunks, { type: format.mimeType.split(';')[0] ?? 'video/webm' }),
     extension: format.extension,

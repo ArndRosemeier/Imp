@@ -30,6 +30,9 @@ function lookup(role: Role) {
 const ASKS: readonly (readonly [string, string])[] = [
   ['save this as a named preproduction crew in the library', 'crew.saved.save'],
   ['save the crew', 'crew.saved.save'],
+  ['switch the interface to German', 'settings.language.set'],
+  ['Sprache auf Deutsch stellen', 'settings.language.set'],
+  ['which language is the app in', 'settings.language.get'],
   ['store crew preset', 'crew.saved.save'],
   ['load a saved crew', 'crew.saved.load'],
   ['which crews are in the library', 'crew.saved.list'],

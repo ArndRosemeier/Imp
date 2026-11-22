@@ -11,6 +11,7 @@ import { ArrowUpIcon, PlusIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { NumberInput } from './audio-controls.js';
+import { fixed, t } from '../i18n/i18n.js';
 
 type Edit = (id: string, input?: Record<string, unknown>) => Promise<unknown>;
 
@@ -26,25 +27,134 @@ const KINDS: readonly {
   hint: string;
   group: 'clean' | 'voice';
 }[] = [
-  { kind: 'denoise', name: 'Noise reduction', hint: 'Hiss, hum, room tone', group: 'clean' },
-  { kind: 'eq', name: 'EQ', hint: 'Tone: rumble, boxiness, clarity', group: 'clean' },
-  { kind: 'compressor', name: 'Compressor', hint: 'Evens out loud and quiet', group: 'clean' },
-  { kind: 'loudness', name: 'Loudness', hint: 'To a LUFS target', group: 'clean' },
-  { kind: 'limiter', name: 'Limiter', hint: 'Keeps peaks under a ceiling', group: 'clean' },
-  { kind: 'distortion', name: 'Distortion', hint: 'Overdrive, clipping, folding', group: 'voice' },
-  { kind: 'pitch', name: 'Pitch', hint: 'Higher or lower, same length', group: 'voice' },
-  { kind: 'ringmod', name: 'Ring modulator', hint: 'Robots and metal', group: 'voice' },
-  { kind: 'crush', name: 'Bit crusher', hint: 'Lo-fi grit', group: 'voice' },
+  {
+    kind: 'denoise',
+    get name(): string {
+      return t('Noise reduction');
+    },
+    get hint(): string {
+      return t('Hiss, hum, room tone');
+    },
+    group: 'clean',
+  },
+  {
+    kind: 'eq',
+    name: 'EQ',
+    get hint(): string {
+      return t('Tone: rumble, boxiness, clarity');
+    },
+    group: 'clean',
+  },
+  {
+    kind: 'compressor',
+    get name(): string {
+      return t('Compressor');
+    },
+    get hint(): string {
+      return t('Evens out loud and quiet');
+    },
+    group: 'clean',
+  },
+  {
+    kind: 'loudness',
+    get name(): string {
+      return t('Loudness');
+    },
+    get hint(): string {
+      return t('To a LUFS target');
+    },
+    group: 'clean',
+  },
+  {
+    kind: 'limiter',
+    get name(): string {
+      return t('Limiter');
+    },
+    get hint(): string {
+      return t('Keeps peaks under a ceiling');
+    },
+    group: 'clean',
+  },
+  {
+    kind: 'distortion',
+    get name(): string {
+      return t('Distortion');
+    },
+    get hint(): string {
+      return t('Overdrive, clipping, folding');
+    },
+    group: 'voice',
+  },
+  {
+    kind: 'pitch',
+    get name(): string {
+      return t('Pitch');
+    },
+    get hint(): string {
+      return t('Higher or lower, same length');
+    },
+    group: 'voice',
+  },
+  {
+    kind: 'ringmod',
+    get name(): string {
+      return t('Ring modulator');
+    },
+    get hint(): string {
+      return t('Robots and metal');
+    },
+    group: 'voice',
+  },
+  {
+    kind: 'crush',
+    get name(): string {
+      return t('Bit crusher');
+    },
+    get hint(): string {
+      return t('Lo-fi grit');
+    },
+    group: 'voice',
+  },
 ];
 
 /** The ready-made voices, in the order offered. */
 const VOICES: readonly { preset: VoicePreset; name: string }[] = [
-  { preset: 'telephone', name: 'Telephone' },
-  { preset: 'radio', name: 'Radio' },
-  { preset: 'megaphone', name: 'Megaphone' },
-  { preset: 'robot', name: 'Robot' },
-  { preset: 'monster', name: 'Monster' },
-  { preset: 'chipmunk', name: 'Chipmunk' },
+  {
+    preset: 'telephone',
+    get name(): string {
+      return t('Telephone');
+    },
+  },
+  {
+    preset: 'radio',
+    get name(): string {
+      return t('Radio');
+    },
+  },
+  {
+    preset: 'megaphone',
+    get name(): string {
+      return t('Megaphone');
+    },
+  },
+  {
+    preset: 'robot',
+    get name(): string {
+      return t('Robot');
+    },
+  },
+  {
+    preset: 'monster',
+    get name(): string {
+      return t('Monster');
+    },
+  },
+  {
+    preset: 'chipmunk',
+    get name(): string {
+      return t('Chipmunk');
+    },
+  },
 ];
 const nameOf = (kind: EffectKind): string =>
   KINDS.find((entry) => entry.kind === kind)?.name ?? kind;
@@ -52,15 +162,27 @@ const nameOf = (kind: EffectKind): string =>
 /** Starting points for the equalizer, from the cleanup a dialogue editor does first. */
 const EQ_PRESETS: readonly { name: string; bands: EqBand[] }[] = [
   {
-    name: 'Dialogue',
+    get name(): string {
+      return t('Dialogue');
+    },
     bands: [
       EqBand.parse({ type: 'highpass', frequency: 90 }),
       EqBand.parse({ type: 'bell', frequency: 350, gainDb: -3, q: 1.2 }),
       EqBand.parse({ type: 'bell', frequency: 3200, gainDb: 2, q: 1 }),
     ],
   },
-  { name: 'Rumble', bands: [EqBand.parse({ type: 'highpass', frequency: 80 })] },
-  { name: 'Hiss', bands: [EqBand.parse({ type: 'lowpass', frequency: 9000 })] },
+  {
+    get name(): string {
+      return t('Rumble');
+    },
+    bands: [EqBand.parse({ type: 'highpass', frequency: 80 })],
+  },
+  {
+    get name(): string {
+      return t('Hiss');
+    },
+    bands: [EqBand.parse({ type: 'lowpass', frequency: 9000 })],
+  },
 ];
 
 /** The equalizer's curve, on a log frequency axis from 20 Hz to 20 kHz. */
@@ -83,7 +205,7 @@ function EqCurve({ bands }: { bands: readonly EqBand[] }): ReactElement {
       className="eq-curve"
       viewBox={`0 0 ${String(width)} ${String(height)}`}
       role="img"
-      aria-label="EQ curve"
+      aria-label={t('EQ curve')}
       preserveAspectRatio="none"
     >
       {[100, 1000, 10_000].map((frequency) => (
@@ -127,7 +249,7 @@ function BandRow({
   return (
     <div className="band">
       <div className="knob">
-        <label htmlFor={id}>Band</label>
+        <label htmlFor={id}>{t('Band')}</label>
         <select
           id={id}
           className="input"
@@ -136,16 +258,16 @@ function BandRow({
             onChange({ ...band, type: EqBand.shape.type.parse(event.target.value) });
           }}
         >
-          <option value="highpass">High-pass</option>
-          <option value="lowshelf">Low shelf</option>
-          <option value="bell">Bell</option>
-          <option value="highshelf">High shelf</option>
-          <option value="lowpass">Low-pass</option>
+          <option value="highpass">{t('High-pass')}</option>
+          <option value="lowshelf">{t('Low shelf')}</option>
+          <option value="bell">{t('Bell')}</option>
+          <option value="highshelf">{t('High shelf')}</option>
+          <option value="lowpass">{t('Low-pass')}</option>
         </select>
       </div>
       <NumberInput
-        label="Frequency"
-        unit="Hz"
+        label={t('Frequency')}
+        unit={t('Hz')}
         value={band.frequency}
         step={10}
         min={20}
@@ -156,7 +278,7 @@ function BandRow({
       />
       {!pass && (
         <NumberInput
-          label="Gain"
+          label={t('Gain')}
           unit="dB"
           value={band.gainDb}
           step={0.5}
@@ -168,7 +290,7 @@ function BandRow({
         />
       )}
       <NumberInput
-        label="Q"
+        label={t('Q')}
         value={band.q}
         step={0.1}
         min={0.1}
@@ -181,7 +303,7 @@ function BandRow({
         <button
           type="button"
           className="icon-button fx-remove"
-          aria-label="Remove band"
+          aria-label={t('Remove band')}
           onClick={onRemove}
         >
           <XIcon aria-hidden="true" />
@@ -226,7 +348,7 @@ function Settings({
       return (
         <div className="stack tight">
           <EqCurve bands={effect.bands} />
-          <div className="row wrap fx-presets" role="group" aria-label="EQ presets">
+          <div className="row wrap fx-presets" role="group" aria-label={t('EQ presets')}>
             {EQ_PRESETS.map((preset) => (
               <button
                 key={preset.name}
@@ -270,7 +392,7 @@ function Settings({
                 });
               }}
             >
-              <PlusIcon aria-hidden="true" /> Band
+              <PlusIcon aria-hidden="true" /> {t('Band')}
             </button>
           )}
         </div>
@@ -278,36 +400,36 @@ function Settings({
     case 'compressor':
       return (
         <div className="knobs">
-          {knob('Threshold', 'thresholdDb', effect.thresholdDb, 1, -60, 0, 'dB')}
-          {knob('Ratio', 'ratio', effect.ratio, 0.5, 1, 20, ':1')}
-          {knob('Attack', 'attackMs', effect.attackMs, 1, 0.1, 200, 'ms')}
-          {knob('Release', 'releaseMs', effect.releaseMs, 10, 10, 2000, 'ms')}
-          {knob('Knee', 'kneeDb', effect.kneeDb, 1, 0, 24, 'dB')}
-          {knob('Makeup', 'makeupDb', effect.makeupDb, 0.5, 0, 24, 'dB')}
+          {knob(t('Threshold'), 'thresholdDb', effect.thresholdDb, 1, -60, 0, 'dB')}
+          {knob(t('Ratio'), 'ratio', effect.ratio, 0.5, 1, 20, ':1')}
+          {knob(t('Attack'), 'attackMs', effect.attackMs, 1, 0.1, 200, 'ms')}
+          {knob(t('Release'), 'releaseMs', effect.releaseMs, 10, 10, 2000, 'ms')}
+          {knob(t('Knee'), 'kneeDb', effect.kneeDb, 1, 0, 24, 'dB')}
+          {knob(t('Makeup'), 'makeupDb', effect.makeupDb, 0.5, 0, 24, 'dB')}
         </div>
       );
     case 'limiter':
       return (
         <div className="knobs">
-          {knob('Ceiling', 'ceilingDb', effect.ceilingDb, 0.1, -24, 0, 'dB')}
-          {knob('Release', 'releaseMs', effect.releaseMs, 5, 1, 1000, 'ms')}
+          {knob(t('Ceiling'), 'ceilingDb', effect.ceilingDb, 0.1, -24, 0, 'dB')}
+          {knob(t('Release'), 'releaseMs', effect.releaseMs, 5, 1, 1000, 'ms')}
         </div>
       );
     case 'denoise':
       return (
         <div className="knobs">
-          {knob('Reduction', 'reductionDb', effect.reductionDb, 1, 0, 48, 'dB')}
-          {knob('Sensitivity', 'sensitivityDb', effect.sensitivityDb, 0.5, 0, 24, 'dB')}
+          {knob(t('Reduction'), 'reductionDb', effect.reductionDb, 1, 0, 48, 'dB')}
+          {knob(t('Sensitivity'), 'sensitivityDb', effect.sensitivityDb, 0.5, 0, 24, 'dB')}
         </div>
       );
     case 'loudness':
       return (
         <div className="stack tight">
-          <div className="row wrap fx-presets" role="group" aria-label="Loudness targets">
+          <div className="row wrap fx-presets" role="group" aria-label={t('Loudness targets')}>
             {[
-              { name: 'Broadcast −23', lufs: -23 },
-              { name: 'Online −16', lufs: -16 },
-              { name: 'Streaming −14', lufs: -14 },
+              { name: t('Broadcast −23'), lufs: -23 },
+              { name: t('Online −16'), lufs: -16 },
+              { name: t('Streaming −14'), lufs: -14 },
             ].map((target) => (
               <button
                 key={target.lufs}
@@ -323,15 +445,15 @@ function Settings({
             ))}
           </div>
           <div className="knobs">
-            {knob('Target', 'targetLufs', effect.targetLufs, 0.5, -40, -5, 'LUFS')}
-            {knob('True peak', 'truePeakDb', effect.truePeakDb, 0.1, -9, 0, 'dBTP')}
+            {knob(t('Target'), 'targetLufs', effect.targetLufs, 0.5, -40, -5, 'LUFS')}
+            {knob(t('True peak'), 'truePeakDb', effect.truePeakDb, 0.1, -9, 0, 'dBTP')}
           </div>
         </div>
       );
     case 'distortion':
       return (
         <div className="stack tight">
-          <span className="segmented" role="group" aria-label="Distortion shape">
+          <span className="segmented" role="group" aria-label={t('Distortion shape')}>
             {(['soft', 'hard', 'fold'] as const).map((shape) => (
               <button
                 key={shape}
@@ -341,43 +463,43 @@ function Settings({
                   onChange({ ...effect, shape });
                 }}
               >
-                {shape === 'soft' ? 'Soft' : shape === 'hard' ? 'Hard' : 'Fold'}
+                {shape === 'soft' ? t('Soft') : shape === 'hard' ? t('Hard') : t('Fold')}
               </button>
             ))}
           </span>
           <div className="knobs">
-            {knob('Drive', 'driveDb', effect.driveDb, 1, 0, 48, 'dB')}
-            {knob('Tone', 'toneHz', effect.toneHz, 100, 500, 20_000, 'Hz')}
-            {knob('Mix', 'mix', effect.mix, 0.05, 0, 1)}
-            {knob('Output', 'outputDb', effect.outputDb, 0.5, -24, 12, 'dB')}
+            {knob(t('Drive'), 'driveDb', effect.driveDb, 1, 0, 48, 'dB')}
+            {knob(t('Tone'), 'toneHz', effect.toneHz, 100, 500, 20_000, t('Hz'))}
+            {knob(t('Mix'), 'mix', effect.mix, 0.05, 0, 1)}
+            {knob(t('Output'), 'outputDb', effect.outputDb, 0.5, -24, 12, 'dB')}
           </div>
         </div>
       );
     case 'pitch':
       return (
         <div className="knobs">
-          {knob('Semitones', 'semitones', effect.semitones, 0.5, -12, 12)}
+          {knob(t('Semitones'), 'semitones', effect.semitones, 0.5, -12, 12)}
         </div>
       );
     case 'ringmod':
       return (
         <div className="knobs">
-          {knob('Frequency', 'frequency', effect.frequency, 5, 1, 2000, 'Hz')}
-          {knob('Mix', 'mix', effect.mix, 0.05, 0, 1)}
+          {knob(t('Frequency'), 'frequency', effect.frequency, 5, 1, 2000, t('Hz'))}
+          {knob(t('Mix'), 'mix', effect.mix, 0.05, 0, 1)}
         </div>
       );
     case 'crush':
       return (
         <div className="knobs">
-          {knob('Bits', 'bits', effect.bits, 1, 2, 16)}
-          {knob('Every', 'downsample', effect.downsample, 1, 1, 32, 'samples')}
+          {knob(t('Bits'), 'bits', effect.bits, 1, 2, 16)}
+          {knob(t('Every'), 'downsample', effect.downsample, 1, 1, 32, 'samples')}
         </div>
       );
   }
 }
 
 const show = (value: number | null, digits = 1): string =>
-  value === null ? '−∞' : value.toFixed(digits).replace('-', '−');
+  value === null ? '−∞' : fixed(value, digits).replace('-', '−');
 
 /**
  * A region's effects as cards, in the order they run. Every change is one
@@ -448,18 +570,21 @@ export function EffectsPanel({
   const denoise = effects.find((effect) => effect.kind === 'denoise');
 
   return (
-    <section className="stack fx-panel" aria-label="Effects" aria-busy={busy}>
+    <section className="stack fx-panel" aria-label={t('Effects')} aria-busy={busy}>
       <div className="fx-top">
-        <p className="eyebrow">Effects</p>
+        <p className="eyebrow">{t('Effects')}</p>
         <p className="muted mono small fx-meter" aria-live="polite">
           {report === null
-            ? 'Measuring…'
-            : `${show(report.integratedLufs)} LUFS · ${show(report.truePeakDb)} dBTP`}
+            ? t('Measuring…')
+            : t('{integratedLufs} LUFS · {truePeakDb} dBTP', {
+                integratedLufs: show(report.integratedLufs),
+                truePeakDb: show(report.truePeakDb),
+              })}
         </p>
       </div>
       {effects.length === 0 && (
         <p className="muted small">
-          None yet. They run in order, on the whole sound of the region.
+          {t('None yet. They run in order, on the whole sound of the region.')}
         </p>
       )}
       <ol className="fx-cards">
@@ -473,7 +598,7 @@ export function EffectsPanel({
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Run ${nameOf(effect.kind)} earlier`}
+                    aria-label={t('Run {kind} earlier', { kind: nameOf(effect.kind) })}
                     disabled={busy}
                     onClick={() => {
                       const next = effects.flatMap((existing, i) =>
@@ -488,7 +613,7 @@ export function EffectsPanel({
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Remove ${nameOf(effect.kind)}`}
+                  aria-label={t('Remove {kind}', { kind: nameOf(effect.kind) })}
                   disabled={busy}
                   onClick={() => {
                     setChain(effects.filter((_, i) => i !== index));
@@ -514,7 +639,7 @@ export function EffectsPanel({
                   add('denoise');
                 }}
               >
-                Learn the noise again from the selection
+                {t('Learn the noise again from the selection')}
               </button>
             )}
           </li>
@@ -522,9 +647,9 @@ export function EffectsPanel({
       </ol>
       {(['clean', 'voice'] as const).map((group) => (
         <div key={group} className="stack tight">
-          <p className="fx-group">{group === 'clean' ? 'Clean up' : 'Change the voice'}</p>
+          <p className="fx-group">{group === 'clean' ? t('Clean up') : t('Change the voice')}</p>
           {group === 'voice' && (
-            <div className="row wrap fx-presets" role="group" aria-label="Ready-made voices">
+            <div className="row wrap fx-presets" role="group" aria-label={t('Ready-made voices')}>
               {VOICES.map((entry) => (
                 <button
                   key={entry.preset}
@@ -543,7 +668,7 @@ export function EffectsPanel({
           <div
             className="fx-add"
             role="group"
-            aria-label={group === 'clean' ? 'Add a clean-up effect' : 'Add a voice effect'}
+            aria-label={group === 'clean' ? t('Add a clean-up effect') : t('Add a voice effect')}
           >
             {KINDS.filter((entry) => entry.group === group && !present.has(entry.kind)).map(
               (entry) => (
@@ -569,7 +694,9 @@ export function EffectsPanel({
       ))}
       {denoise === undefined && stretch === null && (
         <p className="muted small">
-          For noise reduction, drag across a stretch of this region where only the noise is heard.
+          {t(
+            'For noise reduction, drag across a stretch of this region where only the noise is heard.',
+          )}
         </p>
       )}
     </section>

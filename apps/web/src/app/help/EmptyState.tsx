@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { OPEN_VIEW } from '../library/model.js';
 import { askCoordinator } from './help.js';
 import { HornedBadge } from '../ImpMark.js';
+import { t } from '../../i18n/i18n.js';
 
 /**
  * What a stage shows while it has nothing to show: what belongs here, and the
@@ -50,12 +51,14 @@ export function EmptyState({
         {ask !== undefined && (
           <button
             className="button quiet"
-            title="Puts the request in the coordinator's message box. Nothing is sent until you press Send."
+            title={t(
+              "Puts the request in the coordinator's message box. Nothing is sent until you press Send.",
+            )}
             onClick={() => {
               askCoordinator(ask);
             }}
           >
-            <ChatCircleDotsIcon aria-hidden="true" /> Ask the coordinator
+            <ChatCircleDotsIcon aria-hidden="true" /> {t('Ask the coordinator')}
           </button>
         )}
       </div>

@@ -18,28 +18,77 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
+import { t, tn } from '../i18n/i18n.js';
 
 const Items = z.object({ items: z.array(WorldElement) });
 const Cast = z.object({ characters: z.array(Character.pick({ id: true, name: true })) });
 
 export const worldPrefix = (project: Project): string => `projects/${project.id}/world/`;
 
-const KIND_TEXT: Readonly<
-  Record<WorldKind, { tab: string; one: string; empty: string; idKey: string }>
-> = {
+interface KindText {
+  readonly tab: string;
+  readonly empty: string;
+  readonly idKey: string;
+  readonly noView: string;
+  readonly remove: string;
+  readonly removeQuestion: string;
+  readonly newName: string;
+  readonly add: string;
+}
+
+// Each kind has its own sentences, because languages such as German change the words around a noun.
+const KIND_TEXT: Readonly<Record<WorldKind, KindText>> = {
   location: {
-    tab: 'Locations',
-    one: 'location',
     idKey: 'locationId',
-    empty:
-      'No places yet. Add one, or ask the Production Designer to find the locations in the script.',
+    get tab(): string {
+      return t('Locations');
+    },
+    get empty(): string {
+      return t(
+        'No places yet. Add one, or ask the Production Designer to find the locations in the script.',
+      );
+    },
+    get noView(): string {
+      return t('This location has no view.');
+    },
+    get remove(): string {
+      return t('Delete location');
+    },
+    get removeQuestion(): string {
+      return t('Delete this location and its pictures for good?');
+    },
+    get newName(): string {
+      return t('New location');
+    },
+    get add(): string {
+      return t('Add location');
+    },
   },
   object: {
-    tab: 'Objects',
-    one: 'object',
     idKey: 'objectId',
-    empty:
-      'No objects yet. Add the props that matter to the story, or ask the Production Designer.',
+    get tab(): string {
+      return t('Objects');
+    },
+    get empty(): string {
+      return t(
+        'No objects yet. Add the props that matter to the story, or ask the Production Designer.',
+      );
+    },
+    get noView(): string {
+      return t('This object has no view.');
+    },
+    get remove(): string {
+      return t('Delete object');
+    },
+    get removeQuestion(): string {
+      return t('Delete this object and its pictures for good?');
+    },
+    get newName(): string {
+      return t('New object');
+    },
+    get add(): string {
+      return t('Add object');
+    },
   },
 };
 
@@ -118,29 +167,31 @@ function Stage({
         {fallback === undefined ? (
           <span className="plate-empty">
             {isMaster
-              ? 'Draw the master view first: every other view and state is drawn to agree with it.'
-              : 'Not drawn yet. It will be drawn to agree with the pictures already made.'}
+              ? t(
+                  'Draw the master view first: every other view and state is drawn to agree with it.',
+                )
+              : t('Not drawn yet. It will be drawn to agree with the pictures already made.')}
           </span>
         ) : (
           <Picture image={fallback} alt={where} />
         )}
         {key === undefined && fallback !== undefined && (
-          <span className="plate-note">Stand-in: the closest picture there is</span>
+          <span className="plate-note">{t('Stand-in: the closest picture there is')}</span>
         )}
         {busy && (
           <span className="portrait-busy" role="status">
-            Developing…
+            {t('Developing…')}
           </span>
         )}
       </div>
       {pictures.length > 1 && (
-        <div className="thumbs wide" role="group" aria-label={`Pictures of ${where}`}>
+        <div className="thumbs wide" role="group" aria-label={t('Pictures of {where}', { where })}>
           {pictures.map((image, index) => (
             <button
               key={image.id}
               className="thumb"
               aria-pressed={image.id === keyId}
-              aria-label={`Use picture ${String(index + 1)} as the key picture`}
+              aria-label={t('Use picture {value} as the key picture', { value: String(index + 1) })}
               title={image.prompt}
               onClick={() => {
                 void act(`world.${element.kind}.image.select`, { ...at, imageId: image.id });
@@ -153,14 +204,14 @@ function Stage({
       )}
       <form className="row portrait-make" onSubmit={generate}>
         <label className="sr-only" htmlFor={directionId}>
-          Direction for the next picture
+          {t('Direction for the next picture')}
         </label>
         <input
           id={directionId}
           type="text"
           className="input"
           value={direction}
-          placeholder="Direction, e.g. warmer light, less clutter"
+          placeholder={t('Direction, e.g. warmer light, less clutter')}
           onChange={(event) => {
             setDirection(event.target.value);
           }}
@@ -169,9 +220,11 @@ function Stage({
           type="submit"
           className="button"
           disabled={busy || model === null}
-          title={model === null ? 'Choose an image model first.' : `Drawn by ${model}`}
+          title={
+            model === null ? t('Choose an image model first.') : t('Drawn by {model}', { model })
+          }
         >
-          <SparkleIcon aria-hidden="true" /> {key === undefined ? 'Draw' : 'Another'}
+          <SparkleIcon aria-hidden="true" /> {key === undefined ? t('Draw') : t('Another')}
           <Price
             command={`world.${element.kind}.image.generate`}
             input={{ ...at, viewId: view.id, stateId: state?.id ?? null }}
@@ -182,12 +235,16 @@ function Stage({
         <div className="row wrap">
           <span className="muted small">
             {key.references === 0
-              ? 'Drawn from the words alone.'
-              : `Drawn to agree with ${String(key.references)} ${key.references === 1 ? 'picture' : 'pictures'}.`}
+              ? t('Drawn from the words alone.')
+              : tn(
+                  key.references,
+                  'Drawn to agree with {count} picture.',
+                  'Drawn to agree with {count} pictures.',
+                )}
           </span>
           <ConfirmButton
-            label="Delete picture"
-            question="Delete this picture for good?"
+            label={t('Delete picture')}
+            question={t('Delete this picture for good?')}
             onConfirm={() => {
               void act(`world.${element.kind}.image.delete`, { ...at, imageId: key.id });
             }}
@@ -218,15 +275,15 @@ function ContactSheet({
   const columns: (State | null)[] = [null, ...element.states];
   return (
     <div className="sheet-scroll">
-      <table className="sheet" aria-label={`Views and states of ${element.name}`}>
+      <table className="sheet" aria-label={t('Views and states of {name}', { name: element.name })}>
         <thead>
           <tr>
             <th scope="col">
-              <span className="sr-only">View</span>
+              <span className="sr-only">{t('View')}</span>
             </th>
             {columns.map((state) => (
               <th key={state?.id ?? 'usual'} scope="col">
-                {state === null ? 'Usual' : state.name}
+                {state === null ? t('Usual') : state.name}
               </th>
             ))}
           </tr>
@@ -236,21 +293,21 @@ function ContactSheet({
             <tr key={view.id}>
               <th scope="row">
                 {view.name}
-                {row === 0 && <span className="tag neutral">Master</span>}
+                {row === 0 && <span className="tag neutral">{t('Master')}</span>}
               </th>
               {columns.map((state) => {
                 const exact = element.keyImages.find(
                   (key) => key.viewId === view.id && key.stateId === (state?.id ?? null),
                 );
                 const image = element.images.find((candidate) => candidate.id === exact?.imageId);
-                const label = `${view.name}, ${state === null ? 'usual look' : state.name}`;
+                const label = `${view.name}, ${state === null ? t('usual look') : state.name}`;
                 return (
                   <td key={state?.id ?? 'usual'}>
                     <button
                       type="button"
                       className="sheet-cell"
                       aria-pressed={view.id === viewId && (state?.id ?? null) === stateId}
-                      aria-label={image === undefined ? `${label}, not drawn` : label}
+                      aria-label={image === undefined ? t('{label}, not drawn', { label }) : label}
                       onClick={() => {
                         onPick(view.id, state?.id ?? null);
                       }}
@@ -339,21 +396,21 @@ function ElementEditor({
   const change = (fields: Record<string, unknown>): Promise<unknown> =>
     act(`world.${kind}.update`, { ...at, ...fields });
 
-  if (view === undefined) return <p className="muted">This {text.one} has no view.</p>;
+  if (view === undefined) return <p className="muted">{text.noView}</p>;
 
   return (
     <article className="card stack design" aria-label={element.name}>
       <div className="row spread wrap">
         <EditableField
-          label="Name"
+          label={t('Name')}
           hideLabel
           value={element.name}
           onCommit={(name) => change({ name })}
         />
         <WorkingOn kind={element.kind} id={element.id} />
         <ConfirmButton
-          label={`Delete ${text.one}`}
-          question={`Delete this ${text.one} and its pictures for good?`}
+          label={text.remove}
+          question={text.removeQuestion}
           onConfirm={() => {
             void act(`world.${kind}.delete`, at);
           }}
@@ -374,8 +431,8 @@ function ElementEditor({
       />
       <div className="row wrap design-adds">
         <AddNamed
-          label="Add view"
-          placeholder={kind === 'location' ? 'Toward the sea window' : 'In hand'}
+          label={t('Add view')}
+          placeholder={kind === 'location' ? t('Toward the sea window') : t('In hand')}
           onAdd={(name) =>
             act(`world.${kind}.view.add`, { ...at, name }).then((made) => {
               const added = made as View | undefined;
@@ -384,8 +441,8 @@ function ElementEditor({
           }
         />
         <AddNamed
-          label="Add state"
-          placeholder={kind === 'location' ? 'Night, storm' : 'Cracked'}
+          label={t('Add state')}
+          placeholder={kind === 'location' ? t('Night, storm') : t('Cracked')}
           onAdd={(name) =>
             act(`world.${kind}.state.add`, { ...at, name }).then((made) => {
               const added = made as State | undefined;
@@ -395,13 +452,13 @@ function ElementEditor({
         />
       </div>
 
-      <section className="stack design-part" aria-label={`View ${view.name}`}>
+      <section className="stack design-part" aria-label={t('View {name}', { name: view.name })}>
         <div className="row spread wrap">
-          <h3>View · {view.name}</h3>
+          <h3>{t('View · {name}', { name: view.name })}</h3>
           {element.views.length > 1 && (
             <ConfirmButton
-              label="Remove view"
-              question="Remove this view and its pictures?"
+              label={t('Remove view')}
+              question={t('Remove this view and its pictures?')}
               onConfirm={() => {
                 setPicked(null);
                 void act(`world.${kind}.view.remove`, { ...at, viewId: view.id });
@@ -412,15 +469,17 @@ function ElementEditor({
           )}
         </div>
         <EditableField
-          label="View name"
+          label={t('View name')}
           value={view.name}
           onCommit={(name) => act(`world.${kind}.view.update`, { ...at, viewId: view.id, name })}
         />
         <EditableField
-          label="Where the camera stands"
+          label={t('Where the camera stands')}
           rows={2}
           value={view.description}
-          placeholder="Low in the stairwell door, looking up at the lamp; the sea window on the right."
+          placeholder={t(
+            'Low in the stairwell door, looking up at the lamp; the sea window on the right.',
+          )}
           onCommit={(description) =>
             act(`world.${kind}.view.update`, { ...at, viewId: view.id, description })
           }
@@ -428,12 +487,12 @@ function ElementEditor({
       </section>
 
       {state !== null && (
-        <section className="stack design-part" aria-label={`State ${state.name}`}>
+        <section className="stack design-part" aria-label={t('State {name}', { name: state.name })}>
           <div className="row spread wrap">
-            <h3>State · {state.name}</h3>
+            <h3>{t('State · {name}', { name: state.name })}</h3>
             <ConfirmButton
-              label="Remove state"
-              question="Remove this state and its pictures?"
+              label={t('Remove state')}
+              question={t('Remove this state and its pictures?')}
               onConfirm={() => {
                 setPicked({ viewId: view.id, stateId: null });
                 void act(`world.${kind}.state.remove`, { ...at, stateId: state.id });
@@ -443,17 +502,17 @@ function ElementEditor({
             </ConfirmButton>
           </div>
           <EditableField
-            label="State name"
+            label={t('State name')}
             value={state.name}
             onCommit={(name) =>
               act(`world.${kind}.state.update`, { ...at, stateId: state.id, name })
             }
           />
           <EditableField
-            label="What differs"
+            label={t('What differs')}
             rows={2}
             value={state.description}
-            placeholder="Rain lashing the windows; only the lamp lights the room."
+            placeholder={t('Rain lashing the windows; only the lamp lights the room.')}
             onCommit={(description) =>
               act(`world.${kind}.state.update`, { ...at, stateId: state.id, description })
             }
@@ -461,45 +520,47 @@ function ElementEditor({
         </section>
       )}
 
-      <section className="stack design-part" aria-label="Description">
+      <section className="stack design-part" aria-label={t('Description')}>
         <EditableField
-          label="What it is"
+          label={t('What it is')}
           rows={3}
           value={element.description}
-          placeholder="What it is and what it means in the story."
+          placeholder={t('What it is and what it means in the story.')}
           onCommit={(description) => change({ description })}
         />
         <EditableField
-          label="Look"
+          label={t('Look')}
           rows={4}
           value={element.look}
           placeholder={
             kind === 'location'
-              ? 'Architecture, materials, colours, wear, light. Precise enough to draw from.'
-              : 'Shape, size, materials, colours, wear. Precise enough to draw from.'
+              ? t('Architecture, materials, colours, wear, light. Precise enough to draw from.')
+              : t('Shape, size, materials, colours, wear. Precise enough to draw from.')
           }
           onCommit={(look) => change({ look })}
         />
         {element.kind === 'location' && (
           <>
             <EditableField
-              label="Layout"
+              label={t('Layout')}
               rows={3}
               value={element.layout}
-              placeholder="Where things are relative to each other: the door faces the sea window, the stairs come up in the middle."
+              placeholder={t(
+                'Where things are relative to each other: the door faces the sea window, the stairs come up in the middle.',
+              )}
               onCommit={(layout) => change({ layout })}
             />
             <EditableField
-              label="Ambience"
+              label={t('Ambience')}
               rows={2}
               value={element.ambience}
-              placeholder="Wind in the iron frame, distant surf."
+              placeholder={t('Wind in the iron frame, distant surf.')}
               onCommit={(ambience) => change({ ambience })}
             />
           </>
         )}
         <div className="field">
-          <label htmlFor={relationId}>{kind === 'location' ? 'Part of' : 'Belongs to'}</label>
+          <label htmlFor={relationId}>{kind === 'location' ? t('Part of') : t('Belongs to')}</label>
           <select
             id={relationId}
             className="select"
@@ -509,7 +570,7 @@ function ElementEditor({
               void change(kind === 'location' ? { parentId: value } : { ownerId: value });
             }}
           >
-            <option value="">{kind === 'location' ? 'Nothing larger' : 'Nobody'}</option>
+            <option value="">{kind === 'location' ? t('Nothing larger') : t('Nobody')}</option>
             {kind === 'object' &&
               cast.map((character) => (
                 <option key={character.id} value={character.id}>
@@ -559,7 +620,7 @@ function KindPanel({
   const element = items.find((candidate) => candidate.id === selectedId) ?? items[0];
 
   const add = (): void => {
-    void act(`world.${kind}.create`, { name: `New ${text.one}` }).then((made) => {
+    void act(`world.${kind}.create`, { name: text.newName }).then((made) => {
       if (made !== undefined) setSelectedId((made as WorldElement).id);
     });
   };
@@ -583,7 +644,7 @@ function KindPanel({
           </button>
         ))}
         <button className="chip add" onClick={add}>
-          <PlusIcon aria-hidden="true" /> Add {text.one}
+          <PlusIcon aria-hidden="true" /> {text.add}
         </button>
       </div>
       {element === undefined ? (
@@ -610,13 +671,13 @@ export function DesignView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Design</h1>
+        <h1>{t('Design')}</h1>
         <span className="muted">
-          The places and objects of the film, drawn from every side the camera sees them.
+          {t('The places and objects of the film, drawn from every side the camera sees them.')}
         </span>
       </div>
       <div className="row wrap model-pickers">
-        <div className="kind-switch" role="tablist" aria-label="Kind">
+        <div className="kind-switch" role="tablist" aria-label={t('Kind')}>
           {(['location', 'object'] as const).map((candidate) => (
             <button
               key={candidate}
@@ -642,8 +703,8 @@ export function DesignView({ project }: { project: Project }): ReactElement {
         models={[
           {
             id: 'design-image-model',
-            label: 'Image',
-            empty: 'Choose a model to draw pictures',
+            label: t('Image'),
+            empty: t('Choose a model to draw pictures'),
             setting: IMAGE_MODEL_SETTING,
             choice: images,
           },

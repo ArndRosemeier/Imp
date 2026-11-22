@@ -4,7 +4,11 @@ import {
   freeName,
   itemKey,
   projectPrefix,
+  phrase,
+  phraseText,
   type CollisionChoice,
+  type PhrasePart,
+  type StageProgress,
   type CopyOutcome,
   type CoreRuntime,
   type GuidedPath,
@@ -87,6 +91,19 @@ async function readMovie(store: KeyValueStore, projectId: string): Promise<Movie
   };
 }
 
+/** A stage's line in the project overview, in English and in parts the interface translates. */
+const progress = (
+  id: string,
+  name: string,
+  done: number,
+  total: number,
+  parts: PhrasePart[],
+): StageProgress => ({ id, name, done, total, note: phraseText(parts), phrase: parts });
+
+/** The English form that fits `total`; German and English both tell one from many. */
+const counted = (total: number, one: string, other: string, done?: number): PhrasePart =>
+  phrase(total === 1 ? one : other, done === undefined ? { total } : { total, done });
+
 const plural = (n: number, one: string, many = `${one}s`): string =>
   `${String(n)} ${n === 1 ? one : many}`;
 
@@ -124,73 +141,77 @@ export async function summarizeMovie(
     headline: firstLine(development.logline) || firstLine(development.premise),
     posterKeys: posterKeys.slice(0, 4),
     stages: [
-      {
-        id: 'development',
-        name: 'Development',
-        done: filled,
-        total: 4,
-        note: filled === 0 ? 'Not started' : `${String(filled)} of 4 parts written`,
-      },
-      {
-        id: 'script',
-        name: 'Script',
-        done: written,
-        total: scenes.length,
-        note:
-          scenes.length === 0
-            ? 'No scenes'
-            : `${String(written)} of ${plural(scenes.length, 'scene')} written`,
-      },
-      {
-        id: 'casting',
-        name: 'Casting',
-        done: cast,
-        total: characters.length,
-        note:
-          characters.length === 0
-            ? 'No characters'
-            : `${plural(characters.length, 'character')}, ${String(portrayed)} with a portrait, ${String(voiced)} with a voice`,
-      },
-      {
-        id: 'design',
-        name: 'Design',
-        done: drawn,
-        total: world.length,
-        note:
-          world.length === 0
-            ? 'No locations or objects'
-            : `${plural(movie.locations.length, 'location')}, ${plural(movie.objects.length, 'object')}, ${String(drawn)} drawn`,
-      },
-      {
-        id: 'shots',
-        name: 'Shots',
-        done: ready,
-        total: shots.length,
-        note:
-          shots.length === 0
-            ? 'No shots'
-            : `${String(ready)} of ${plural(shots.length, 'clip')} ready`,
-      },
-      {
-        id: 'sound',
-        name: 'Sound',
-        done: made,
-        total: sounds.length,
-        note:
-          sounds.length === 0
-            ? 'No sounds'
-            : `${String(made)} of ${plural(sounds.length, 'sound')} made`,
-      },
-      {
-        id: 'edit',
-        name: 'Edit',
-        done: cut,
-        total: scenes.length,
-        note:
-          scenes.length === 0
-            ? 'Nothing to cut'
-            : `${String(cut)} of ${plural(scenes.length, 'scene')} cut`,
-      },
+      progress('development', 'Development', filled, 4, [
+        filled === 0
+          ? phrase('Not started')
+          : phrase('{done} of 4 parts written', { done: filled }),
+      ]),
+      progress('script', 'Script', written, scenes.length, [
+        scenes.length === 0
+          ? phrase('No scenes')
+          : counted(
+              scenes.length,
+              '{done} of {total} scene written',
+              '{done} of {total} scenes written',
+              written,
+            ),
+      ]),
+      progress(
+        'casting',
+        'Casting',
+        cast,
+        characters.length,
+        characters.length === 0
+          ? [phrase('No characters')]
+          : [
+              counted(characters.length, '{total} character', '{total} characters'),
+              phrase('{portrayed} with a portrait', { portrayed }),
+              phrase('{voiced} with a voice', { voiced }),
+            ],
+      ),
+      progress(
+        'design',
+        'Design',
+        drawn,
+        world.length,
+        world.length === 0
+          ? [phrase('No locations or objects')]
+          : [
+              counted(movie.locations.length, '{total} location', '{total} locations'),
+              counted(movie.objects.length, '{total} object', '{total} objects'),
+              phrase('{drawn} drawn', { drawn }),
+            ],
+      ),
+      progress('shots', 'Shots', ready, shots.length, [
+        shots.length === 0
+          ? phrase('No shots')
+          : counted(
+              shots.length,
+              '{done} of {total} clip ready',
+              '{done} of {total} clips ready',
+              ready,
+            ),
+      ]),
+      progress('sound', 'Sound', made, sounds.length, [
+        sounds.length === 0
+          ? phrase('No sounds')
+          : counted(
+              sounds.length,
+              '{done} of {total} sound made',
+              '{done} of {total} sounds made',
+              made,
+            ),
+      ]),
+      progress('edit', 'Edit', cut, scenes.length, [
+        scenes.length === 0
+          ? phrase('Nothing to cut')
+          : counted(
+              scenes.length,
+              '{done} of {total} scene cut',
+              '{done} of {total} scenes cut',
+              cut,
+            ),
+      ]),
     ],
   };
 }

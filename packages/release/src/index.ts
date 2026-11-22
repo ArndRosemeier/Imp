@@ -6,11 +6,15 @@ export {
   isEntry,
   parseEntry,
   splitSubject,
+  TRANSLATED_LANGUAGES,
+  translationLanguage,
+  translationPath,
   UNVERSIONED,
   type BuildOptions,
   type MergeRecord,
   type Release,
   type ReleaseNotes,
+  type Translation,
 } from './notes.js';
 export { readReleaseNotes, type ReadOptions } from './git.js';
 export {

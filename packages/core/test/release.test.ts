@@ -54,6 +54,41 @@ describe('release commands', () => {
     await expect(run('app.changelog', { since: 'latest' })).rejects.toThrow();
   });
 
+  it('tell the changes in the interface language, or the one asked for', async () => {
+    const translated: ReleaseNotes = {
+      ...notes,
+      releases: [
+        {
+          version: '0.010',
+          date: '2026-11-25',
+          title: 'Ten',
+          notes: ['Tenth.'],
+          translations: { de: { title: 'Zehn', notes: ['Zehnte.'] } },
+        },
+        { version: '0.009', date: '2026-11-24', title: 'Nine', notes: [] },
+      ],
+    };
+    const runtime = createTestRuntime();
+    const registry = new CommandRegistry({ runtime }).register(
+      ...createReleaseCommands(translated),
+    );
+    const run = (input: unknown) =>
+      registry.executeById('app.changelog', input, { actor: { kind: 'user', id: 'u' } });
+    expect(await run({})).toMatchObject({
+      output: { releases: [{ title: 'Ten' }, { title: 'Nine' }] },
+    });
+    const german = await run({ language: 'de' });
+    expect(german).toMatchObject({
+      output: { releases: [{ title: 'Zehn', notes: ['Zehnte.'] }, { title: 'Nine' }] },
+    });
+    // The translations themselves stay out of the answer.
+    expect(JSON.stringify(german)).not.toContain('translations');
+    await runtime.store.batch([{ type: 'put', key: 'settings/ui.language', value: 'de' }]);
+    expect(await run({})).toMatchObject({
+      output: { releases: [{ title: 'Zehn' }, { title: 'Nine' }] },
+    });
+  });
+
   it('refuse broken notes when the build starts', () => {
     expect(() => createReleaseCommands({ ...notes, version: 'one' })).toThrow();
   });

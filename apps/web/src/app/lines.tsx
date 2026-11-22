@@ -5,6 +5,7 @@ import { EditableField } from './Field.js';
 import type { Act } from './movie.js';
 import { NumberField } from './NumberField.js';
 import { Price } from './spend.js';
+import { t } from '../i18n/i18n.js';
 
 /** A piece must be at least this wide to be grabbed with a finger. */
 const MIN_BLOCK_PX = 22;
@@ -51,18 +52,22 @@ export function CharacterLanes({
   return (
     <>
       {cut.lanes.map((lane) => (
-        <div key={lane.characterId} className="lane lane-voice" aria-label={`${lane.name} lane`}>
+        <div
+          key={lane.characterId}
+          className="lane lane-voice"
+          aria-label={t('{name} lane', { name: lane.name })}
+        >
           <span className="lane-name">
             {lane.name}{' '}
             <button
               className="button quiet icon"
-              aria-label={`Add a line to ${lane.name} at the playhead`}
-              title={`Add a line to ${lane.name} at the playhead`}
+              aria-label={t('Add a line to {name} at the playhead', { name: lane.name })}
+              title={t('Add a line to {name} at the playhead', { name: lane.name })}
               onClick={() => {
                 void act('movie.edit.line.add', {
                   sceneId,
                   characterId: lane.characterId,
-                  text: 'New line',
+                  text: t('New line'),
                   startSeconds: Math.round(at * 10) / 10,
                 }).then((added) => {
                   const id = (added as { id?: unknown } | undefined)?.id;
@@ -136,26 +141,26 @@ export function LineInspector({
         <span className="muted">
           {line.recorded
             ? line.outdated
-              ? 'recording is of earlier words'
-              : 'recorded'
-            : 'not recorded'}
+              ? t('recording is of earlier words')
+              : t('recorded')
+            : t('not recorded')}
         </span>
       </h3>
       <EditableField
-        label="Words"
+        label={t('Words')}
         rows={3}
         value={line.text}
         onCommit={(text) => change({ text })}
       />
       <EditableField
-        label="Delivery"
+        label={t('Delivery')}
         value={line.delivery}
-        placeholder="How it is said: hushed, tired, amused."
+        placeholder={t('How it is said: hushed, tired, amused.')}
         onCommit={(delivery) => change({ delivery })}
       />
       <div className="row wrap">
         <NumberField
-          label="Starts at (s)"
+          label={t('Starts at (s)')}
           value={line.startSeconds}
           step={0.5}
           max={36000}
@@ -164,7 +169,7 @@ export function LineInspector({
           }}
         />
         <NumberField
-          label="Volume (0 to 1)"
+          label={t('Volume (0 to 1)')}
           value={line.volume}
           step={0.1}
           max={1}
@@ -173,7 +178,7 @@ export function LineInspector({
           }}
         />
         <NumberField
-          label="Fade in (s)"
+          label={t('Fade in (s)')}
           value={line.fadeInSeconds}
           step={0.1}
           max={60}
@@ -182,7 +187,7 @@ export function LineInspector({
           }}
         />
         <NumberField
-          label="Fade out (s)"
+          label={t('Fade out (s)')}
           value={line.fadeOutSeconds}
           step={0.1}
           max={60}
@@ -192,17 +197,19 @@ export function LineInspector({
         />
       </div>
       {/* The words are in the field above; a recording has no caption track. */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      {url !== undefined && <audio controls src={url} aria-label={`Recording of ${who}`} />}
+      {url !== undefined && (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <audio controls src={url} aria-label={t('Recording of {who}', { who })} />
+      )}
       <div className="row wrap">
         <button
           className="button"
           onClick={() => {
             void act('movie.edit.line.record', { sceneId, lineId: line.id });
           }}
-          title="Speaks the line in the voice of the character. Costs a cent or less."
+          title={t('Speaks the line in the voice of the character. Costs a cent or less.')}
         >
-          <MicrophoneIcon aria-hidden="true" /> {line.recorded ? 'Record again' : 'Record'}
+          <MicrophoneIcon aria-hidden="true" /> {line.recorded ? t('Record again') : t('Record')}
           <Price command="movie.edit.line.record" input={{ sceneId, lineId: line.id }} />
         </button>
         <button
@@ -211,7 +218,7 @@ export function LineInspector({
             void act('movie.edit.line.remove', { sceneId, lineId: line.id }).then(onGone);
           }}
         >
-          <TrashIcon aria-hidden="true" /> Remove line
+          <TrashIcon aria-hidden="true" /> {t('Remove line')}
         </button>
       </div>
     </>

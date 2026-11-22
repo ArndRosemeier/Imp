@@ -87,7 +87,7 @@ describe("What's new", () => {
     const { user } = start([], RELEASE);
     await completeSetup(user);
     const button = await screen.findByRole('button', {
-      name: /What's new in Imp 0\.003, with changes/,
+      name: /What’s new in Imp 0\.003, with changes/,
     });
     expect(button.textContent).toContain('0.003');
     await user.click(button);
@@ -105,13 +105,13 @@ describe("What's new", () => {
     ).toMatch(/\/pull\/41$/);
     expect(localStorage.getItem('imp.whatsNew.seen')).toBe('0.003');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: "What's new in Imp 0.003" })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'What’s new in Imp 0.003' })).toBeTruthy();
   });
 
   it('says so when a build knows no history', async () => {
     const { user } = start();
     await completeSetup(user);
-    await user.click(await screen.findByRole('button', { name: /What's new in Imp 0\.000/ }));
+    await user.click(await screen.findByRole('button', { name: /What’s new in Imp 0\.000/ }));
     expect(screen.getByText(/made without its history/)).toBeTruthy();
     expect(screen.getByText(/A preview build/)).toBeTruthy();
   });

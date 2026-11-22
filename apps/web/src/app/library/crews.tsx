@@ -10,6 +10,7 @@ import { useId, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { ConfirmButton } from '../Field.js';
+import { t, tn, tx } from '../../i18n/i18n.js';
 
 const SavedCrews = z.object({
   crews: z.array(
@@ -37,8 +38,7 @@ export function useSavedCrewCount(): number | undefined {
 }
 
 const shortModel = (model: string): string => model.replace(/^~/, '').split('/').pop() ?? model;
-const plural = (count: number, word: string): string =>
-  `${String(count)} ${word}${count === 1 ? '' : 's'}`;
+const agents = (count: number): string => tn(count, '{count} agent', '{count} agents');
 
 function CrewCard({
   saved,
@@ -71,9 +71,13 @@ function CrewCard({
     run('crew.saved.load', { id: saved.id, replace }, (output) => {
       const { hired, dismissed } = Loaded.parse(output);
       onStatus(
-        `${saved.name}: hired ${plural(hired.length, 'agent')}${
-          dismissed.length > 0 ? `, dismissed ${dismissed.join(', ')}` : ''
-        }.`,
+        dismissed.length > 0
+          ? t('{name}: hired {agents}, dismissed {dismissed}.', {
+              name: saved.name,
+              agents: agents(hired.length),
+              dismissed: dismissed.join(', '),
+            })
+          : t('{name}: hired {agents}.', { name: saved.name, agents: agents(hired.length) }),
       );
     });
   };
@@ -91,7 +95,7 @@ function CrewCard({
           }}
         >
           <label className="sr-only" htmlFor={nameId}>
-            Name
+            {t('Name')}
           </label>
           <input
             id={nameId}
@@ -104,8 +108,8 @@ function CrewCard({
           />
           <textarea
             className="input"
-            aria-label="Notes"
-            placeholder="What this crew is good for"
+            aria-label={t('Notes')}
+            placeholder={t('What this crew is good for')}
             rows={2}
             value={notes}
             onChange={(event) => {
@@ -114,7 +118,7 @@ function CrewCard({
           />
           <div className="row">
             <button type="submit" className="button small">
-              Save
+              {t('Save')}
             </button>
             <button
               type="button"
@@ -125,7 +129,7 @@ function CrewCard({
                 setNotes(saved.notes);
               }}
             >
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
         </form>
@@ -139,8 +143,8 @@ function CrewCard({
           <button
             type="button"
             className="button quiet small"
-            aria-label={`Rename ${saved.name}`}
-            title="Rename"
+            aria-label={t('Rename {name}', { name: saved.name })}
+            title={t('Rename')}
             onClick={() => {
               setEditing(true);
             }}
@@ -149,18 +153,20 @@ function CrewCard({
           </button>
         </div>
       )}
-      <ul className="crew-card-members" aria-label={`Who is on ${saved.name}`}>
+      <ul className="crew-card-members" aria-label={t('Who is on {name}', { name: saved.name })}>
         {saved.members.map((member, index) => (
           <li key={`${member.name}-${String(index)}`} title={member.model}>
-            <span className="crew-card-name">{member.name}</span>
+            <span className="crew-card-name">{tx(member.name)}</span>
             <span className="muted">{shortModel(member.model)}</span>
           </li>
         ))}
       </ul>
       {asking ? (
-        <div className="crew-card-confirm" role="group" aria-label="Replace the crew">
+        <div className="crew-card-confirm" role="group" aria-label={t('Replace the crew')}>
           <span className="small">
-            Dismiss {replacing.join(', ')} and their conversations? The coordinator stays.
+            {t('Dismiss {value} and their conversations? The coordinator stays.', {
+              value: replacing.join(', '),
+            })}
           </span>
           <div className="row">
             <button
@@ -170,7 +176,7 @@ function CrewCard({
                 load(true);
               }}
             >
-              Replace
+              {t('Replace')}
             </button>
             <button
               type="button"
@@ -179,7 +185,7 @@ function CrewCard({
                 setAsking(false);
               }}
             >
-              Cancel
+              {t('Cancel')}
             </button>
           </div>
         </div>
@@ -193,26 +199,26 @@ function CrewCard({
               else setAsking(true);
             }}
           >
-            <UsersThreeIcon aria-hidden="true" /> Load
+            <UsersThreeIcon aria-hidden="true" /> {t('Load')}
           </button>
           <button
             type="button"
             className="button quiet small"
-            title="Hire these agents next to the current crew"
+            title={t('Hire these agents next to the current crew')}
             onClick={() => {
               load(false);
             }}
           >
-            <UserPlusIcon aria-hidden="true" /> Add to crew
+            <UserPlusIcon aria-hidden="true" /> {t('Add to crew')}
           </button>
           <button
             type="button"
             className="button quiet small"
-            title="Save the current crew under this name instead"
-            aria-label={`Update ${saved.name} with the current crew`}
+            title={t('Save the current crew under this name instead')}
+            aria-label={t('Update {name} with the current crew', { name: saved.name })}
             onClick={() => {
               run('crew.saved.save', { id: saved.id }, () => {
-                onStatus(`${saved.name} now holds the current crew.`);
+                onStatus(t('{name} now holds the current crew.', { name: saved.name }));
               });
             }}
           >
@@ -220,11 +226,11 @@ function CrewCard({
           </button>
           <ConfirmButton
             label=""
-            ariaLabel={`Delete ${saved.name}`}
-            question={`Delete “${saved.name}”? The current crew stays.`}
+            ariaLabel={t('Delete {name}', { name: saved.name })}
+            question={t('Delete “{name}”? The current crew stays.', { name: saved.name })}
             onConfirm={() => {
               run('crew.saved.delete', { id: saved.id }, () => {
-                onStatus(`Deleted ${saved.name}.`);
+                onStatus(t('Deleted {name}.', { name: saved.name }));
               });
             }}
           >
@@ -258,7 +264,7 @@ export function CrewShelf({
   ).data?.crew;
   const replacing = (crew ?? [])
     .filter((member) => member.roleId !== 'coordinator')
-    .map((member) => member.name)
+    .map((member) => tx(member.name))
     // By name: agents hired in the same millisecond have no other order.
     .sort((a, b) => a.localeCompare(b));
   const crews = saved.data?.crews ?? [];
@@ -271,7 +277,7 @@ export function CrewShelf({
           event.preventDefault();
           runCommand(imp, 'crew.saved.save', { name: name.trim() }).then(
             () => {
-              onStatus(`Saved the crew as ${name.trim()}.`);
+              onStatus(t('Saved the crew as {value}.', { value: name.trim() }));
               setName('');
             },
             (reason: unknown) => {
@@ -281,14 +287,14 @@ export function CrewShelf({
         }}
       >
         <label htmlFor={nameId} className="eyebrow">
-          Save the current crew
-          {crew !== undefined && ` (${plural(crew.length, 'agent')})`}
+          {t('Save the current crew')}
+          {crew !== undefined && ` (${agents(crew.length)})`}
         </label>
         <div className="row">
           <input
             id={nameId}
             className="input"
-            placeholder="Name, for example Drama team"
+            placeholder={t('Name, for example Drama team')}
             value={name}
             onChange={(event) => {
               setName(event.target.value);
@@ -299,7 +305,7 @@ export function CrewShelf({
             className="button small"
             disabled={name.trim() === '' || crew?.length === 0}
           >
-            <FloppyDiskIcon aria-hidden="true" /> Save
+            <FloppyDiskIcon aria-hidden="true" /> {t('Save')}
           </button>
         </div>
       </form>
@@ -309,12 +315,14 @@ export function CrewShelf({
           <UsersThreeIcon aria-hidden="true" size={36} weight="light" />
           <p>
             {query === ''
-              ? 'No saved crews yet. Save the crew you have now under a name, and load it again in any project, in place of the current crew or next to it.'
-              : 'No saved crew matches.'}
+              ? t(
+                  'No saved crews yet. Save the crew you have now under a name, and load it again in any project, in place of the current crew or next to it.',
+                )
+              : t('No saved crew matches.')}
           </p>
         </div>
       )}
-      <ul className="crew-cards" aria-label="Saved crews">
+      <ul className="crew-cards" aria-label={t('Saved crews')}>
         {crews.map((entry) => (
           <CrewCard key={entry.id} saved={entry} replacing={replacing} onStatus={onStatus} />
         ))}

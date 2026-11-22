@@ -44,6 +44,7 @@ import { saveFileAs } from './save-file.js';
 import { useLibraryDrop } from './library/drag.js';
 import { soundForScene } from './library/scene.js';
 import { FOCUS_EVENT, type Focus } from './library/model.js';
+import { currentLanguage, fixed, keyLabel, t, tn, tx } from '../i18n/i18n.js';
 
 /** A failure the editor has already shown, so saving says nothing more. */
 class SilentFailure extends Error {}
@@ -350,7 +351,7 @@ function RegionWave({
       <canvas ref={canvas} className="wave" aria-hidden="true" style={{ width, height }} />
       {unheard !== null && (
         <span className="unheard" title={unheard}>
-          Silent here: {unheard}
+          {t('Silent here: {unheard}', { unheard })}
         </span>
       )}
     </>
@@ -416,7 +417,7 @@ function ToolButton({
       aria-label={label}
       aria-pressed={pressed}
       aria-keyshortcuts={keys}
-      title={keys === undefined ? label : `${label} (${keys})`}
+      title={keys === undefined ? label : `${label} (${keyLabel(keys)})`}
       disabled={disabled}
       onClick={onClick}
     >
@@ -428,8 +429,8 @@ function ToolButton({
 /** Who made a step, in words. */
 function byWhom(step: z.infer<typeof Step>): string {
   // The cut of a scene keeps its steps without saying who made them.
-  if (step.actor === null) return 'Scene';
-  if (step.actor.kind !== 'agent') return 'You';
+  if (step.actor === null) return t('Scene');
+  if (step.actor.kind !== 'agent') return t('You');
   const role = step.actor.role ?? 'agent';
   return role
     .split('-')
@@ -460,22 +461,25 @@ function Inspector({
   };
   const steps = history?.undo.slice(-8).reverse() ?? [];
   return (
-    <aside className="audio-inspector" aria-label="Inspector">
+    <aside className="audio-inspector" aria-label={t('Inspector')}>
       {region !== undefined ? (
         <section className="stack">
-          <p className="eyebrow">Region</p>
+          <p className="eyebrow">{t('Region')}</p>
           <EditableField
-            label="Label"
+            label={t('Label')}
             value={region.label}
-            placeholder="Mara, line 3"
+            placeholder={t('Mara, line 3')}
             onCommit={(label) => edit('audio.region.update', { regionId: region.id, label })}
           />
           <p className="muted mono small">
-            {timecode(region.startSeconds)} to {timecode(region.endSeconds)}
+            {t('{startSeconds} to {endSeconds}', {
+              startSeconds: timecode(region.startSeconds),
+              endSeconds: timecode(region.endSeconds),
+            })}
           </p>
           <div className="knobs">
             <NumberInput
-              label="Gain"
+              label={t('Gain')}
               unit="dB"
               value={region.gainDb}
               step={0.5}
@@ -486,7 +490,7 @@ function Inspector({
               }}
             />
             <NumberInput
-              label="Volume"
+              label={t('Volume')}
               value={region.volume}
               step={0.05}
               min={0}
@@ -496,7 +500,7 @@ function Inspector({
               }}
             />
             <NumberInput
-              label="Fade in"
+              label={t('Fade in')}
               unit="s"
               value={region.fadeInSeconds}
               step={0.1}
@@ -507,7 +511,7 @@ function Inspector({
               }}
             />
             <NumberInput
-              label="Fade out"
+              label={t('Fade out')}
               unit="s"
               value={region.fadeOutSeconds}
               step={0.1}
@@ -518,7 +522,7 @@ function Inspector({
               }}
             />
             <NumberInput
-              label="Pan"
+              label={t('Pan')}
               value={region.pan}
               step={0.1}
               min={-1}
@@ -528,7 +532,7 @@ function Inspector({
               }}
             />
             <div className="knob">
-              <span id={`curve-${region.id}`}>Fade shape</span>
+              <span id={`curve-${region.id}`}>{t('Fade shape')}</span>
               <span className="segmented" role="group" aria-labelledby={`curve-${region.id}`}>
                 {(['linear', 'smooth'] as const).map((curve) => (
                   <button
@@ -539,7 +543,7 @@ function Inspector({
                       change({ fadeCurve: curve });
                     }}
                   >
-                    {curve === 'linear' ? 'Linear' : 'Smooth'}
+                    {curve === 'linear' ? t('Linear') : t('Smooth')}
                   </button>
                 ))}
               </span>
@@ -553,7 +557,7 @@ function Inspector({
                 void edit('audio.normalize', { regionIds: [region.id] });
               }}
             >
-              <EqualizerIcon aria-hidden="true" /> Normalize to −1 dB
+              <EqualizerIcon aria-hidden="true" /> {t('Normalize to −1 dB')}
             </button>
             <button
               type="button"
@@ -562,7 +566,7 @@ function Inspector({
                 onSelectRegion(region);
               }}
             >
-              Select its time
+              {t('Select its time')}
             </button>
           </div>
           <EffectsPanel
@@ -574,17 +578,18 @@ function Inspector({
         </section>
       ) : track !== undefined ? (
         <section className="stack">
-          <p className="eyebrow">Track</p>
+          <p className="eyebrow">{t('Track')}</p>
           <p className="inspector-title">{track.name}</p>
           {doc.link !== null && (
             <p className="muted small">
-              The tracks of a scene are its kinds of sound. Set levels on the regions, or normalize
-              them all here.
+              {t(
+                'The tracks of a scene are its kinds of sound. Set levels on the regions, or normalize them all here.',
+              )}
             </p>
           )}
           <div className="knobs" hidden={doc.link !== null}>
             <NumberInput
-              label="Gain"
+              label={t('Gain')}
               unit="dB"
               value={track.gainDb}
               step={0.5}
@@ -595,7 +600,7 @@ function Inspector({
               }}
             />
             <NumberInput
-              label="Pan"
+              label={t('Pan')}
               value={track.pan}
               step={0.1}
               min={-1}
@@ -614,12 +619,12 @@ function Inspector({
                 void edit('audio.normalize', { trackId: track.id });
               }}
             >
-              <EqualizerIcon aria-hidden="true" /> Normalize regions
+              <EqualizerIcon aria-hidden="true" /> {t('Normalize regions')}
             </button>
             {doc.link === null && (
               <ConfirmButton
-                label="Remove track"
-                question="Remove this track and its regions?"
+                label={t('Remove track')}
+                question={t('Remove this track and its regions?')}
                 onConfirm={() => {
                   void edit('audio.track.remove', { trackId: track.id });
                 }}
@@ -631,17 +636,17 @@ function Inspector({
         </section>
       ) : (
         <section className="stack">
-          <p className="eyebrow">Document</p>
+          <p className="eyebrow">{t('Document')}</p>
           <p className="inspector-title">{doc.name}</p>
           <p className="muted">
-            Click a region to shape it, or drag across a track to select a stretch of time.
+            {t('Click a region to shape it, or drag across a track to select a stretch of time.')}
           </p>
         </section>
       )}
       <section className="stack history">
-        <p className="eyebrow">History</p>
+        <p className="eyebrow">{t('History')}</p>
         {steps.length === 0 ? (
-          <p className="muted small">Nothing changed yet.</p>
+          <p className="muted small">{t('Nothing changed yet.')}</p>
         ) : (
           <ol className="steps-list">
             {steps.map((step, index) => (
@@ -649,7 +654,7 @@ function Inspector({
                 key={`${step.at ?? 'step'}-${String(index)}`}
                 data-agent={step.actor?.kind === 'agent'}
               >
-                <span>{step.label}</span>
+                <span>{tx(step.label)}</span>
                 <span className="muted small">{byWhom(step)}</span>
               </li>
             ))}
@@ -729,8 +734,11 @@ function AudioEditor({
   useLibraryDrop(timeline, {
     label:
       loaded === undefined
-        ? 'Audio editor'
-        : `${loaded.name}, ${dropTrack?.name ?? 'a new track'}, at the playhead`,
+        ? t('Audio editor')
+        : t('{name}, {value}, at the playhead', {
+            name: loaded.name,
+            value: dropTrack?.name ?? t('a new track'),
+          }),
     accepts: (asset) => {
       if (loaded === undefined || asset.modality !== 'sound' || asset.blobKey === null) {
         return false;
@@ -768,7 +776,7 @@ function AudioEditor({
         : dropTrack?.id;
       if (target === undefined) {
         const added = await edit('audio.track.add', {
-          name: asset.title.slice(0, 80) || 'Track 1',
+          name: asset.title.slice(0, 80) || t('Track 1'),
         });
         if (added === undefined) return;
         target = WithDoc.parse(added).document.tracks.at(-1)?.id;
@@ -815,7 +823,7 @@ function AudioEditor({
         <Problem text={live.error} />
         {live.error !== null && (
           <button type="button" className="button" onClick={onClose}>
-            Back to the documents
+            {t('Back to the documents')}
           </button>
         )}
       </>
@@ -983,17 +991,23 @@ function AudioEditor({
       );
     },
     addTrack: () => {
-      void edit('audio.track.add', { name: `Track ${String(tracks.length + 1)}` });
+      void edit('audio.track.add', {
+        name: t('Track {value}', { value: String(tracks.length + 1) }),
+      });
     },
     exportFile: () => {
       saveFileAs(
-        { suggestedName: `${doc.name}.wav`, mediaType: 'audio/wav', description: 'Sound' },
+        {
+          suggestedName: t('{name}.wav', { name: doc.name }),
+          mediaType: 'audio/wav',
+          description: t('Sound'),
+        },
         async () => {
           const output = await edit('audio.export');
           // The editor has already said what went wrong.
           if (output === undefined) throw new SilentFailure();
           const file = await imp.blob(Rendered.parse(output).key);
-          if (file === undefined) throw new Error('The exported sound went missing.');
+          if (file === undefined) throw new Error(t('The exported sound went missing.'));
           return file.bytes;
         },
       ).catch((reason: unknown) => {
@@ -1087,24 +1101,26 @@ function AudioEditor({
     }
     const hit = (event.target as HTMLElement).closest<HTMLElement>('[data-region-id]');
     const index = trackIndexAt(event.clientY);
-    const t = timeAt(event.clientX);
+    const time = timeAt(event.clientX);
     if (event.shiftKey && selection !== null) {
       const anchor =
-        Math.abs(t - selection.from) < Math.abs(t - selection.to) ? selection.to : selection.from;
+        Math.abs(time - selection.from) < Math.abs(time - selection.to)
+          ? selection.to
+          : selection.from;
       sweep.current = { trackIndex: index, at: anchor, moved: true, regionId: null };
-      setSelection({ ...selection, from: Math.min(anchor, t), to: Math.max(anchor, t) });
+      setSelection({ ...selection, from: Math.min(anchor, time), to: Math.max(anchor, time) });
       return;
     }
     sweep.current = {
       trackIndex: index,
-      at: t,
+      at: time,
       moved: false,
       regionId: hit?.dataset['regionId'] ?? null,
     };
     setRegionId(null);
     setTrackId(tracks[index]?.id ?? null);
     setSelection(null);
-    player.setAt(t);
+    player.setAt(time);
   };
   const onLanesMove = (event: PointerEvent<HTMLDivElement>): void => {
     if (fingers.current.has(event.pointerId)) {
@@ -1116,16 +1132,16 @@ function AudioEditor({
     }
     const start = sweep.current;
     if (start === null) return;
-    const t = timeAt(event.clientX);
-    if (!start.moved && Math.abs(t - start.at) * zoom < 3) return;
+    const time = timeAt(event.clientX);
+    if (!start.moved && Math.abs(time - start.at) * zoom < 3) return;
     start.moved = true;
     const index = trackIndexAt(event.clientY);
     const low = Math.min(index, start.trackIndex);
     const high = Math.max(index, start.trackIndex);
     setSelection({
       trackIds: tracks.slice(low, high + 1).map((track) => track.id),
-      from: Math.min(start.at, t),
-      to: Math.max(start.at, t),
+      from: Math.min(start.at, time),
+      to: Math.max(start.at, time),
     });
   };
   const onLanesUp = (event: PointerEvent<HTMLDivElement>): void => {
@@ -1202,17 +1218,22 @@ function AudioEditor({
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}
       onKeyDown={onKey}
-      aria-label={`Audio editor: ${doc.name}`}
+      aria-label={t('Audio editor: {name}', { name: doc.name })}
     >
       <div className="audio-top">
-        <div className="transport" role="group" aria-label="Transport">
-          <ToolButton icon={SkipBackIcon} label="To start" keys="Home" onClick={actions.toStart} />
+        <div className="transport" role="group" aria-label={t('Transport')}>
+          <ToolButton
+            icon={SkipBackIcon}
+            label={t('To start')}
+            keys="Home"
+            onClick={actions.toStart}
+          />
           <button
             type="button"
             className="play"
-            aria-label={player.playing ? 'Pause' : 'Play'}
+            aria-label={player.playing ? t('Pause') : t('Play')}
             aria-keyshortcuts="Space"
-            title={player.playing ? 'Pause (Space)' : 'Play (Space)'}
+            title={player.playing ? t('Pause (Space)') : t('Play (Space)')}
             disabled={player.loading || doc.durationSeconds === 0}
             onClick={actions.playPause}
           >
@@ -1222,21 +1243,25 @@ function AudioEditor({
               <PlayIcon aria-hidden="true" size={20} weight="fill" />
             )}
           </button>
-          <output className="readout" aria-label="Playhead">
+          <output className="readout" aria-label={t('Playhead')}>
             {timecode(at)}
-            <small>{player.loading ? 'mixing…' : `of ${timecode(doc.durationSeconds)}`}</small>
+            <small>
+              {player.loading
+                ? t('mixing…')
+                : t('of {duration}', { duration: timecode(doc.durationSeconds) })}
+            </small>
           </output>
           {/* Always there, so the layout does not move while a selection is drawn. */}
-          <output className="readout range" aria-label="Selection" data-empty={range === null}>
-            {range === null ? 'No selection' : `${timecode(range.from)} – ${timecode(range.to)}`}
+          <output className="readout range" aria-label={t('Selection')} data-empty={range === null}>
+            {range === null ? t('No selection') : `${timecode(range.from)} – ${timecode(range.to)}`}
             <small>
               {range === null
-                ? 'drag across a track'
-                : `${(range.to - range.from).toFixed(3)} s selected`}
+                ? t('drag across a track')
+                : t('{value} s selected', { value: fixed(range.to - range.from, 3) })}
             </small>
           </output>
         </div>
-        <div className="tools" role="toolbar" aria-label="Edit">
+        <div className="tools" role="toolbar" aria-label={t('Edit')}>
           <RecordControl
             imp={imp}
             projectId={project.id}
@@ -1246,35 +1271,42 @@ function AudioEditor({
             disabledReason={
               doc.link === null
                 ? null
-                : "A scene's sound holds only sounds of the film. Record into a document of its own (New)."
+                : t(
+                    "A scene's sound holds only sounds of the film. Record into a document of its own (New).",
+                  )
             }
             onError={setError}
           />
           <span className="tool-gap" />
           <ToolButton
             icon={ScissorsIcon}
-            label="Split at playhead"
+            label={t('Split at playhead')}
             keys="S"
             onClick={actions.split}
           />
           <ToolButton
             icon={CopyIcon}
-            label="Copy"
+            label={t('Copy')}
             keys="Control+C"
             disabled={range === null && picked === undefined}
             onClick={actions.copy}
           />
-          <ToolButton icon={ClipboardIcon} label="Paste" keys="Control+V" onClick={actions.paste} />
+          <ToolButton
+            icon={ClipboardIcon}
+            label={t('Paste')}
+            keys="Control+V"
+            onClick={actions.paste}
+          />
           <ToolButton
             icon={TrashIcon}
-            label="Delete"
+            label={t('Delete')}
             keys="Delete"
             disabled={range === null && picked === undefined}
             onClick={actions.remove}
           />
           <ToolButton
             icon={SpeakerSimpleSlashIcon}
-            label="Silence selection"
+            label={t('Silence selection')}
             keys="Control+L"
             disabled={range === null}
             onClick={actions.silence}
@@ -1282,7 +1314,7 @@ function AudioEditor({
           <span className="tool-gap" />
           <ToolButton
             icon={ArrowCounterClockwiseIcon}
-            label="Undo"
+            label={t('Undo')}
             keys="Control+Z"
             disabled={history?.undo.length === 0}
             onClick={() => {
@@ -1291,7 +1323,7 @@ function AudioEditor({
           />
           <ToolButton
             icon={ArrowClockwiseIcon}
-            label="Redo"
+            label={t('Redo')}
             keys="Control+Shift+Z"
             disabled={history?.redo.length === 0}
             onClick={actions.redo}
@@ -1299,7 +1331,7 @@ function AudioEditor({
           <span className="tool-gap" />
           <ToolButton
             icon={MagnifyingGlassMinusIcon}
-            label="Zoom out"
+            label={t('Zoom out')}
             keys="-"
             onClick={actions.zoomOut}
           />
@@ -1307,13 +1339,13 @@ function AudioEditor({
             type="button"
             className="tool text"
             onClick={actions.fit}
-            title="Fit the document"
+            title={t('Fit the document')}
           >
-            Fit
+            {t('Fit')}
           </button>
           <ToolButton
             icon={MagnifyingGlassPlusIcon}
-            label="Zoom in"
+            label={t('Zoom in')}
             keys="="
             onClick={actions.zoomIn}
           />
@@ -1322,12 +1354,12 @@ function AudioEditor({
             type="button"
             className="tool text"
             aria-pressed={showWords}
-            title="Dialogue as text: pick words to select, delete or move them"
+            title={t('Dialogue as text: pick words to select, delete or move them')}
             onClick={() => {
               setWordsOpen(!showWords);
             }}
           >
-            <TextTIcon aria-hidden="true" size={18} /> Words
+            <TextTIcon aria-hidden="true" size={18} /> {t('Words')}
           </button>
           <span className="tool-gap" />
           <button
@@ -1336,21 +1368,26 @@ function AudioEditor({
             onClick={actions.exportFile}
             disabled={doc.durationSeconds === 0}
           >
-            <DownloadSimpleIcon aria-hidden="true" /> Export WAV
+            <DownloadSimpleIcon aria-hidden="true" /> {t('Export WAV')}
           </button>
         </div>
       </div>
       {doc.link?.kind === 'scene' && (
         <p className="linked-note muted small">
-          This is the sound of the scene&apos;s cut. Changes here change the Edit stage, and undo
-          there as well. Moving or trimming a shot&apos;s line takes it apart from its picture.
+          {t(
+            'This is the sound of the scene’s cut. Changes here change the Edit stage, and undo there as well. Moving or trimming a shot’s line takes it apart from its picture.',
+          )}
         </p>
       )}
       {agentLast && (
         <div className="agent-pass" role="status">
           <RobotIcon aria-hidden="true" size={16} />
           <span>
-            {byWhom(lastStep)} changed this document: {lastStep.label.toLowerCase()}.
+            {t('{lastStep} changed this document: {value}.', {
+              lastStep: byWhom(lastStep),
+              // English reads the step in lower case inside the sentence; German keeps its capitals.
+              value: currentLanguage() === 'en' ? lastStep.label.toLowerCase() : tx(lastStep.label),
+            })}
           </span>
           <button
             type="button"
@@ -1359,7 +1396,7 @@ function AudioEditor({
               actions.undo(true);
             }}
           >
-            Undo this pass
+            {t('Undo this pass')}
           </button>
         </div>
       )}
@@ -1369,12 +1406,12 @@ function AudioEditor({
           <div className="track-heads">
             <div className="ruler-corner">
               <span className="eyebrow">
-                {tracks.length === 1 ? '1 track' : `${String(tracks.length)} tracks`}
+                {tn(tracks.length, '{count} track', '{count} tracks')}
               </span>
             </div>
             {picture !== null && (
               <div className="picture-head">
-                <span className="eyebrow">Picture</span>
+                <span className="eyebrow">{t('Picture')}</span>
               </div>
             )}
             {tracks.map((track, index) => (
@@ -1400,37 +1437,40 @@ function AudioEditor({
                     type="button"
                     className="ms"
                     aria-pressed={track.mute}
-                    aria-label={`Mute ${track.name}`}
-                    title="Mute"
+                    aria-label={t('Mute {name}', { name: track.name })}
+                    title={t('Mute')}
                     onClick={() => {
                       void edit('audio.track.update', { trackId: track.id, mute: !track.mute });
                     }}
                   >
-                    M
+                    {t('M')}
                   </button>
                   <button
                     type="button"
                     className="ms solo"
                     aria-pressed={track.solo}
-                    aria-label={`Solo ${track.name}`}
-                    title="Solo"
+                    aria-label={t('Solo {name}', { name: track.name })}
+                    title={t('Solo')}
                     onClick={() => {
                       void edit('audio.track.update', { trackId: track.id, solo: !track.solo });
                     }}
                   >
-                    S
+                    {t('S')}
                   </button>
                   <span className="muted mono small">
                     {track.gainDb === 0
                       ? '0 dB'
-                      : `${track.gainDb > 0 ? '+' : ''}${String(track.gainDb)} dB`}
+                      : t('{value}{gainDb} dB', {
+                          value: track.gainDb > 0 ? '+' : '',
+                          gainDb: String(track.gainDb),
+                        })}
                   </span>
                 </div>
               </div>
             ))}
             {doc.link === null && (
               <button type="button" className="add-track" onClick={actions.addTrack}>
-                <PlusIcon aria-hidden="true" /> Add track
+                <PlusIcon aria-hidden="true" /> {t('Add track')}
               </button>
             )}
           </div>
@@ -1440,7 +1480,7 @@ function AudioEditor({
                 className="audio-ruler"
                 role="slider"
                 tabIndex={-1}
-                aria-label="Playhead position"
+                aria-label={t('Playhead position')}
                 aria-valuemin={0}
                 aria-valuemax={Math.round(doc.durationSeconds * 1000) / 1000}
                 aria-valuenow={Math.round(at * 1000) / 1000}
@@ -1469,7 +1509,7 @@ function AudioEditor({
                 ))}
               </div>
               {picture !== null && (
-                <div className="picture-strip" aria-label="Picture of the scene" role="group">
+                <div className="picture-strip" aria-label={t('Picture of the scene')} role="group">
                   {picture.map((item) => (
                     <span
                       key={item.itemId}
@@ -1482,7 +1522,9 @@ function AudioEditor({
                       title={item.label}
                     >
                       <strong>
-                        {item.kind === 'title' ? 'Title' : `Shot ${String(item.index)}`}
+                        {item.kind === 'title'
+                          ? t('Title')
+                          : t('Shot {index}', { index: String(item.index) })}
                       </strong>{' '}
                       {item.label}
                     </span>
@@ -1528,7 +1570,7 @@ function AudioEditor({
                         const lift = drag?.regionId === original.id ? drag.dTrack * LANE_PX : 0;
                         const fadeInPx = Math.min(w, region.fadeInSeconds * zoom);
                         const fadeOutPx = Math.min(w, region.fadeOutSeconds * zoom);
-                        const name = region.label === '' ? 'Sound' : region.label;
+                        const name = region.label === '' ? t('Sound') : region.label;
                         return (
                           <div
                             key={original.id}
@@ -1537,7 +1579,11 @@ function AudioEditor({
                             data-dragging={drag?.regionId === original.id}
                             data-region-id={original.id}
                             role="group"
-                            aria-label={`${name}, ${timecode(region.startSeconds)} to ${timecode(region.endSeconds)}`}
+                            aria-label={t('{name}, {startSeconds} to {endSeconds}', {
+                              name,
+                              startSeconds: timecode(region.startSeconds),
+                              endSeconds: timecode(region.endSeconds),
+                            })}
                             style={{ left, width: w, transform: `translateY(${String(lift)}px)` }}
                             onDoubleClick={() => {
                               setSelection({
@@ -1549,7 +1595,7 @@ function AudioEditor({
                           >
                             <span
                               className="region-bar"
-                              title="Drag to move"
+                              title={t('Drag to move')}
                               aria-hidden="true"
                               onPointerDown={(event) => {
                                 onRegionDown(event, original, 'move');
@@ -1562,7 +1608,12 @@ function AudioEditor({
                             <span className="region-label">
                               {name}
                               {region.gainDb !== 0 && (
-                                <small>{` ${region.gainDb > 0 ? '+' : ''}${region.gainDb.toFixed(1)} dB`}</small>
+                                <small>
+                                  {t(' {value}{value2} dB', {
+                                    value: region.gainDb > 0 ? '+' : '',
+                                    value2: fixed(region.gainDb, 1),
+                                  })}
+                                </small>
                               )}
                             </span>
                             <RegionWave region={region} width={w} height={LANE_PX - 26} />
@@ -1671,19 +1722,27 @@ function AudioEditor({
         />
       )}
       <p className="muted small shortcuts">
-        Space plays · R records · S splits at the playhead · drag across a track to select (two
-        fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap
-        · Ctrl+L silences · Ctrl+Z undoes
+        {t(
+          'Space plays · R records · S splits at the playhead · drag across a track to select (two fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L silences · Ctrl+Z undoes',
+        )}
       </p>
     </div>
   );
 }
 
 const KIND_LABEL = {
-  dialogue: 'Dialogue',
-  effect: 'Effect',
-  music: 'Music',
-  voice: 'Voice',
+  get dialogue(): string {
+    return t('Dialogue');
+  },
+  get effect(): string {
+    return t('Effect');
+  },
+  get music(): string {
+    return t('Music');
+  },
+  get voice(): string {
+    return t('Voice');
+  },
 } as const;
 
 function NewDocument({
@@ -1714,7 +1773,7 @@ function NewDocument({
     }));
     runCommand(imp, 'audio.doc.create', {
       projectId: project.id,
-      name: name.trim() === '' ? 'Untitled sound' : name.trim(),
+      name: name.trim() === '' ? t('Untitled sound') : name.trim(),
       sources,
     }).then(
       (output) => {
@@ -1726,25 +1785,26 @@ function NewDocument({
     );
   };
   return (
-    <section className="card stack new-audio" aria-label="New audio document">
+    <section className="card stack new-audio" aria-label={t('New audio document')}>
       <div className="field">
-        <label htmlFor={nameId}>Name</label>
+        <label htmlFor={nameId}>{t('Name')}</label>
         <input
           id={nameId}
           className="input"
           value={name}
-          placeholder="Scene 4, lamp room"
+          placeholder={t('Scene 4, lamp room')}
           onChange={(event) => {
             setName(event.target.value);
           }}
         />
       </div>
       <fieldset className="library">
-        <legend>Sounds to start with, each on its own track</legend>
+        <legend>{t('Sounds to start with, each on its own track')}</legend>
         {library.data !== undefined && sounds.length === 0 && (
           <p className="muted">
-            No sounds are recorded yet. Record dialogue on the Shots stage or make effects and music
-            on the Sound stage, or start empty.
+            {t(
+              'No sounds are recorded yet. Record dialogue on the Shots stage or make effects and music on the Sound stage, or start empty.',
+            )}
           </p>
         )}
         {sounds.map((sound) => (
@@ -1773,12 +1833,12 @@ function NewDocument({
         <button type="button" className="button primary" onClick={create}>
           <WaveformIcon aria-hidden="true" />{' '}
           {chosen.length === 0
-            ? 'Start empty'
-            : `Open ${String(chosen.length)} ${chosen.length === 1 ? 'sound' : 'sounds'}`}
+            ? t('Start empty')
+            : tn(chosen.length, 'Open {count} sound', 'Open {count} sounds')}
         </button>
         {onCancel !== null && (
           <button type="button" className="button quiet" onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </button>
         )}
       </div>
@@ -1804,7 +1864,7 @@ export function OpenInAudioEditor({
       <button
         type="button"
         className="button quiet"
-        title="Edit this scene's sound in the audio editor: waveforms, trims, fades, levels"
+        title={t("Edit this scene's sound in the audio editor: waveforms, trims, fades, levels")}
         onClick={() => {
           setError(null);
           runCommand(imp, 'audio.doc.open', {
@@ -1826,7 +1886,7 @@ export function OpenInAudioEditor({
           );
         }}
       >
-        <WaveformIcon aria-hidden="true" /> Audio editor
+        <WaveformIcon aria-hidden="true" /> {t('Audio editor')}
       </button>
       {error !== null && (
         <span className="error" role="alert">
@@ -1886,8 +1946,8 @@ export function AudioView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Audio</h1>
-        <div className="row wrap audio-docs" role="tablist" aria-label="Audio documents">
+        <h1>{t('Audio')}</h1>
+        <div className="row wrap audio-docs" role="tablist" aria-label={t('Audio documents')}>
           {documents.map((candidate) => (
             <button
               key={candidate.id}
@@ -1910,7 +1970,7 @@ export function AudioView({ project }: { project: Project }): ReactElement {
               setMaking(true);
             }}
           >
-            <PlusIcon aria-hidden="true" /> New
+            <PlusIcon aria-hidden="true" /> {t('New')}
           </button>
         </div>
       </div>
@@ -1919,9 +1979,9 @@ export function AudioView({ project }: { project: Project }): ReactElement {
         <>
           {documents.length === 0 && (
             <p className="muted">
-              Edit sound the way an audio editor does: cut, trim, fade, level and mix recorded
-              dialogue, effects and music on tracks. Agents can do every step too, and you can undo
-              their work at once.
+              {t(
+                'Edit sound the way an audio editor does: cut, trim, fade, level and mix recorded dialogue, effects and music on tracks. Agents can do every step too, and you can undo their work at once.',
+              )}
             </p>
           )}
           <NewDocument
@@ -1951,15 +2011,15 @@ export function AudioView({ project }: { project: Project }): ReactElement {
           />
           <div className="row wrap doc-actions">
             <EditableField
-              label="Document name"
+              label={t('Document name')}
               value={open.name}
               onCommit={(name) =>
                 runCommand(imp, 'audio.doc.rename', { projectId: project.id, docId: open.id, name })
               }
             />
             <ConfirmButton
-              label="Delete document"
-              question="Delete this audio document? The sounds it plays stay."
+              label={t('Delete document')}
+              question={t('Delete this audio document? The sounds it plays stay.')}
               onConfirm={() => {
                 void runCommand(imp, 'audio.doc.delete', {
                   projectId: project.id,

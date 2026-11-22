@@ -3,6 +3,7 @@ import { ArrowSquareOutIcon, SparkleIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp } from './context.js';
+import { currentLanguage, t } from '../i18n/i18n.js';
 
 /** The last version this browser has shown in What's new. */
 const SEEN_KEY = 'imp.whatsNew.seen';
@@ -50,12 +51,14 @@ export function unseenVersions(changelog: Changelog, seen: string | null): Set<s
   );
 }
 
-const DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
-
 function formatDay(date: string): string {
   const [year, month, day] = date.split('-').map(Number);
   if (year === undefined || month === undefined || day === undefined) return date;
-  return DAY.format(new Date(year, month - 1, day));
+  return new Intl.DateTimeFormat(currentLanguage(), {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day));
 }
 
 /** The version in the top bar, and the panel of what changed that it opens. */
@@ -86,7 +89,7 @@ export function WhatsNew(): ReactElement | null {
   if (changelog === null) {
     return error === null ? null : (
       <span className="whats-new-error" title={error}>
-        Version unknown
+        {t('Version unknown')}
       </span>
     );
   }
@@ -100,9 +103,18 @@ export function WhatsNew(): ReactElement | null {
   };
   const latest = changelog.releases.find((release) => release.version === changelog.version);
   const summary = changelog.preview
-    ? 'A preview build, not a published version.'
-    : `${latest === undefined || latest.date === null ? '' : `Published ${formatDay(latest.date)}. `}Every change that lands adds 0.001.`;
-  const label = `What's new in Imp ${changelog.version}${unseen.size > 0 ? ', with changes you have not seen' : ''}`;
+    ? t('A preview build, not a published version.')
+    : latest === undefined || latest.date === null
+      ? t('Every change that lands adds 0.001.')
+      : t('Published {date}. Every change that lands adds 0.001.', {
+          date: formatDay(latest.date),
+        });
+  const label =
+    unseen.size > 0
+      ? t('What’s new in Imp {version}, with changes you have not seen', {
+          version: changelog.version,
+        })
+      : t('What’s new in Imp {version}', { version: changelog.version });
 
   return (
     <>
@@ -111,14 +123,14 @@ export function WhatsNew(): ReactElement | null {
         data-unseen={unseen.size > 0 ? 'true' : undefined}
         aria-label={label}
         aria-haspopup="dialog"
-        title="What's new"
+        title={t('What’s new')}
         onClick={open}
       >
         <SparkleIcon aria-hidden="true" size={18} weight={unseen.size > 0 ? 'fill' : 'regular'} />
-        <span className="label">What&rsquo;s new</span>
+        <span className="label">{t('What’s new')}</span>
         <span className="version-tag">
           {changelog.version}
-          {changelog.preview && <span className="preview-mark"> preview</span>}
+          {changelog.preview && <span className="preview-mark"> {t('preview')}</span>}
         </span>
         {unseen.size > 0 && <span className="whats-new-dot" aria-hidden="true" />}
       </button>
@@ -134,7 +146,7 @@ export function WhatsNew(): ReactElement | null {
       >
         <header className="whats-new-head">
           <div className="stack whats-new-heading">
-            <span className="eyebrow">What&rsquo;s new</span>
+            <span className="eyebrow">{t('What’s new')}</span>
             <h2 id="whats-new-title">
               Imp <span className="whats-new-version">{changelog.version}</span>
             </h2>
@@ -142,7 +154,7 @@ export function WhatsNew(): ReactElement | null {
           </div>
           <button
             className="button quiet icon"
-            aria-label="Close"
+            aria-label={t('Close')}
             onClick={() => dialog.current?.close()}
           >
             <XIcon aria-hidden="true" size={18} />
@@ -150,7 +162,7 @@ export function WhatsNew(): ReactElement | null {
         </header>
         {changelog.releases.length === 0 ? (
           <p className="whats-new-empty muted">
-            This build was made without its history, so it cannot say what changed.
+            {t('This build was made without its history, so it cannot say what changed.')}
           </p>
         ) : (
           <ol className="releases">
@@ -166,13 +178,13 @@ export function WhatsNew(): ReactElement | null {
                   <div className="release-rail">
                     <span className="release-version">{release.version}</span>
                     <span className="release-date">
-                      {release.date === null ? 'Not merged yet' : formatDay(release.date)}
+                      {release.date === null ? t('Not merged yet') : formatDay(release.date)}
                     </span>
                   </div>
                   <div className="release-body">
                     <h3 className="release-title">
                       {release.title}
-                      {isNew && <span className="release-new">New</span>}
+                      {isNew && <span className="release-new">{t('New')}</span>}
                     </h3>
                     {release.notes.length > 0 && (
                       <ul className="release-notes">
@@ -188,7 +200,8 @@ export function WhatsNew(): ReactElement | null {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Change #{release.pr} <ArrowSquareOutIcon aria-hidden="true" size={13} />
+                        {t('Change #{pr}', { pr: release.pr })}{' '}
+                        <ArrowSquareOutIcon aria-hidden="true" size={13} />
                       </a>
                     )}
                   </div>
