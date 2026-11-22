@@ -52,12 +52,19 @@ export class ArchiveStreamWriter {
   readonly #stamp: { time: number; date: number };
   readonly #written: Written[] = [];
   readonly #paths = new Set<string>();
+  readonly #limit: number;
   #at = 0;
   #finished = false;
 
-  constructor(sink: ArchiveSink, modified = new Date()) {
+  /**
+   * `zip64From` is the size, offset or count from which ZIP64 records are
+   * written: where ZIP requires them unless given. Tests pass 0 to write them
+   * for every entry, as they are for files of more than 4 GB.
+   */
+  constructor(sink: ArchiveSink, modified = new Date(), zip64From = MAX_32) {
     this.#sink = sink;
     this.#stamp = dosDateTime(modified);
+    this.#limit = zip64From;
   }
 
   /** Bytes handed to the sink so far. */
@@ -77,7 +84,7 @@ export class ArchiveStreamWriter {
     this.#paths.add(path);
     const name = encodeUtf8(path);
     const crc = crc32(bytes);
-    const big = bytes.length >= MAX_32;
+    const big = bytes.length >= this.#limit;
     const header = new Uint8Array(30 + name.length + (big ? 20 : 0));
     const view = new DataView(header.buffer);
     view.setUint32(0, LOCAL_HEADER, true);
@@ -112,8 +119,8 @@ export class ArchiveStreamWriter {
     const parts: Uint8Array[] = [];
     let centralSize = 0;
     for (const entry of this.#written) {
-      const bigSize = entry.size >= MAX_32;
-      const bigOffset = entry.offset >= MAX_32;
+      const bigSize = entry.size >= this.#limit;
+      const bigOffset = entry.offset >= this.#limit;
       const extraLength = (bigSize ? 16 : 0) + (bigOffset ? 8 : 0);
       const record = new Uint8Array(
         46 + entry.name.length + (extraLength > 0 ? 4 + extraLength : 0),
@@ -151,7 +158,10 @@ export class ArchiveStreamWriter {
     }
     const centralStart = this.#at;
     const count = this.#written.length;
-    const zip64End = count >= MAX_16 || centralStart >= MAX_32 || centralSize >= MAX_32;
+    const zip64End =
+      count >= Math.min(MAX_16, this.#limit) ||
+      centralStart >= this.#limit ||
+      centralSize >= this.#limit;
     if (zip64End) {
       const end = new Uint8Array(56 + 20);
       const view = new DataView(end.buffer);

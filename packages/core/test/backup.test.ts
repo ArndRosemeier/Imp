@@ -59,6 +59,30 @@ function setup(afterLoad?: (store: KeyValueStore) => Promise<void>) {
   return { runtime, run, savedFile, pick };
 }
 
+async function streamed(
+  entries: readonly (readonly [string, Uint8Array])[],
+  zip64From?: number,
+): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  const writer = new ArchiveStreamWriter(
+    (bytes) => {
+      chunks.push(bytes.slice());
+      return Promise.resolve();
+    },
+    new Date(0),
+    zip64From,
+  );
+  for (const [path, bytes] of entries) await writer.add(path, bytes);
+  const size = await writer.finish();
+  const file = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    file.set(chunk, at);
+    at += chunk.length;
+  }
+  return file;
+}
+
 describe('the streamed archive', () => {
   it('writes a ZIP that the in-memory reader and the streamed reader both read back', async () => {
     const chunks: Uint8Array[] = [];
@@ -125,6 +149,72 @@ describe('the streamed archive', () => {
     expect(await readArchiveFile(bytesSource(file), last)).toEqual(
       new Uint8Array([(count - 1) & 255]),
     );
+  });
+
+  it('writes and reads ZIP64 size and offset fields, as for files over 4 GB', async () => {
+    const file = await streamed(
+      [
+        ['a', encodeUtf8('first')],
+        ['b/c', new Uint8Array([1, 2, 3])],
+      ],
+      0,
+    );
+    const view = new DataView(file.buffer);
+    expect(view.getUint32(18, true)).toBe(0xffffffff);
+    const directory = await readArchiveDirectory(bytesSource(file));
+    expect(directory.map((entry) => [entry.path, entry.size])).toEqual([
+      ['a', 5],
+      ['b/c', 3],
+    ]);
+    const second = directory[1];
+    if (second === undefined) throw new Error('missing');
+    expect(second.headerOffset).toBeGreaterThan(0);
+    expect(await readArchiveFile(bytesSource(file), second)).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it('refuses what it cannot read, and a writer used after it finished', async () => {
+    const writer = new ArchiveStreamWriter(() => Promise.resolve());
+    await writer.finish();
+    await expect(writer.add('x', new Uint8Array())).rejects.toThrow(/finished/);
+    await expect(writer.finish()).rejects.toThrow(/finished/);
+    await expect(readArchiveDirectory(bytesSource(new Uint8Array(10)))).rejects.toThrow(
+      /not a ZIP/,
+    );
+    await expect(readArchiveDirectory(bytesSource(new Uint8Array(100)))).rejects.toThrow(
+      /not a ZIP/,
+    );
+    const good = await streamed([['x', encodeUtf8('hello')]]);
+    // Cut off before the table of contents.
+    const cut = good.slice(0, 10);
+    const tail = good.slice(good.length - 22);
+    const joined = new Uint8Array(cut.length + tail.length);
+    joined.set(cut);
+    joined.set(tail, cut.length);
+    await expect(readArchiveDirectory(bytesSource(joined))).rejects.toThrow(/cut short|damaged/);
+    // A broken table of contents.
+    const broken = good.slice();
+    const [entry] = await readArchiveDirectory(bytesSource(good));
+    if (entry === undefined) throw new Error('missing');
+    broken[good.length - 22 - 47] = 0;
+    await expect(readArchiveDirectory(bytesSource(broken))).rejects.toThrow(/broken/);
+    // Packed again by another program, a broken local header, and a file cut short.
+    await expect(readArchiveFile(bytesSource(good), { ...entry, method: 8 })).rejects.toThrow(
+      /another program/,
+    );
+    await expect(readArchiveFile(bytesSource(good), { ...entry, headerOffset: 5 })).rejects.toThrow(
+      /damaged at/,
+    );
+    await expect(
+      readArchiveFile(bytesSource(good), { ...entry, packedSize: good.length }),
+    ).rejects.toThrow(/cut short/);
+    // Folders are left out.
+    const withFolder = writeArchive([
+      { path: 'dir/', bytes: new Uint8Array() },
+      { path: 'dir/f', bytes: new Uint8Array([1]) },
+    ]);
+    expect((await readArchiveDirectory(bytesSource(withFolder))).map((e) => e.path)).toEqual([
+      'dir/f',
+    ]);
   });
 
   it('notices a damaged entry', async () => {
@@ -260,6 +350,86 @@ describe('Save all and Load all', () => {
     await expect(run('backup.load', { fileKey: 'uploads/junk' })).rejects.toThrow(/not a ZIP/);
     await expect(run('backup.load', { fileKey: 'settings/x' })).rejects.toThrow(/Invalid input/);
     await expect(run('backup.load', { fileKey: 'uploads/none' })).rejects.toThrow(/No file/);
+  });
+
+  it('says clearly what is wrong with a file that is not a usable backup', async () => {
+    const { run, pick } = setup();
+    const manifest = (extra: Record<string, unknown> = {}) =>
+      encodeUtf8(
+        JSON.stringify({
+          format: 'imp-backup',
+          version: 1,
+          savedAt: '2026-01-01T00:00:00.000Z',
+          appVersion: '0.100',
+          projects: [],
+          records: 0,
+          files: [],
+          ...extra,
+        }),
+      );
+    const store = encodeUtf8('[]');
+    const load = async (entries: [string, Uint8Array][]) =>
+      run('backup.load', { fileKey: await pick(await streamed(entries)) });
+    await expect(load([['other.txt', store]])).rejects.toThrow(/not a file from Save all/);
+    await expect(load([['imp-backup.json', encodeUtf8('{nope')]])).rejects.toThrow(/damaged at/);
+    await expect(load([['imp-backup.json', encodeUtf8('{}')]])).rejects.toThrow(
+      /not a file from Save all, or it is damaged/,
+    );
+    await expect(load([['imp-backup.json', manifest({ version: 9 })]])).rejects.toThrow(
+      /newer Imp/,
+    );
+    await expect(load([['imp-backup.json', manifest()]])).rejects.toThrow(/not a file from/);
+    await expect(
+      load([
+        ['imp-backup.json', manifest()],
+        ['store.json', encodeUtf8('{"a":1}')],
+      ]),
+    ).rejects.toThrow(/records cannot be read/);
+    await expect(
+      load([
+        ['imp-backup.json', manifest()],
+        ['store.json', encodeUtf8('[{"key":"a/../b","value":1}]')],
+      ]),
+    ).rejects.toThrow(/bad key/);
+    await expect(
+      load([
+        ['imp-backup.json', manifest({ files: [{ key: 'x/y', mediaType: 'a/b', sizeBytes: 1 }] })],
+        ['store.json', store],
+      ]),
+    ).rejects.toThrow(/"x\/y" is missing/);
+    // A file packed again by another program is refused before anything changes.
+    const repacked = await streamed([
+      ['imp-backup.json', manifest({ files: [{ key: 'x/y', mediaType: 'a/b', sizeBytes: 1 }] })],
+      ['store.json', store],
+      ['files/x/y', new Uint8Array([1])],
+    ]);
+    const directory = await readArchiveDirectory(bytesSource(repacked));
+    const packed = directory.find((entry) => entry.path === 'files/x/y');
+    if (packed === undefined) throw new Error('missing');
+    // Mark the entry as compressed in the table of contents.
+    const view = new DataView(repacked.buffer);
+    for (let at = repacked.length - 22; at > 0; at -= 1) {
+      if (
+        view.getUint32(at, true) === 0x02014b50 &&
+        view.getUint32(at + 42, true) === packed.headerOffset
+      ) {
+        view.setUint16(at + 10, 8, true);
+        break;
+      }
+    }
+    await expect(run('backup.load', { fileKey: await pick(repacked) })).rejects.toThrow(
+      /another program/,
+    );
+  });
+
+  it('loads a backup that was just saved, straight from where it waits', async () => {
+    const { run, runtime } = setup();
+    await runtime.store.batch([{ type: 'put', key: 'settings/x', value: 'saved' }]);
+    await run('backup.save', {});
+    await runtime.store.batch([{ type: 'put', key: 'settings/x', value: 'changed' }]);
+    await run('backup.load', { fileKey: 'exports/backup' });
+    expect(await runtime.store.get('settings/x')).toBe('saved');
+    expect(await runtime.blobs.list('exports/backup/')).toEqual([]);
   });
 
   it('asks a person before an agent may load, and puts loaded state in order afterwards', async () => {
