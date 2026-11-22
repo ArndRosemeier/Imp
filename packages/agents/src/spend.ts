@@ -421,6 +421,38 @@ export function createSpendCommands(options: {
     },
   });
 
+  const quote = defineCommand({
+    id: 'spend.quote',
+    title: 'Price a kind of work',
+    description:
+      'Says what a kind of generation would cost without naming a command or anything in a project, for example a 4 second 720p clip with sound on a video model, or a picture. The model defaults to the one set for that kind of work. Use spend.estimate for a particular command and input.',
+    effect: 'read',
+    input: CostRequest.extend({
+      model: z
+        .string()
+        .nullable()
+        .default(null)
+        .describe('A model id from models.list; null for the one set for this kind of work.'),
+    }),
+    output: z.object({ estimate: Estimate }),
+    handler: async ({ runtime }, request) => {
+      const setting: Readonly<Record<SpendKind, string>> = {
+        chat: 'coordinator.model',
+        image: 'images.model',
+        speech: 'speech.model',
+        sound: 'sounds.model',
+        music: 'music.model',
+        video: 'video.model',
+        transcription: 'transcription.model',
+      };
+      const set = await runtime.store.get(`settings/${setting[request.kind]}`);
+      const model = request.model ?? (typeof set === 'string' && set !== '' ? set : null);
+      return {
+        estimate: await priceRequest({ ...request, model }, { store: runtime.store, models }),
+      };
+    },
+  });
+
   const summary = defineCommand({
     id: 'spend.summary',
     title: 'Show spending',
@@ -468,5 +500,5 @@ export function createSpendCommands(options: {
     },
   });
 
-  return [estimate, summary];
+  return [estimate, quote, summary];
 }

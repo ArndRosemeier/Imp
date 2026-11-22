@@ -351,7 +351,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
           </button>
           <SpendTotal />
-          <HelpPanel />
+          <HelpPanel context={context} />
           <WhatsNew />
           <button
             className="button quiet"

@@ -164,13 +164,15 @@ Work done in the browser does not move over by itself: export the project and im
     id: 'help-and-support',
     area: 'workspace',
     title: 'Help and support',
-    summary: 'Tips, this guide, and asking for help.',
+    summary: 'Tips, Ask Imp, and this guide.',
     body: `## Tips
 
 The first time you open a stage, a short tip says what it is for. Close one with **Got it**. If you know your way around, **Turn off all tips** removes every tip at once; the help panel and Ask Imp stay. Turn them back on in **Settings** or in this panel.
 
-## Asking for help
+## Ask Imp
 
-Ask the coordinator anything about Imp in plain words, such as "how do I make a dissolve?". It can read this guide and can do the step for you.`,
+The **Help** button opens **Ask Imp**. Ask anything in plain words, such as "how do I make a dissolve?" or "what will this scene cost?". Imp answers from this guide and can see your project. Ask it to do the step and it does it for you, with the same buttons you have; it asks before spending money or deleting anything. Imp runs on the coordinator's model and counts toward your spending like any agent.
+
+The coordinator can answer questions about Imp too.`,
   },
 ];

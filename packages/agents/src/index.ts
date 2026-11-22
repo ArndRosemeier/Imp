@@ -22,7 +22,7 @@ export {
   SavedCrew,
   SavedCrewMember,
 } from './saved-crews.js';
-export { RoleCatalog, StoredRole, coordinatorRole, type Role } from './role.js';
+export { RoleCatalog, StoredRole, coordinatorRole, guideRole, type Role } from './role.js';
 export {
   runAgent,
   type AgentRunOptions,
