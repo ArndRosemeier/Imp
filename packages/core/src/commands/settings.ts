@@ -50,7 +50,7 @@ export const settingsSet = defineCommand({
       throw new CommandError(
         'denied',
         'settings.set',
-        `Only the person can change "${key}": it is what agents may spend without asking.`,
+        `"${key}" is the budget agents may spend without asking, so an agent cannot set it here. Use spend.allowance.set: the person is asked to approve the change. They can also change it in Settings or the Spending panel.`,
       );
     }
     await runtime.store.batch([{ type: 'put', key: `${SETTINGS_PREFIX}${key}`, value }]);

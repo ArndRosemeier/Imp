@@ -1,5 +1,4 @@
 import {
-  CommandError,
   CostRequest,
   CURRENT_PROJECT_SETTING,
   defineCommand,
@@ -600,19 +599,14 @@ export function createSpendCommands(options: {
     title: 'Set the spending budget',
     keywords: ['budget', 'approval', 'ask', 'autonomous', 'without asking', 'limit'],
     description:
-      'Sets the budget agents may spend on one project without asking ("project", in US dollars; 0 makes them ask before every paid step) and, optionally, the most one step may cost without asking ("step"; 0 for no limit). Only the person can change it.',
-    effect: 'write',
+      'Sets the budget agents may spend on one project without asking ("project", in US dollars; 0 makes them ask before every paid step) and, optionally, the most one step may cost without asking ("step"; 0 for no limit). When an agent runs it, the person is always asked to approve the change first, whatever the budget.',
+    // Counted as spending, so that an agent's change always goes to the person for approval:
+    // an agent that could raise its own budget would need no approval at all. It has no
+    // estimate, so the budget itself never lets it through.
+    effect: 'spend',
     input: Allowance.partial(),
     output: Allowance,
-    handler: async ({ actor, runtime }, input) => {
-      if (actor.kind !== 'user') {
-        // An agent that could raise its own allowance would need no approval at all.
-        throw new CommandError(
-          'denied',
-          'spend.allowance.set',
-          'Only the person can change what agents may spend without asking.',
-        );
-      }
+    handler: async ({ runtime }, input) => {
       await runtime.store.batch([
         ...(input.step === undefined
           ? []

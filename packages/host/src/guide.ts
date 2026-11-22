@@ -78,7 +78,7 @@ Every button in Imp runs a command, and agents use the same commands. Whatever y
 
 ## Approvals and budgets
 
-Agents ask before they delete something, and before they spend beyond the budget without approval: an approval card appears in their panel. Until a project's budget is used up, paid steps run without asking, so that work you hand over, like a whole film from one prompt, does not stop for every cent. Set the budget in the Spending panel (the coins in the top bar), which also shows how much is left: $1 per project at first, with an optional most per step. Set it to 0 to approve every paid step yourself. Each agent also has a budget per run, and stops when it is reached.`,
+Agents ask before they delete something, and before they spend beyond the budget without approval: an approval card appears in their panel. Until a project's budget is used up, paid steps run without asking, so that work you hand over, like a whole film from one prompt, does not stop for every cent. Set the budget in Settings, under What agents do without asking, or in the Spending panel (the coins in the top bar); both show how much is left: $1 per project at first, with an optional most per step. Set it to 0 to approve every paid step yourself. Each agent also has a budget per run, and stops when it is reached.`,
   },
   {
     id: 'costs',
@@ -99,7 +99,7 @@ Agents ask before they delete something, and before they spend beyond the budget
 ## Before and after
 
 - Every button that spends money shows the expected price on it, for example **Generate clip ≈ $0.20**. A video price comes from the model's own price list; other prices come from what the same model cost you before. A dashed price is a rough typical one, used until the model has been tried once.
-- Agents ask for approval once a project's budget without approval is used up ($1 at first, set in the Spending panel); the approval card shows the price too. An agent stops at its budget per run.
+- Agents ask for approval once a project's budget without approval is used up ($1 at first, set in Settings or the Spending panel); the approval card shows the price too. An agent stops at its budget per run.
 - The **total** in the top bar shows what this project has cost. Open it for today, all projects, a breakdown by kind and the latest calls. Asking an agent "what has this cost so far?" works too.
 
 ## Keeping costs low

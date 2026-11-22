@@ -22,7 +22,7 @@ import { saveFileAs } from './save-file.js';
 import { ACTIVE_MIX_KEY, INTERNAL_SETTINGS, settingLabel } from './settings-labels.js';
 import { currentLanguage, t, tx } from '../i18n/i18n.js';
 import { LanguagePicker } from '../i18n/LanguagePicker.js';
-import { formatUsd } from './spend.js';
+import { AllowanceFields, formatUsd } from './spend.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
@@ -455,6 +455,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
       </section>
       <section className="card stack" aria-labelledby="always-heading">
         <h3 id="always-heading">{t('What agents do without asking')}</h3>
+        <AllowanceFields />
         <AlwaysAllowed />
       </section>
       <section className="card stack" aria-labelledby="help-heading">

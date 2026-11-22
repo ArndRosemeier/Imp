@@ -1,5 +1,5 @@
 import { CoinsIcon, XIcon } from '@phosphor-icons/react';
-import { useRef, type ReactElement } from 'react';
+import { useId, useRef, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useImp, useLive } from './context.js';
 import { NumberField } from './NumberField.js';
@@ -44,8 +44,10 @@ const AllowanceView = z.object({
 });
 
 /** What agents may spend without asking, set by the person and only by them. */
-function AllowanceFields(): ReactElement | null {
+export function AllowanceFields(): ReactElement | null {
   const imp = useImp();
+  // Shown in the Spending panel and in Settings, both on the page at once.
+  const headingId = useId();
   const allowance = useLive(['settings/', 'spend/'], async (current) =>
     AllowanceView.parse(await runCommand(current, 'spend.allowance.get', {})),
   );
@@ -55,8 +57,8 @@ function AllowanceFields(): ReactElement | null {
     runCommand(imp, 'spend.allowance.set', change).catch(() => undefined);
   };
   return (
-    <section className="stack spend-allowance" aria-labelledby="spend-allowance">
-      <h3 id="spend-allowance" className="eyebrow">
+    <section className="stack spend-allowance" aria-labelledby={headingId}>
+      <h3 id={headingId} className="eyebrow">
         {t('Budget without approval')}
       </h3>
       <div className="row">
