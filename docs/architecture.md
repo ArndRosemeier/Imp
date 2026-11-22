@@ -76,6 +76,10 @@ project can load one. A saved crew copies the custom roles its agents hold;
 loading it brings back any that were deleted and never dismisses the
 coordinator, which may be the agent doing the loading.
 
+## Help
+
+Imp explains itself from one set of pages, the guide (`help.*` commands in `@imp/core`). Each stage of a mode carries its own page, with the short tip shown the first time the stage opens (`Stage.guide`); pages about Imp as a whole live in `packages/host/src/guide.ts`. The help panel, the tips, and agents that answer questions all read the same pages. Whether tips are shown, and which were closed, are the settings `help.enabled` and `help.dismissed`, so turning all help off is one command a person or an agent can run.
+
 ## Modes
 
 A working mode (movie first) is a package that contributes commands, agent

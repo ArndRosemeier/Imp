@@ -35,6 +35,8 @@ import { Resizer, usePanelWidth } from './Resizer.js';
 import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { WhatsNew } from './WhatsNew.js';
+import { HelpPanel } from './help/HelpPanel.js';
+import { StageTip } from './help/StageTip.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 import { LibraryDragProvider } from './library/drag.js';
@@ -343,6 +345,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           >
             <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
           </button>
+          <HelpPanel />
           <WhatsNew />
           <button
             className="button quiet"
@@ -403,7 +406,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           )}
           {isStage &&
             state.data !== undefined &&
-            (project === null ? startMovie : <StageView stage={view} project={project} />)}
+            (project === null ? (
+              startMovie
+            ) : (
+              <>
+                <StageTip key={view} stage={view} />
+                <StageView stage={view} project={project} />
+              </>
+            ))}
         </main>
         {showLibrary && (
           <div className="library-column" id="library-panel">

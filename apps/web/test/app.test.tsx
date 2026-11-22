@@ -1208,6 +1208,45 @@ describe('App', () => {
     }
   });
 
+  it('shows a tip the first time a stage opens, and turns all tips off in one step', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+
+    const first = await screen.findByRole('complementary', { name: /Start with the idea/ });
+    await user.click(within(first).getByRole('button', { name: 'Got it' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Start with the idea/ })).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    const second = await screen.findByRole('complementary', { name: /Break the story/ });
+    await user.click(within(second).getByRole('button', { name: 'Turn off all tips' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Break the story/ })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await screen.findByRole('heading', { name: 'Casting' });
+    expect(screen.queryByRole('complementary', { name: /^Tip/ })).toBeNull();
+    expect((await imp.store.get('settings/help.enabled')) ?? true).toBe(false);
+
+    // The guide stays, and searching finds the page about the Edit stage.
+    await user.click(screen.getByRole('button', { name: /Help/ }));
+    const guide = await screen.findByRole('dialog', { name: 'The Imp guide' });
+    expect(await within(guide).findByRole('heading', { name: 'Getting started' })).toBeTruthy();
+    await user.type(within(guide).getByRole('searchbox'), 'dissolve');
+    await user.click(await within(guide).findByRole('button', { name: /^Edit/ }));
+    expect(await within(guide).findByRole('heading', { name: 'Edit' })).toBeTruthy();
+
+    // Tips come back from the same switch, in the guide or in Settings.
+    await user.click(within(guide).getByRole('switch', { name: /Show tips/ }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('settings/help.enabled')).toBe(true);
+    });
+  });
+
   it('switches web search on for a crew member', async () => {
     const { imp, user } = start();
     await completeSetup(user);

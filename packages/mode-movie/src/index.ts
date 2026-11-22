@@ -176,3 +176,4 @@ export {
   type Placed,
   type Punch,
 } from './piece-time.js';
+export { movieGuides } from './guide.js';
