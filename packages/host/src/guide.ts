@@ -87,7 +87,7 @@ Agents ask before they spend money or delete something: an approval card appears
 
 - Make a key frame (a still, about 1 cent) and check it before making the clip.
 - Use short clips; the edit can slow them down or hold the last frame.
-- Choose cheaper models while you learn. Ask the coordinator for the cheapest models that do the job.`,
+- Use the **Starter** model mix while you learn and switch to **Balanced** or **Best** for the final film, from the Models chip on any stage.`,
   },
   {
     id: 'library',

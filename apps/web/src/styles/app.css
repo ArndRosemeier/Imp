@@ -5417,3 +5417,111 @@ dialog.spend-dialog {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* First run: the starter mixes and the help choice */
+.setup-panel[data-wide='true'] {
+  width: min(860px, 100%);
+}
+.mix-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.mix-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.mix-choice[data-selected='true'] {
+  border-color: var(--accent);
+  background: linear-gradient(160deg, var(--accent-wash), transparent 70%), var(--surface);
+}
+.mix-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.mix-choice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mix-choice-head svg {
+  color: var(--ink-muted);
+}
+.mix-choice[data-selected='true'] .mix-choice-head svg {
+  color: var(--accent);
+}
+.mix-choice-head strong {
+  font: 400 24px/1 var(--font-display);
+}
+.mix-choice-head .tag {
+  margin-left: auto;
+}
+.mix-choice-notes {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.mix-choice-models {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.mix-choice-price {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.setup-help {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.setup-help-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+.setup-help-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+}
+.setup-help-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.setup-help-option input {
+  accent-color: var(--accent);
+}
+.setup-help-option svg {
+  flex: none;
+  color: var(--accent);
+}
+.setup-help-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
