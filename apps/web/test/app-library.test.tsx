@@ -434,6 +434,19 @@ describe('App: library, crew and help', () => {
     const panel = await screen.findByRole('dialog', { name: 'What Imp has spent' });
     expect(within(panel).getAllByText('Pictures').length).toBe(2);
     expect(within(panel).getAllByText('vendor/painter').length).toBeGreaterThan(0);
+
+    // The budget without approval: what is left of it here, and the person sets it.
+    const budget = within(panel).getByRole('region', { name: 'Budget without approval' });
+    await vi.waitFor(() => {
+      expect(budget.textContent).toContain('$0.99 left of $1.00');
+    });
+    const field = within(budget).getByLabelText('Per project, $');
+    await user.clear(field);
+    await user.type(field, '5');
+    await user.tab();
+    await vi.waitFor(() => {
+      expect(budget.textContent).toContain('$4.99 left of $5.00');
+    });
   });
 
   it('switches web search on for a crew member', async () => {

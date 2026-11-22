@@ -113,6 +113,8 @@ export {
   createSupportCommands,
   ISSUES_URL,
   ProblemReport,
+  READY_REPORT_KEY,
+  ReadyReport,
   redactSecrets,
   type SupportOptions,
 } from './commands/support.js';
@@ -124,6 +126,7 @@ export type { JsonValue } from './json.js';
 export { defaultPolicy, type ExecutionPolicy, type PolicyDecision } from './policy.js';
 export {
   CommandRegistry,
+  type AutoApproval,
   type CommandRegistryOptions,
   type ExecuteOptions,
   type ExecutionResult,

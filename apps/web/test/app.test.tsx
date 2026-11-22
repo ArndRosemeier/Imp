@@ -567,6 +567,8 @@ describe('App: setup and agents', () => {
       .map((entry) => entry.value as { id: string; roleId: string })
       .find((member) => member.roleId === 'screenwriter');
     const args = { memberId: writer?.id ?? '', task: 'Write a scene.' };
+    // With no budget without approval, every paid step asks.
+    await imp.store.batch([{ type: 'put', key: 'settings/spend.allowance.project', value: 0 }]);
     provider.script(
       {
         toolCalls: [

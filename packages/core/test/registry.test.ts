@@ -221,3 +221,47 @@ describe('CommandRegistry', () => {
     expect((await readActivity(runtime.store))[0]?.outcome).toBe('denied');
   });
 });
+
+describe('approval without asking', () => {
+  function withAutoApprove(autoApprove: (actor: Actor) => Promise<boolean>) {
+    const runtime = createTestRuntime();
+    const registry = new CommandRegistry({
+      runtime,
+      autoApprove: (context) => autoApprove(context.actor),
+    });
+    registry.register(withEffect('spend'), withEffect('read'));
+    return registry;
+  }
+
+  it('lets a step the policy would ask about run when the check allows it', async () => {
+    const registry = withAutoApprove(() => Promise.resolve(true));
+    expect(await registry.executeById('test.spend', {}, { actor: agent })).toMatchObject({
+      status: 'ok',
+    });
+  });
+
+  it('asks when the check says no or fails, and never lifts a deny', async () => {
+    expect(
+      await withAutoApprove(() => Promise.resolve(false)).executeById(
+        'test.spend',
+        {},
+        { actor: agent },
+      ),
+    ).toMatchObject({ status: 'needs-approval' });
+    expect(
+      await withAutoApprove(() => Promise.reject(new Error('no prices'))).executeById(
+        'test.spend',
+        {},
+        { actor: agent },
+      ),
+    ).toMatchObject({ status: 'needs-approval' });
+    const denying = new CommandRegistry({
+      runtime: createTestRuntime(),
+      policy: () => 'deny',
+      autoApprove: () => Promise.resolve(true),
+    }).register(withEffect('spend'));
+    await expect(denying.executeById('test.spend', {}, { actor: agent })).rejects.toThrow(
+      /may not run/,
+    );
+  });
+});

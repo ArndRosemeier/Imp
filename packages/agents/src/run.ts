@@ -86,6 +86,8 @@ export interface AgentRunOptions {
   readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
   /** Where the media that commands show the agent is read from. Without it, nothing is shown. */
   readonly blobs?: BlobStore;
+  /** Called after each command the agent ran successfully, with its id. */
+  readonly onCommand?: (commandId: string) => void;
 }
 
 const DEFAULT_MAX_STEPS = 20;
@@ -258,6 +260,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
           note: 'The user must approve this before it runs. It has been put in front of them.',
         });
       }
+      options.onCommand?.(commandId);
       const content = JSON.stringify({ status: 'ok', output: result.output });
       const attachments = attachmentsOf(result.output);
       if (attachments.length === 0) return content;

@@ -23,6 +23,8 @@ export const SETTING_LABELS: Readonly<Record<string, string>> = {
   'edit.agent-drafts': 'Agents cut drafts on the Edit stage',
   theme: 'Theme',
   'budget.daily': 'Daily budget',
+  'spend.allowance.project': 'Budget without approval, per project',
+  'spend.allowance.step': 'Most per step without approval',
 };
 
 /** A setting's name in words: "video.model" reads as "Video model". */

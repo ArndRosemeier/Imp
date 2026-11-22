@@ -8,7 +8,11 @@ export const MODE_ID = 'movie';
 export const Development = z.object({
   logline: z.string().describe('The film in one or two sentences.'),
   premise: z.string().describe('The situation, the main character and what is at stake.'),
-  tone: z.string().describe('Genre, mood and visual style.'),
+  tone: z
+    .string()
+    .describe(
+      'Genre, mood and visual style. Every picture of the film (portraits, places, key frames) is drawn in this style.',
+    ),
   treatment: z.string().describe('The story told in prose from beginning to end.'),
 });
 export type Development = z.infer<typeof Development>;
