@@ -163,7 +163,7 @@ textarea.input {
   min-height: 100%;
   display: grid;
   place-items: center;
-  padding: var(--space-5);
+  padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--space-5) var(--space-5);
 }
 .setup-panel {
   width: min(520px, 100%);
@@ -211,7 +211,13 @@ textarea.input {
   /* The visible height, which leaves room for a tablet's on-screen keyboard. */
   height: var(--app-height, 100%);
   display: grid;
-  grid-template-rows: 60px minmax(0, 1fr) auto;
+  /* An installed copy on an iPad draws under the status bar (viewport-fit=cover with a
+     translucent status bar). iPadOS keeps taps up there for itself, so the top bar starts
+     below it, and the home indicator and rounded corners keep the rest clear. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px)
+    env(safe-area-inset-left, 0px);
+  grid-template-rows: calc(60px + var(--safe-top)) minmax(0, 1fr) auto;
   /* The crew panel never takes more than 45% of the window, so the stage keeps room on a tablet. */
   --crew-column: min(var(--crew-width, 360px), 45vw);
   /* The library sits between the stage and the crew, so assets are dragged a short way. */
@@ -226,7 +232,7 @@ textarea.input {
   display: flex;
   align-items: center;
   gap: var(--space-5);
-  padding: 0 28px;
+  padding: var(--safe-top) 28px 0;
   border-bottom: 1px solid var(--line);
 }
 /* In a crowded top bar (a tablet) the buttons keep their icons and words; only the
@@ -2729,7 +2735,8 @@ html {
 dialog.modal {
   width: min(520px, calc(100vw - 32px));
   /* --app-height shrinks with a tablet's on-screen keyboard. */
-  max-height: calc(var(--app-height, 100dvh) - 32px);
+  /* Centred, so taking the status bar off both ends keeps a tall dialog's top below it. */
+  max-height: calc(var(--app-height, 100dvh) - 32px - 2 * env(safe-area-inset-top, 0px));
   overflow-y: auto;
   padding: 0;
   border: 1px solid var(--line-strong);
@@ -5667,7 +5674,7 @@ dialog.whats-new-dialog {
 }
 dialog.help-dialog {
   width: min(1040px, calc(100vw - 32px));
-  height: min(820px, calc(var(--app-height, 100dvh) - 48px));
+  height: min(820px, calc(var(--app-height, 100dvh) - 48px - 2 * env(safe-area-inset-top, 0px)));
   overflow: hidden;
 }
 dialog.help-dialog[open] {
