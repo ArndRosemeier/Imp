@@ -1,8 +1,10 @@
 import { CrewMember } from '@imp/agents';
 import {
   ArrowLeftIcon,
+  ArrowSquareOutIcon,
   BookOpenTextIcon,
   ChatTeardropTextIcon,
+  LifebuoyIcon,
   MagnifyingGlassIcon,
   QuestionIcon,
   XIcon,
@@ -12,6 +14,7 @@ import { CrewPanel } from '../CrewPanel.js';
 import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { GuideText } from './GuideText.js';
+import { ReportProblem } from './ReportProblem.js';
 import { OPEN_HELP, useHelpState, useTopic, useTopics, type TopicListing } from './help.js';
 
 const AREA_ORDER = ['workspace'];
@@ -172,7 +175,7 @@ function AskImp({ context }: { context: string }): ReactElement {
  */
 export function HelpPanel({ context }: { context: string }): ReactElement {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [tab, setTab] = useState<'ask' | 'guide'>('ask');
+  const [tab, setTab] = useState<'ask' | 'guide' | 'report'>('ask');
   // Ask Imp is only set up once someone opens the panel, so nobody is hired unasked.
   const [opened, setOpened] = useState(false);
   const [query, setQuery] = useState('');
@@ -229,7 +232,9 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
         <header className="help-head">
           <div className="stack help-heading">
             <span className="eyebrow">Help</span>
-            <h2 id="help-title">{tab === 'ask' ? 'Ask Imp' : 'The Imp guide'}</h2>
+            <h2 id="help-title">
+              {tab === 'ask' ? 'Ask Imp' : tab === 'guide' ? 'The Imp guide' : 'Report a problem'}
+            </h2>
           </div>
           <div className="help-tabs" role="tablist" aria-label="Help">
             <button
@@ -252,6 +257,16 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
             >
               <BookOpenTextIcon aria-hidden="true" size={16} /> Guide
             </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'report'}
+              className="help-tab"
+              onClick={() => {
+                setTab('report');
+              }}
+            >
+              <LifebuoyIcon aria-hidden="true" size={16} /> Report a problem
+            </button>
           </div>
           <button
             className="button quiet icon"
@@ -264,6 +279,11 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
         {tab === 'ask' && opened && (
           <div className="help-ask">
             <AskImp context={context} />
+          </div>
+        )}
+        {tab === 'report' && (
+          <div className="help-report">
+            <ReportProblem />
           </div>
         )}
         <div className="help-layout" hidden={tab !== 'guide'}>
@@ -329,6 +349,9 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
         </div>
         <footer className="help-foot">
           <TipsSwitch />
+          <a className="help-web" href="./docs/index.html" target="_blank" rel="noreferrer">
+            The guide on the web <ArrowSquareOutIcon aria-hidden="true" size={14} />
+          </a>
         </footer>
       </dialog>
     </>

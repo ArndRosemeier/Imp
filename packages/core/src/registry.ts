@@ -138,8 +138,18 @@ export class CommandRegistry {
       }
       return { status: 'ok', output };
     } catch (error) {
-      await record('failed', error instanceof Error ? error.message : String(error));
+      await record('failed', failureText(error));
       throw error;
     }
   }
+}
+
+/** A failure as one line for the log: the message, and what caused it when the message hides it. */
+function failureText(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause: unknown = error.cause;
+  if (cause instanceof Error && !error.message.includes(cause.message)) {
+    return `${error.message} ${cause.message}`;
+  }
+  return error.message;
 }

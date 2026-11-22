@@ -5794,9 +5794,21 @@ dialog.help-dialog[open] {
   font-weight: 600;
 }
 .help-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
   padding: 10px 24px 10px 32px;
   border-top: 1px solid var(--line);
   background: var(--surface);
+}
+.help-web {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--hit);
+  font-size: 13px;
 }
 /* A narrow screen, such as a tablet beside the keyboard: the list or the page, not both. */
 @media (max-width: 860px) {
@@ -6576,4 +6588,42 @@ dialog.spend-dialog {
 }
 .first-film-step strong {
   font-size: 14px;
+}
+
+/* Help: reporting a problem as a GitHub issue the person submits */
+.help-report {
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6, 32px);
+}
+.report {
+  max-width: 680px;
+  margin: 0 auto;
+}
+.report textarea.input {
+  resize: vertical;
+  min-height: 0;
+}
+.report-activity {
+  min-height: var(--hit);
+  align-items: flex-start;
+}
+.report-activity input {
+  margin-top: 3px;
+}
+.report-preview {
+  margin: 0;
+  max-height: 340px;
+  overflow: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--ground);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.report a.button {
+  text-decoration: none;
 }

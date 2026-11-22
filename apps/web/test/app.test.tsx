@@ -1437,6 +1437,29 @@ describe('App', () => {
     });
   });
 
+  it('writes a problem report that opens as a GitHub issue, without the key', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    const help = await screen.findByRole('dialog', { name: /Ask Imp/ });
+    await user.click(within(help).getByRole('tab', { name: /Report a problem/ }));
+    await user.type(
+      within(help).getByLabelText(/The problem in a few words/),
+      'Clips never finish',
+    );
+    await user.type(within(help).getByLabelText(/What happened/), 'The clip spins forever.');
+    await user.click(within(help).getByRole('button', { name: 'Write the report' }));
+    const link = await within(help).findByRole('link', { name: /Open on GitHub/ });
+    const href = link.getAttribute('href') ?? '';
+    expect(href.startsWith('https://github.com/ArndRosemeier/Imp/issues/new?title=Clips')).toBe(
+      true,
+    );
+    const preview = within(help).getByLabelText('The report');
+    expect(preview.textContent).toMatch(/The clip spins forever/);
+    expect(preview.textContent).toMatch(/Version:/);
+    expect(href).not.toContain('sk-');
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);

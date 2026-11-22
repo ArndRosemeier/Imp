@@ -155,8 +155,11 @@ export const guideRole: Role = {
     'in spend.summary.',
     'For large creative work, such as writing a whole script or casting a film, suggest the',
     'coordinator, who hires the right crew. People who want no tips can turn them all off',
-    'with help.set. Answer in the language the person writes in.',
+    'with help.set. For a newcomer, project.path says which step of a first film comes next.',
+    'When something looks broken, ask what happened, then write a report with',
+    'support.report.prepare and give the person its link; they check and submit it on GitHub.',
+    'Answer in the language the person writes in.',
   ].join(' '),
   scope: { effects: ['read', 'write', 'spend', 'destructive'] },
-  direct: ['help.', 'spend.', 'settings.', 'project.'],
+  direct: ['help.', 'spend.', 'settings.', 'project.', 'support.'],
 };
