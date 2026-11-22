@@ -18,6 +18,14 @@ function plainCase(text: string): string {
 export function shortSceneTitle(heading: string): string {
   const trimmed = heading.trim();
   if (trimmed === '') return 'Untitled';
+  // Two slug lines in one heading ("INT. LAMP ROOM - NIGHT / EXT. CLIFF ROAD
+  // - DAWN") read as "Lamp Room, night / Cliff Road, dawn".
+  const parts = trimmed.split(/\s+\/\s+(?=(?:INT|EXT|I\/E)\b)/i);
+  if (parts.length > 1) return parts.map(shortSlugTitle).join(' / ');
+  return shortSlugTitle(trimmed);
+}
+
+function shortSlugTitle(trimmed: string): string {
   if (!SETTING.test(trimmed)) return trimmed;
   const [location = '', ...rest] = trimmed.replace(SETTING, '').split(TIME_SPLIT);
   const place = location.split(',').at(-1)?.trim() ?? '';

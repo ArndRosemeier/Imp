@@ -229,6 +229,27 @@ textarea.input {
   padding: 0 28px;
   border-bottom: 1px solid var(--line);
 }
+/* In a crowded top bar (a tablet) the buttons keep their icons and words; only the
+   command search gives up room. */
+.button > svg {
+  flex: none;
+}
+.topbar > .button,
+.topbar > * > .button {
+  flex-shrink: 0;
+}
+.topbar > .palette-trigger {
+  flex-shrink: 1;
+  min-width: 120px;
+  overflow: hidden;
+}
+/* Below a wide desktop the top bar buttons are icons; their names stay as labels and titles. */
+@media (max-width: 1279px) {
+  .topbar .button:not(.palette-trigger) .label,
+  .topbar .palette-trigger kbd {
+    display: none;
+  }
+}
 .palette-trigger {
   width: min(360px, 40vw);
   justify-content: space-between;
@@ -3572,9 +3593,9 @@ dialog.modal::backdrop {
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  overflow-x: auto;
-  scrollbar-width: none;
+  border-radius: calc(var(--control-height) / 2);
+  /* Wraps rather than scrolls, so no tab (Crews, Mixes) hides past the edge. */
+  flex-wrap: wrap;
   flex: none;
 }
 .library-modality {
@@ -6477,6 +6498,7 @@ dialog.spend-dialog {
 /* The guided way to a first film: one slim bar above the stage that opens into the steps. */
 .first-film {
   flex: none;
+  position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
   background: var(--surface);
@@ -6486,7 +6508,8 @@ dialog.spend-dialog {
   align-items: center;
   gap: var(--space-3);
   min-height: 48px;
-  padding: 4px 6px 4px 4px;
+  /* Room on the right for the close button, which stays in the corner when the bar wraps. */
+  padding: 4px 56px 4px 4px;
   flex-wrap: wrap;
 }
 .first-film-toggle {
@@ -6544,7 +6567,9 @@ dialog.spend-dialog {
   flex-wrap: wrap;
 }
 .first-film-close {
-  margin-left: auto;
+  position: absolute;
+  top: 4px;
+  right: 6px;
 }
 .first-film-steps {
   list-style: none;

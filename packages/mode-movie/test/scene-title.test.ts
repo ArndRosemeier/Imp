@@ -12,6 +12,8 @@ describe('shortSceneTitle', () => {
     ['EXT. - NIGHT', 'Night'],
     ['INT.', 'INT.'],
     ['INT. , - DAWN', 'Dawn'],
+    ['INT. LAMP ROOM - NIGHT / EXT. CLIFF ROAD - DAWN', 'Lamp Room, night / Cliff Road, dawn'],
+    ['INT. HALL / KITCHEN - DAY', 'Hall / Kitchen, day'],
     ['Opening montage', 'Opening montage'],
     ['  ', 'Untitled'],
   ])('names %j as %j', (heading, title) => {

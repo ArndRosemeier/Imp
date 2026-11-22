@@ -391,8 +391,13 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
 }
 
 const ACTIVE_MIX_KEY = 'models.mix';
-/** Settings the app keeps for itself, such as which crew member is the coordinator. */
-const INTERNAL_SETTINGS: ReadonlySet<string> = new Set(['coordinator.member', 'project.current']);
+// Kept by the app itself, or shown in their own section (Help), so not listed as raw rows.
+const INTERNAL_SETTINGS: ReadonlySet<string> = new Set([
+  'coordinator.member',
+  'project.current',
+  'help.enabled',
+  'help.dismissed',
+]);
 const SETTING_LABELS: Readonly<Record<string, string>> = {
   'coordinator.model': 'Coordinator model',
   'video.model': 'Video model',
