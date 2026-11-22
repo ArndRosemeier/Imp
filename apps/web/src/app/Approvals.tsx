@@ -1,4 +1,4 @@
-import { WaitingApprovalSchema, type WaitingApproval } from '@imp/agents';
+import { conversationPrefix, WaitingApprovalSchema, type WaitingApproval } from '@imp/agents';
 import {
   CaretDownIcon,
   CheckIcon,
@@ -39,11 +39,18 @@ const CrewNames = z.object({ crew: z.array(z.object({ id: z.string(), name: z.st
 
 /** Everything the crew is waiting on in the open project, kept current. */
 export function useWaitingApprovals(): Live<readonly WaitingApproval[]> {
-  const live = useLive(
-    ['crew/', 'conversations/', 'settings/project.current'],
+  // Each project keeps its own conversations, so the ones to watch follow the open project.
+  const current = useLive(['settings/project.current'], async (imp) => {
+    const { value } = z
+      .object({ value: z.json() })
+      .parse(await runCommand(imp, 'settings.get', { key: 'project.current' }));
+    return typeof value === 'string' ? value : null;
+  });
+  const conversations = conversationPrefix(current.data ?? null);
+  return useLive(
+    ['crew/', conversations, 'settings/project.current'],
     async (imp) => WaitingList.parse(await runCommand(imp, 'crew.approvals.list', {})).approvals,
   );
-  return live;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
