@@ -48,6 +48,9 @@ export const textStylesKey = (projectId: string): string => `${base(projectId)}t
 /** Subtitle files written for download, by name. */
 export const subtitleFileKey = (projectId: string, name: string): string =>
   `${base(projectId)}subtitles/${name}`;
+/** Script files written for download (PDF, Fountain, Final Draft), by name. */
+export const scriptFileKey = (projectId: string, name: string): string =>
+  `${base(projectId)}script-files/${name}`;
 /** Rendered films: a record each, and its file in parts in the blob store. */
 export const filmExportPrefix = (projectId: string): string => `${base(projectId)}exports/`;
 /** The film's look: one grade laid over every piece. */
@@ -58,14 +61,17 @@ export const markerKey = (projectId: string, sceneId: string): string =>
 export const characterPrefix = (projectId: string): string => `${base(projectId)}characters/`;
 export const movieDevelopmentKey = (projectId: string): string => developmentKey(projectId);
 
-async function readScenes(store: KeyValueStore, projectId: string): Promise<Scene[]> {
+export async function readScenes(store: KeyValueStore, projectId: string): Promise<Scene[]> {
   return (await store.list(scenePrefix(projectId)))
     .map((entry) => Scene.parse(entry.value))
     .sort((a, b) => a.position - b.position);
 }
 
 /** Writes the scenes back with positions 1..n in the given order. */
-function renumbered(projectId: string, scenes: readonly Scene[]) {
+export function renumbered(
+  projectId: string,
+  scenes: readonly Scene[],
+): { type: 'put'; key: string; value: Scene }[] {
   return scenes.map((scene, index) => ({
     type: 'put' as const,
     key: `${scenePrefix(projectId)}${scene.id}`,

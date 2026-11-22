@@ -8,6 +8,7 @@ import {
   SPEECH_MODEL_SETTING,
   VIDEO_MODEL_SETTING,
 } from '@imp/mode-movie';
+import type { ScriptLineView } from '@imp/mode-movie';
 import {
   ArrowCounterClockwiseIcon,
   FilmStripIcon,
@@ -25,6 +26,7 @@ import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
+import { useScriptLines } from './screenplay.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
@@ -519,6 +521,7 @@ function ShotCard({
   model,
   speechModel,
   imageModel,
+  scriptLines,
   act,
 }: {
   shot: Shot;
@@ -528,9 +531,13 @@ function ShotCard({
   model: string | null;
   speechModel: string | null;
   imageModel: string | null;
+  /** The lines of the scene's script, to pick the shot's line from. */
+  scriptLines: readonly ScriptLineView[];
   act: Act;
 }): ReactElement {
   const speakerId = useId();
+  const scriptId = useId();
+  const fromScript = scriptLines.find((line) => line.shotIds.includes(shot.id));
   const at = { sceneId: shot.sceneId, shotId: shot.id };
   const [starting, setStarting] = useState(false);
   const pending = shot.clip?.status === 'pending';
@@ -627,6 +634,37 @@ function ShotCard({
             </label>
           ))}
         </fieldset>
+      )}
+      {scriptLines.length > 0 && (
+        <div className="field">
+          <label htmlFor={scriptId}>From the script</label>
+          <select
+            id={scriptId}
+            className="select"
+            value={fromScript === undefined ? '' : String(fromScript.index)}
+            onChange={(event) => {
+              const line = scriptLines.find(
+                (candidate) => String(candidate.index) === event.target.value,
+              );
+              if (line === undefined) return;
+              void change({
+                line: line.words,
+                ...(line.characterId === null ? {} : { speakerId: line.characterId }),
+                ...(line.direction === '' ? {} : { delivery: line.direction }),
+              });
+            }}
+          >
+            <option value="">
+              {shot.line.trim() === '' ? 'Choose a line…' : 'Not a line of the script'}
+            </option>
+            {scriptLines.map((line) => (
+              <option key={line.index} value={String(line.index)}>
+                {line.speaker}:{' '}
+                {line.words.length > 70 ? `${line.words.slice(0, 70)}…` : line.words}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
       <EditableField
         label="Line, as it is said"
@@ -728,6 +766,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         ),
   );
   const shots = listed.data?.shots.filter((shot) => shot.sceneId === sceneId) ?? [];
+  const script = useScriptLines(project, sceneId);
 
   // Clips that are being made are looked at again until they are done, also after a reload.
   const waiting = shots
@@ -812,6 +851,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
                 model={video.model}
                 speechModel={speech.model}
                 imageModel={images.model}
+                scriptLines={script.data?.lines ?? []}
                 act={act}
               />
             ))}
