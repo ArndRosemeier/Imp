@@ -40,6 +40,8 @@ describe('deciding many requests at once', () => {
     if (always === undefined) throw new Error('an always-allow switch expected');
     await user.click(always);
     await user.click(within(dialog).getByRole('button', { name: 'Approve 1 · decline 1' }));
+    // Out of the way at once, even while what was approved still runs.
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     // The coordinator goes on once everything it asked for is decided.
     expect(await screen.findByText('One gone, one kept.')).toBeTruthy();
@@ -49,6 +51,7 @@ describe('deciding many requests at once', () => {
       commandIds: ['project.delete'],
     });
     expect(provider.requests).toHaveLength(3);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('opens from the crew panel, and declines everything with one press, in a project', async () => {
@@ -79,6 +82,7 @@ describe('deciding many requests at once', () => {
     await user.click(within(again).getByRole('button', { name: /Decline all/ }));
     expect(await screen.findByText('Nothing deleted.')).toBeTruthy();
     expect(screen.getAllByText('Declined: project.delete')).toHaveLength(3);
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(provider.requests).toHaveLength(3);
   });
 
