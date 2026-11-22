@@ -276,18 +276,24 @@ describe('spending without asking', () => {
     expect(await asAgent('media.paint', { prompt: 'a dragon' })).toBe('ok');
   });
 
-  it('can be changed only by the person', async () => {
-    const { registry, asUser } = allowanceSetup();
-    await expect(
-      registry.executeById('spend.allowance.set', { step: 100 }, { actor: agent }),
-    ).rejects.toThrow(/Only the person/);
+  it('is changed by an agent only once the person approves, even with budget left', async () => {
+    const { registry, asAgent, asUser } = allowanceSetup();
+    expect(await asAgent('spend.allowance.set', { project: 100 })).toBe('needs-approval');
+    expect(
+      await registry.executeById(
+        'spend.allowance.set',
+        { project: 3 },
+        { actor: agent, approved: true },
+      ),
+    ).toMatchObject({ status: 'ok', output: { project: 3 } });
+    // Not around the approval through the raw setting either; the refusal says what to use.
     await expect(
       registry.executeById(
         'settings.set',
         { key: 'spend.allowance.step', value: 100 },
         { actor: agent },
       ),
-    ).rejects.toThrow(/Only the person/);
+    ).rejects.toThrow(/Use spend\.allowance\.set/);
     expect(await asUser('spend.allowance.set', { step: 0.1, project: 2 })).toBe('ok');
     const shown = await registry.executeById('spend.allowance.get', {}, { actor: agent });
     expect(shown).toMatchObject({

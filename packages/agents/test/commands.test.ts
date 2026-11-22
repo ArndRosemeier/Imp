@@ -536,6 +536,10 @@ describe('waiting approvals', () => {
     await expect(run('crew.approvals.always.set', { commandId: 'made.up' })).rejects.toMatchObject({
       code: 'invalid_input',
     });
+    // Changing the budget without approval asks every time.
+    await expect(
+      run('crew.approvals.always.set', { commandId: 'spend.allowance.set' }),
+    ).rejects.toThrow(/always asks you first/);
     // Taking back something unknown is harmless.
     expect(await run('crew.approvals.always.set', { commandId: 'made.up', allow: false })).toEqual({
       commands: [],

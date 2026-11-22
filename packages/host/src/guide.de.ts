@@ -80,7 +80,7 @@ Jede Schaltfläche in Imp führt einen Befehl aus, und Agenten nutzen dieselben 
 
 ## Freigaben und Budgets
 
-Agenten fragen, bevor sie etwas löschen und bevor sie über das Budget ohne Rückfrage hinaus Geld ausgeben: In ihrer Leiste erscheint dann eine Freigabekarte. Bis das Budget eines Projekts aufgebraucht ist, laufen bezahlte Schritte ohne Rückfrage, damit Arbeit, die du übergibst, etwa ein ganzer Film aus einem Prompt, nicht für jeden Cent anhält. Das Budget legst du in der Ausgabenübersicht fest (die Münzen in der oberen Leiste), die auch zeigt, wie viel übrig ist: anfangs 1 $ pro Projekt, wahlweise mit einer Höchstgrenze pro Schritt. Setz es auf 0, um jeden bezahlten Schritt selbst freizugeben. Jeder Agent hat außerdem ein Budget pro Durchlauf und hört auf, wenn es erreicht ist.`,
+Agenten fragen, bevor sie etwas löschen und bevor sie über das Budget ohne Rückfrage hinaus Geld ausgeben: In ihrer Leiste erscheint dann eine Freigabekarte. Bis das Budget eines Projekts aufgebraucht ist, laufen bezahlte Schritte ohne Rückfrage, damit Arbeit, die du übergibst, etwa ein ganzer Film aus einem Prompt, nicht für jeden Cent anhält. Das Budget legst du in den Optionen unter „Was Agenten ohne Rückfrage tun“ oder in der Ausgabenübersicht fest (die Münzen in der oberen Leiste); beide zeigen, wie viel übrig ist: anfangs 1 $ pro Projekt, wahlweise mit einer Höchstgrenze pro Schritt. Setz es auf 0, um jeden bezahlten Schritt selbst freizugeben. Jeder Agent hat außerdem ein Budget pro Durchlauf und hört auf, wenn es erreicht ist.`,
   },
   {
     id: 'costs',
@@ -101,7 +101,7 @@ Agenten fragen, bevor sie etwas löschen und bevor sie über das Budget ohne Rü
 ## Vorher und nachher
 
 - Jede Schaltfläche, die Geld kostet, zeigt den erwarteten Preis, zum Beispiel **Clip erstellen ≈ 0,20 $**. Ein Videopreis stammt aus der Preisliste des Modells; andere Preise stammen aus dem, was dasselbe Modell dich bisher gekostet hat. Ein gestrichelter Preis ist ein grober üblicher Preis, der gilt, bis das Modell einmal benutzt wurde.
-- Agenten bitten um Freigabe, sobald das Budget ohne Rückfrage eines Projekts aufgebraucht ist (anfangs 1 $, einstellbar in der Ausgabenübersicht); die Freigabekarte zeigt ebenfalls den Preis. Ein Agent hört bei seinem Budget pro Durchlauf auf.
+- Agenten bitten um Freigabe, sobald das Budget ohne Rückfrage eines Projekts aufgebraucht ist (anfangs 1 $, einstellbar in den Optionen oder der Ausgabenübersicht); die Freigabekarte zeigt ebenfalls den Preis. Ein Agent hört bei seinem Budget pro Durchlauf auf.
 - Die **Summe** in der oberen Leiste zeigt, was dieses Projekt gekostet hat. Öffne sie für heute, alle Projekte, eine Aufschlüsselung nach Art und die letzten Aufrufe. Du kannst auch einen Agenten fragen: „Was hat das bisher gekostet?“
 
 ## Kosten niedrig halten

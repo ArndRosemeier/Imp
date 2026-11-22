@@ -12,6 +12,9 @@ export const INTERNAL_SETTINGS: ReadonlySet<string> = new Set([
   'help.enabled',
   'help.dismissed',
   'ui.language',
+  // The budget without approval has its own fields, under What agents do without asking.
+  'spend.allowance.project',
+  'spend.allowance.step',
 ]);
 export const SETTING_LABELS: Readonly<Record<string, string>> = {
   get 'coordinator.model'(): string {

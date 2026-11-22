@@ -321,7 +321,10 @@ async function readAlwaysAllowed(store: KeyValueStore): Promise<string[]> {
  * approved it. For the registry's autoApprove hook.
  */
 export const alwaysAllowed: AutoApproval = async ({ runtime }, command) =>
-  (await readAlwaysAllowed(runtime.store)).includes(command.id);
+  !NEVER_ALWAYS.has(command.id) && (await readAlwaysAllowed(runtime.store)).includes(command.id);
+
+/** Commands that ask every time: an agent that may raise its own budget needs no approval at all. */
+const NEVER_ALWAYS: ReadonlySet<string> = new Set(['spend.allowance.set']);
 
 /** One request waiting for the user, with who asked for it. */
 export const WaitingApprovalSchema = z.object({
@@ -798,6 +801,13 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           'denied',
           'crew.approvals.always.set',
           'Only the user can decide what agents may do without asking.',
+        );
+      }
+      if (allow && NEVER_ALWAYS.has(commandId)) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.approvals.always.set',
+          'Changing the budget without approval always asks you first.',
         );
       }
       if (allow && !registry.has(commandId)) {

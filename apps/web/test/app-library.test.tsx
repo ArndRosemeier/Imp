@@ -307,6 +307,17 @@ describe('App: library, crew and help', () => {
     expect(await within(list).findByText('Coordinator model')).toBeTruthy();
     expect(within(list).getByText('vendor/writer')).toBeTruthy();
     expect(within(list).queryByText(/coordinator\.member/)).toBeNull();
+    // The budget without approval is set here too, not only in the Spending panel.
+    const agents = screen.getByRole('region', { name: 'What agents do without asking' });
+    const budget = await within(agents).findByRole('region', { name: 'Budget without approval' });
+    const field = within(budget).getByLabelText('Per project, $');
+    await user.clear(field);
+    await user.type(field, '3');
+    await user.tab();
+    await vi.waitFor(() => {
+      expect(budget.textContent).toContain('$3.00 left of $3.00');
+    });
+    expect(within(list).queryByText('Budget without approval, per project')).toBeNull();
     // A button, so the save dialog can ask where the download goes.
     expect(
       await screen.findByRole('button', { name: /Download Imp for your computer/ }),
