@@ -2,6 +2,7 @@ import { ArrowClockwiseIcon, XIcon } from '@phosphor-icons/react';
 import { useEffect, useState, type ReactElement } from 'react';
 import { CHECK_EVERY_MS, fetchPublishedVersion, loadNewestVersion } from './updates.js';
 import { t } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 /**
  * Tells the person when a newer Imp has been published while this one is open
@@ -49,7 +50,11 @@ export function UpdateNotice({
   return (
     <div className="update-notice" role="status">
       <ArrowClockwiseIcon aria-hidden="true" size={20} />
-      <span>{t('Imp {version} is ready. You are on {running}.', { version: newer, running })}</span>
+      <span>
+        <Marked
+          text={t('Imp **{version}** is ready. You are on {running}.', { version: newer, running })}
+        />
+      </span>
       <button
         className="button primary"
         disabled={loading}

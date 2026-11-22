@@ -40,6 +40,7 @@ function wordsFromTheCore(): Set<string> {
     ...imp.registry.list().map((command) => command.title),
     ...imp.roles.list().flatMap((role) => [role.name, role.summary]),
     ...imp.modes.flatMap((mode) => [
+      mode.name,
       ...mode.stages.map((stage) => stage.name),
       ...(mode.project?.templates ?? []).flatMap((template) => [template.name, template.summary]),
       ...(mode.project?.path?.steps ?? []).flatMap((step) => [step.title, step.body]),

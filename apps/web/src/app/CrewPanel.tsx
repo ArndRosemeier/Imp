@@ -460,8 +460,8 @@ export function CrewPanel({
             </section>
           ))}
         {report !== null && (
-          <section className="approval" aria-label="Problem report">
-            <span className="eyebrow">Problem report ready</span>
+          <section className="approval" aria-label={t('Problem report')}>
+            <span className="eyebrow">{t('Problem report ready')}</span>
             <p>{report.title}</p>
             <div className="row">
               <a
@@ -471,10 +471,10 @@ export function CrewPanel({
                 rel="noreferrer"
                 onClick={dismissReport}
               >
-                <BugIcon aria-hidden="true" /> Check and submit on GitHub
+                <BugIcon aria-hidden="true" /> {t('Check and submit on GitHub')}
               </a>
               <button className="button" onClick={dismissReport}>
-                <XIcon aria-hidden="true" /> Dismiss
+                <XIcon aria-hidden="true" /> {t('Dismiss')}
               </button>
             </div>
           </section>

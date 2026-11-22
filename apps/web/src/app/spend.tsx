@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { runCommand, useImp, useLive } from './context.js';
 import { NumberField } from './NumberField.js';
 import { currentLanguage, formatNumber, t } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 const Kind = z.enum(['chat', 'image', 'speech', 'sound', 'music', 'video', 'transcription']);
 const Estimate = z.object({
@@ -56,11 +57,11 @@ function AllowanceFields(): ReactElement | null {
   return (
     <section className="stack spend-allowance" aria-labelledby="spend-allowance">
       <h3 id="spend-allowance" className="eyebrow">
-        Budget without approval
+        {t('Budget without approval')}
       </h3>
       <div className="row">
         <NumberField
-          label="Per project, $"
+          label={t('Per project, $')}
           value={data.project}
           step={0.5}
           max={1000}
@@ -69,7 +70,7 @@ function AllowanceFields(): ReactElement | null {
           }}
         />
         <NumberField
-          label="Most per step, $ (0: no limit)"
+          label={t('Most per step, $ (0: no limit)')}
           value={data.step}
           step={0.05}
           max={100}
@@ -79,13 +80,21 @@ function AllowanceFields(): ReactElement | null {
         />
       </div>
       <p className="spend-left">
-        <strong>{formatUsd(data.projectLeftUsd)}</strong> left of {formatUsd(data.project)}
-        <span className="muted"> · {formatUsd(data.projectSpentUsd)} spent here</span>
+        <Marked
+          text={t('**{left}** left of {project}', {
+            left: formatUsd(data.projectLeftUsd),
+            project: formatUsd(data.project),
+          })}
+        />
+        <span className="muted">
+          {' '}
+          {t('· {spent} spent here', { spent: formatUsd(data.projectSpentUsd) })}
+        </span>
       </p>
       <p className="muted small">
-        Agents spend without asking until this budget is used up; then every paid step asks again.
-        Steps whose price is unknown still ask, and so does anything that deletes. Set the budget to
-        0 to approve every paid step yourself.
+        {t(
+          'Agents spend without asking until this budget is used up; then every paid step asks again. Steps whose price is unknown still ask, and so does anything that deletes. Set the budget to 0 to approve every paid step yourself.',
+        )}
       </p>
     </section>
   );

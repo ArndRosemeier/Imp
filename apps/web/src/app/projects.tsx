@@ -459,7 +459,7 @@ function NewProjectForm({
             >
               {imp.modes.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
-                  {candidate.name}
+                  {tx(candidate.name)}
                 </option>
               ))}
             </select>

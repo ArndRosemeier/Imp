@@ -41,6 +41,13 @@ function formatUsd(usd: number): string {
   return usd > 0 && usd < 0.1 ? `$${usd.toFixed(4)}` : formatCents(usd);
 }
 import { STAGE_ICONS } from './stage-icons.js';
+import { currentLanguage, t, tn, tx } from '../i18n/i18n.js';
+
+/** A command's title inside a sentence: lower-case in English, as the language writes it otherwise. */
+function commandWords(title: string): string {
+  const words = tx(title);
+  return currentLanguage() === 'en' ? words.toLowerCase() : words;
+}
 
 /**
  * The crew at work: who is working on what right now, live. One reading of
@@ -191,10 +198,10 @@ export function formatDuration(ms: number): string {
 
 function ago(at: string, now: number): string {
   const minutes = Math.round((now - Date.parse(at)) / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${String(minutes)} min ago`;
+  if (minutes < 1) return t('just now');
+  if (minutes < 60) return t('{minutes} min ago', { minutes: String(minutes) });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${String(hours)} h ago`;
+  if (hours < 24) return t('{hours} h ago', { hours: String(hours) });
   return new Date(at).toLocaleDateString();
 }
 
@@ -238,12 +245,48 @@ const STATUS: Record<
   Exclude<WorkEntry['status'], 'working'>,
   { label: string; icon: Icon; tone: string }
 > = {
-  completed: { label: 'Done', icon: CheckCircleIcon, tone: 'ok' },
-  'awaiting-approval': { label: 'Asked you', icon: HandPalmIcon, tone: 'wait' },
-  'step-limit': { label: 'Step limit', icon: HourglassMediumIcon, tone: 'wait' },
-  'budget-exhausted': { label: 'Budget used up', icon: HourglassMediumIcon, tone: 'wait' },
-  cancelled: { label: 'Interrupted', icon: StopCircleIcon, tone: 'muted' },
-  failed: { label: 'Failed', icon: WarningCircleIcon, tone: 'danger' },
+  completed: {
+    get label(): string {
+      return t('Done');
+    },
+    icon: CheckCircleIcon,
+    tone: 'ok',
+  },
+  'awaiting-approval': {
+    get label(): string {
+      return t('Asked you');
+    },
+    icon: HandPalmIcon,
+    tone: 'wait',
+  },
+  'step-limit': {
+    get label(): string {
+      return t('Step limit');
+    },
+    icon: HourglassMediumIcon,
+    tone: 'wait',
+  },
+  'budget-exhausted': {
+    get label(): string {
+      return t('Budget used up');
+    },
+    icon: HourglassMediumIcon,
+    tone: 'wait',
+  },
+  cancelled: {
+    get label(): string {
+      return t('Interrupted');
+    },
+    icon: StopCircleIcon,
+    tone: 'muted',
+  },
+  failed: {
+    get label(): string {
+      return t('Failed');
+    },
+    icon: WarningCircleIcon,
+    tone: 'danger',
+  },
 };
 
 function useStageNames(): (stage: string) => string {
@@ -301,18 +344,25 @@ export function WorkIndicator(): ReactElement | null {
   const faces = working.slice(0, 3);
   const label =
     working.length === 0
-      ? 'The crew is free'
+      ? t('The crew is free')
       : working.length === 1
-        ? `${working[0]?.memberName ?? ''} is working`
-        : `${String(working.length)} at work`;
+        ? t('{name} is working', { name: working[0]?.memberName ?? '' })
+        : t('{count} at work', { count: String(working.length) });
   return (
     <>
       <button
         className="button quiet work-indicator"
         data-busy={working.length > 0 ? 'true' : undefined}
         aria-haspopup="dialog"
-        aria-label={`${label}${waiting > 0 ? `, ${String(waiting)} waiting for you` : ''}. Show who is working on what`}
-        title="Who is working on what"
+        aria-label={
+          waiting > 0
+            ? t('{label}, {waiting} waiting for you. Show who is working on what', {
+                label,
+                waiting,
+              })
+            : t('{label}. Show who is working on what', { label })
+        }
+        title={t('Who is working on what')}
         onClick={() => {
           setOpen(true);
           dialog.current?.showModal();
@@ -383,10 +433,10 @@ function WorkingCard({
   const stage = stageOfRun(entry);
   const doing =
     entry.now === null
-      ? 'Getting started'
+      ? t('Getting started')
       : entry.now.kind === 'thinking'
-        ? 'Thinking'
-        : entry.now.title;
+        ? t('Thinking')
+        : tx(entry.now.title);
   const budget = entry.budgetUsd > 0 ? Math.min(1, entry.costUsd / entry.budgetUsd) : 0;
   return (
     <li
@@ -402,7 +452,9 @@ function WorkingCard({
             <span className="work-role">{entry.roleName}</span>
           )}
           {entry.askedBy.kind === 'agent' && (
-            <span className="work-asked">asked by {entry.askedBy.name ?? 'an agent'}</span>
+            <span className="work-asked">
+              {t('asked by {name}', { name: entry.askedBy.name ?? t('an agent') })}
+            </span>
           )}
           <span className="work-elapsed mono">
             {formatDuration(now - Date.parse(entry.startedAt))}
@@ -411,7 +463,7 @@ function WorkingCard({
         {entry.task !== null ? (
           <p className="work-task">{entry.task}</p>
         ) : (
-          <p className="work-task muted">Going on where it stopped</p>
+          <p className="work-task muted">{t('Going on where it stopped')}</p>
         )}
         <div className="work-now" aria-live="polite">
           {entry.now?.kind === 'thinking' ? (
@@ -421,7 +473,9 @@ function WorkingCard({
           )}
           <span className="work-now-text">{doing}</span>
           {entry.now?.kind === 'thinking' && entry.now.after !== null && (
-            <span className="work-now-after">after {entry.now.after.title.toLowerCase()}</span>
+            <span className="work-now-after">
+              {t('after {command}', { command: commandWords(entry.now.after.title) })}
+            </span>
           )}
           {stage !== null && <StageChip stage={stage} />}
           {entry.now?.kind === 'command' && <SubjectChips subjects={entry.now.subjects} max={3} />}
@@ -432,11 +486,12 @@ function WorkingCard({
         <div className="work-meters">
           <span
             className="work-meter"
-            title={`Step ${String(entry.steps)} of at most ${String(entry.maxSteps)}`}
+            title={t('Step {steps} of at most {maxSteps}', {
+              steps: String(entry.steps),
+              maxSteps: String(entry.maxSteps),
+            })}
           >
-            <span className="work-meter-label">
-              Step {entry.steps}/{entry.maxSteps}
-            </span>
+            <span className="work-meter-label">{`${t('Step')} ${String(entry.steps)}/${String(entry.maxSteps)}`}</span>
             <span className="work-meter-track" aria-hidden="true">
               <span
                 className="work-meter-fill"
@@ -446,7 +501,10 @@ function WorkingCard({
           </span>
           <span
             className="work-meter cost"
-            title={`${formatUsd(entry.costUsd)} of the ${formatUsd(entry.budgetUsd)} this agent may spend on one run`}
+            title={t('{costUsd} of the {budgetUsd} this agent may spend on one run', {
+              costUsd: formatUsd(entry.costUsd),
+              budgetUsd: formatUsd(entry.budgetUsd),
+            })}
           >
             <span className="work-meter-label mono">{formatUsd(entry.costUsd)}</span>
             <span className="work-meter-track" aria-hidden="true">
@@ -460,12 +518,12 @@ function WorkingCard({
               onTalk(entry.memberId);
             }}
           >
-            Watch
+            {t('Watch')}
           </button>
         </div>
         {entry.subjects.length > 0 && (
           <div className="work-touched">
-            <span className="muted small">Changed</span>
+            <span className="muted small">{t('Changed')}</span>
             <SubjectChips subjects={entry.subjects} max={5} />
           </div>
         )}
@@ -496,7 +554,7 @@ function DoneRow({
                 <StatusIcon aria-hidden="true" size={14} weight="fill" /> {status.label}
               </span>
             </span>
-            <span className="work-done-task">{entry.task ?? 'Went on where it stopped'}</span>
+            <span className="work-done-task">{entry.task ?? t('Went on where it stopped')}</span>
           </span>
           <span className="work-done-meta mono">
             <span>{formatUsd(entry.costUsd)}</span>
@@ -516,9 +574,11 @@ function DoneRow({
           {entry.error !== null && <p className="error small">{entry.error}</p>}
           <p className="muted small">
             {entry.askedBy.kind === 'agent'
-              ? `Asked by ${entry.askedBy.name ?? 'an agent'}`
-              : 'Asked by you'}{' '}
-            · {entry.commands} commands in {entry.steps} steps · took {formatDuration(took)}
+              ? t('Asked by {name}', { name: entry.askedBy.name ?? t('an agent') })
+              : t('Asked by you')}{' '}
+            · {tn(entry.commands, '{count} command', '{count} commands')} ·{' '}
+            {tn(entry.steps, '{count} step', '{count} steps')} ·{' '}
+            {t('took {duration}', { duration: formatDuration(took) })}
           </p>
         </div>
       </details>
@@ -545,16 +605,16 @@ export function WorkBoardView({
     <>
       <header className="spend-head work-head">
         <div className="stack">
-          <span className="eyebrow">Crew at work</span>
-          <h2 id="work-title">Who is working on what</h2>
+          <span className="eyebrow">{t('Crew at work')}</span>
+          <h2 id="work-title">{t('Who is working on what')}</h2>
         </div>
         <div className="work-head-totals">
-          <span className="work-total" title="What the runs going on have cost so far">
-            <span className="muted small">Running now</span>
+          <span className="work-total" title={t('What the runs going on have cost so far')}>
+            <span className="muted small">{t('Running now')}</span>
             <span className="mono">{formatUsd(board?.workingUsd ?? 0)}</span>
           </span>
           {onClose !== undefined && (
-            <button className="button quiet icon" aria-label="Close" onClick={onClose}>
+            <button className="button quiet icon" aria-label={t('Close')} onClick={onClose}>
               <XIcon aria-hidden="true" size={18} />
             </button>
           )}
@@ -564,7 +624,7 @@ export function WorkBoardView({
         {(board?.waiting.length ?? 0) > 0 && (
           <section className="stack" aria-labelledby="work-waiting">
             <h3 id="work-waiting" className="eyebrow">
-              Waiting for you
+              {t('Waiting for you')}
             </h3>
             <ul className="work-list">
               {board?.waiting.map((waiting) => {
@@ -573,8 +633,12 @@ export function WorkBoardView({
                   <li key={waiting.memberId} className="work-waiting">
                     <CrewAvatar name={waiting.memberName} roleId={member?.roleId ?? ''} size={36} />
                     <span className="work-waiting-text">
-                      <strong>{waiting.memberName}</strong> asks to{' '}
-                      {waiting.commandIds.map((id) => titleOf(id).toLowerCase()).join(', ')}
+                      <strong>{waiting.memberName}</strong>{' '}
+                      {t('asks to {commands}', {
+                        commands: waiting.commandIds
+                          .map((id) => commandWords(titleOf(id)))
+                          .join(', '),
+                      })}
                     </span>
                     <button
                       type="button"
@@ -583,7 +647,7 @@ export function WorkBoardView({
                         onTalk(waiting.memberId);
                       }}
                     >
-                      Decide
+                      {t('Decide')}
                     </button>
                   </li>
                 );
@@ -593,12 +657,13 @@ export function WorkBoardView({
         )}
         <section className="stack" aria-labelledby="work-now-heading">
           <h3 id="work-now-heading" className="eyebrow">
-            Working now
+            {t('Working now')}
           </h3>
           {working.length === 0 ? (
             <p className="work-empty muted">
-              Nobody is working right now. Give an agent a task in the crew panel, and you will see
-              here what it does, step by step.
+              {t(
+                'Nobody is working right now. Give an agent a task in the crew panel, and you will see here what it does, step by step.',
+              )}
             </p>
           ) : (
             <ul className="work-list">
@@ -609,14 +674,14 @@ export function WorkBoardView({
           )}
           {free.length > 0 && (
             <div className="work-free">
-              <span className="muted small">Free</span>
+              <span className="muted small">{t('Free')}</span>
               <span className="work-free-faces">
                 {free.map((member) => (
                   <button
                     key={member.id}
                     type="button"
                     className="work-free-member"
-                    title={`Talk to ${member.name}`}
+                    title={t('Talk to {name}', { name: member.name })}
                     onClick={() => {
                       onTalk(member.id);
                     }}
@@ -631,13 +696,13 @@ export function WorkBoardView({
         </section>
         <section className="stack" aria-labelledby="work-done-heading">
           <h3 id="work-done-heading" className="eyebrow">
-            Done lately
+            {t('Done lately')}
             {(board?.recent.length ?? 0) > 0 && (
               <span className="mono muted"> · {formatUsd(board?.recentUsd ?? 0)}</span>
             )}
           </h3>
           {(board?.recent.length ?? 0) === 0 ? (
-            <p className="muted small">No finished work in this project yet.</p>
+            <p className="muted small">{t('No finished work in this project yet.')}</p>
           ) : (
             <ol className="work-list">
               {board?.recent.map((entry) => (
@@ -661,7 +726,7 @@ export function StageWorkers({ stage }: { readonly stage: string }): ReactElemen
   return (
     <span
       className="stage-workers"
-      title={`${here.map((entry) => entry.memberName).join(', ')} working here`}
+      title={t('{names} working here', { names: here.map((entry) => entry.memberName).join(', ') })}
     >
       {here.slice(0, 2).map((entry) => (
         <CrewAvatar
@@ -695,8 +760,8 @@ export function WorkingOn({
   const on = (board?.working ?? []).filter((entry) => worksOn(entry, kind, id));
   const [first] = on;
   if (first === undefined) return null;
-  const names = on.map((entry) => entry.memberName).join(' and ');
-  const doing = first.now?.kind === 'command' ? first.now.title.toLowerCase() : 'working';
+  const names = on.map((entry) => entry.memberName).join(t(' and '));
+  const doing = first.now?.kind === 'command' ? commandWords(first.now.title) : t('working');
   if (compact) {
     return (
       <span className="working-on compact" title={`${names}: ${doing}`}>
@@ -724,7 +789,7 @@ export function WorkingOn({
         />
       ))}
       <span className="working-on-text">
-        {on.length > 1 ? names : `${first.memberName} at work`}
+        {on.length > 1 ? names : t('{memberName} at work', { memberName: first.memberName })}
       </span>
     </span>
   );
