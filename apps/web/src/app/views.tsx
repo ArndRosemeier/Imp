@@ -16,6 +16,7 @@ import { useModelMixes } from './model-bar.js';
 import { TipsSwitch } from './help/HelpPanel.js';
 import { openHelp } from './help/help.js';
 import { FfmpegOffer } from './FfmpegOffer.js';
+import { ACTIVE_MIX_KEY, INTERNAL_SETTINGS, settingLabel } from './settings-labels.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
@@ -388,36 +389,6 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
       </div>
     </form>
   );
-}
-
-const ACTIVE_MIX_KEY = 'models.mix';
-// Kept by the app itself, or shown in their own section (Help), so not listed as raw rows.
-const INTERNAL_SETTINGS: ReadonlySet<string> = new Set([
-  'coordinator.member',
-  'project.current',
-  'help.enabled',
-  'help.dismissed',
-]);
-const SETTING_LABELS: Readonly<Record<string, string>> = {
-  'coordinator.model': 'Coordinator model',
-  'video.model': 'Video model',
-  'speech.model': 'Voice model',
-  'images.model': 'Image model',
-  'sounds.model': 'Sound effects model',
-  'music.model': 'Music model',
-  'transcription.model': 'Transcript model',
-  [ACTIVE_MIX_KEY]: 'Model mix',
-  'edit.agent-drafts': 'Agents cut drafts on the Edit stage',
-  theme: 'Theme',
-  'budget.daily': 'Daily budget',
-};
-
-/** A setting's name in words: "video.model" reads as "Video model". */
-function settingLabel(key: string): string {
-  const known = SETTING_LABELS[key];
-  if (known !== undefined) return known;
-  const words = key.replace(/[._-]+/g, ' ').trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function settingValue(value: unknown): string {
