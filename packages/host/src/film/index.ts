@@ -4,8 +4,11 @@ export {
   drawLane,
   drawText,
   drawTexts,
+  FAMILY_WEIGHTS,
+  layoutText,
   TEXT_FAMILIES,
   type DrawnText,
+  type TextLayout,
   type LaneText,
   type TextCanvas,
 } from './text-draw.js';
