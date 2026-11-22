@@ -124,6 +124,7 @@ export function createTemplateCommands(support: readonly ModeProjectSupport[]) {
         summary: input.summary,
         mode: project.mode,
         builtIn: false,
+        sample: false,
         createdAt: runtime.now().toISOString(),
         sourceProjectName: project.name,
       };
