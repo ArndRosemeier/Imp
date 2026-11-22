@@ -178,6 +178,8 @@ const SAME_IN = new Set<string>([
   'Take',
   'Fastnet Rock, 1891',
   'Serif (Instrument)',
+  'In',
+  'Out',
   'Clip',
   'Clips',
   'Trailer',

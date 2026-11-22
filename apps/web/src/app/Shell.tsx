@@ -373,7 +373,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                   }
                 }}
               >
-                <BooksIcon aria-hidden="true" size={18} /> <span className="label">{t('Library')}</span>
+                <BooksIcon aria-hidden="true" size={18} />{' '}
+                <span className="label">{t('Library')}</span>
               </button>
             )}
             <button
@@ -384,7 +385,8 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               title={crewOpen ? t('Hide the crew panel') : t('Show the crew panel')}
               onClick={switchCrew}
             >
-              <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">{t('Crew')}</span>
+              <ChatsCircleIcon aria-hidden="true" size={18} />{' '}
+              <span className="label">{t('Crew')}</span>
             </button>
             <WorkIndicator />
             <SpendTotal />
@@ -456,7 +458,9 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                 <>
                   <FirstFilm
                     stage={view}
-                    stageNames={Object.fromEntries(stages.map((stage) => [stage.id, tx(stage.name)]))}
+                    stageNames={Object.fromEntries(
+                      stages.map((stage) => [stage.id, tx(stage.name)]),
+                    )}
                   />
                   <StageTip key={view} stage={view} />
                   <StageView stage={view} project={project} />
@@ -479,13 +483,23 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
             </div>
           )}
           {showLibrary && !libraryWide && (
-            <Resizer label={t('Resize the library')} side="right" panel="library" width={libraryWidth} />
+            <Resizer
+              label={t('Resize the library')}
+              side="right"
+              panel="library"
+              width={libraryWidth}
+            />
           )}
           <ActivityStrip />
           <BackupWatcher />
           <Resizer label={t('Resize the navigation')} side="left" width={navWidth} />
           {crewOpen && (
-            <Resizer label={t('Resize the crew panel')} side="right" panel="crew" width={crewWidth} />
+            <Resizer
+              label={t('Resize the crew panel')}
+              side="right"
+              panel="crew"
+              width={crewWidth}
+            />
           )}
           <div className="crew" id="crew-panel">
             {crew.length > 1 && (

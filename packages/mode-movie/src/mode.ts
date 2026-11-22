@@ -27,6 +27,7 @@ import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
 import { movieProjectSupport } from './project.js';
+import { movieGuidesDe } from './guide.de.js';
 import { createCharacterVoiceCommands } from './voice.js';
 import { movieWork } from './work.js';
 
@@ -353,6 +354,7 @@ export function createMovieMode(options: {
       { id: 'edit', name: 'Edit', guide: editGuide },
       { id: 'audio', name: 'Audio', guide: audioGuide },
     ],
+    guideTranslations: { de: movieGuidesDe },
     commands: [
       ...movieCommands,
       ...createCharacterImageCommands(options.provider),

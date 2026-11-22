@@ -13,6 +13,10 @@ Each version's entry in the app's **What's new** panel (and in the
   `changes/edit-ripple-delete.md`, so that it never clashes with another
   pull request's file.
 - Without a file, the pull request's title is shown instead.
+- **Add the German version beside it** as `changes/<name>.de.md`, in the same
+  shape: a `# Title` and the same bullets, in natural German with "du". A test
+  fails while an entry has no translation. Imp shows the German one when the
+  interface is German.
 
 ## Writing an entry
 

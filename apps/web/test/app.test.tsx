@@ -105,7 +105,7 @@ describe("What's new", () => {
     ).toMatch(/\/pull\/41$/);
     expect(localStorage.getItem('imp.whatsNew.seen')).toBe('0.003');
     await user.click(within(panel).getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: "What’s new in Imp 0.003" })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'What’s new in Imp 0.003' })).toBeTruthy();
   });
 
   it('says so when a build knows no history', async () => {

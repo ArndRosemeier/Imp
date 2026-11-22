@@ -30,7 +30,18 @@ export interface Release {
   readonly pr?: number;
   /** One plain-language line per change people will notice. */
   readonly notes: readonly string[];
+  /** The title and notes in other languages, by language id, where the entry has them. */
+  readonly translations?: Readonly<Record<string, Translation>>;
 }
+
+/** An entry in another language: `changes/<name>.<language>.md` beside `changes/<name>.md`. */
+export interface Translation {
+  readonly title: string;
+  readonly notes: readonly string[];
+}
+
+/** The languages entries are translated into, beside English. */
+export const TRANSLATED_LANGUAGES = ['de'] as const;
 
 export interface ReleaseNotes {
   /** The version this build is. */
@@ -64,7 +75,24 @@ export function formatVersion(count: number): string {
 
 /** Whether `path` is an entry rather than the folder's own explanation or something else. */
 export function isEntry(path: string): boolean {
-  return path.startsWith(`${CHANGES_DIR}/`) && path.endsWith('.md') && path !== CHANGES_README;
+  return (
+    path.startsWith(`${CHANGES_DIR}/`) &&
+    path.endsWith('.md') &&
+    path !== CHANGES_README &&
+    translationLanguage(path) === undefined
+  );
+}
+
+const TRANSLATION = /\.([a-z]{2})\.md$/;
+
+/** "changes/x.de.md" is a translation into German; English entries have no language in the name. */
+export function translationLanguage(path: string): string | undefined {
+  return TRANSLATION.exec(path)?.[1];
+}
+
+/** Where the translation of an entry into a language lives. */
+export function translationPath(entry: string, language: string): string {
+  return entry.replace(/\.md$/, `.${language}.md`);
 }
 
 const BULLET = /^\s*[-*](?:\s+(.*))?$/;
@@ -134,17 +162,36 @@ export interface BuildOptions {
 function notesOf(
   paths: readonly string[],
   read: (path: string) => string | undefined,
+  language?: string,
 ): { title?: string; notes: string[] } {
   let title: string | undefined;
   const notes: string[] = [];
-  for (const path of [...paths].filter(isEntry).sort()) {
-    const text = read(path);
+  for (const entry of [...paths].filter(isEntry).sort()) {
+    const text = read(language === undefined ? entry : translationPath(entry, language));
     if (text === undefined) continue;
-    const entry = parseEntry(text);
-    title ??= entry.title;
-    notes.push(...entry.notes);
+    const parsed = parseEntry(text);
+    title ??= parsed.title;
+    notes.push(...parsed.notes);
   }
   return title === undefined ? { notes } : { title, notes };
+}
+
+/**
+ * The entry in every language it was translated into. A translation without
+ * a title of its own keeps the English one.
+ */
+function translationsOf(
+  paths: readonly string[],
+  read: (path: string) => string | undefined,
+  englishTitle: string,
+): Record<string, Translation> | undefined {
+  const result: Record<string, Translation> = {};
+  for (const language of TRANSLATED_LANGUAGES) {
+    const entry = notesOf(paths, read, language);
+    if (entry.title === undefined && entry.notes.length === 0) continue;
+    result[language] = { title: entry.title ?? englishTitle, notes: entry.notes };
+  }
+  return Object.keys(result).length === 0 ? undefined : result;
 }
 
 /** Turns the history into the versions people read, newest first. */
@@ -152,23 +199,29 @@ export function buildReleaseNotes(options: BuildOptions): ReleaseNotes {
   const releases: Release[] = options.merges.map((merge, index) => {
     const subject = splitSubject(merge.subject);
     const entry = notesOf(merge.added, options.read);
+    const title = entry.title ?? subject.title;
+    const translations = translationsOf(merge.added, options.read, title);
     return {
       version: formatVersion(index + 1),
       date: merge.date.slice(0, 10),
-      title: entry.title ?? subject.title,
+      title,
       ...(subject.pr === undefined ? {} : { pr: subject.pr }),
       notes: entry.notes,
+      ...(translations === undefined ? {} : { translations }),
     };
   });
   const latest = releases.at(-1);
   if (options.preview && options.pending !== undefined && options.pending.length > 0) {
     const entry = notesOf(options.pending, options.read);
     if (entry.notes.length > 0 || entry.title !== undefined) {
+      const title = entry.title ?? 'Not merged yet';
+      const translations = translationsOf(options.pending, options.read, title);
       releases.push({
         version: formatVersion(releases.length + 1),
         date: null,
-        title: entry.title ?? 'Not merged yet',
+        title,
         notes: entry.notes,
+        ...(translations === undefined ? {} : { translations }),
       });
     }
   }

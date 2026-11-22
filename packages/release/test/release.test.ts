@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildReleaseNotes,
@@ -12,6 +13,8 @@ import {
   RELEASE_MODULE,
   releaseNotesPlugin,
   splitSubject,
+  TRANSLATED_LANGUAGES,
+  translationLanguage,
   UNVERSIONED,
 } from '../src/index.js';
 
@@ -70,6 +73,12 @@ describe('splitSubject and isEntry', () => {
     expect(isEntry('changes/README.md')).toBe(false);
     expect(isEntry('changes/notes.txt')).toBe(false);
     expect(isEntry('docs/sound.md')).toBe(false);
+  });
+
+  it('takes a file named for a language as a translation, not an entry', () => {
+    expect(isEntry('changes/sound.de.md')).toBe(false);
+    expect(translationLanguage('changes/sound.de.md')).toBe('de');
+    expect(translationLanguage('changes/sound.md')).toBeUndefined();
   });
 });
 
@@ -148,6 +157,50 @@ describe('buildReleaseNotes', () => {
   it('has no version without merges', () => {
     expect(buildReleaseNotes({ merges: [], read, preview: true })).toEqual(UNVERSIONED);
   });
+
+  it('carries the translations of an entry, with the English title where one has none', () => {
+    const translated: Record<string, string> = {
+      ...files,
+      'changes/start.de.md': '# Imp bisher\n- Alles bis jetzt.',
+      'changes/a.de.md': '- Erster Teil.',
+      'changes/b.de.md': '- Zweiter Teil.',
+      'changes/next.de.md': '- Bald.',
+    };
+    const notes = buildReleaseNotes({
+      merges,
+      read: (path) => translated[path],
+      preview: true,
+      pending: ['changes/next.md', 'changes/next.de.md'],
+    });
+    expect(notes.releases.map((release) => release.translations?.['de'])).toEqual([
+      { title: 'Not merged yet', notes: ['Bald.'] },
+      { title: 'Direct push', notes: ['Erster Teil.', 'Zweiter Teil.'] },
+      undefined,
+      { title: 'Imp bisher', notes: ['Alles bis jetzt.'] },
+    ]);
+  });
+});
+
+describe('the entries in this repository', () => {
+  const folder = fileURLToPath(new URL('../../../changes/', import.meta.url));
+  const names = readdirSync(folder);
+
+  for (const language of TRANSLATED_LANGUAGES) {
+    it(`each have a translation into ${language}`, () => {
+      // Write changes/<name>.${language}.md beside changes/<name>.md, in the same shape.
+      const missing = names
+        .filter((name) => isEntry(`changes/${name}`))
+        .filter((name) => !names.includes(name.replace(/\.md$/, `.${language}.md`)));
+      expect(missing).toEqual([]);
+    });
+
+    it(`have no ${language} translation without its entry`, () => {
+      const orphans = names
+        .filter((name) => translationLanguage(`changes/${name}`) === language)
+        .filter((name) => !names.includes(name.replace(`.${language}.md`, '.md')));
+      expect(orphans).toEqual([]);
+    });
+  }
 });
 
 describe('readReleaseNotes', () => {
