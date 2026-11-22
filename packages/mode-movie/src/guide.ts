@@ -1,0 +1,256 @@
+import type { GuideTopic } from '@imp/core';
+
+/**
+ * The guide's pages about the movie stages, each with the tip shown the first
+ * time the stage opens. Written for the person making the film: what the stage
+ * is for, what to do first, and who on the crew can do it for them.
+ */
+
+export const developmentGuide: GuideTopic = {
+  id: 'stage-development',
+  area: 'development',
+  title: 'Development',
+  summary: 'The idea of the film before there is a script: logline, premise, tone, treatment.',
+  hint: {
+    title: 'Start with the idea',
+    body: 'Write a logline and the story in a few paragraphs, or tell the coordinator your idea in one sentence and let the Screenwriter draft it. Everything later builds on this page.',
+  },
+  body: `Development holds what the film is before there is a script: the **logline** (the film in a sentence or two), the **premise** (the situation, the main character and what is at stake), the **tone** (genre, mood and visual style) and the **treatment** (the story in prose, beginning to end).
+
+## What to do here
+
+1. Write the logline: who wants what, and what stands in the way.
+2. Write the premise and then the treatment.
+3. Put the visual style into the tone in words (for example "grainy 16mm, cold blues, handheld"). Pictures of the world are drawn in it, so the film looks like one film.
+
+## Let the crew do it
+
+Tell the coordinator the story in a sentence. It hires a **Screenwriter**, who writes the development and can go on to the scenes. You can change every word afterwards.
+
+## Tips
+
+- Short films work best with one main character and one clear turn.
+- A clear visual style is worth a minute: it is the cheapest way to keep a long film coherent.`,
+};
+
+export const scriptGuide: GuideTopic = {
+  id: 'stage-script',
+  area: 'script',
+  title: 'Script',
+  summary: 'Scenes and the screenplay: what happens, where, who speaks.',
+  hint: {
+    title: 'Break the story into scenes',
+    body: 'Each scene gets a place, a time of day, what happens and the lines. Ask the Screenwriter to draft them from Development, then rewrite whatever you like.',
+  },
+  body: `The Script stage holds the film's **scenes** in order. Each scene has a heading (place and time of day), a summary of what happens, the screenplay with action and dialogue, and optionally the location from Design where it happens.
+
+## What to do here
+
+1. Add scenes yourself with the plus button, or ask the Screenwriter to break the synopsis into scenes.
+2. Open a scene from the tabs to write or rewrite it, and link it to its location.
+3. Write lines the way they should be performed. "Get away from the rail!" comes out louder than "Get away from the rail."
+
+## How scenes are used later
+
+- Casting finds the characters who speak.
+- Shots splits each scene into shots, and dialogue is spoken in each character's voice.
+- Edit lays each scene out as its own timeline and joins them into the film.
+
+## Let the crew do it
+
+The **Screenwriter** writes and rewrites scenes. Ask for a change in plain words: "make scene 3 shorter and give Mara the last line".`,
+};
+
+export const castingGuide: GuideTopic = {
+  id: 'stage-casting',
+  area: 'casting',
+  title: 'Casting',
+  summary: 'Characters with descriptions, portraits and voices.',
+  hint: {
+    title: 'Give every character a face and a voice',
+    body: 'Describe each character, then make a portrait and a voice sample. Shots reuse the portrait so the same face appears in every clip. Each portrait or voice costs a cent or two.',
+  },
+  body: `Casting holds the film's **characters**: a description, portraits and a voice.
+
+## What to do here
+
+1. Add a character, or let the **Casting Director** find them in the script.
+2. Write how they look: age, build, face, clothes. Be specific; the portrait follows it.
+3. Make a **portrait**. Make a few and pick the one you like; the chosen portrait guides every clip they appear in.
+4. Make a **voice**: describe how they speak and try a sample line with a direction such as "calm" or "panicked".
+
+## Costs
+
+A portrait costs about a cent with a cheap image model, a voice sample a little more.
+
+## Tips
+
+- Drop any picture from the library onto a character to use it as their portrait.
+- Keep descriptions stable once clips exist, so later clips still match earlier ones.`,
+};
+
+export const designGuide: GuideTopic = {
+  id: 'stage-design',
+  area: 'design',
+  title: 'Design',
+  summary: 'Locations and objects, drawn from every side the camera sees them.',
+  hint: {
+    title: 'Build the world once, use it everywhere',
+    body: 'Add the places and important objects of the film. Each gets pictures from the angles the camera needs, and states such as "night" or "after the storm", so every shot of it matches.',
+  },
+  body: `Design holds the **locations** and **objects** of the film. Each has views (the sides the camera sees) and states (night, rain, wrecked), drawn in the film's visual style.
+
+## What to do here
+
+1. Add a location such as "the lighthouse kitchen" and describe it.
+2. Make its views: wide, reverse, details. These become reference pictures for shots set there.
+3. Add states when a place changes during the film.
+4. Do the same for objects that matter to the story, such as a letter or a car.
+
+## Let the crew do it
+
+The **Production Designer** reads the script, finds the places and objects, and draws them.
+
+## Why it matters
+
+Video models forget what a room looked like between clips. Giving each shot the same location pictures keeps a long film coherent.`,
+};
+
+export const shotsGuide: GuideTopic = {
+  id: 'stage-shots',
+  area: 'shots',
+  title: 'Shots',
+  summary: 'Each scene split into shots, each shot made into a video clip.',
+  hint: {
+    title: 'Plan shots, then make clips',
+    body: 'Describe each shot (framing, action, who is in it), choose a key frame if you want the clip to start on a set picture, then make the clip. Clips are the most expensive part of a film, so check the key frame first.',
+  },
+  body: `Shots splits each scene into **shots** and turns each into a **video clip**.
+
+## What to do here
+
+1. Pick a scene from the tabs.
+2. Add shots: framing (wide, close-up), what happens, who is in it, how long.
+3. Optionally make a **key frame**, a still picture the clip starts on. It is cheap and lets you check the look before paying for video.
+4. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it.
+5. Add **dialogue**: lines are spoken in the character's voice over the clip.
+
+## Takes
+
+Making a clip again never throws the old one away. Earlier clips stay as **takes** under the clip; tap one to watch it and use it again.
+
+## Costs
+
+A 4 second clip costs roughly 15 to 40 cents depending on the model and resolution.
+
+## Let the crew do it
+
+The **Clip Designer** plans shots from the script and makes the clips. It asks before spending.`,
+};
+
+export const soundGuide: GuideTopic = {
+  id: 'stage-sound',
+  area: 'sound',
+  title: 'Sound',
+  summary: 'Sound effects and music for each scene.',
+  hint: {
+    title: 'Add effects and music per scene',
+    body: 'Describe a sound ("waves breaking on rocks at night") or a piece of music and Imp makes it. Sounds go into the scene and can be placed on the Edit timeline or opened in the audio editor.',
+  },
+  body: `Sound holds the **sound effects** and **music** of each scene.
+
+## What to do here
+
+1. Pick a scene.
+2. Describe a sound effect. Start with what makes the sound: "a heavy door slamming in an empty hall".
+3. Describe music: mood, instruments, tempo, and "instrumental, no vocals" if that is what you want.
+4. Listen, and make it again if it is not right.
+
+## Using the sounds
+
+- On the Edit stage, drag a sound onto the audio lane at the right moment.
+- Open any sound in the **Audio** stage to trim it, change its loudness or add effects.
+
+## Let the crew do it
+
+The **Sound Designer** reads each scene and makes what it needs.`,
+};
+
+export const editGuide: GuideTopic = {
+  id: 'stage-edit',
+  area: 'edit',
+  title: 'Edit',
+  summary: 'Join clips, sound and text into the film, and export it.',
+  hint: {
+    title: 'Put the film together',
+    body: 'The strip shows the whole film, one block per scene. Open a scene to cut its shots, place sound and add titles. Picture and sound are edited separately. Export the film from the menu when it is ready.',
+  },
+  body: `Edit is where clips become a film. Imp exists to make films of any length that hold together, and this is where that happens.
+
+## The film and its scenes
+
+- The **film strip** shows every scene as a block as long as the scene: green when all its pieces are ready, amber while some are missing.
+- Open a scene to see its **timeline**: pictures on one lane, sound on its own lanes, text on another.
+- Playback runs on from one scene into the next, so you can watch the film through.
+
+## Cutting
+
+- Trim a piece by dragging its edges; split it at the playhead; drag pieces to reorder them.
+- Select a piece to see its inspector: takes, speed, freeze frame, punch-in, colour grade, and how it comes in (cut, dissolve, dip, wipe).
+- **J and L cuts** let the sound of one shot start early or run on under the next.
+- Leave **markers** (notes, to-dos, problems) at the playhead with M.
+- Undo and redo work for every change.
+
+## Sound and text
+
+- Drag sounds from the Sound stage or the library onto the audio lane.
+- The text lane holds titles, lower thirds, captions, subtitles and credits.
+
+## Working with the Film Editor
+
+The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic** watches the film and leaves markers.
+
+## Export
+
+Export renders the film as an MP4 file, faster than real time, in the browser.`,
+};
+
+export const audioGuide: GuideTopic = {
+  id: 'stage-audio',
+  area: 'audio',
+  title: 'Audio',
+  summary: 'A full audio editor: tracks, effects, loudness, recording, dialogue by its words.',
+  hint: {
+    title: 'Fine-tune sound like in a studio',
+    body: 'Open a scene or a single sound as an audio document. Arrange regions on tracks, add effects, set loudness, record from your microphone with R, and edit dialogue by its words.',
+  },
+  body: `Audio is a full audio editor for anything in the film: a scene's whole soundtrack or a single sound.
+
+## What you can do
+
+- Arrange **regions** on **tracks**, trim, split, fade and move them.
+- Add **effects** to a region or a track: EQ, compressor, limiter, noise reduction, and voices such as telephone, radio, robot, megaphone or monster.
+- Set **loudness** so the film sounds even from scene to scene.
+- **Record** from your microphone at the playhead with R.
+- Edit **dialogue by its words**: choose Words, then "Write down what is said". Tap a word and another to pick everything between, then Delete, Silence, or move them with Ctrl+X and Ctrl+V.
+
+## Getting sound in
+
+Drag a sound from the library onto a track (on a tablet, hold it a moment first), or choose "Open in audio editor" on any sound.
+
+## Let the crew do it
+
+The **Sound Editor** mixes, cleans and levels sound with the same tools.`,
+};
+
+/** In the order of the stages. */
+export const movieGuides: readonly GuideTopic[] = [
+  developmentGuide,
+  scriptGuide,
+  castingGuide,
+  designGuide,
+  shotsGuide,
+  soundGuide,
+  editGuide,
+  audioGuide,
+];

@@ -15,9 +15,11 @@ import {
   NotePencilIcon,
   PauseIcon,
   PlayIcon,
+  SlidersHorizontalIcon,
   StarIcon,
   TrashIcon,
   UploadSimpleIcon,
+  UsersThreeIcon,
   WaveformIcon,
   XIcon,
   type Icon,
@@ -36,6 +38,9 @@ import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { ConfirmButton } from '../Field.js';
 import { useBlobUrl } from '../movie.js';
 import { actionsFor } from './actions.js';
+import { CrewShelf, useSavedCrewCount } from './crews.js';
+import { MixShelf } from './mixes.js';
+import { useModelMixes } from '../model-bar.js';
 import { useDragSource, useLibraryDrag } from './drag.js';
 import { formatDuration, Listing, openWhereMade, type Asset } from './model.js';
 
@@ -619,6 +624,11 @@ export function LibraryPanel({
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
   const [modality, setModality] = useState<string | null>(null);
+  // The Crews and Mixes tabs show saved crews or model mixes in place of assets.
+  const [shelf, setShelf] = useState<'crews' | 'mixes' | null>(null);
+  const crews = shelf !== null;
+  const crewCount = useSavedCrewCount();
+  const mixCount = useModelMixes().data?.mixes.length;
   const [kind, setKind] = useState<string | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [favorite, setFavorite] = useState(false);
@@ -831,7 +841,13 @@ export function LibraryPanel({
               id={searchId}
               type="search"
               className="input"
-              placeholder="Search names, words, tags"
+              placeholder={
+                shelf === 'crews'
+                  ? 'Search saved crews'
+                  : shelf === 'mixes'
+                    ? 'Search model mixes'
+                    : 'Search names, words, tags'
+              }
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -842,11 +858,12 @@ export function LibraryPanel({
             <button
               type="button"
               role="tab"
-              aria-selected={modality === null}
+              aria-selected={modality === null && !crews}
               className="library-modality"
               onClick={() => {
                 setModality(null);
                 setKind(null);
+                setShelf(null);
               }}
             >
               <span>All</span>
@@ -859,13 +876,14 @@ export function LibraryPanel({
                   key={facet.id}
                   type="button"
                   role="tab"
-                  aria-selected={modality === facet.id}
+                  aria-selected={modality === facet.id && !crews}
                   aria-label={`${facet.label}, ${String(facet.count)}`}
                   title={facet.label}
                   className="library-modality"
                   onClick={() => {
                     setModality(facet.id);
                     setKind(null);
+                    setShelf(null);
                   }}
                 >
                   <FacetIcon aria-hidden="true" />
@@ -874,95 +892,145 @@ export function LibraryPanel({
                 </button>
               );
             })}
-          </div>
-          <div className="library-filters">
-            {kinds.length > 1 &&
-              kinds.map((facet) => (
-                <button
-                  key={facet.id}
-                  type="button"
-                  className="chip small"
-                  aria-pressed={kind === facet.id}
-                  onClick={() => {
-                    setKind(kind === facet.id ? null : facet.id);
-                  }}
-                >
-                  <span>{facet.label}</span> <span className="muted">{facet.count}</span>
-                </button>
-              ))}
-            {(data?.facets.tags.length ?? 0) > 0 && (
-              <select
-                className="select small"
-                aria-label="Tag"
-                value={tag ?? ''}
-                onChange={(event) => {
-                  setTag(event.target.value === '' ? null : event.target.value);
-                }}
-              >
-                <option value="">Any tag</option>
-                {data?.facets.tags.map((facet) => (
-                  <option key={facet.id} value={facet.id}>
-                    {facet.label} ({facet.count})
-                  </option>
-                ))}
-              </select>
-            )}
             <button
               type="button"
-              className="chip small"
-              aria-pressed={favorite}
+              role="tab"
+              aria-selected={shelf === 'crews'}
+              aria-label={`Crews, ${String(crewCount ?? 0)}`}
+              title="Saved crews"
+              className="library-modality"
               onClick={() => {
-                setFavorite(!favorite);
+                setShelf('crews');
               }}
             >
-              <StarIcon aria-hidden="true" weight={favorite ? 'fill' : 'regular'} />
-              <span>Starred</span>
+              <UsersThreeIcon aria-hidden="true" />
+              <span className="label">Crews</span>
+              <span className="count">{crewCount ?? 0}</span>
             </button>
-            <select
-              className="select small library-sort"
-              aria-label="Order"
-              value={sort}
-              onChange={(event) => {
-                setSort(event.target.value as typeof sort);
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shelf === 'mixes'}
+              aria-label={`Model mixes, ${String(mixCount ?? 0)}`}
+              title="Model mixes"
+              className="library-modality"
+              onClick={() => {
+                setShelf('mixes');
               }}
             >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="name">By name</option>
-            </select>
+              <SlidersHorizontalIcon aria-hidden="true" />
+              <span className="label">Mixes</span>
+              <span className="count">{mixCount ?? 0}</span>
+            </button>
           </div>
-          {listing.error !== null && <p className="error small">{listing.error}</p>}
-          {data !== undefined && assets.length === 0 && (
-            <div className="library-empty">
-              <BooksIcon aria-hidden="true" size={36} weight="light" />
-              <p>
-                {allCount === 0 && debounced === '' && modality === null && !favorite
-                  ? 'Nothing here yet. Everything this project makes appears here by itself: portraits, key frames, clips, dialogue, effects, music and scenes. Import your own files with Import, or drop them here.'
-                  : 'Nothing matches. Try other words or clear a filter.'}
-              </p>
-            </div>
-          )}
-          <ul className="library-grid" aria-label="Assets">
-            {assets.map((asset) => (
-              <Tile
-                key={asset.id}
-                asset={asset}
-                selected={false}
-                playing={preview.playing === asset.id}
-                onSelect={() => {
-                  setSelectedId(asset.id);
-                }}
-                onPlay={(url) => {
-                  preview.toggle(asset, url);
-                }}
-              />
-            ))}
-          </ul>
-          {assets.length > 0 && (
-            <p className="muted small library-hint">
-              Drag an asset to where it is used, holding it a moment on a tablet, or tap it for
-              more.
-            </p>
+          {shelf === 'mixes' ? (
+            <MixShelf
+              query={debounced}
+              onStatus={(message, failed = false) => {
+                if (failed) setError(message);
+                else setStatus(message);
+              }}
+            />
+          ) : shelf === 'crews' ? (
+            <CrewShelf
+              query={debounced}
+              onStatus={(message, failed = false) => {
+                if (failed) setError(message);
+                else setStatus(message);
+              }}
+            />
+          ) : (
+            <>
+              <div className="library-filters">
+                {kinds.length > 1 &&
+                  kinds.map((facet) => (
+                    <button
+                      key={facet.id}
+                      type="button"
+                      className="chip small"
+                      aria-pressed={kind === facet.id}
+                      onClick={() => {
+                        setKind(kind === facet.id ? null : facet.id);
+                      }}
+                    >
+                      <span>{facet.label}</span> <span className="muted">{facet.count}</span>
+                    </button>
+                  ))}
+                {(data?.facets.tags.length ?? 0) > 0 && (
+                  <select
+                    className="select small"
+                    aria-label="Tag"
+                    value={tag ?? ''}
+                    onChange={(event) => {
+                      setTag(event.target.value === '' ? null : event.target.value);
+                    }}
+                  >
+                    <option value="">Any tag</option>
+                    {data?.facets.tags.map((facet) => (
+                      <option key={facet.id} value={facet.id}>
+                        {facet.label} ({facet.count})
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  className="chip small"
+                  aria-pressed={favorite}
+                  onClick={() => {
+                    setFavorite(!favorite);
+                  }}
+                >
+                  <StarIcon aria-hidden="true" weight={favorite ? 'fill' : 'regular'} />
+                  <span>Starred</span>
+                </button>
+                <select
+                  className="select small library-sort"
+                  aria-label="Order"
+                  value={sort}
+                  onChange={(event) => {
+                    setSort(event.target.value as typeof sort);
+                  }}
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name">By name</option>
+                </select>
+              </div>
+              {listing.error !== null && <p className="error small">{listing.error}</p>}
+              {data !== undefined && assets.length === 0 && (
+                <div className="library-empty">
+                  <BooksIcon aria-hidden="true" size={36} weight="light" />
+                  <p>
+                    {allCount === 0 && debounced === '' && modality === null && !favorite
+                      ? 'Nothing here yet. Everything this project makes appears here by itself: portraits, key frames, clips, dialogue, effects, music and scenes. Import your own files with Import, or drop them here.'
+                      : 'Nothing matches. Try other words or clear a filter.'}
+                  </p>
+                </div>
+              )}
+              <ul className="library-grid" aria-label="Assets">
+                {assets.map((asset) => (
+                  <Tile
+                    key={asset.id}
+                    asset={asset}
+                    selected={false}
+                    playing={preview.playing === asset.id}
+                    onSelect={() => {
+                      setSelectedId(asset.id);
+                    }}
+                    onPlay={(url) => {
+                      preview.toggle(asset, url);
+                    }}
+                  />
+                ))}
+              </ul>
+              {assets.length > 0 && (
+                <p className="muted small library-hint">
+                  Drag an asset to where it is used, holding it a moment on a tablet, or tap it for
+                  more.
+                </p>
+              )}
+            </>
           )}
         </>
       )}

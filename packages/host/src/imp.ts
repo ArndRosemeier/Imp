@@ -3,6 +3,8 @@ import {
   createAgentCommands,
   createCrewCommands,
   createModelCommands,
+  createModelMixCommands,
+  createSavedCrewCommands,
   releaseInterruptedRuns,
   RoleCatalog,
   type Mode,
@@ -11,11 +13,13 @@ import {
   audioLibrarySource,
   createAudioCommands,
   createDefaultAudioCodec,
+  TRANSCRIPTION_MODEL_SETTING,
   type Mp4AudioDecoder,
 } from '@imp/audio';
 import {
   activityCommands,
   CommandRegistry,
+  createHelpCommands,
   createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
@@ -32,6 +36,11 @@ import {
 import {
   createMovieMode,
   createSceneAudioLink,
+  EFFECT_MODEL_SETTING,
+  IMAGE_MODEL_SETTING,
+  MUSIC_MODEL_SETTING,
+  SPEECH_MODEL_SETTING,
+  VIDEO_MODEL_SETTING,
   type FilmRenderer,
   type ColorSampler,
   type FrameGrabber,
@@ -39,6 +48,7 @@ import {
 } from '@imp/mode-movie';
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
+import { workspaceGuides } from './guide.js';
 import type { SecretStore } from './secrets.js';
 
 /** The assembled core of one host. The interface reaches it through `serveImp`. */
@@ -143,6 +153,11 @@ export function createImp(options: ImpOptions): Imp {
     ...settingsCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
     ...activityCommands,
+    // The guide: Imp's pages about itself, and the stages' pages from each mode.
+    ...createHelpCommands([
+      ...workspaceGuides,
+      ...modes.flatMap((mode) => mode.stages.flatMap((stage) => stage.guide ?? [])),
+    ]),
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createLibraryCommands([
@@ -169,6 +184,16 @@ export function createImp(options: ImpOptions): Imp {
     ...createCrewCommands(roles, {
       commandIds: () => registry.list().map((command) => command.id),
     }),
+    ...createSavedCrewCommands(roles),
+    ...createModelMixCommands([
+      { setting: 'coordinator.model', label: 'Agents' },
+      { setting: VIDEO_MODEL_SETTING, label: 'Video' },
+      { setting: SPEECH_MODEL_SETTING, label: 'Voices' },
+      { setting: IMAGE_MODEL_SETTING, label: 'Pictures' },
+      { setting: EFFECT_MODEL_SETTING, label: 'Sound effects' },
+      { setting: MUSIC_MODEL_SETTING, label: 'Music' },
+      { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
+    ]),
     ...createAgentCommands({ registry, provider, roles }),
   );
   let started: Promise<void> | undefined;

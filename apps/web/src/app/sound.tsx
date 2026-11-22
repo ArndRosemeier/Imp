@@ -5,15 +5,8 @@ import { useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
-import {
-  ModelPicker,
-  moviePrefix,
-  Problem,
-  useAct,
-  useBlobUrl,
-  useModelSetting,
-  type Act,
-} from './movie.js';
+import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
+import { ModelBar } from './model-bar.js';
 import { SceneTabs } from './shots.js';
 
 const Scenes = z.object({
@@ -151,28 +144,26 @@ export function SoundView({ project }: { project: Project }): ReactElement {
           {sounds.length === 1 ? '1 sound' : `${String(sounds.length)} sounds`} in this scene
         </span>
       </div>
-      <div className="row wrap model-pickers">
-        <ModelPicker
-          id="effects-model"
-          label="Sound effects model"
-          empty="Choose a model to make effects"
-          setting={EFFECT_MODEL_SETTING}
-          choice={effects}
-          act={act}
-        />
-        <ModelPicker
-          id="music-model"
-          label="Music model"
-          empty="Choose a model to make music"
-          setting={MUSIC_MODEL_SETTING}
-          choice={music}
-          act={act}
-        />
-      </div>
-      <p className="muted">
-        Effects are made by speech models, and not every one of them can: a model that cannot reads
-        the description aloud instead.
-      </p>
+      <ModelBar
+        act={act}
+        models={[
+          {
+            id: 'effects-model',
+            label: 'Sound effects',
+            empty: 'Choose a model to make effects',
+            setting: EFFECT_MODEL_SETTING,
+            choice: effects,
+          },
+          {
+            id: 'music-model',
+            label: 'Music',
+            empty: 'Choose a model to make music',
+            setting: MUSIC_MODEL_SETTING,
+            choice: music,
+          },
+        ]}
+        note="Effects are made by speech models, and not every one of them can: a model that cannot reads the description aloud instead."
+      />
       <Problem text={outline.error ?? listed.error ?? error ?? effects.error ?? music.error} />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (

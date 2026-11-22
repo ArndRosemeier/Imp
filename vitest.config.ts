@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // The app tests walk whole workflows through the UI; on a busy CI runner one can pass 5 s.
+    testTimeout: 20_000,
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',

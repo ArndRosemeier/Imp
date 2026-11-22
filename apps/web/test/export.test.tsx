@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ImpContext } from '../src/app/context.js';
 import { ExportBar } from '../src/app/ExportBar.js';
-import { chooseFormat, fadeLevel, nearestRate } from '../src/host/film-format.js';
+import { chooseFormat, fadeLevel, nearestRate } from '@imp/host/film';
 import { createLocalSecretStore } from '../src/host/secrets.js';
 
 afterEach(cleanup);

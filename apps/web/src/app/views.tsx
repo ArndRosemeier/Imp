@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
+import { TipsSwitch } from './help/HelpPanel.js';
+import { openHelp } from './help/help.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
@@ -349,6 +351,20 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
         ))}
         {settings.data?.settings.length === 0 && <p className="muted">Nothing is set yet.</p>}
       </div>
+      <section className="card stack" aria-labelledby="help-heading">
+        <h3 id="help-heading">Help</h3>
+        <TipsSwitch />
+        <div className="row">
+          <button
+            className="button"
+            onClick={() => {
+              openHelp();
+            }}
+          >
+            Open the guide
+          </button>
+        </div>
+      </section>
       <section className="card stack" aria-labelledby="key-heading">
         <h3 id="key-heading">OpenRouter key</h3>
         <p className="muted">

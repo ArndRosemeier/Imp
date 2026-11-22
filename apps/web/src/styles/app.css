@@ -172,13 +172,25 @@ textarea.input {
   gap: var(--space-5);
 }
 .wordmark {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
   font-family: var(--font-display);
   font-size: 28px;
   color: var(--accent);
   line-height: 1;
 }
+.imp-mark {
+  flex: none;
+  /* The glyph's baseline sits a little above its tail; this lines it up with the word. */
+  margin-bottom: -2px;
+}
 .setup-panel .wordmark {
   font-size: 40px;
+}
+.setup-panel .imp-mark {
+  height: 44px;
+  width: 22px;
 }
 .steps {
   display: flex;
@@ -800,6 +812,90 @@ input.input.script {
 .model-pickers {
   align-items: flex-end;
   margin-bottom: var(--space-5);
+}
+
+/* The models of a stage, folded into one chip; opening it switches mixes or single models. */
+.model-bar {
+  margin-bottom: var(--space-4);
+}
+.model-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .model-chip:hover {
+    border-color: var(--accent);
+    color: var(--ink);
+  }
+}
+.model-chip svg {
+  flex: none;
+  color: var(--accent);
+}
+.model-chip-mix {
+  flex: none;
+  color: var(--ink);
+  font-weight: 600;
+}
+.model-chip-flag {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+.model-chip-models {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+.model-chip.missing {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.model-chip.missing .model-chip-models {
+  color: var(--accent);
+}
+.model-chip-caret {
+  transition: transform 0.15s ease;
+}
+.model-bar.open .model-chip-caret {
+  transform: rotate(180deg);
+}
+.model-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+.model-panel .model-pickers {
+  margin-bottom: 0;
+}
+.model-panel > p {
+  margin: 0;
+}
+.model-mixes {
+  align-items: center;
+  gap: var(--space-2);
+}
+.model-mixes .button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .model-picker {
   flex: 1 1 260px;
@@ -4618,6 +4714,10 @@ dialog.whats-new-dialog {
   padding: 14px 20px 12px;
   gap: 0;
 }
+.main[data-stage='edit'] > .stage-tip {
+  flex: none;
+  margin-bottom: 10px;
+}
 .edit-screen {
   flex: 1 1 auto;
   /* Below this the screen scrolls rather than squeezing the picture to nothing. */
@@ -5129,4 +5229,461 @@ dialog.whats-new-dialog {
   .edit-head h1 {
     font-size: 26px;
   }
+}
+
+/* Saved crews, in the library's Crews tab. */
+.crew-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.crew-save {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  background: radial-gradient(120% 120% at 0% 0%, var(--accent-wash), transparent 70%);
+}
+.crew-save .row {
+  flex-wrap: nowrap;
+}
+.crew-save .input {
+  flex: 1;
+  min-width: 0;
+}
+.crew-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.crew-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface-raised);
+}
+.crew-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+}
+.crew-card-head > svg {
+  color: var(--accent);
+  margin-top: 2px;
+}
+.crew-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.crew-card-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.crew-card-members li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.crew-card-name {
+  font-weight: 600;
+}
+.crew-card-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.crew-card-actions .button {
+  min-height: 36px;
+}
+.crew-card-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 10px;
+  border-radius: var(--radius-s);
+  background: var(--accent-wash);
+}
+
+/* Help: the first-time tip of a stage */
+.stage-tip {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: 14px 10px 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: var(--radius-m);
+  background: linear-gradient(100deg, var(--accent-wash), transparent 60%), var(--surface);
+  animation: stage-tip-in 220ms ease-out;
+}
+@keyframes stage-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-tip {
+    animation: none;
+  }
+}
+.stage-tip-icon {
+  color: var(--accent);
+  margin-top: 2px;
+}
+.stage-tip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.stage-tip-text strong {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.stage-tip-text p {
+  margin: 0;
+  max-width: 78ch;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.stage-tip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.stage-tip-actions .button.small {
+  padding: 0 14px;
+}
+.stage-tip-actions .button.primary {
+  margin-right: var(--space-1);
+}
+.stage-tip-close {
+  margin: -6px -2px 0 0;
+}
+
+/* Help: the switch that turns all tips on or off */
+.tips-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--hit);
+  cursor: pointer;
+}
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.switch-track {
+  flex: none;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+  transition: background 160ms ease;
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: transform 160ms ease;
+}
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+.switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(18px);
+  background: var(--accent-ink);
+}
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.switch-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+/* Help: the guide panel */
+.help-toggle {
+  color: var(--ink-soft);
+}
+dialog.help-dialog {
+  width: min(1040px, calc(100vw - 32px));
+  height: min(820px, calc(var(--app-height, 100dvh) - 48px));
+  overflow: hidden;
+}
+dialog.help-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.help-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 24px 20px 18px 32px;
+  border-bottom: 1px solid var(--line);
+}
+.help-heading {
+  gap: var(--space-1);
+}
+.help-head h2 {
+  font-size: 36px;
+}
+.help-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  min-height: 0;
+}
+.help-index {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-3) var(--space-5) var(--space-5);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.help-search {
+  position: relative;
+  display: block;
+}
+.help-search svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-muted);
+}
+.help-search .input {
+  padding-left: 36px;
+  border-radius: var(--radius-pill);
+}
+.help-none {
+  font-size: 13px;
+}
+.help-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.help-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.help-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .help-entry:hover {
+    background: var(--surface);
+  }
+}
+.help-entry[aria-current='page'] {
+  background: var(--accent-wash);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.help-entry-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+.help-entry[aria-current='page'] .help-entry-title {
+  color: var(--accent);
+}
+.help-entry-summary {
+  font-size: 12px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+.help-page {
+  padding: var(--space-5) 40px var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.help-back {
+  display: none;
+}
+.help-page-title {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0;
+}
+.help-page-summary {
+  margin: 6px 0 var(--space-4);
+  color: var(--ink-muted);
+}
+.guide-text {
+  max-width: 68ch;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+.guide-text h3 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.guide-text p {
+  margin: 0 0 var(--space-3);
+}
+.guide-text ul,
+.guide-text ol {
+  margin: 0 0 var(--space-3);
+  padding-left: 22px;
+}
+.guide-text li + li {
+  margin-top: 4px;
+}
+.guide-text ol li::marker {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.guide-text strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.help-foot {
+  padding: 10px 24px 10px 32px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+/* A narrow screen, such as a tablet beside the keyboard: the list or the page, not both. */
+@media (max-width: 860px) {
+  .help-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .help-index {
+    border-right: none;
+  }
+  .help-dialog[data-reading='true'] .help-index {
+    display: none;
+  }
+  .help-dialog:not([data-reading='true']) .help-page {
+    display: none;
+  }
+  .help-dialog[data-reading='true'] .help-back {
+    display: inline-flex;
+    margin-bottom: var(--space-3);
+  }
+}
+/* On a full-screen editor the tip is one line: title, the start of the text, and the buttons. */
+.stage-tip[data-compact='true'] {
+  align-items: center;
+  padding: 6px 6px 6px 16px;
+}
+.stage-tip[data-compact='true'] .stage-tip-icon {
+  margin-top: 0;
+}
+.stage-tip[data-compact='true'] .stage-tip-text {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+}
+.stage-tip[data-compact='true'] .stage-tip-text strong {
+  flex: none;
+  font-size: 18px;
+}
+.stage-tip[data-compact='true'] .stage-tip-text p {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stage-tip[data-compact='true'] .stage-tip-actions {
+  flex: none;
+  flex-wrap: nowrap;
+  margin-top: 0;
+}
+.stage-tip[data-compact='true'] .stage-tip-close {
+  margin: 0;
+}
+@container main (max-width: 900px) {
+  .stage-tip[data-compact='true'] .stage-tip-text p {
+    display: none;
+  }
+}
+/* Model mixes, in the library's Mixes tab. They reuse the saved-crew cards. */
+.mix-card.active {
+  border-color: var(--accent);
+}
+.mix-card-badge {
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+@media (pointer: coarse) {
+  .crew-card-actions .button {
+    min-height: var(--hit);
+    min-width: var(--hit);
+  }
+}
+
+/* Picks up an agent run that stopped part way. */
+.continue-run {
+  align-self: flex-start;
 }

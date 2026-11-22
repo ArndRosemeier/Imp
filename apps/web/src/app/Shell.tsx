@@ -1,5 +1,6 @@
 import { AudioView, OPEN_VIEW } from './audio.js';
 import { EditView } from './edit.js';
+import { ImpMark } from './ImpMark.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
 import { CrewMember } from '@imp/agents';
@@ -35,6 +36,8 @@ import { Resizer, usePanelWidth } from './Resizer.js';
 import { DesignView } from './design.js';
 import { CastingView, DevelopmentView, ScriptView, StartMovie } from './movie.js';
 import { WhatsNew } from './WhatsNew.js';
+import { HelpPanel } from './help/HelpPanel.js';
+import { StageTip } from './help/StageTip.js';
 import { ActivityStrip, CrewView, SettingsView } from './views.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 import { LibraryDragProvider } from './library/drag.js';
@@ -266,7 +269,10 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
         }
       >
         <header className="topbar">
-          <div className="wordmark">Imp</div>
+          <div className="wordmark">
+            <ImpMark />
+            Imp
+          </div>
           {projects.length > 0 && (
             <div className="row project-switch">
               <label className="sr-only" htmlFor="project-select">
@@ -343,6 +349,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           >
             <ChatsCircleIcon aria-hidden="true" size={18} /> <span className="label">Crew</span>
           </button>
+          <HelpPanel />
           <WhatsNew />
           <button
             className="button quiet"
@@ -403,7 +410,14 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           )}
           {isStage &&
             state.data !== undefined &&
-            (project === null ? startMovie : <StageView stage={view} project={project} />)}
+            (project === null ? (
+              startMovie
+            ) : (
+              <>
+                <StageTip key={view} stage={view} />
+                <StageView stage={view} project={project} />
+              </>
+            ))}
         </main>
         {showLibrary && (
           <div className="library-column" id="library-panel">

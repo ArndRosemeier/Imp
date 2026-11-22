@@ -14,15 +14,8 @@ import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { ConfirmButton, EditableField } from './Field.js';
-import {
-  ModelPicker,
-  moviePrefix,
-  Problem,
-  useAct,
-  useBlobUrl,
-  useModelSetting,
-  type Act,
-} from './movie.js';
+import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
+import { ModelBar } from './model-bar.js';
 
 const Items = z.object({ items: z.array(WorldElement) });
 const Cast = z.object({ characters: z.array(Character.pick({ id: true, name: true })) });
@@ -636,15 +629,19 @@ export function DesignView({ project }: { project: Project }): ReactElement {
             </button>
           ))}
         </div>
-        <ModelPicker
-          id="design-image-model"
-          label="Image model"
-          empty="Choose a model to draw pictures"
-          setting={IMAGE_MODEL_SETTING}
-          choice={images}
-          act={act}
-        />
       </div>
+      <ModelBar
+        act={act}
+        models={[
+          {
+            id: 'design-image-model',
+            label: 'Image',
+            empty: 'Choose a model to draw pictures',
+            setting: IMAGE_MODEL_SETTING,
+            choice: images,
+          },
+        ]}
+      />
       <Problem text={error ?? images.error} />
       <KindPanel key={kind} project={project} kind={kind} model={images.model} />
     </>

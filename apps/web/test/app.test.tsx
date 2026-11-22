@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { MemoryKeyValueStore, settingsGet, type ReleaseNotes } from '@imp/core';
+import { MemoryKeyValueStore, settingsGet, type JsonValue, type ReleaseNotes } from '@imp/core';
 import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
@@ -283,7 +283,7 @@ describe('App', () => {
     await user.click(await screen.findByRole('button', { name: /Add scene/ }));
     await user.type(await screen.findByLabelText('Scene heading'), 'INT. LAMP ROOM - NIGHT');
     await user.tab();
-    expect(await screen.findByRole('tab', { name: /1 · INT\. LAMP ROOM - NIGHT/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: '1 · Lamp Room, night' })).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Delete scene/ }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText(/There are no scenes yet/)).toBeTruthy();
@@ -410,7 +410,7 @@ describe('App', () => {
       context: expect.stringContaining(`projectId "${projectId}"`) as string,
     });
     await user.click(screen.getByRole('button', { name: 'Script' }));
-    expect(await screen.findByRole('tab', { name: /1 · EXT\. HARBOUR - DUSK/ })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: '1 · Harbour, dusk' })).toBeTruthy();
   });
 
   it('resizes the side panels with the keyboard and remembers the widths', async () => {
@@ -455,6 +455,37 @@ describe('App', () => {
     expect(localStorage.getItem('imp.crew.open')).toBe('false');
     await user.click(toggle);
     expect(screen.getByRole('separator', { name: 'Resize the crew panel' })).toBeTruthy();
+  });
+
+  it('continues an agent run that was cut off', async () => {
+    const { imp, provider, user } = start([{ content: 'Hello.' }]);
+    await completeSetup(user);
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Hi.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Hello.')).toBeTruthy();
+
+    // The tab closed part way: the task was saved, the answer never came.
+    const memberId = (await imp.store.get('settings/coordinator.member')) as string;
+    const key = `conversations/${memberId}`;
+    const saved = (await imp.store.get(key)) as { messages: JsonValue[] };
+    await imp.store.batch([
+      {
+        type: 'put',
+        key,
+        value: {
+          ...saved,
+          messages: [...saved.messages, { role: 'user', content: 'Write the logline.' }],
+          lastStatus: 'cancelled',
+        },
+      },
+    ]);
+    cleanup();
+    render(<App imp={connect(imp)} />);
+    expect(await screen.findByText(/The last run was interrupted/)).toBeTruthy();
+    provider.script({ content: 'Logline written.' });
+    await user.click(screen.getByRole('button', { name: 'Continue where Coordinator stopped' }));
+    expect(await screen.findByText('Logline written.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Continue where/ })).toBeNull();
   });
 
   it('keeps the conversation across a restart and resumes after an approval', async () => {
@@ -1123,6 +1154,143 @@ describe('App', () => {
     });
   });
 
+  it('keeps crews in the library under a name and loads them back', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    const actor = { actor: { kind: 'user', id: 't' } } as const;
+    await imp.registry.executeById(
+      'crew.hire',
+      { roleId: 'screenwriter', model: 'm/a', name: 'Ada' },
+      actor,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    await user.click(within(library).getByRole('tab', { name: 'Crews, 0' }));
+    expect(await within(library).findByText(/No saved crews yet/)).toBeTruthy();
+    await user.type(within(library).getByLabelText(/Save the current crew/), 'Core team');
+    await user.click(within(library).getByRole('button', { name: /Save/ }));
+    const cards = await within(library).findByRole('list', { name: 'Saved crews' });
+    expect(await within(cards).findByRole('heading', { name: 'Core team' })).toBeTruthy();
+    expect(within(library).getByRole('tab', { name: 'Crews, 1' })).toBeTruthy();
+
+    const crew = async () =>
+      (
+        (await imp.registry.executeById('crew.list', {}, actor)) as {
+          output: { crew: { name: string }[] };
+        }
+      ).output.crew
+        .map((member) => member.name)
+        .sort();
+    const before = await crew();
+    await imp.registry.executeById(
+      'crew.hire',
+      { roleId: 'screenwriter', model: 'm/b', name: 'Bo' },
+      actor,
+    );
+    await user.click(within(cards).getByRole('button', { name: /Load/ }));
+    const confirm = await within(cards).findByRole('group', { name: 'Replace the crew' });
+    expect(within(confirm).getByText(/Dismiss Ada, Bo/)).toBeTruthy();
+    await user.click(within(confirm).getByRole('button', { name: 'Replace' }));
+    await vi.waitFor(async () => {
+      expect(await crew()).toEqual(before);
+    });
+
+    await user.click(within(cards).getByRole('button', { name: 'Rename Core team' }));
+    const name = within(cards).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Drama team');
+    await user.click(within(cards).getByRole('button', { name: 'Save' }));
+    expect(await within(cards).findByRole('heading', { name: 'Drama team' })).toBeTruthy();
+    await user.click(within(cards).getByRole('button', { name: /Add to crew/ }));
+    await vi.waitFor(async () => {
+      expect(await crew()).toHaveLength(before.length * 2 - 1);
+    });
+    await user.click(
+      within(cards).getByRole('button', { name: 'Update Drama team with the current crew' }),
+    );
+    await user.click(within(cards).getByRole('button', { name: 'Delete Drama team' }));
+    await user.click(within(cards).getByRole('button', { name: 'Delete' }));
+    expect(await within(library).findByText(/No saved crews yet/)).toBeTruthy();
+  });
+
+  it('keeps the models under a name, switches back to them from a stage chip and the library', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Design' }));
+
+    // The chip opens by itself while a model is missing, and folds once it is chosen.
+    const bar = await screen.findByRole('region', { name: 'Models' });
+    const chip = within(bar).getByRole('button', { name: /Choose image model/ });
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    await screen.findByRole('option', { name: 'vendor/painter' });
+    await user.selectOptions(within(bar).getByLabelText('Image model'), 'vendor/painter');
+    await vi.waitFor(() => {
+      expect(chip.getAttribute('aria-expanded')).toBe('false');
+    });
+    expect(chip.textContent).toContain('painter');
+
+    await user.click(chip);
+    await user.click(within(bar).getByRole('button', { name: /Save all models as a mix/ }));
+    await user.type(within(bar).getByLabelText('Name of the mix'), 'Drafts');
+    await user.click(within(bar).getByRole('button', { name: 'Save' }));
+    expect(await within(bar).findByText(/Saved “Drafts”/)).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(chip.textContent).toContain('Drafts');
+    });
+
+    // Another model in use: the chip says the mix was changed, and the mix brings it back.
+    const actor = { actor: { kind: 'user', id: 't' } } as const;
+    await imp.registry.executeById(
+      'settings.set',
+      { key: 'images.model', value: '~vendor/latest' },
+      actor,
+    );
+    expect(await within(bar).findByText('changed')).toBeTruthy();
+    await user.click(within(bar).getByRole('button', { name: /Drafts/, pressed: true }));
+    await vi.waitFor(() => {
+      expect(within(bar).queryByText('changed')).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    await user.click(within(library).getByRole('tab', { name: 'Model mixes, 1' }));
+    const cards = await within(library).findByRole('list', { name: 'Model mixes' });
+    expect(await within(cards).findByText('in use')).toBeTruthy();
+    expect(within(cards).getByText('painter')).toBeTruthy();
+    await user.type(within(library).getByLabelText(/Save the models in use/), 'Final');
+    await user.click(within(library).getByRole('button', { name: /Save/ }));
+    expect(await within(cards).findByRole('heading', { name: /Final/ })).toBeTruthy();
+
+    await user.click(within(cards).getByRole('button', { name: 'Rename Drafts' }));
+    const name = within(cards).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Cheap');
+    await user.click(within(cards).getByRole('button', { name: 'Save' }));
+    expect(await within(cards).findByRole('heading', { name: 'Cheap' })).toBeTruthy();
+    await user.click(within(cards).getByRole('button', { name: 'Use Cheap' }));
+    expect(await within(library).findByText('Using Cheap.')).toBeTruthy();
+    await user.click(
+      within(cards).getByRole('button', { name: 'Update Cheap with the models in use' }),
+    );
+    await user.type(within(library).getByRole('searchbox'), 'nothing like it');
+    expect(await within(library).findByText('No model mix matches.')).toBeTruthy();
+    await user.clear(within(library).getByRole('searchbox'));
+    await user.click(await within(cards).findByRole('button', { name: 'Delete Cheap' }));
+    await user.click(within(cards).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => {
+      expect(within(cards).queryByRole('heading', { name: 'Cheap' })).toBeNull();
+    });
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);
@@ -1146,6 +1314,45 @@ describe('App', () => {
     } finally {
       mark.remove();
     }
+  });
+
+  it('shows a tip the first time a stage opens, and turns all tips off in one step', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+
+    const first = await screen.findByRole('complementary', { name: /Start with the idea/ });
+    await user.click(within(first).getByRole('button', { name: 'Got it' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Start with the idea/ })).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Script' }));
+    const second = await screen.findByRole('complementary', { name: /Break the story/ });
+    await user.click(within(second).getByRole('button', { name: 'Turn off all tips' }));
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('complementary', { name: /Break the story/ })).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Casting' }));
+    await screen.findByRole('heading', { name: 'Casting' });
+    expect(screen.queryByRole('complementary', { name: /^Tip/ })).toBeNull();
+    expect((await imp.store.get('settings/help.enabled')) ?? true).toBe(false);
+
+    // The guide stays, and searching finds the page about the Edit stage.
+    await user.click(screen.getByRole('button', { name: /Help/ }));
+    const guide = await screen.findByRole('dialog', { name: 'The Imp guide' });
+    expect(await within(guide).findByRole('heading', { name: 'Getting started' })).toBeTruthy();
+    await user.type(within(guide).getByRole('searchbox'), 'dissolve');
+    await user.click(await within(guide).findByRole('button', { name: /^Edit/ }));
+    expect(await within(guide).findByRole('heading', { name: 'Edit' })).toBeTruthy();
+
+    // Tips come back from the same switch, in the guide or in Settings.
+    await user.click(within(guide).getByRole('switch', { name: /Show tips/ }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('settings/help.enabled')).toBe(true);
+    });
   });
 
   it('switches web search on for a crew member', async () => {

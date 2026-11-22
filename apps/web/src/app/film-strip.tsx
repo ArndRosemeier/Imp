@@ -6,6 +6,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { shortSceneTitle } from '@imp/mode-movie';
 import type { z } from 'zod';
 import { ITEM_STATE_TEXT, type Film } from './cut-player.js';
 import { usePinchZoom } from './gestures.js';
@@ -251,8 +252,7 @@ export function FilmStrip({
                   }}
                 >
                   <span className="film-scene-name">
-                    <strong>{scene.position}</strong>{' '}
-                    {scene.heading === '' ? 'Untitled' : scene.heading}
+                    <strong>{scene.position}</strong> {shortSceneTitle(scene.heading)}
                   </span>
                   <span className="film-scene-meta">
                     {filmClock(scene.durationSeconds)}

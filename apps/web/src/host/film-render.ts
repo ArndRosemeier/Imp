@@ -28,9 +28,8 @@ import {
   type VideoSample,
   type VideoCodec,
 } from 'mediabunny';
-import { chooseFormat } from './film-format.js';
+import { chooseFormat, drawText, drawTexts } from '@imp/host/film';
 import { framesInOrder } from './frame-order.js';
-import { drawText, drawTexts } from './text-draw.js';
 import { loadTextFonts } from './text-fonts.js';
 
 /** The engine's sound: 48 kHz stereo, as @imp/audio mixes it. */

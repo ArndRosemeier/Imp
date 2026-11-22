@@ -68,6 +68,13 @@ export {
   writeArchive,
   type ArchiveEntry,
 } from './archive.js';
+export {
+  createHelpCommands,
+  GuideTopic,
+  HELP_DISMISSED,
+  HELP_ENABLED,
+  HelpState,
+} from './commands/help.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export {
   createReleaseCommands,

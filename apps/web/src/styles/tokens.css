@@ -21,6 +21,9 @@
   --accent: #e8a33d;
   --accent-ink: #0e0d0b;
   --accent-wash: rgb(232 163 61 / 0.1);
+  /* Ends of the gold gradient on Imp's mark. */
+  --mark-top: #f6c66e;
+  --mark-bottom: #c97f1f;
   --danger: #f08a6c;
   --ok: #9ccf8f;
   /* Track colours of the audio editor: dialogue amber, then teal, rose and sage. */
@@ -60,6 +63,8 @@
   --accent: #9a5b00;
   --accent-ink: #fffdf8;
   --accent-wash: rgb(154 91 0 / 0.08);
+  --mark-top: #c98419;
+  --mark-bottom: #7a4600;
   --danger: #b3261e;
   --ok: #2e6b2a;
   --track-0: #9a5b00;
