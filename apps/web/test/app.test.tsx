@@ -1468,6 +1468,7 @@ describe('App', () => {
 
     // The guide stays, and searching finds the page about the Edit stage.
     await user.click(screen.getByRole('button', { name: /Help/ }));
+    await user.click(await screen.findByRole('tab', { name: /Guide/ }));
     const guide = await screen.findByRole('dialog', { name: 'The Imp guide' });
     expect(await within(guide).findByRole('heading', { name: 'Getting started' })).toBeTruthy();
     await user.type(within(guide).getByRole('searchbox'), 'dissolve');
@@ -1479,6 +1480,38 @@ describe('App', () => {
     await vi.waitFor(async () => {
       expect(await imp.store.get('settings/help.enabled')).toBe(true);
     });
+  });
+
+  it('answers questions from the guide with Ask Imp, hired the first time help opens', async () => {
+    const { imp, provider, user } = start([
+      {
+        toolCalls: [
+          {
+            id: 'h1',
+            name: 'help__topics',
+            arguments: { query: 'dissolve' },
+            argumentsText: '{"query":"dissolve"}',
+          },
+        ],
+      },
+      { content: 'Select the shot on the Edit stage and choose Dissolve in its inspector.' },
+    ]);
+    await completeSetup(user);
+    expect((await imp.store.list('crew/')).length).toBe(1);
+
+    await user.click(screen.getByRole('button', { name: /Help/ }));
+    const panel = await screen.findByRole('dialog', { name: 'Ask Imp' });
+    const chat = await within(panel).findByRole('complementary', { name: 'Conversation with Imp' });
+    await user.click(within(chat).getByRole('button', { name: /dissolve between two shots/ }));
+    await user.click(within(chat).getByRole('button', { name: /Send/ }));
+    expect(await within(chat).findByText(/choose Dissolve in its inspector/)).toBeTruthy();
+    // It looked in the guide, on the coordinator's model.
+    expect(provider.requests.at(-1)?.model).toBe('vendor/writer');
+    const crew = await imp.store.list('crew/');
+    expect(crew.map((entry) => (entry.value as { roleId: string }).roleId).sort()).toEqual([
+      'coordinator',
+      'guide',
+    ]);
   });
 
   it('shows the price on a button that spends, and keeps a running total', async () => {

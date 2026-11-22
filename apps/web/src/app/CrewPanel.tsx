@@ -9,7 +9,15 @@ import {
   WrenchIcon,
   XIcon,
 } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react';
 import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
@@ -100,11 +108,14 @@ export function CrewPanel({
   member,
   context,
   hidden = false,
+  intro,
 }: {
   member: CrewMember;
   /** What the agent should know about where the user is, sent with every message. */
   context: string;
   hidden?: boolean;
+  /** Shown before the first message, in place of the usual words. It can fill in the message box. */
+  intro?: (suggest: (text: string) => void) => ReactNode;
 }): ReactElement {
   const imp = useImp();
   const live = useLive([`conversations/${member.id}`], async (current) =>
@@ -254,12 +265,16 @@ export function CrewPanel({
         </div>
       </div>
       <div className="thread" aria-live="polite">
-        {messages.length === 0 && (
-          <p className="muted">
-            Tell {member.name} what you want to make or set up. It acts through the same commands
-            you have, and asks before spending or deleting.
-          </p>
-        )}
+        {messages.length === 0 &&
+          (intro?.((text) => {
+            setDraft(text);
+            document.getElementById(inputId)?.focus();
+          }) ?? (
+            <p className="muted">
+              Tell {member.name} what you want to make or set up. It acts through the same commands
+              you have, and asks before spending or deleting.
+            </p>
+          ))}
         {messages.map((message, index) => {
           if (message.role === 'user') {
             return (

@@ -409,7 +409,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
           <button
             className="button"
             onClick={() => {
-              openHelp();
+              openHelp('getting-started');
             }}
           >
             Open the guide

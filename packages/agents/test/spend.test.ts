@@ -186,6 +186,17 @@ describe('spending', () => {
     })) as Priced;
     expect(second.estimate).toMatchObject({ basis: 'your history', usd: 0.01 });
 
+    // A kind of work is priced without a command, on the model set for it.
+    await run('settings.set', { key: 'video.model', value: 'vendor/clips' });
+    const quoted = (await run('spend.quote', {
+      kind: 'video',
+      seconds: 4,
+      resolution: '720p',
+      audio: true,
+    })) as Priced;
+    expect(quoted.estimate).toMatchObject({ basis: 'price list' });
+    expect(quoted.estimate?.usd).toBeCloseTo(0.2);
+
     // Commands that do not spend, and inputs that do not fit, cost nothing to ask about.
     expect(await run('spend.estimate', { commandId: 'settings.get', input: { key: 'a' } })).toEqual(
       { estimate: null },

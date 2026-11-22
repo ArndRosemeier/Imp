@@ -1,5 +1,6 @@
 import {
   coordinatorRole,
+  guideRole,
   createAgentCommands,
   createCrewCommands,
   createModelCommands,
@@ -153,7 +154,11 @@ export function createImp(options: ImpOptions): Imp {
       ...(options.colorSampler === undefined ? {} : { colorSampler: options.colorSampler }),
     }),
   ];
-  const roles = new RoleCatalog([coordinatorRole, ...modes.flatMap((mode) => mode.roles)]);
+  const roles = new RoleCatalog([
+    coordinatorRole,
+    guideRole,
+    ...modes.flatMap((mode) => mode.roles),
+  ]);
   const registry = new CommandRegistry({ runtime });
   registry.register(
     ...settingsCommands,
