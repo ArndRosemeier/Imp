@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { CommandInfo } from '@imp/host';
 import { messageOf, runCommand, useImp } from './context.js';
+import { t, tx } from '../i18n/i18n.js';
 
 interface Field {
   readonly name: string;
@@ -87,16 +88,16 @@ function CommandForm({
     <form className="palette-form stack" onSubmit={submit}>
       <div className="row">
         <button type="button" className="button quiet" onClick={onBack}>
-          <ArrowLeftIcon aria-hidden="true" /> All commands
+          <ArrowLeftIcon aria-hidden="true" /> {t('All commands')}
         </button>
       </div>
-      <h2>{command.title}</h2>
+      <h2>{tx(command.title)}</h2>
       <p className="muted">{command.description}</p>
       {fields.map((field, index) => (
         <label key={field.name} className="field">
           <span>
             {field.name}
-            {field.required ? '' : ' (optional)'}
+            {field.required ? '' : ` ${t('(optional)')}`}
             {field.description === undefined ? '' : ` · ${field.description}`}
           </span>
           {field.kind === 'boolean' ? (
@@ -107,9 +108,9 @@ function CommandForm({
                 setValues({ ...values, [field.name]: event.target.value });
               }}
             >
-              <option value="">As it is by default</option>
-              <option value="false">No</option>
-              <option value="true">Yes</option>
+              <option value="">{t('As it is by default')}</option>
+              <option value="false">{t('No')}</option>
+              <option value="true">{t('Yes')}</option>
             </select>
           ) : (
             <input
@@ -117,7 +118,7 @@ function CommandForm({
               // eslint-disable-next-line jsx-a11y/no-autofocus -- the dialog was opened to fill this in
               autoFocus={index === 0}
               inputMode={field.kind === 'number' ? 'decimal' : undefined}
-              placeholder={field.kind === 'json' ? 'JSON value' : undefined}
+              placeholder={field.kind === 'json' ? t('JSON value') : undefined}
               required={field.required}
               value={values[field.name] ?? ''}
               onChange={(event) => {
@@ -129,7 +130,7 @@ function CommandForm({
       ))}
       <div className="row">
         <button className="button primary">
-          <PlayIcon aria-hidden="true" /> Run
+          <PlayIcon aria-hidden="true" /> {t('Run')}
         </button>
         <span className="effect" data-effect={command.effect}>
           {command.id} · {command.effect}
@@ -141,7 +142,7 @@ function CommandForm({
         </p>
       )}
       {result !== null && (
-        <pre className="result" aria-label="Result">
+        <pre className="result" aria-label={t('Result')}>
           {result}
         </pre>
       )}
@@ -176,7 +177,9 @@ export function CommandPalette({
 
   const needle = query.trim().toLowerCase();
   const commands = imp.commands.filter((command) =>
-    `${command.id} ${command.title} ${command.description}`.toLowerCase().includes(needle),
+    `${command.id} ${command.title} ${tx(command.title)} ${command.description}`
+      .toLowerCase()
+      .includes(needle),
   );
 
   return (
@@ -186,7 +189,7 @@ export function CommandPalette({
     <dialog
       ref={dialog}
       className="palette"
-      aria-label="Commands"
+      aria-label={t('Commands')}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === event.currentTarget) dialog.current?.close();
@@ -197,8 +200,8 @@ export function CommandPalette({
           <div className="palette-head">
             <input
               className="input palette-search"
-              aria-label="Search commands"
-              placeholder="Search commands"
+              aria-label={t('Search commands')}
+              placeholder={t('Search commands')}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -207,7 +210,7 @@ export function CommandPalette({
             <button
               type="button"
               className="button quiet"
-              aria-label="Close commands"
+              aria-label={t('Close commands')}
               onClick={() => {
                 dialog.current?.close();
               }}
@@ -224,7 +227,7 @@ export function CommandPalette({
                     setSelected(command);
                   }}
                 >
-                  <span>{command.title}</span>
+                  <span>{tx(command.title)}</span>
                   <span className="effect" data-effect={command.effect}>
                     {command.id}
                   </span>
@@ -232,7 +235,9 @@ export function CommandPalette({
                 </button>
               </li>
             ))}
-            {commands.length === 0 && <li className="muted palette-option">No command matches.</li>}
+            {commands.length === 0 && (
+              <li className="muted palette-option">{t('No command matches.')}</li>
+            )}
           </ul>
         </>
       ) : (

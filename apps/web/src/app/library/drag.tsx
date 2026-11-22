@@ -12,6 +12,7 @@ import {
   type RefObject,
 } from 'react';
 import type { Asset } from './model.js';
+import { t, tx } from '../../i18n/i18n.js';
 
 /** Where an asset was let go, or null when it was placed from the "Use in" menu. */
 export type DropPoint = { readonly clientX: number; readonly clientY: number } | null;
@@ -233,7 +234,7 @@ export function LibraryDragProvider({ children }: { children: ReactNode }): Reac
           }}
           aria-hidden="true"
         >
-          <span className="eyebrow">{carried.asset.kindLabel}</span>
+          <span className="eyebrow">{tx(carried.asset.kindLabel)}</span>
           <span className="library-ghost-title">{carried.asset.title}</span>
         </div>
       )}
@@ -243,7 +244,7 @@ export function LibraryDragProvider({ children }: { children: ReactNode }): Reac
 
 export function useLibraryDrag(): DragApi {
   const api = useContext(DragContext);
-  if (api === null) throw new Error('useLibraryDrag must be used inside LibraryDragProvider.');
+  if (api === null) throw new Error(t('useLibraryDrag must be used inside LibraryDragProvider.'));
   return api;
 }
 

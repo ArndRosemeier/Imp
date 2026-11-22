@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Asset } from './model.js';
+import { t } from '../../i18n/i18n.js';
 
 /** Runs a command in the open project (the project id is added) and answers its output. */
 export type RunInProject = (id: string, input: Record<string, unknown>) => Promise<unknown>;
@@ -27,7 +28,8 @@ export async function soundForScene(
   sceneId: string,
   asset: Asset,
 ): Promise<SceneSound> {
-  if (asset.blobKey === null) throw new Error(`“${asset.title}” has no sound yet.`);
+  if (asset.blobKey === null)
+    throw new Error(t('“{title}” has no sound yet.', { title: asset.title }));
   const { refs } = asset;
   if (asset.id.startsWith('movie:dialogue:') && refs['shotId'] !== undefined) {
     return {

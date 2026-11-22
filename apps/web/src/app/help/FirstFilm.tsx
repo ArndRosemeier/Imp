@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { OPEN_VIEW } from '../library/model.js';
 import { askCoordinator, useHelpState } from './help.js';
+import { t, tx } from '../../i18n/i18n.js';
 
 /** The id the path is closed under, like a tip, so "Turn off all tips" and the help settings cover it. */
 export const FIRST_FILM = 'path.first-film';
@@ -69,23 +70,25 @@ export function FirstFilm({
             go(step.stage);
           }}
         >
-          Go to {stageNames[step.stage] ?? step.stage} <ArrowRightIcon aria-hidden="true" />
+          {t('Go to')} {stageNames[step.stage] ?? step.stage} <ArrowRightIcon aria-hidden="true" />
         </button>
       )}
       <button
         className="button quiet small"
-        title="Puts the request in the coordinator's message box. Nothing is sent until you press Send."
+        title={t(
+          "Puts the request in the coordinator's message box. Nothing is sent until you press Send.",
+        )}
         onClick={() => {
           askCoordinator(step.ask);
         }}
       >
-        <ChatCircleDotsIcon aria-hidden="true" /> Ask the coordinator
+        <ChatCircleDotsIcon aria-hidden="true" /> {t('Ask the coordinator')}
       </button>
     </span>
   );
 
   return (
-    <section className="first-film" aria-label="Your first film" data-open={open}>
+    <section className="first-film" aria-label={t('Your first film')} data-open={open}>
       <div className="first-film-bar">
         <button
           className="first-film-toggle"
@@ -99,29 +102,34 @@ export function FirstFilm({
               <span key={step.id} data-done={step.done} data-next={step.id === data.next} />
             ))}
           </span>
-          <span className="eyebrow">Your first film</span>
+          <span className="eyebrow">{t('Your first film')}</span>
           <span className="muted small">
-            {String(doneCount)} of {String(data.steps.length)}
+            {t('{doneCount} of {count}', {
+              doneCount: String(doneCount),
+              count: String(data.steps.length),
+            })}
           </span>
           <CaretDownIcon className="first-film-caret" aria-hidden="true" size={14} />
         </button>
         {next === undefined ? (
           <span className="first-film-next">
             <FlagCheckeredIcon aria-hidden="true" size={18} />
-            <strong>Your first film is made.</strong>
-            <span className="muted">Export it from Edit whenever you like.</span>
+            <strong>{t('Your first film is made.')}</strong>
+            <span className="muted">{t('Export it from Edit whenever you like.')}</span>
           </span>
         ) : (
           <span className="first-film-next">
-            <span className="muted small">Next</span>
-            <strong>{next.title}</strong>
+            <span className="muted small">{t('Next')}</span>
+            <strong>{tx(next.title)}</strong>
           </span>
         )}
         {next !== undefined && !open && actions(next)}
         <button
           className="button quiet icon first-film-close"
-          aria-label={next === undefined ? 'Close: done' : 'Hide the guided path for good'}
-          title={next === undefined ? 'Done' : 'Hide for good. It comes back if you reset tips.'}
+          aria-label={next === undefined ? t('Close: done') : t('Hide the guided path for good')}
+          title={
+            next === undefined ? t('Done') : t('Hide for good. It comes back if you reset tips.')
+          }
           onClick={close}
         >
           <XIcon aria-hidden="true" size={16} />
@@ -132,13 +140,13 @@ export function FirstFilm({
           {data.steps.map((step) => (
             <li key={step.id} data-done={step.done} data-next={step.id === data.next}>
               {step.done ? (
-                <CheckCircleIcon aria-label="Done" size={20} weight="fill" />
+                <CheckCircleIcon aria-label={t('Done')} size={20} weight="fill" />
               ) : (
-                <CircleIcon aria-label="Not done yet" size={20} />
+                <CircleIcon aria-label={t('Not done yet')} size={20} />
               )}
               <span className="first-film-step">
-                <strong>{step.title}</strong>
-                <span className="muted">{step.body}</span>
+                <strong>{tx(step.title)}</strong>
+                <span className="muted">{tx(step.body)}</span>
               </span>
               {!step.done && actions(step)}
             </li>

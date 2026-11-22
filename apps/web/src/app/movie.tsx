@@ -28,6 +28,7 @@ import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
 import { SceneScript, ScriptFiles } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
+import { t, tn } from '../i18n/i18n.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
 const ScriptLength = z.object({ pages: z.number(), minutes: z.number() });
@@ -51,9 +52,9 @@ export function pagesText(pages: number): string {
 
 /** A running time in whole minutes, or under a minute. */
 export function minutesText(minutes: number): string {
-  if (minutes < 1) return 'under a minute';
+  if (minutes < 1) return t('under a minute');
   const whole = Math.round(minutes);
-  return whole === 1 ? '1 minute' : `${String(whole)} minutes`;
+  return tn(whole, '{count} minute', '{count} minutes');
 }
 const CharacterList = z.object({ characters: z.array(Character) });
 
@@ -107,17 +108,19 @@ export function StartMovie({ onCreated }: { onCreated: (project: Project) => voi
   return (
     <>
       <div className="view-head">
-        <h1>Start a movie</h1>
-        <span className="muted">Give it a working title. You can change it at any time.</span>
+        <h1>{t('Start a movie')}</h1>
+        <span className="muted">
+          {t('Give it a working title. You can change it at any time.')}
+        </span>
       </div>
       <form className="card stack start" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="movie-title">Working title</label>
+          <label htmlFor="movie-title">{t('Working title')}</label>
           <input
             id="movie-title"
             className="input"
             value={name}
-            placeholder="The Lighthouse Keeper"
+            placeholder={t('The Lighthouse Keeper')}
             onChange={(event) => {
               setName(event.target.value);
             }}
@@ -126,7 +129,7 @@ export function StartMovie({ onCreated }: { onCreated: (project: Project) => voi
         <Problem text={error} />
         <div className="row">
           <button className="button primary" disabled={name.trim() === ''}>
-            <FilmSlateIcon aria-hidden="true" /> Start the movie
+            <FilmSlateIcon aria-hidden="true" /> {t('Start the movie')}
           </button>
         </div>
       </form>
@@ -140,19 +143,45 @@ const DEVELOPMENT_FIELDS: readonly {
   rows?: number;
   placeholder: string;
 }[] = [
-  { key: 'logline', label: 'Logline', rows: 2, placeholder: 'The film in one or two sentences.' },
+  {
+    key: 'logline',
+    get label(): string {
+      return t('Logline');
+    },
+    rows: 2,
+    get placeholder(): string {
+      return t('The film in one or two sentences.');
+    },
+  },
   {
     key: 'premise',
-    label: 'Premise',
+    get label(): string {
+      return t('Premise');
+    },
     rows: 4,
-    placeholder: 'The situation, the main character and what is at stake.',
+    get placeholder(): string {
+      return t('The situation, the main character and what is at stake.');
+    },
   },
-  { key: 'tone', label: 'Tone and style', rows: 3, placeholder: 'Genre, mood and visual style.' },
+  {
+    key: 'tone',
+    get label(): string {
+      return t('Tone and style');
+    },
+    rows: 3,
+    get placeholder(): string {
+      return t('Genre, mood and visual style.');
+    },
+  },
   {
     key: 'treatment',
-    label: 'Treatment',
+    get label(): string {
+      return t('Treatment');
+    },
     rows: 14,
-    placeholder: 'The story told in prose from beginning to end.',
+    get placeholder(): string {
+      return t('The story told in prose from beginning to end.');
+    },
   },
 ];
 
@@ -164,9 +193,11 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
   return (
     <>
       <div className="view-head">
-        <h1>Development</h1>
+        <h1>{t('Development')}</h1>
         <span className="muted">
-          What the film is, before there is a script. Write it yourself or ask the Screenwriter.
+          {t(
+            'What the film is, before there is a script. Write it yourself or ask the Screenwriter.',
+          )}
         </span>
       </div>
       <Problem text={development.error ?? error} />
@@ -231,20 +262,23 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Script</h1>
+        <h1>{t('Script')}</h1>
         <span className="muted">
-          {scenes.length === 1 ? '1 scene' : `${String(scenes.length)} scenes`}
+          {tn(scenes.length, '{count} scene', '{count} scenes')}
           {length !== undefined && length.pages > 0 && (
             <>
-              {' · '}
-              {pagesText(length.pages)} · about {minutesText(length.minutes)}
+              {' '}
+              {t('· {pages} · about {minutes}', {
+                pages: pagesText(length.pages),
+                minutes: minutesText(length.minutes),
+              })}
             </>
           )}
         </span>
       </div>
       <ScriptFiles project={project} onImported={setSelectedId} />
       <Problem text={listed.error ?? error} />
-      <div className="chips" role="tablist" aria-label="Scenes">
+      <div className="chips" role="tablist" aria-label={t('Scenes')}>
         {scenes.map((candidate) => (
           <button
             key={candidate.id}
@@ -262,32 +296,34 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
           </button>
         ))}
         <button className="chip add" onClick={add}>
-          <PlusIcon aria-hidden="true" /> Add scene
+          <PlusIcon aria-hidden="true" /> {t('Add scene')}
         </button>
       </div>
       {scene === undefined ? (
         listed.data !== undefined && (
           <EmptyState
             icon={ScrollIcon}
-            title="No scenes yet"
-            quip="A blank page. The imp finds that very tempting."
-            body="There are no scenes yet. Add one with Add scene, or have the script written from the development notes."
-            ask="Write the script of this film from the development notes, scene by scene."
+            title={t('No scenes yet')}
+            quip={t('A blank page. The imp finds that very tempting.')}
+            body={t(
+              'There are no scenes yet. Add one with Add scene, or have the script written from the development notes.',
+            )}
+            ask={t('Write the script of this film from the development notes, scene by scene.')}
           />
         )
       ) : (
         <article
           key={scene.id}
           className="card stack page"
-          aria-label={`Scene ${String(scene.position)}`}
+          aria-label={t('Scene {position}', { position: String(scene.position) })}
         >
           <EditableField
-            label="Scene heading"
+            label={t('Scene heading')}
             hideLabel
             script
             heading
             value={scene.heading}
-            placeholder="INT. LOCATION - TIME"
+            placeholder={t('INT. LOCATION - TIME')}
             onCommit={(heading) => act('movie.scene.update', { sceneId: scene.id, heading })}
           />
           <ScenePlace
@@ -298,9 +334,9 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             act={act}
           />
           <EditableField
-            label="Summary"
+            label={t('Summary')}
             value={scene.summary}
-            placeholder="What happens in this scene, in a sentence or two."
+            placeholder={t('What happens in this scene, in a sentence or two.')}
             onCommit={(summary) => act('movie.scene.update', { sceneId: scene.id, summary })}
           />
           <SceneScript
@@ -324,7 +360,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
                   });
                 }}
               >
-                <ArrowLeftIcon aria-hidden="true" /> Move earlier
+                <ArrowLeftIcon aria-hidden="true" /> {t('Move earlier')}
               </button>
               <button
                 className="button quiet"
@@ -336,12 +372,12 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
                   });
                 }}
               >
-                Move later <ArrowRightIcon aria-hidden="true" />
+                {t('Move later')} <ArrowRightIcon aria-hidden="true" />
               </button>
             </div>
             <ConfirmButton
-              label="Delete scene"
-              question="Delete this scene for good?"
+              label={t('Delete scene')}
+              question={t('Delete this scene for good?')}
               onConfirm={() => {
                 void act('movie.scene.delete', { sceneId: scene.id });
               }}
@@ -361,15 +397,45 @@ const CHARACTER_FIELDS: readonly {
   rows?: number;
   placeholder: string;
 }[] = [
-  { key: 'part', label: 'Part', placeholder: 'Protagonist, antagonist, the neighbour' },
-  { key: 'description', label: 'Who they are', rows: 5, placeholder: 'Background, want, flaw.' },
+  {
+    key: 'part',
+    get label(): string {
+      return t('Part');
+    },
+    get placeholder(): string {
+      return t('Protagonist, antagonist, the neighbour');
+    },
+  },
+  {
+    key: 'description',
+    get label(): string {
+      return t('Who they are');
+    },
+    rows: 5,
+    get placeholder(): string {
+      return t('Background, want, flaw.');
+    },
+  },
   {
     key: 'appearance',
-    label: 'Appearance',
+    get label(): string {
+      return t('Appearance');
+    },
     rows: 5,
-    placeholder: 'Age, build, face, hair, clothing. Precise enough to draw from.',
+    get placeholder(): string {
+      return t('Age, build, face, hair, clothing. Precise enough to draw from.');
+    },
   },
-  { key: 'voice', label: 'Voice', rows: 4, placeholder: 'Pitch, pace, accent, manner.' },
+  {
+    key: 'voice',
+    get label(): string {
+      return t('Voice');
+    },
+    rows: 4,
+    get placeholder(): string {
+      return t('Pitch, pace, accent, manner.');
+    },
+  },
 ];
 
 const ImageModels = z.object({
@@ -474,7 +540,7 @@ function CharacterImages({
   // A picture from the library becomes an image of the character, and its portrait.
   const portraitBox = useRef<HTMLDivElement>(null);
   useLibraryDrop(portraitBox, {
-    label: `${character.name}, portrait`,
+    label: t('{name}, portrait', { name: character.name }),
     accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
     onDrop: async (asset) => {
       await act('movie.character.image.fromFile', { ...at, blobKey: asset.blobKey });
@@ -488,22 +554,29 @@ function CharacterImages({
             {character.name.slice(0, 1).toUpperCase()}
           </span>
         ) : (
-          <StoredImage blobKey={portrait.blobKey} alt={`Portrait of ${character.name}`} />
+          <StoredImage
+            blobKey={portrait.blobKey}
+            alt={t('Portrait of {name}', { name: character.name })}
+          />
         )}
         {busy && (
           <span className="portrait-busy" role="status">
-            Developing…
+            {t('Developing…')}
           </span>
         )}
       </div>
       {character.images.length > 1 && (
-        <div className="thumbs" role="group" aria-label={`Images of ${character.name}`}>
+        <div
+          className="thumbs"
+          role="group"
+          aria-label={t('Images of {name}', { name: character.name })}
+        >
           {character.images.map((image, index) => (
             <button
               key={image.id}
               className="thumb"
               aria-pressed={image.id === character.portraitId}
-              aria-label={`Use image ${String(index + 1)} as the portrait`}
+              aria-label={t('Use image {value} as the portrait', { value: String(index + 1) })}
               title={image.prompt}
               onClick={() => {
                 void act('movie.character.image.select', { ...at, imageId: image.id });
@@ -516,14 +589,14 @@ function CharacterImages({
       )}
       <form className="row portrait-make" onSubmit={generate}>
         <label className="sr-only" htmlFor={directionId}>
-          Direction for the next image
+          {t('Direction for the next image')}
         </label>
         <input
           id={directionId}
           type="text"
           className="input"
           value={direction}
-          placeholder="Direction, e.g. in profile, at night"
+          placeholder={t('Direction, e.g. in profile, at night')}
           onChange={(event) => {
             setDirection(event.target.value);
           }}
@@ -532,17 +605,19 @@ function CharacterImages({
           type="submit"
           className="button"
           disabled={busy || model === null}
-          title={model === null ? 'Choose an image model first.' : `Made with ${model}`}
+          title={
+            model === null ? t('Choose an image model first.') : t('Made with {model}', { model })
+          }
         >
-          <SparkleIcon aria-hidden="true" /> {portrait === undefined ? 'Portrait' : 'Another'}
+          <SparkleIcon aria-hidden="true" /> {portrait === undefined ? t('Portrait') : t('Another')}
           <Price command="movie.character.image.generate" input={at} />
         </button>
       </form>
       {portrait !== undefined && (
         <div className="row">
           <ConfirmButton
-            label="Delete image"
-            question="Delete this image for good?"
+            label={t('Delete image')}
+            question={t('Delete this image for good?')}
             onConfirm={() => {
               void act('movie.character.image.delete', { ...at, imageId: portrait.id });
             }}
@@ -587,7 +662,7 @@ export function ModelPicker({
         {choice.model !== null && !choice.models.some((model) => model.id === choice.model) && (
           <option value={choice.model}>
             {choice.model}
-            {choice.models.length > 0 ? ' (not offered: unsuitable or unknown)' : ''}
+            {choice.models.length > 0 ? t(' (not offered: unsuitable or unknown)') : ''}
           </option>
         )}
         {choice.models.map((model) => (
@@ -635,38 +710,46 @@ function CharacterVoice({
   };
 
   return (
-    <form className="stack voice" onSubmit={record} aria-label={`Voice of ${character.name}`}>
+    <form
+      className="stack voice"
+      onSubmit={record}
+      aria-label={t('Voice of {name}', { name: character.name })}
+    >
       {sample !== null && (
         <figure className="voice-sample">
           {url !== null && (
             // The words spoken are the caption below; a generated clip has no caption track.
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <audio controls src={url} aria-label={`Voice sample of ${character.name}`} />
+            <audio
+              controls
+              src={url}
+              aria-label={t('Voice sample of {name}', { name: character.name })}
+            />
           )}
           <figcaption className="muted">“{sample.line}”</figcaption>
         </figure>
       )}
       <div className="field">
-        <label htmlFor={lineId}>Line to record</label>
+        <label htmlFor={lineId}>{t('Line to record')}</label>
         <input
           id={lineId}
           type="text"
           className="input"
           value={line}
-          placeholder={`Hello. My name is ${character.name}.`}
+          placeholder={t('Hello. My name is {name}.', { name: character.name })}
           onChange={(event) => {
             setLine(event.target.value);
           }}
         />
       </div>
       <div className="field">
-        <label htmlFor={deliveryId}>Delivery</label>
+        <label htmlFor={deliveryId}>{t('Delivery')}</label>
         <input
           id={deliveryId}
           type="text"
           className="input"
           value={delivery}
-          placeholder="Shouting over a storm, out of breath"
+          placeholder={t('Shouting over a storm, out of breath')}
           onChange={(event) => {
             setDelivery(event.target.value);
           }}
@@ -677,10 +760,12 @@ function CharacterVoice({
           type="submit"
           className="button"
           disabled={busy || model === null}
-          title={model === null ? 'Choose a voice model first.' : `Spoken by ${model}`}
+          title={
+            model === null ? t('Choose a voice model first.') : t('Spoken by {model}', { model })
+          }
         >
           <MicrophoneIcon aria-hidden="true" />{' '}
-          {busy ? 'Recording…' : sample === null ? 'Record voice' : 'Record again'}
+          {busy ? t('Recording…') : sample === null ? t('Record voice') : t('Record again')}
           {!busy && (
             <Price
               command="movie.character.voice.generate"
@@ -690,8 +775,8 @@ function CharacterVoice({
         </button>
         {sample !== null && (
           <ConfirmButton
-            label="Delete recording"
-            question="Delete this recording for good?"
+            label={t('Delete recording')}
+            question={t('Delete this recording for good?')}
             onConfirm={() => {
               void act('movie.character.voice.delete', at);
             }}
@@ -717,17 +802,17 @@ export function CastingView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Casting</h1>
+        <h1>{t('Casting')}</h1>
         <span className="muted">
-          {characters.length === 1 ? '1 character' : `${String(characters.length)} characters`}
+          {tn(characters.length, '{count} character', '{count} characters')}
         </span>
         <button
           className="button"
           onClick={() => {
-            void act('movie.character.create', { name: 'New character' });
+            void act('movie.character.create', { name: t('New character') });
           }}
         >
-          <PlusIcon aria-hidden="true" /> Add character
+          <PlusIcon aria-hidden="true" /> {t('Add character')}
         </button>
       </div>
       <ModelBar
@@ -735,15 +820,15 @@ export function CastingView({ project }: { project: Project }): ReactElement {
         models={[
           {
             id: 'image-model',
-            label: 'Image',
-            empty: 'Choose a model to make portraits',
+            label: t('Image'),
+            empty: t('Choose a model to make portraits'),
             setting: IMAGE_MODEL_SETTING,
             choice: images,
           },
           {
             id: 'speech-model',
-            label: 'Voice',
-            empty: 'Choose a model to record voices',
+            label: t('Voice'),
+            empty: t('Choose a model to record voices'),
             setting: SPEECH_MODEL_SETTING,
             choice: speech,
           },
@@ -753,10 +838,14 @@ export function CastingView({ project }: { project: Project }): ReactElement {
       {listed.data !== undefined && characters.length === 0 && (
         <EmptyState
           icon={UsersThreeIcon}
-          title="Nobody is cast yet"
-          quip="An empty stage, and the imp is bored already."
-          body="Nobody is cast yet. Add a character, or have the cast built from the script, with a look and a voice for each."
-          ask="Build the cast of this film from the script: who appears, how they look and sound. Tell me the price before making portraits."
+          title={t('Nobody is cast yet')}
+          quip={t('An empty stage, and the imp is bored already.')}
+          body={t(
+            'Nobody is cast yet. Add a character, or have the cast built from the script, with a look and a voice for each.',
+          )}
+          ask={t(
+            'Build the cast of this film from the script: who appears, how they look and sound. Tell me the price before making portraits.',
+          )}
         />
       )}
       <div className="grid cast">
@@ -764,7 +853,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
           <article key={character.id} className="card stack" aria-label={character.name}>
             <div className="row">
               <EditableField
-                label="Name"
+                label={t('Name')}
                 hideLabel
                 value={character.name}
                 onCommit={(name) =>
@@ -796,7 +885,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                   });
                 }}
               />
-              Voice only (a narrator: heard, never seen)
+              {t('Voice only (a narrator: heard, never seen)')}
             </label>
             <label className="row">
               <input
@@ -809,13 +898,13 @@ export function CastingView({ project }: { project: Project }): ReactElement {
                   });
                 }}
               />
-              Own lane in the Edit stage (lines placed in time)
+              {t('Own lane in the Edit stage (lines placed in time)')}
             </label>
             <CharacterVoice character={character} model={speech.model} act={act} />
             <div className="row">
               <ConfirmButton
-                label="Delete character"
-                question="Delete this character for good?"
+                label={t('Delete character')}
+                question={t('Delete this character for good?')}
                 onConfirm={() => {
                   void act('movie.character.delete', { characterId: character.id });
                 }}

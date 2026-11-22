@@ -1,5 +1,6 @@
 import { ListedAsset } from '@imp/core';
 import { z } from 'zod';
+import { fixed, t } from '../../i18n/i18n.js';
 
 /** An asset as the library shows it: in a list its text may be only the start. */
 export type Asset = ListedAsset;
@@ -39,6 +40,7 @@ export function openWhereMade(target: Focus): void {
 export function formatDuration(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) return '';
   const whole = Math.round(seconds);
-  if (whole < 60) return `${seconds < 10 ? seconds.toFixed(1) : String(whole)} s`;
+  if (whole < 60)
+    return t('{value} s', { value: seconds < 10 ? fixed(seconds, 1) : String(whole) });
   return `${String(Math.floor(whole / 60))}:${String(whole % 60).padStart(2, '0')}`;
 }

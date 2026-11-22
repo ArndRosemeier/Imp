@@ -50,6 +50,9 @@ export {
   ResourceItem,
   ResourceKindInfo,
   StageProgress,
+  PhrasePart,
+  phrase,
+  phraseText,
   type CopySpec,
   type GuidedPath,
   type ModeProjectSupport,
@@ -101,6 +104,7 @@ export {
   HELP_DISMISSED,
   HELP_ENABLED,
   HelpState,
+  type GuideTranslations,
 } from './commands/help.js';
 export { MediaAttachment, mediaCommands, mediaView } from './commands/media.js';
 export {
@@ -116,7 +120,23 @@ export {
   redactSecrets,
   type SupportOptions,
 } from './commands/support.js';
-export { settingsCommands, settingsGet, settingsList, settingsSet } from './commands/settings.js';
+export {
+  languageCommands,
+  languageGet,
+  languageSet,
+  settingsCommands,
+  settingsGet,
+  settingsList,
+  settingsSet,
+} from './commands/settings.js';
+export {
+  DEFAULT_LANGUAGE,
+  Language,
+  LANGUAGE_SETTING,
+  LANGUAGES,
+  languageInfo,
+  readLanguage,
+} from './language.js';
 export { chosenModel, CostRequest } from './cost.js';
 export { CommandError, type CommandErrorCode } from './errors.js';
 export { patchOf } from './patch.js';

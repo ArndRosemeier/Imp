@@ -11,10 +11,12 @@ import {
 import { useEffect, useId, useState, type SyntheticEvent, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp } from './context.js';
 import { ImpMark } from './ImpMark.js';
-import { IMP_NAME } from './imp-names.js';
+import { impName } from './imp-names.js';
+import { LanguagePicker } from '../i18n/LanguagePicker.js';
 import { starterMixes, type StarterMix } from './onboarding/presets.js';
 import { formatUsd } from './spend.js';
 import { servedByLocalServer } from '../host/served.js';
+import { t } from '../i18n/i18n.js';
 
 /** Models an agent can run on: they write text and accept tools. */
 export function agentModels(models: readonly ModelInfo[]): ModelInfo[] {
@@ -38,7 +40,7 @@ function clipPrice(mix: StarterMix, models: readonly ModelInfo[]): string | null
 
 /** A model id without its vendor, as it reads on a card: "claude-haiku-latest". */
 function shortName(id: string | undefined): string {
-  if (id === undefined) return 'not available';
+  if (id === undefined) return t('not available');
   return id.replace(/^~/, '').split('/').at(-1) ?? id;
 }
 
@@ -54,19 +56,19 @@ function HelpChoice({
     {
       value: true,
       icon: CompassIcon,
-      title: 'Guide me',
-      body: 'A short tip the first time each stage opens.',
+      title: t('Guide me'),
+      body: t('A short tip the first time each stage opens.'),
     },
     {
       value: false,
       icon: LightningIcon,
-      title: 'I know my way around',
-      body: 'No tips. Help stays one tap away.',
+      title: t('I know my way around'),
+      body: t('No tips. Help stays one tap away.'),
     },
   ];
   return (
     <fieldset className="setup-help">
-      <legend className="eyebrow">Help while you work</legend>
+      <legend className="eyebrow">{t('Help while you work')}</legend>
       <div className="setup-help-options">
         {options.map((option) => (
           <label key={option.title} className="setup-help-option" aria-label={option.title}>
@@ -191,7 +193,8 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
             <ImpMark />
             Imp
           </div>
-          <span className="setup-motto">{IMP_NAME}</span>
+          <span className="setup-motto">{impName()}</span>
+          <LanguagePicker compact />
         </div>
         <div className="steps" aria-hidden="true">
           <span data-done="true" />
@@ -199,16 +202,19 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
         </div>
         {!hasKey ? (
           <form className="stack" onSubmit={submitKey}>
-            <h1>Connect OpenRouter</h1>
+            <h1>{t('Connect OpenRouter')}</h1>
             <p className="muted">
-              Imp makes pictures, voices, sound and video through your own OpenRouter account, and
-              you pay OpenRouter only for what you make.{' '}
+              {t(
+                'Imp makes pictures, voices, sound and video through your own OpenRouter account, and you pay OpenRouter only for what you make.',
+              )}{' '}
               {servedByLocalServer()
-                ? 'The key is kept by Imp on this computer, never in the browser, and is sent only to OpenRouter.'
-                : 'The key is kept encrypted in this browser and is sent only to OpenRouter.'}
+                ? t(
+                    'The key is kept by Imp on this computer, never in the browser, and is sent only to OpenRouter.',
+                  )
+                : t('The key is kept encrypted in this browser and is sent only to OpenRouter.')}
             </p>
             <label className="field" htmlFor={keyId}>
-              <span>OpenRouter API key</span>
+              <span>{t('OpenRouter API key')}</span>
               <input
                 id={keyId}
                 className="input"
@@ -228,10 +234,10 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
             )}
             <div className="row">
               <button className="button primary" disabled={busy || key.trim() === ''}>
-                {busy ? 'Checking' : 'Continue'} <ArrowRightIcon aria-hidden="true" />
+                {busy ? t('Checking') : t('Continue')} <ArrowRightIcon aria-hidden="true" />
               </button>
               <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">
-                Get a key
+                {t('Get a key')}
               </a>
             </div>
           </form>
@@ -243,21 +249,25 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
               finish(model);
             }}
           >
-            <h1>Choose your coordinator</h1>
+            <h1>{t('Choose your coordinator')}</h1>
             <p className="muted">
-              The coordinator is the agent you talk to. It plans the work, hires the rest of the
-              crew and can choose the other models for you. You can change it later.
+              {t(
+                'The coordinator is the agent you talk to. It plans the work, hires the rest of the crew and can choose the other models for you. You can change it later.',
+              )}
             </p>
             <label className="field" htmlFor={modelId}>
               <span>
-                Model{models.length > 0 ? ` (${String(models.length)} can run agents)` : ''}
+                {t('Model')}
+                {models.length > 0
+                  ? t(' ({count} can run agents)', { count: String(models.length) })
+                  : ''}
               </span>
               <input
                 id={modelId}
                 className="input"
                 list={listId}
                 required
-                placeholder={models.length === 0 ? 'Loading the catalog' : 'Type to search'}
+                placeholder={models.length === 0 ? t('Loading the catalog') : t('Type to search')}
                 value={model}
                 onChange={(event) => {
                   setModel(event.target.value);
@@ -279,7 +289,8 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
             )}
             <div className="row">
               <button className="button primary" disabled={busy || !known}>
-                {busy ? 'Hiring' : 'Hire the coordinator'} <ArrowRightIcon aria-hidden="true" />
+                {busy ? t('Hiring') : t('Hire the coordinator')}{' '}
+                <ArrowRightIcon aria-hidden="true" />
               </button>
               {mixes.length > 0 && (
                 <button
@@ -289,7 +300,7 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
                     setCustom(false);
                   }}
                 >
-                  <ArrowLeftIcon aria-hidden="true" /> Back to the starter mixes
+                  <ArrowLeftIcon aria-hidden="true" /> {t('Back to the starter mixes')}
                 </button>
               )}
             </div>
@@ -303,19 +314,20 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
               if (mix !== undefined && coordinator !== undefined) finish(coordinator, mix);
             }}
           >
-            <h1>Pick your models</h1>
+            <h1>{t('Pick your models')}</h1>
             <p className="muted">
-              A mix is a set of models, one for each kind of work. Start cheap while you learn;
-              switch to a stronger mix for the final film at any time, from any stage.
+              {t(
+                'A mix is a set of models, one for each kind of work. Start cheap while you learn; switch to a stronger mix for the final film at any time, from any stage.',
+              )}
             </p>
             {catalog.length === 0 && error === null && (
               <p className="muted" role="status">
-                Reading the OpenRouter catalog…
+                {t('Reading the OpenRouter catalog…')}
               </p>
             )}
             {mixes.length > 0 && (
               <fieldset className="mix-choices">
-                <legend className="sr-only">Model mix</legend>
+                <legend className="sr-only">{t('Model mix')}</legend>
                 {mixes.map((candidate) => {
                   const selected = candidate.id === mix?.id;
                   const clip = clipPrice(candidate, catalog);
@@ -338,17 +350,25 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
                         )}
                         <strong>{candidate.name}</strong>
                         {candidate.id === 'starter' && (
-                          <span className="tag accent">Start here</span>
+                          <span className="tag accent">{t('Start here')}</span>
                         )}
                       </span>
                       <span className="mix-choice-notes">{candidate.notes}</span>
                       <span className="mix-choice-models mono">
-                        <span>Agents · {shortName(candidate.models['coordinator.model'])}</span>
-                        <span>Video · {shortName(candidate.models['video.model'])}</span>
+                        <span>
+                          {t('Agents · {value}', {
+                            value: shortName(candidate.models['coordinator.model']),
+                          })}
+                        </span>
+                        <span>
+                          {t('Video · {value}', {
+                            value: shortName(candidate.models['video.model']),
+                          })}
+                        </span>
                       </span>
                       {clip !== null && (
                         <span className="mix-choice-price">
-                          4 s clip with sound <span className="price">≈ {clip}</span>
+                          {t('4 s clip with sound')} <span className="price">≈ {clip}</span>
                         </span>
                       )}
                     </label>
@@ -364,7 +384,9 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
             )}
             <div className="row wrap">
               <button className="button primary" disabled={busy || mix === undefined}>
-                {busy ? 'Setting up' : `Start with ${mix?.name ?? 'a mix'}`}{' '}
+                {busy
+                  ? t('Setting up')
+                  : t('Start with {value}', { value: mix?.name ?? t('a mix') })}{' '}
                 <ArrowRightIcon aria-hidden="true" />
               </button>
               <button
@@ -374,7 +396,7 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
                   setCustom(true);
                 }}
               >
-                Choose models myself
+                {t('Choose models myself')}
               </button>
             </div>
           </form>

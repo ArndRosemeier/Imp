@@ -10,6 +10,7 @@ import { shortSceneTitle } from '@imp/mode-movie';
 import type { z } from 'zod';
 import { ITEM_STATE_TEXT, type Film } from './cut-player.js';
 import { usePinchZoom } from './gestures.js';
+import { t, tn } from '../i18n/i18n.js';
 
 type FilmView = z.infer<typeof Film>;
 type SceneView = FilmView['scenes'][number];
@@ -72,11 +73,17 @@ export function fitScale(durations: readonly number[], width: number): number {
 
 /** What a scene's block says when looked at closely: its state and what is missing. */
 export function sceneSummary(scene: SceneView): string {
-  const heading = scene.heading === '' ? 'Untitled' : scene.heading;
+  const heading = scene.heading === '' ? t('Untitled') : scene.heading;
   const parts = [
-    `Scene ${String(scene.position)} · ${heading}`,
-    `starts at ${filmClock(scene.startSeconds)}, lasts ${filmClock(scene.durationSeconds)}`,
-    `${String(scene.readyItems)} of ${String(scene.items)} pieces ready`,
+    t('Scene {position} · {heading}', { position: String(scene.position), heading }),
+    t('starts at {startSeconds}, lasts {durationSeconds}', {
+      startSeconds: filmClock(scene.startSeconds),
+      durationSeconds: filmClock(scene.durationSeconds),
+    }),
+    t('{readyItems} of {items} pieces ready', {
+      readyItems: String(scene.readyItems),
+      items: String(scene.items),
+    }),
   ];
   if (scene.missing.length > 0) {
     parts.push(
@@ -87,7 +94,7 @@ export function sceneSummary(scene: SceneView): string {
     );
   }
   if (scene.openMarkers > 0) {
-    parts.push(`${String(scene.openMarkers)} open marker${scene.openMarkers === 1 ? '' : 's'}`);
+    parts.push(tn(scene.openMarkers, '{count} open marker', '{count} open markers'));
   }
   return parts.join('\n');
 }
@@ -173,16 +180,16 @@ export function FilmStrip({
       <button
         className="button small quiet"
         aria-pressed={playOn}
-        title="When a scene ends, open the next one and play on"
+        title={t('When a scene ends, open the next one and play on')}
         onClick={() => {
           onPlayOn(!playOn);
         }}
       >
-        Play on
+        {t('Play on')}
       </button>
-      <span className="segmented" role="group" aria-label="Zoom the film">
+      <span className="segmented" role="group" aria-label={t('Zoom the film')}>
         <button
-          aria-label="Zoom out"
+          aria-label={t('Zoom out')}
           onClick={() => {
             step(1 / 1.6);
           }}
@@ -195,10 +202,10 @@ export function FilmStrip({
             setScale(null);
           }}
         >
-          Fit
+          {t('Fit')}
         </button>
         <button
-          aria-label="Zoom in"
+          aria-label={t('Zoom in')}
           onClick={() => {
             step(1.6);
           }}
@@ -209,15 +216,18 @@ export function FilmStrip({
     </span>
   );
   return (
-    <section className={`film-strip${compact ? ' compact' : ''}`} aria-label="The whole film">
+    <section className={`film-strip${compact ? ' compact' : ''}`} aria-label={t('The whole film')}>
       {!compact && (
         <div className="film-strip-head">
-          <span className="film-strip-title">Film</span>
+          <span className="film-strip-title">{t('Film')}</span>
           <span className="muted small">
-            {String(film.scenes.length)} {film.scenes.length === 1 ? 'scene' : 'scenes'} ·{' '}
-            {filmClock(film.totalSeconds)} · {String(ready)} finished
+            {tn(film.scenes.length, '{count} scene', '{count} scenes')}{' '}
+            {t('· {totalSeconds} · {ready} finished', {
+              totalSeconds: filmClock(film.totalSeconds),
+              ready: String(ready),
+            })}
             {film.openMarkers > 0
-              ? ` · ${String(film.openMarkers)} open marker${film.openMarkers === 1 ? '' : 's'}`
+              ? ` · ${tn(film.openMarkers, '{count} open marker', '{count} open markers')}`
               : ''}
           </span>
           {controls}

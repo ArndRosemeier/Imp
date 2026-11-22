@@ -43,6 +43,7 @@ import { MixShelf } from './mixes.js';
 import { useModelMixes } from '../model-bar.js';
 import { useDragSource, useLibraryDrag } from './drag.js';
 import { formatDuration, Listing, openWhereMade, type Asset } from './model.js';
+import { t, tn, tx } from '../../i18n/i18n.js';
 
 const MODALITY_ICONS: Readonly<Record<string, Icon>> = {
   image: ImageIcon,
@@ -184,20 +185,20 @@ function Tile({
         type="button"
         className="library-tile-main"
         aria-pressed={selected}
-        aria-label={`${asset.title}, ${asset.kindLabel}`}
+        aria-label={`${asset.title}, ${tx(asset.kindLabel)}`}
         onClick={onSelect}
       >
         <span className="library-thumb">
           <Thumb asset={asset} seen={seen} />
           {duration !== '' && <span className="library-duration mono">{duration}</span>}
           {asset.favorite && (
-            <StarIcon className="library-star" weight="fill" aria-label="Starred" size={14} />
+            <StarIcon className="library-star" weight="fill" aria-label={t('Starred')} size={14} />
           )}
         </span>
         <span className="library-tile-text">
           <span className="library-title">{asset.title}</span>
           <span className="library-sub">
-            {asset.kindLabel}
+            {tx(asset.kindLabel)}
             {asset.context === '' ? '' : ` · ${asset.context}`}
           </span>
         </span>
@@ -206,7 +207,11 @@ function Tile({
         <button
           type="button"
           className="library-play"
-          aria-label={playing ? `Stop ${asset.title}` : `Play ${asset.title}`}
+          aria-label={
+            playing
+              ? t('Stop {title}', { title: asset.title })
+              : t('Play {title}', { title: asset.title })
+          }
           onClick={() => {
             onPlay(soundUrl);
           }}
@@ -287,14 +292,14 @@ function TagsField({
   };
   return (
     <div className="field">
-      <label htmlFor={id}>Tags</label>
+      <label htmlFor={id}>{t('Tags')}</label>
       <div className="library-tags">
         {tags.map((tag) => (
           <span key={tag} className="tag neutral library-tag">
             {tag}
             <button
               type="button"
-              aria-label={`Remove tag ${tag}`}
+              aria-label={t('Remove tag {tag}', { tag })}
               onClick={() => {
                 onCommit(tags.filter((candidate) => candidate !== tag));
               }}
@@ -307,7 +312,7 @@ function TagsField({
           id={id}
           className="input"
           value={draft}
-          placeholder={tags.length === 0 ? 'Add tags, such as storm or keep' : 'Add a tag'}
+          placeholder={tags.length === 0 ? t('Add tags, such as storm or keep') : t('Add a tag')}
           onChange={(event) => {
             setDraft(event.target.value);
           }}
@@ -385,16 +390,16 @@ function Detail({
   const ModalityIcon = MODALITY_ICONS[asset.modality] ?? BooksIcon;
 
   return (
-    <section className="library-detail" aria-label={`${asset.title}, details`}>
+    <section className="library-detail" aria-label={t('{title}, details', { title: asset.title })}>
       <div className="library-detail-head">
         <button type="button" className="button quiet small" onClick={onBack}>
-          <CaretLeftIcon aria-hidden="true" /> All assets
+          <CaretLeftIcon aria-hidden="true" /> {t('All assets')}
         </button>
         <button
           type="button"
           className="button quiet small library-star-toggle"
           aria-pressed={asset.favorite}
-          aria-label={asset.favorite ? 'Remove the star' : 'Star'}
+          aria-label={asset.favorite ? t('Remove the star') : t('Star')}
           onClick={() => {
             update({ favorite: !asset.favorite });
           }}
@@ -410,13 +415,13 @@ function Detail({
       />
       <div className="stack tight">
         <span className="eyebrow row">
-          <ModalityIcon aria-hidden="true" /> {asset.kindLabel}
+          <ModalityIcon aria-hidden="true" /> {tx(asset.kindLabel)}
           <span className="muted">· {asset.origin}</span>
         </span>
         {own ? (
           <input
             id={nameId}
-            aria-label="Name"
+            aria-label={t('Name')}
             className="input library-name"
             defaultValue={asset.title}
             key={asset.title}
@@ -440,7 +445,7 @@ function Detail({
               if (asset.open !== null) openWhereMade(asset.open);
             }}
           >
-            <ArrowSquareOutIcon aria-hidden="true" /> Open where it was made
+            <ArrowSquareOutIcon aria-hidden="true" /> {t('Open where it was made')}
           </button>
         )}
         {actionsFor(asset).map((action) => (
@@ -463,16 +468,28 @@ function Detail({
             setUsing(!using);
           }}
         >
-          <HandGrabbingIcon aria-hidden="true" /> Use in…
+          <HandGrabbingIcon aria-hidden="true" /> {t('Use in…')}
         </button>
       </div>
       {targets !== null && (
-        <div className="library-use" role="group" aria-label="Use in">
+        <div className="library-use" role="group" aria-label={t('Use in')}>
           {targets.length === 0 ? (
             <p className="muted small">
-              Nothing on this screen takes a {asset.modalityLabel.toLowerCase()}. Open the place you
-              want it, such as the audio editor for a sound, then drag it there or come back here.
-              {asset.modality === 'text' && ' A text can be dragged into any text field.'}
+              {asset.modality === 'text'
+                ? t(
+                    'Nothing on this screen takes a text. Open the place you want it, then drag it there or come back here. A text can be dragged into any text field.',
+                  )
+                : asset.modality === 'image'
+                  ? t(
+                      'Nothing on this screen takes a picture. Open the place you want it, then drag it there or come back here.',
+                    )
+                  : asset.modality === 'video'
+                    ? t(
+                        'Nothing on this screen takes a clip. Open the place you want it, then drag it there or come back here.',
+                      )
+                    : t(
+                        'Nothing on this screen takes a sound. Open the place you want it, such as the audio editor, then drag it there or come back here.',
+                      )}
             </p>
           ) : (
             targets.map((target) => (
@@ -495,7 +512,7 @@ function Detail({
       {asset.modality === 'text' &&
         (own ? (
           <div className="field">
-            <label htmlFor={textId}>Text</label>
+            <label htmlFor={textId}>{t('Text')}</label>
             <textarea
               id={textId}
               className="input script library-text"
@@ -518,14 +535,14 @@ function Detail({
         }}
       />
       <div className="field">
-        <label htmlFor={notesId}>Notes</label>
+        <label htmlFor={notesId}>{t('Notes')}</label>
         <textarea
           id={notesId}
           className="input"
           rows={2}
           defaultValue={asset.notes}
           key={asset.notes}
-          placeholder="Why it matters, where it goes"
+          placeholder={t('Why it matters, where it goes')}
           onBlur={(event) => {
             if (event.target.value !== asset.notes) update({ notes: event.target.value });
           }}
@@ -535,7 +552,7 @@ function Detail({
       {(projects.data?.length ?? 0) > 0 && (asset.blobKey !== null || asset.text !== null) && (
         <div className="row library-copy">
           <label className="sr-only" htmlFor={`${notesId}-copy`}>
-            Copy to project
+            {t('Copy to project')}
           </label>
           <select
             id={`${notesId}-copy`}
@@ -545,7 +562,7 @@ function Detail({
               setCopyTo(event.target.value);
             }}
           >
-            <option value="">Copy to another project…</option>
+            <option value="">{t('Copy to another project…')}</option>
             {projects.data?.map((candidate) => (
               <option key={candidate.id} value={candidate.id}>
                 {candidate.name}
@@ -557,7 +574,7 @@ function Detail({
             className="button small"
             disabled={copyTo === ''}
             onClick={() => {
-              const name = projects.data?.find((p) => p.id === copyTo)?.name ?? 'the project';
+              const name = projects.data?.find((p) => p.id === copyTo)?.name ?? t('the project');
               run(
                 () =>
                   runCommand(imp, 'library.copy', {
@@ -565,18 +582,20 @@ function Detail({
                     assetIds: [asset.id],
                     toProjectId: copyTo,
                   }),
-                `Copied to “${name}”.`,
+                t('Copied to “{name}”.', { name }),
               );
             }}
           >
-            <CopyIcon aria-hidden="true" /> Copy
+            <CopyIcon aria-hidden="true" /> {t('Copy')}
           </button>
         </div>
       )}
       {own && (
         <ConfirmButton
-          label="Delete from the library"
-          question={`Delete “${asset.title}” from the library? Where it was placed, it stops playing.`}
+          label={t('Delete from the library')}
+          question={t('Delete “{title}” from the library? Where it was placed, it stops playing.', {
+            title: asset.title,
+          })}
           onConfirm={() => {
             run(async () => {
               await runCommand(imp, 'library.delete', {
@@ -688,8 +707,11 @@ export function LibraryPanel({
       for (const file of files) {
         setStatus(
           files.length === 1
-            ? `Importing ${file.name}…`
-            : `Importing ${String(done + 1)} of ${String(files.length)}…`,
+            ? t('Importing {name}…', { name: file.name })
+            : t('Importing {value} of {count}…', {
+                value: String(done + 1),
+                count: String(files.length),
+              }),
         );
         try {
           const bytes = new Uint8Array(await file.arrayBuffer());
@@ -715,7 +737,7 @@ export function LibraryPanel({
           setError(`${file.name}: ${messageOf(reason)}`);
         }
       }
-      setStatus(done === 0 ? null : `Imported ${String(done)} ${done === 1 ? 'file' : 'files'}.`);
+      setStatus(done === 0 ? null : tn(done, 'Imported {count} file.', 'Imported {count} files.'));
     })();
   };
 
@@ -728,7 +750,7 @@ export function LibraryPanel({
   return (
     <aside
       className="library-panel"
-      aria-label="Library"
+      aria-label={t('Library')}
       data-wide={wide}
       data-file-over={fileOver}
       onDragOver={onFileDrag}
@@ -744,29 +766,29 @@ export function LibraryPanel({
       <div className="library-head">
         <div className="stack tight">
           <span className="eyebrow">{project.name}</span>
-          <h2>Library</h2>
+          <h2>{t('Library')}</h2>
         </div>
         <div className="row library-head-buttons">
           <button
             type="button"
             className="button quiet small library-import"
-            aria-label="Import files"
-            title="Import pictures, sounds, clips or texts"
+            aria-label={t('Import files')}
+            title={t('Import pictures, sounds, clips or texts')}
             onClick={() => {
               fileInput.current?.click();
             }}
           >
-            <UploadSimpleIcon aria-hidden="true" /> <span className="label">Import</span>
+            <UploadSimpleIcon aria-hidden="true" /> <span className="label">{t('Import')}</span>
           </button>
           <button
             type="button"
             className="button quiet small"
-            aria-label="Write a note"
-            title="Write a note"
+            aria-label={t('Write a note')}
+            title={t('Write a note')}
             onClick={() => {
               runCommand(imp, 'library.text.create', {
                 projectId: project.id,
-                name: 'New note',
+                name: t('New note'),
                 text: '',
               }).then(
                 (output) => {
@@ -784,8 +806,8 @@ export function LibraryPanel({
             type="button"
             className="button quiet small library-wide-toggle"
             aria-pressed={wide}
-            aria-label={wide ? 'Narrow the library' : 'Widen the library'}
-            title={wide ? 'Narrow' : 'Widen'}
+            aria-label={wide ? t('Narrow the library') : t('Widen the library')}
+            title={wide ? t('Narrow') : t('Widen')}
             onClick={onToggleWide}
           >
             {wide ? (
@@ -797,8 +819,8 @@ export function LibraryPanel({
           <button
             type="button"
             className="button quiet small"
-            aria-label="Close the library"
-            title="Close"
+            aria-label={t('Close the library')}
+            title={t('Close')}
             onClick={onClose}
           >
             <XIcon aria-hidden="true" />
@@ -810,7 +832,7 @@ export function LibraryPanel({
           multiple
           accept={ACCEPT}
           hidden
-          aria-label="Files to import"
+          aria-label={t('Files to import')}
           onChange={(event) => {
             importFiles([...(event.target.files ?? [])]);
             event.target.value = '';
@@ -835,7 +857,7 @@ export function LibraryPanel({
           <div className="library-search">
             <MagnifyingGlassIcon aria-hidden="true" />
             <label className="sr-only" htmlFor={searchId}>
-              Search the library
+              {t('Search the library')}
             </label>
             <input
               id={searchId}
@@ -843,10 +865,10 @@ export function LibraryPanel({
               className="input"
               placeholder={
                 shelf === 'crews'
-                  ? 'Search saved crews'
+                  ? t('Search saved crews')
                   : shelf === 'mixes'
-                    ? 'Search model mixes'
-                    : 'Search names, words, tags'
+                    ? t('Search model mixes')
+                    : t('Search names, words, tags')
               }
               value={query}
               onChange={(event) => {
@@ -854,7 +876,7 @@ export function LibraryPanel({
               }}
             />
           </div>
-          <div className="library-modalities" role="tablist" aria-label="What to show">
+          <div className="library-modalities" role="tablist" aria-label={t('What to show')}>
             <button
               type="button"
               role="tab"
@@ -866,7 +888,7 @@ export function LibraryPanel({
                 setShelf(null);
               }}
             >
-              <span>All</span>
+              <span>{t('All')}</span>
               <span className="count">{allCount}</span>
             </button>
             {data?.facets.modalities.map((facet) => {
@@ -877,8 +899,8 @@ export function LibraryPanel({
                   type="button"
                   role="tab"
                   aria-selected={modality === facet.id && !crews}
-                  aria-label={`${facet.label}, ${String(facet.count)}`}
-                  title={facet.label}
+                  aria-label={`${tx(facet.label)}, ${String(facet.count)}`}
+                  title={tx(facet.label)}
                   className="library-modality"
                   onClick={() => {
                     setModality(facet.id);
@@ -887,7 +909,7 @@ export function LibraryPanel({
                   }}
                 >
                   <FacetIcon aria-hidden="true" />
-                  <span className="label">{facet.label}</span>
+                  <span className="label">{tx(facet.label)}</span>
                   <span className="count">{facet.count}</span>
                 </button>
               );
@@ -896,30 +918,30 @@ export function LibraryPanel({
               type="button"
               role="tab"
               aria-selected={shelf === 'crews'}
-              aria-label={`Crews, ${String(crewCount ?? 0)}`}
-              title="Saved crews"
+              aria-label={t('Crews, {value}', { value: String(crewCount ?? 0) })}
+              title={t('Saved crews')}
               className="library-modality"
               onClick={() => {
                 setShelf('crews');
               }}
             >
               <UsersThreeIcon aria-hidden="true" />
-              <span className="label">Crews</span>
+              <span className="label">{t('Crews')}</span>
               <span className="count">{crewCount ?? 0}</span>
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={shelf === 'mixes'}
-              aria-label={`Model mixes, ${String(mixCount ?? 0)}`}
-              title="Model mixes"
+              aria-label={t('Model mixes, {value}', { value: String(mixCount ?? 0) })}
+              title={t('Model mixes')}
               className="library-modality"
               onClick={() => {
                 setShelf('mixes');
               }}
             >
               <SlidersHorizontalIcon aria-hidden="true" />
-              <span className="label">Mixes</span>
+              <span className="label">{t('Mixes')}</span>
               <span className="count">{mixCount ?? 0}</span>
             </button>
           </div>
@@ -953,19 +975,19 @@ export function LibraryPanel({
                         setKind(kind === facet.id ? null : facet.id);
                       }}
                     >
-                      <span>{facet.label}</span> <span className="muted">{facet.count}</span>
+                      <span>{tx(facet.label)}</span> <span className="muted">{facet.count}</span>
                     </button>
                   ))}
                 {(data?.facets.tags.length ?? 0) > 0 && (
                   <select
                     className="select small"
-                    aria-label="Tag"
+                    aria-label={t('Tag')}
                     value={tag ?? ''}
                     onChange={(event) => {
                       setTag(event.target.value === '' ? null : event.target.value);
                     }}
                   >
-                    <option value="">Any tag</option>
+                    <option value="">{t('Any tag')}</option>
                     {data?.facets.tags.map((facet) => (
                       <option key={facet.id} value={facet.id}>
                         {facet.label} ({facet.count})
@@ -982,19 +1004,19 @@ export function LibraryPanel({
                   }}
                 >
                   <StarIcon aria-hidden="true" weight={favorite ? 'fill' : 'regular'} />
-                  <span>Starred</span>
+                  <span>{t('Starred')}</span>
                 </button>
                 <select
                   className="select small library-sort"
-                  aria-label="Order"
+                  aria-label={t('Order')}
                   value={sort}
                   onChange={(event) => {
                     setSort(event.target.value as typeof sort);
                   }}
                 >
-                  <option value="newest">Newest first</option>
-                  <option value="oldest">Oldest first</option>
-                  <option value="name">By name</option>
+                  <option value="newest">{t('Newest first')}</option>
+                  <option value="oldest">{t('Oldest first')}</option>
+                  <option value="name">{t('By name')}</option>
                 </select>
               </div>
               {listing.error !== null && <p className="error small">{listing.error}</p>}
@@ -1003,12 +1025,14 @@ export function LibraryPanel({
                   <BooksIcon aria-hidden="true" size={36} weight="light" />
                   <p>
                     {allCount === 0 && debounced === '' && modality === null && !favorite
-                      ? 'Nothing here yet. Everything this project makes appears here by itself: portraits, key frames, clips, dialogue, effects, music and scenes. Import your own files with Import, or drop them here.'
-                      : 'Nothing matches. Try other words or clear a filter.'}
+                      ? t(
+                          'Nothing here yet. Everything this project makes appears here by itself: portraits, key frames, clips, dialogue, effects, music and scenes. Import your own files with Import, or drop them here.',
+                        )
+                      : t('Nothing matches. Try other words or clear a filter.')}
                   </p>
                 </div>
               )}
-              <ul className="library-grid" aria-label="Assets">
+              <ul className="library-grid" aria-label={t('Assets')}>
                 {assets.map((asset) => (
                   <Tile
                     key={asset.id}
@@ -1026,8 +1050,9 @@ export function LibraryPanel({
               </ul>
               {assets.length > 0 && (
                 <p className="muted small library-hint">
-                  Drag an asset to where it is used, holding it a moment on a tablet, or tap it for
-                  more.
+                  {t(
+                    'Drag an asset to where it is used, holding it a moment on a tablet, or tap it for more.',
+                  )}
                 </p>
               )}
             </>
@@ -1040,7 +1065,7 @@ export function LibraryPanel({
           <button
             type="button"
             className="button quiet small"
-            aria-label="Dismiss"
+            aria-label={t('Dismiss')}
             onClick={() => {
               setStatus(null);
               setError(null);
@@ -1054,7 +1079,7 @@ export function LibraryPanel({
       {fileOver && (
         <div className="library-drop-files" aria-hidden="true">
           <UploadSimpleIcon size={32} weight="light" />
-          <span>Drop to import</span>
+          <span>{t('Drop to import')}</span>
         </div>
       )}
     </aside>

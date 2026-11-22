@@ -9,6 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { t } from '../i18n/i18n.js';
 
 /**
  * A button that opens a panel beside it: the Edit screen's menus (Export,
@@ -123,7 +124,7 @@ export function Popover({
             <button
               type="button"
               className="button quiet icon-only"
-              aria-label={`Close ${heading.toLowerCase()}`}
+              aria-label={t('Close {value}', { value: heading.toLowerCase() })}
               onClick={close}
             >
               <XIcon aria-hidden="true" />
@@ -139,27 +140,27 @@ export function Popover({
 }
 
 /** The editor's keys, as the help lists them. */
-const KEYS: readonly (readonly [string, string])[] = [
-  ['Space', 'Play or pause'],
-  ['S', 'Split the selected shot at the playhead'],
-  [', and .', 'One frame back or on'],
-  ['I and O', 'Mark the start and end of a stretch to ask the crew about'],
-  ['Esc', 'Clear the marked stretch'],
-  ['M', 'Leave a marker at the playhead'],
-  ['Ctrl C, X, V', 'Copy, cut and paste the selected piece'],
-  ['Delete', 'Remove the selected piece'],
-  ['Ctrl Z', 'Undo; with Shift, redo'],
-  ['Ctrl + wheel', 'Zoom the timeline'],
+const keys = (): readonly (readonly [string, string])[] => [
+  [t('Space'), t('Play or pause')],
+  ['S', t('Split the selected shot at the playhead')],
+  [t(', and .'), t('One frame back or on')],
+  [t('I and O'), t('Mark the start and end of a stretch to ask the crew about')],
+  [t('Esc'), t('Clear the marked stretch')],
+  ['M', t('Leave a marker at the playhead')],
+  [t('Ctrl C, X, V'), t('Copy, cut and paste the selected piece')],
+  [t('Delete'), t('Remove the selected piece')],
+  [t('Ctrl Z'), t('Undo; with Shift, redo')],
+  [t('Ctrl + wheel'), t('Zoom the timeline')],
 ];
 
-const GESTURES: readonly (readonly [string, string])[] = [
-  ['Tap', 'Select a piece on the timeline'],
-  ['Drag a selected piece', 'Move it onto another to reorder; audio slides sideways'],
-  ['Drag an end', 'Trim the piece'],
-  ['Swipe', 'Scroll the timeline'],
-  ['Pinch', 'Zoom the timeline or the film strip'],
-  ['Drag the time ruler', 'Move the playhead'],
-  ['Drag the bar above the tools', 'Give the picture or the timeline more room'],
+const gestures = (): readonly (readonly [string, string])[] => [
+  [t('Tap'), t('Select a piece on the timeline')],
+  [t('Drag a selected piece'), t('Move it onto another to reorder; audio slides sideways')],
+  [t('Drag an end'), t('Trim the piece')],
+  [t('Swipe'), t('Scroll the timeline')],
+  [t('Pinch'), t('Zoom the timeline or the film strip')],
+  [t('Drag the time ruler'), t('Move the playhead')],
+  [t('Drag the bar above the tools'), t('Give the picture or the timeline more room')],
 ];
 
 /** How the editor is used: its gestures and keys, out of the way until asked for. */
@@ -202,29 +203,29 @@ export function EditHelp({
     <dialog
       ref={dialog}
       className="modal wide edit-help"
-      aria-label="Using the editor"
+      aria-label={t('Using the editor')}
       onClose={onClose}
     >
       <div className="stack modal-body">
         <div className="row edit-help-head">
-          <h2>Using the editor</h2>
+          <h2>{t('Using the editor')}</h2>
           <button
             type="button"
             className="button quiet icon-only"
-            aria-label="Close the help"
+            aria-label={t('Close the help')}
             onClick={onClose}
           >
             <XIcon aria-hidden="true" />
           </button>
         </div>
         <p className="muted">
-          Select a piece on the timeline to change it in the panel beside the picture. Mark in and
-          out to send a stretch with your next message to the crew. Exports run in the background
-          from the Export menu, and the Film Editor can do all of this too.
+          {t(
+            'Select a piece on the timeline to change it in the panel beside the picture. Mark in and out to send a stretch with your next message to the crew. Exports run in the background from the Export menu, and the Film Editor can do all of this too.',
+          )}
         </p>
         <div className="edit-help-columns">
-          {coarse ? table(GESTURES, 'Touch') : table(KEYS, 'Keys')}
-          {coarse ? table(KEYS, 'With a keyboard') : table(GESTURES, 'Touch')}
+          {coarse ? table(gestures(), t('Touch')) : table(keys(), t('Keys'))}
+          {coarse ? table(keys(), t('With a keyboard')) : table(gestures(), t('Touch'))}
         </div>
       </div>
     </dialog>
@@ -318,7 +319,7 @@ export function SplitBar({
       className="edit-splitbar"
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Room for the picture and the timeline"
+      aria-label={t('Room for the picture and the timeline')}
       aria-valuenow={height === null ? undefined : Math.round(height)}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
       tabIndex={0}

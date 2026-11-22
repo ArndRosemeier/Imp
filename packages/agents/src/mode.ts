@@ -1,4 +1,11 @@
-import type { Command, GuideTopic, KeyValueStore, LibrarySource, ProjectSupport } from '@imp/core';
+import type {
+  Command,
+  GuideTopic,
+  GuideTranslations,
+  KeyValueStore,
+  LibrarySource,
+  ProjectSupport,
+} from '@imp/core';
 import type { Role } from './role.js';
 
 /** One step of a mode's workflow, shown in the navigation. Stages can be visited in any order. */
@@ -23,6 +30,8 @@ export interface Mode {
   readonly name: string;
   readonly summary: string;
   readonly stages: readonly Stage[];
+  /** The stages' guide pages in other languages, with the same ids as the English ones. */
+  readonly guideTranslations?: GuideTranslations;
   readonly commands: readonly Command[];
   readonly roles: readonly Role[];
   /** Templates, progress for the start screen, and what can be copied between projects. */

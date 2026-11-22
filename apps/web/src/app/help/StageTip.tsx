@@ -5,6 +5,7 @@ import { messageOf, runCommand, useImp, useLive } from '../context.js';
 import { openHelp, stageHintId, TopicListing, useHelpState } from './help.js';
 import { GuideTopic } from '@imp/core';
 import { ImpMark } from '../ImpMark.js';
+import { t } from '../../i18n/i18n.js';
 
 /** Stages that are full-screen editors: their tip keeps to one line, so the editor keeps its room. */
 const COMPACT = new Set(['edit', 'audio']);
@@ -41,7 +42,7 @@ export function StageTip({ stage }: { stage: string }): ReactElement | null {
     <aside
       className="stage-tip"
       data-compact={COMPACT.has(stage) ? 'true' : undefined}
-      aria-label={`Tip: ${page.hint.title}`}
+      aria-label={t('Tip: {title}', { title: page.hint.title })}
     >
       {/* Tips come from the imp, so they carry its mark. */}
       <span className="stage-tip-icon">
@@ -57,7 +58,7 @@ export function StageTip({ stage }: { stage: string }): ReactElement | null {
               run('help.hint.dismiss', { id });
             }}
           >
-            Got it
+            {t('Got it')}
           </button>
           <button
             className="button quiet small"
@@ -65,7 +66,7 @@ export function StageTip({ stage }: { stage: string }): ReactElement | null {
               openHelp(page.id);
             }}
           >
-            Read more
+            {t('Read more')}
           </button>
           <button
             className="button quiet small"
@@ -73,13 +74,13 @@ export function StageTip({ stage }: { stage: string }): ReactElement | null {
               run('help.set', { enabled: false });
             }}
           >
-            Turn off all tips
+            {t('Turn off all tips')}
           </button>
         </div>
       </div>
       <button
         className="button quiet icon stage-tip-close"
-        aria-label="Close this tip"
+        aria-label={t('Close this tip')}
         onClick={() => {
           run('help.hint.dismiss', { id });
         }}

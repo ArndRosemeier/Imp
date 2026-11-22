@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.js';
 /**
  * Saving a file to the person's computer. Where the browser lets a page ask
  * where to save (Chrome, Edge and other Chromium browsers on computers), the
@@ -123,7 +124,7 @@ export async function saveFileAs(
           : {
               types: [
                 {
-                  description: request.description ?? 'File',
+                  description: request.description ?? t('File'),
                   accept: { [request.mediaType.split(';')[0] ?? request.mediaType]: [extension] },
                 },
               ],

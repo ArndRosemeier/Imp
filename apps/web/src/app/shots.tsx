@@ -25,9 +25,11 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
-import { Price } from './spend.js';
+import { formatUsd, Price } from './spend.js';
 import { useScriptLines } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
+import { fixed, t, tn, tx } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 const Scenes = z.object({
   scenes: z.array(Scene.pick({ id: true, position: true, heading: true, locationId: true })),
@@ -45,7 +47,7 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
     return (
       <div className="clip clip-empty">
         <FilmStripIcon aria-hidden="true" />
-        <span>No clip yet</span>
+        <span>{t('No clip yet')}</span>
       </div>
     );
   }
@@ -53,16 +55,19 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
     return (
       <div className="clip clip-empty" role="status" aria-busy="true">
         <span>
-          Being made{clip.progress === null ? '' : `, ${String(Math.round(clip.progress))}%`}…
+          {t('Being made')}
+          {clip.progress === null ? '' : `, ${String(Math.round(clip.progress))}%`}…
         </span>
-        <span className="muted">This takes a minute or more. You can leave this view.</span>
+        <span className="muted">{t('This takes a minute or more. You can leave this view.')}</span>
       </div>
     );
   }
   if (clip.status === 'failed') {
     return (
       <div className="clip clip-empty">
-        <span className="error">No clip was made: {clip.error ?? 'the model gave no reason'}</span>
+        <span className="error">
+          {t('No clip was made:')} {clip.error ?? t('the model gave no reason')}
+        </span>
       </div>
     );
   }
@@ -74,25 +79,29 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
           <DubbedVideo
             src={url}
             dialogueKey={shot.dialogue?.blobKey}
-            label={`Clip of shot ${String(shot.position)}`}
+            label={t('Clip of shot {position}', { position: String(shot.position) })}
           />
         ) : (
           // The line spoken is shown in the field below; a generated clip has no caption track.
           // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video controls src={url} aria-label={`Clip of shot ${String(shot.position)}`} />
+          <video
+            controls
+            src={url}
+            aria-label={t('Clip of shot {position}', { position: String(shot.position) })}
+          />
         ))}
       <figcaption className="muted">
-        {clip.model === 'file' ? 'From a file' : clip.model}
+        {clip.model === 'file' ? t('From a file') : clip.model}
         {clip.durationSeconds === null ? '' : ` · ${seconds(clip.durationSeconds)}`}
-        {clip.costUsd === null ? '' : ` · $${clip.costUsd.toFixed(2)}`}
+        {clip.costUsd === null ? '' : ` · ${formatUsd(clip.costUsd)}`}
         {clip.model === 'file'
           ? ''
           : clip.startFrameId !== null
-            ? ' · starts on the key frame'
+            ? t(' · starts on the key frame')
             : clip.guides.length === 0
-              ? ' · made from the words alone, without pictures'
-              : ` · guided by ${clip.guides.join(', ')}`}
-        {overlaid ? ' · silent, the recorded dialogue plays over it' : ''}
+              ? t(' · made from the words alone, without pictures')
+              : t(' · guided by {value}', { value: clip.guides.join(', ') })}
+        {overlaid ? t(' · silent, the recorded dialogue plays over it') : ''}
       </figcaption>
     </figure>
   );
@@ -100,7 +109,7 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
 
 /** A clip length as people read it: "4 s", "4.5 s", never "4.041667 s". */
 function seconds(value: number): string {
-  return `${String(Math.round(value * 10) / 10)} s`;
+  return t('{value} s', { value: String(Math.round(value * 10) / 10) });
 }
 
 /** One earlier clip of a shot: a still that plays when tapped, and what it was made with. */
@@ -122,12 +131,15 @@ function TakeCard({
   const url = useBlobUrl(take.blobKey ?? undefined);
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const label = `Take ${String(number)} of shot ${String(shotPosition)}`;
+  const label = t('Take {number} of shot {shotPosition}', {
+    number: String(number),
+    shotPosition: String(shotPosition),
+  });
   return (
     <li className="take">
       <button
         className="take-still"
-        aria-label={playing ? `Stop ${label}` : `Play ${label}`}
+        aria-label={playing ? t('Stop {label}', { label }) : t('Play {label}', { label })}
         aria-pressed={playing}
         onClick={() => {
           const element = video.current;
@@ -162,19 +174,23 @@ function TakeCard({
         <span className="take-number">{number}</span>
       </button>
       <span className="muted small take-info" title={take.prompt}>
-        {take.model === 'file' ? 'From a file' : take.model.split('/').at(-1)}
+        {take.model === 'file' ? t('From a file') : take.model.split('/').at(-1)}
         {take.durationSeconds === null ? '' : ` · ${seconds(take.durationSeconds)}`}
       </span>
       <div className="row take-actions">
         <button
           className="button small"
           disabled={disabled}
-          title="Make this take the clip again; the clip now in use becomes a take."
+          title={t('Make this take the clip again; the clip now in use becomes a take.')}
           onClick={onUse}
         >
-          <ArrowCounterClockwiseIcon aria-hidden="true" /> Use
+          <ArrowCounterClockwiseIcon aria-hidden="true" /> {t('Use')}
         </button>
-        <ConfirmButton label="Delete" question="Delete this take for good?" onConfirm={onDelete}>
+        <ConfirmButton
+          label={t('Delete')}
+          question={t('Delete this take for good?')}
+          onConfirm={onDelete}
+        >
           <TrashIcon aria-hidden="true" />
         </ConfirmButton>
       </div>
@@ -191,11 +207,14 @@ function Takes({ shot, act }: { shot: Shot; act: Act }): ReactElement | null {
   const at = { sceneId: shot.sceneId, shotId: shot.id };
   const pending = shot.clip?.status === 'pending';
   return (
-    <section className="stack takes" aria-label={`Earlier takes of shot ${String(shot.position)}`}>
+    <section
+      className="stack takes"
+      aria-label={t('Earlier takes of shot {position}', { position: String(shot.position) })}
+    >
       <div className="row spread wrap">
-        <h4>Earlier takes</h4>
+        <h4>{t('Earlier takes')}</h4>
         <span className="muted small">
-          {pending ? 'Wait for the new clip before swapping.' : 'Tap one to watch it.'}
+          {pending ? t('Wait for the new clip before swapping.') : t('Tap one to watch it.')}
         </span>
       </div>
       <ol className="take-list">
@@ -255,7 +274,7 @@ function KeyFrames({
   // A picture from the library becomes a key frame, the one the clip starts on.
   const frameBox = useRef<HTMLElement>(null);
   useLibraryDrop(frameBox, {
-    label: `Shot ${String(shot.position)}, key frame`,
+    label: t('Shot {position}, key frame', { position: String(shot.position) }),
     accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
     onDrop: async (asset) => {
       await act('movie.shot.frame.fromFile', { ...at, blobKey: asset.blobKey });
@@ -265,16 +284,16 @@ function KeyFrames({
     <section
       ref={frameBox}
       className="stack key-frames"
-      aria-label={`Key frame of shot ${String(shot.position)}`}
+      aria-label={t('Key frame of shot {position}', { position: String(shot.position) })}
     >
       <div className="row spread wrap">
-        <h4>Key frame</h4>
+        <h4>{t('Key frame')}</h4>
         <span className="muted small">
           {chosen === undefined
             ? shot.frames.length === 0
-              ? 'The clip starts from words and pictures alone.'
-              : 'None chosen: the clip starts from words and pictures.'
-            : 'The clip starts exactly on this frame.'}
+              ? t('The clip starts from words and pictures alone.')
+              : t('None chosen: the clip starts from words and pictures.')
+            : t('The clip starts exactly on this frame.')}
         </span>
       </div>
       {(chosen !== undefined || busy) && (
@@ -282,12 +301,12 @@ function KeyFrames({
           {chosen !== undefined && (
             <FrameImage
               blobKey={chosen.blobKey}
-              alt={`Key frame of shot ${String(shot.position)}`}
+              alt={t('Key frame of shot {position}', { position: String(shot.position) })}
             />
           )}
           {busy && (
             <span className="portrait-busy" role="status">
-              Painting…
+              {t('Painting…')}
             </span>
           )}
         </div>
@@ -295,18 +314,18 @@ function KeyFrames({
       {chosen !== undefined && (
         <span className="muted small">
           {chosen.guides.length === 0
-            ? 'Painted from the words alone.'
-            : `Painted from ${chosen.guides.join(', ')}.`}
+            ? t('Painted from the words alone.')
+            : t('Painted from {value}.', { value: chosen.guides.join(', ') })}
         </span>
       )}
       {shot.frames.length > 0 && (
-        <div className="thumbs wide" role="group" aria-label="Key frames to choose from">
+        <div className="thumbs wide" role="group" aria-label={t('Key frames to choose from')}>
           {shot.frames.map((frame, index) => (
             <button
               key={frame.id}
               className="thumb"
               aria-pressed={frame.id === shot.frameId}
-              aria-label={`Start the clip on frame ${String(index + 1)}`}
+              aria-label={t('Start the clip on frame {value}', { value: String(index + 1) })}
               title={frame.prompt}
               onClick={() => {
                 void act('movie.shot.frame.select', {
@@ -322,14 +341,14 @@ function KeyFrames({
       )}
       <form className="row portrait-make" onSubmit={paint}>
         <label className="sr-only" htmlFor={directionId}>
-          Direction for the next key frame
+          {t('Direction for the next key frame')}
         </label>
         <input
           id={directionId}
           type="text"
           className="input"
           value={direction}
-          placeholder="Direction, e.g. closer, Mara on the left"
+          placeholder={t('Direction, e.g. closer, Mara on the left')}
           onChange={(event) => {
             setDirection(event.target.value);
           }}
@@ -338,17 +357,22 @@ function KeyFrames({
           type="submit"
           className="button"
           disabled={busy || imageModel === null || shot.description.trim() === ''}
-          title={imageModel === null ? 'Choose an image model first.' : `Painted by ${imageModel}`}
+          title={
+            imageModel === null
+              ? t('Choose an image model first.')
+              : t('Painted by {imageModel}', { imageModel })
+          }
         >
-          <SparkleIcon aria-hidden="true" /> {shot.frames.length === 0 ? 'Paint frame' : 'Another'}
+          <SparkleIcon aria-hidden="true" />{' '}
+          {shot.frames.length === 0 ? t('Paint frame') : t('Another')}
           <Price command="movie.shot.frame.generate" input={at} />
         </button>
       </form>
       {chosen !== undefined && (
         <div className="row">
           <ConfirmButton
-            label="Delete frame"
-            question="Delete this key frame for good?"
+            label={t('Delete frame')}
+            question={t('Delete this key frame for good?')}
             onConfirm={() => {
               void act('movie.shot.frame.delete', { ...at, frameId: chosen.id });
             }}
@@ -406,7 +430,7 @@ function DubbedVideo({
       {voice !== null && (
         // The dialogue is the line shown in the field below, so it has no caption track.
         // eslint-disable-next-line jsx-a11y/media-has-caption
-        <audio ref={audio} src={voice} aria-label={`${label}, dialogue`} />
+        <audio ref={audio} src={voice} aria-label={t('{label}, dialogue', { label })} />
       )}
     </>
   );
@@ -423,7 +447,7 @@ export function SceneTabs({
   onSelect: (sceneId: string) => void;
 }): ReactElement {
   return (
-    <div className="chips" role="tablist" aria-label="Scenes">
+    <div className="chips" role="tablist" aria-label={t('Scenes')}>
       {scenes.map((candidate) => (
         <button
           key={candidate.id}
@@ -469,8 +493,8 @@ function Dialogue({
           disabled={busy || !ready || speechModel === null}
           title={
             speechModel === null
-              ? 'Choose a voice model first.'
-              : 'Records the line in the voice of the speaker. Costs a cent or less.'
+              ? t('Choose a voice model first.')
+              : t('Records the line in the voice of the speaker. Costs a cent or less.')
           }
           onClick={() => {
             setBusy(true);
@@ -480,13 +504,13 @@ function Dialogue({
           }}
         >
           <MicrophoneIcon aria-hidden="true" />{' '}
-          {take === null ? 'Record dialogue' : 'Record dialogue again'}
+          {take === null ? t('Record dialogue') : t('Record dialogue again')}
           <Price command="movie.shot.dialogue.generate" input={at} />
         </button>
         {take !== null && (
           <ConfirmButton
-            label="Delete dialogue"
-            question="Delete this recording for good?"
+            label={t('Delete dialogue')}
+            question={t('Delete this recording for good?')}
             onConfirm={() => {
               void act('movie.shot.dialogue.delete', at);
             }}
@@ -498,23 +522,30 @@ function Dialogue({
       {take !== null && url !== null && (
         <figure className="voice">
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={url} aria-label={`Dialogue of shot ${String(shot.position)}`} />
+          <audio
+            controls
+            src={url}
+            aria-label={t('Dialogue of shot {position}', { position: String(shot.position) })}
+          />
           <figcaption className="muted">
-            {take.durationSeconds === null ? '' : `${take.durationSeconds.toFixed(1)} s · `}
+            {take.durationSeconds === null
+              ? ''
+              : t('{value} s · ', { value: fixed(take.durationSeconds, 1) })}
             {take.model}
-            {take.costUsd === null ? '' : ` · $${take.costUsd.toFixed(3)}`}
+            {take.costUsd === null ? '' : ` · ${formatUsd(take.costUsd, 3)}`}
           </figcaption>
         </figure>
       )}
       {outdated && (
         <p className="muted" role="status">
-          The recording is of an earlier line or delivery. Record it again.
+          {t('The recording is of an earlier line or delivery. Record it again.')}
         </p>
       )}
       {take !== null && shot.clip !== null && !shot.clip.silent && (
         <p className="muted" role="status">
-          This clip has a voice of its own. Generate it again to play the recording over a silent
-          one.
+          {t(
+            'This clip has a voice of its own. Generate it again to play the recording over a silent one.',
+          )}
         </p>
       )}
     </div>
@@ -555,7 +586,7 @@ function ShotCard({
   // A video from the library becomes the clip of a shot; a clip it had is kept as a take.
   const card = useRef<HTMLElement>(null);
   useLibraryDrop(card, {
-    label: `Shot ${String(shot.position)}, clip`,
+    label: t('Shot {position}, clip', { position: String(shot.position) }),
     accepts: (asset) =>
       asset.modality === 'video' && asset.blobKey !== null && shot.clip?.status !== 'pending',
     onDrop: async (asset) => {
@@ -567,19 +598,26 @@ function ShotCard({
     },
   });
   return (
-    <article ref={card} className="card stack shot" aria-label={`Shot ${String(shot.position)}`}>
+    <article
+      ref={card}
+      className="card stack shot"
+      aria-label={t('Shot {position}', { position: String(shot.position) })}
+    >
       <div className="row spread">
         <h3>
-          Shot {shot.position}
+          {t('Shot {position}', { position: shot.position })}
           {shot.pickup !== null && (
-            <span className="pickup-badge" title={`Asked for from the edit: ${shot.pickup.reason}`}>
-              Pickup
+            <span
+              className="pickup-badge"
+              title={t('Asked for from the edit: {reason}', { reason: shot.pickup.reason })}
+            >
+              {t('Pickup')}
             </span>
           )}
         </h3>
         <ConfirmButton
-          label="Delete shot"
-          question="Delete this shot and its clips for good?"
+          label={t('Delete shot')}
+          question={t('Delete this shot and its clips for good?')}
           onConfirm={() => {
             void act('movie.shot.delete', at);
           }}
@@ -589,30 +627,43 @@ function ShotCard({
       </div>
       {shot.pickup !== null && shot.clip?.status !== 'ready' && (
         <p className="pickup-note">
-          <strong>The edit needs this shot:</strong> {shot.pickup.reason}{' '}
-          <span className="muted">
-            (
-            {shot.pickup.requestedBy === 'person'
-              ? 'asked by you'
-              : `asked by the ${shot.pickup.requestedBy.replace(/-/g, ' ')}`}
-            , {shot.pickup.seconds.toFixed(1)} s)
-          </span>
+          <Marked
+            text={
+              shot.pickup.requestedBy === 'person'
+                ? t('**The edit needs this shot:** {reason} (asked by you, {seconds} s)', {
+                    reason: shot.pickup.reason,
+                    seconds: fixed(shot.pickup.seconds, 1),
+                  })
+                : t('**The edit needs this shot:** {reason} (asked by the {role}, {seconds} s)', {
+                    reason: shot.pickup.reason,
+                    role: tx(
+                      shot.pickup.requestedBy
+                        .split('-')
+                        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' '),
+                    ),
+                    seconds: fixed(shot.pickup.seconds, 1),
+                  })
+            }
+          />
         </p>
       )}
       <ClipPlayer shot={shot} />
       <Takes shot={shot} act={act} />
       <EditableField
-        label="What we see"
+        label={t('What we see')}
         rows={3}
         value={shot.description}
-        placeholder="Place, framing, camera movement, light. One shot of a few seconds."
+        placeholder={t('Place, framing, camera movement, light. One shot of a few seconds.')}
         onCommit={(description) => change({ description })}
       />
       <EditableField
-        label="Performance"
+        label={t('Performance')}
         rows={3}
         value={shot.performance}
-        placeholder="Who moves how, how far, how fast, and how the others react. Models underplay bodies unless told."
+        placeholder={t(
+          'Who moves how, how far, how fast, and how the others react. Models underplay bodies unless told.',
+        )}
         onCommit={(performance) => change({ performance })}
       />
       <ShotPlace
@@ -624,7 +675,7 @@ function ShotCard({
       />
       {cast.length > 0 && (
         <fieldset className="choices">
-          <legend>In the shot</legend>
+          <legend>{t('In the shot')}</legend>
           {cast.map((character) => (
             <label key={character.id} className="choice">
               <input
@@ -645,7 +696,7 @@ function ShotCard({
       )}
       {scriptLines.length > 0 && (
         <div className="field">
-          <label htmlFor={scriptId}>From the script</label>
+          <label htmlFor={scriptId}>{t('From the script')}</label>
           <select
             id={scriptId}
             className="select"
@@ -663,7 +714,7 @@ function ShotCard({
             }}
           >
             <option value="">
-              {shot.line.trim() === '' ? 'Choose a line…' : 'Not a line of the script'}
+              {shot.line.trim() === '' ? t('Choose a line…') : t('Not a line of the script')}
             </option>
             {scriptLines.map((line) => (
               <option key={line.index} value={String(line.index)}>
@@ -675,15 +726,15 @@ function ShotCard({
         </div>
       )}
       <EditableField
-        label="Line, as it is said"
+        label={t('Line, as it is said')}
         script
         value={shot.line}
-        placeholder="Written flat, it is spoken flat. Tomas! Get away from the rail!"
+        placeholder={t('Written flat, it is spoken flat. Tomas! Get away from the rail!')}
         onCommit={(line) => change({ line })}
       />
       <div className="row wrap shot-speech">
         <div className="field">
-          <label htmlFor={speakerId}>Spoken by</label>
+          <label htmlFor={speakerId}>{t('Spoken by')}</label>
           <select
             id={speakerId}
             className="select"
@@ -692,7 +743,7 @@ function ShotCard({
               void change({ speakerId: event.target.value === '' ? null : event.target.value });
             }}
           >
-            <option value="">Nobody</option>
+            <option value="">{t('Nobody')}</option>
             {cast.map((character) => (
               <option key={character.id} value={character.id}>
                 {character.name}
@@ -701,9 +752,9 @@ function ShotCard({
           </select>
         </div>
         <EditableField
-          label="Delivery"
+          label={t('Delivery')}
           value={shot.delivery}
-          placeholder="Screaming over the wind, voice cracking"
+          placeholder={t('Screaming over the wind, voice cracking')}
           onCommit={(delivery) => change({ delivery })}
         />
       </div>
@@ -715,8 +766,8 @@ function ShotCard({
           disabled={starting || pending || model === null || shot.description.trim() === ''}
           title={
             model === null
-              ? 'Choose a video model first.'
-              : `Made with ${model}. Video costs more than anything else here.`
+              ? t('Choose a video model first.')
+              : t('Made with {model}. Video costs more than anything else here.', { model })
           }
           onClick={() => {
             setStarting(true);
@@ -726,16 +777,16 @@ function ShotCard({
           }}
         >
           <FilmStripIcon aria-hidden="true" />{' '}
-          {shot.clip === null ? 'Generate clip' : 'Generate again'}
+          {shot.clip === null ? t('Generate clip') : t('Generate again')}
           <Price command="movie.shot.clip.generate" input={at} />
         </button>
         {shot.clip !== null && !pending && (
           <ConfirmButton
-            label="Delete clip"
+            label={t('Delete clip')}
             question={
               shot.takes.length === 0
-                ? 'Delete this clip for good?'
-                : 'Delete this clip for good? Its earlier takes stay.'
+                ? t('Delete this clip for good?')
+                : t('Delete this clip for good? Its earlier takes stay.')
             }
             onConfirm={() => {
               void act('movie.shot.clip.delete', at);
@@ -770,7 +821,11 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
     sceneId === undefined
       ? { shots: [] }
       : Shots.parse(
-          await runCommand(imp, 'movie.shot.list', { projectId: project.id, sceneId, full: true }),
+          await runCommand(imp, 'movie.shot.list', {
+            projectId: project.id,
+            sceneId,
+            full: true,
+          }),
         ),
   );
   const shots = listed.data?.shots.filter((shot) => shot.sceneId === sceneId) ?? [];
@@ -798,9 +853,9 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Shots</h1>
+        <h1>{t('Shots')}</h1>
         <span className="muted">
-          {shots.length === 1 ? '1 shot' : `${String(shots.length)} shots`} in this scene
+          {tn(shots.length, '{count} shot in this scene', '{count} shots in this scene')}
         </span>
       </div>
       <ModelBar
@@ -808,27 +863,29 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         models={[
           {
             id: 'video-model',
-            label: 'Video',
-            empty: 'Choose a model to make clips',
+            label: t('Video'),
+            empty: t('Choose a model to make clips'),
             setting: VIDEO_MODEL_SETTING,
             choice: video,
           },
           {
             id: 'shots-voice-model',
-            label: 'Voice',
-            empty: 'Choose a model to record dialogue',
+            label: t('Voice'),
+            empty: t('Choose a model to record dialogue'),
             setting: SPEECH_MODEL_SETTING,
             choice: speech,
           },
           {
             id: 'shots-image-model',
-            label: 'Image',
-            empty: 'Choose a model to paint key frames',
+            label: t('Image'),
+            empty: t('Choose a model to paint key frames'),
             setting: IMAGE_MODEL_SETTING,
             choice: images,
           },
         ]}
-        note="Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the character and played over a silent clip; it is not lip-synced."
+        note={t(
+          'Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the character and played over a silent clip; it is not lip-synced.',
+        )}
       />
       <Problem
         text={outline.error ?? listed.error ?? error ?? video.error ?? speech.error ?? images.error}
@@ -838,10 +895,10 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         outline.data !== undefined && (
           <EmptyState
             icon={FilmStripIcon}
-            title="Write a scene first"
-            quip="No scenes, no shots. Even mischief needs a plan."
-            body="Shots belong to scenes, and there are no scenes yet. Write the script first."
-            go={{ stage: 'script', label: 'Go to Script' }}
+            title={t('Write a scene first')}
+            quip={t('No scenes, no shots. Even mischief needs a plan.')}
+            body={t('Shots belong to scenes, and there are no scenes yet. Write the script first.')}
+            go={{ stage: 'script', label: t('Go to Script') }}
           />
         )
       ) : (
@@ -849,10 +906,12 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
           {listed.data !== undefined && shots.length === 0 && (
             <EmptyState
               icon={FilmStripIcon}
-              title="No shots in this scene"
-              quip="Nothing is rolling yet."
-              body="This scene has no shots yet. Add one, or have the scene broken into shots of a few seconds each."
-              ask="Break the scene I am looking at into shots of four to eight seconds each."
+              title={t('No shots in this scene')}
+              quip={t('Nothing is rolling yet.')}
+              body={t(
+                'This scene has no shots yet. Add one, or have the scene broken into shots of a few seconds each.',
+              )}
+              ask={t('Break the scene I am looking at into shots of four to eight seconds each.')}
             />
           )}
           <div className="grid shots">
@@ -878,7 +937,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
                 void act('movie.shot.create', { sceneId });
               }}
             >
-              <PlusIcon aria-hidden="true" /> Add shot
+              <PlusIcon aria-hidden="true" /> {t('Add shot')}
             </button>
           </div>
         </>

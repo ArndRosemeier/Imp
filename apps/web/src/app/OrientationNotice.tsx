@@ -1,6 +1,7 @@
 import { DeviceRotateIcon, DesktopIcon } from '@phosphor-icons/react';
 import { useState, type ReactElement } from 'react';
 import { useMediaQuery } from './gestures.js';
+import { t } from '../i18n/i18n.js';
 
 const KEY = 'imp.orientation.dismissed';
 /** A touch screen held upright. */
@@ -25,19 +26,21 @@ export function OrientationNotice(): ReactElement | null {
         {small ? (
           <>
             <DesktopIcon aria-hidden="true" size={56} weight="light" />
-            <h2 id="orientation-title">Imp needs a bigger screen</h2>
+            <h2 id="orientation-title">{t('Imp needs a bigger screen')}</h2>
             <p className="muted">
-              Open Imp on a tablet held sideways or on a computer. Phones are too small for its
-              editors.
+              {t(
+                'Open Imp on a tablet held sideways or on a computer. Phones are too small for its editors.',
+              )}
             </p>
           </>
         ) : (
           <>
             <DeviceRotateIcon aria-hidden="true" size={56} weight="light" />
-            <h2 id="orientation-title">Turn your tablet sideways</h2>
+            <h2 id="orientation-title">{t('Turn your tablet sideways')}</h2>
             <p className="muted">
-              Imp lays out its stages, timeline and crew side by side, which needs a landscape
-              screen.
+              {t(
+                'Imp lays out its stages, timeline and crew side by side, which needs a landscape screen.',
+              )}
             </p>
           </>
         )}
@@ -48,7 +51,7 @@ export function OrientationNotice(): ReactElement | null {
             setDismissed(true);
           }}
         >
-          Continue anyway
+          {t('Continue anyway')}
         </button>
       </div>
     </div>

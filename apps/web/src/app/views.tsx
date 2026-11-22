@@ -19,6 +19,9 @@ import { FfmpegOffer } from './FfmpegOffer.js';
 import { BackupPanel } from './backup.js';
 import { saveFileAs } from './save-file.js';
 import { ACTIVE_MIX_KEY, INTERNAL_SETTINGS, settingLabel } from './settings-labels.js';
+import { currentLanguage, t, tx } from '../i18n/i18n.js';
+import { LanguagePicker } from '../i18n/LanguagePicker.js';
+import { formatUsd } from './spend.js';
 
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const RoleList = z.object({
@@ -57,8 +60,10 @@ export function CrewView(): ReactElement {
   return (
     <>
       <div className="view-head">
-        <h1>Crew</h1>
-        <span className="muted">The agents you have hired, and the roles you can hire for.</span>
+        <h1>{t('Crew')}</h1>
+        <span className="muted">
+          {t('The agents you have hired, and the roles you can hire for.')}
+        </span>
       </div>
       {crew.error !== null && <p className="error">{crew.error}</p>}
       <div className="grid">
@@ -69,17 +74,17 @@ export function CrewView(): ReactElement {
                 {member.name.slice(0, 1).toUpperCase()}
               </span>
               <div>
-                <h3>{member.name}</h3>
+                <h3>{tx(member.name)}</h3>
                 <span className="mono muted">{member.model}</span>
               </div>
             </div>
             <div className="row spread muted">
-              <span>Up to ${member.budgetUsdPerRun.toFixed(2)} per run</span>
+              <span>{t('Up to {cost} per run', { cost: formatUsd(member.budgetUsdPerRun) })}</span>
               <label className="choice">
                 <input
                   type="checkbox"
                   checked={member.webSearch}
-                  aria-label={`${member.name} can search the web`}
+                  aria-label={t('{name} can search the web', { name: tx(member.name) })}
                   onChange={() => {
                     runCommand(imp, 'crew.update', {
                       id: member.id,
@@ -89,19 +94,19 @@ export function CrewView(): ReactElement {
                     });
                   }}
                 />
-                Web search
+                {t('Web search')}
               </label>
               {member.id !== coordinator.data?.value && (
                 <button
                   className="button quiet"
-                  aria-label={`Dismiss ${member.name}`}
+                  aria-label={t('Dismiss {name}', { name: tx(member.name) })}
                   onClick={() => {
                     runCommand(imp, 'crew.dismiss', { id: member.id }).catch((error: unknown) => {
                       console.error(messageOf(error));
                     });
                   }}
                 >
-                  <TrashIcon aria-hidden="true" /> Dismiss
+                  <TrashIcon aria-hidden="true" /> {t('Dismiss')}
                 </button>
               )}
             </div>
@@ -110,7 +115,7 @@ export function CrewView(): ReactElement {
       </div>
       <section className="stack" aria-labelledby="roles-heading">
         <div className="row spread wrap">
-          <h2 id="roles-heading">Roles</h2>
+          <h2 id="roles-heading">{t('Roles')}</h2>
           {!defining && (
             <button
               className="button"
@@ -118,14 +123,14 @@ export function CrewView(): ReactElement {
                 setDefining(true);
               }}
             >
-              <PlusIcon aria-hidden="true" /> New role
+              <PlusIcon aria-hidden="true" /> {t('New role')}
             </button>
           )}
         </div>
         <p className="muted">
-          Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator
-          or run “Hire agent” from the command palette. You can define roles of your own, and so can
-          the coordinator.
+          {t(
+            'Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator or run “Hire agent” from the command palette. You can define roles of your own, and so can the coordinator.',
+          )}
         </p>
         {hireError !== null && (
           <p className="error" role="alert">
@@ -143,13 +148,13 @@ export function CrewView(): ReactElement {
           {(roles.data?.roles ?? []).map((role) => (
             <article key={role.id} className="card stack">
               <div className="row spread">
-                <h3>{role.name}</h3>
-                {role.custom && <span className="tag neutral">Custom</span>}
+                <h3>{tx(role.name)}</h3>
+                {role.custom && <span className="tag neutral">{t('Custom')}</span>}
               </div>
-              <p className="muted">{role.summary}</p>
+              <p className="muted">{tx(role.summary)}</p>
               <div className="row">
                 {hiredRoles.has(role.id) ? (
-                  <span className="tag">On the crew</span>
+                  <span className="tag">{t('On the crew')}</span>
                 ) : (
                   <button
                     className="button"
@@ -163,7 +168,7 @@ export function CrewView(): ReactElement {
                       );
                     }}
                   >
-                    <UserPlusIcon aria-hidden="true" /> Hire {role.name}
+                    <UserPlusIcon aria-hidden="true" /> {t('Hire {name}', { name: tx(role.name) })}
                   </button>
                 )}
                 {role.extra === true && !hiredRoles.has(role.id) && (
@@ -177,13 +182,13 @@ export function CrewView(): ReactElement {
                       );
                     }}
                   >
-                    Put away
+                    {t('Put away')}
                   </button>
                 )}
                 {role.custom && !hiredRoles.has(role.id) && (
                   <ConfirmButton
-                    label="Delete role"
-                    question="Delete this role for good?"
+                    label={t('Delete role')}
+                    question={t('Delete this role for good?')}
                     onConfirm={() => {
                       runCommand(imp, 'crew.role.delete', { id: role.id }).catch(
                         (error: unknown) => {
@@ -201,16 +206,17 @@ export function CrewView(): ReactElement {
         </div>
         {(roles.data?.extras.length ?? 0) > 0 && (
           <section className="stack" aria-labelledby="extra-roles-heading">
-            <h3 id="extra-roles-heading">More roles</h3>
+            <h3 id="extra-roles-heading">{t('More roles')}</h3>
             <p className="muted">
-              Built-in roles that are not part of the usual crew. Add one to hire it here; the
-              coordinator can add them too.
+              {t(
+                'Built-in roles that are not part of the usual crew. Add one to hire it here; the coordinator can add them too.',
+              )}
             </p>
             <div className="grid">
               {(roles.data?.extras ?? []).map((role) => (
                 <article key={role.id} className="card stack">
-                  <h3>{role.name}</h3>
-                  <p className="muted">{role.summary}</p>
+                  <h3>{tx(role.name)}</h3>
+                  <p className="muted">{tx(role.summary)}</p>
                   <div className="row">
                     <button
                       className="button"
@@ -223,7 +229,7 @@ export function CrewView(): ReactElement {
                         );
                       }}
                     >
-                      <PlusIcon aria-hidden="true" /> Add {role.name}
+                      <PlusIcon aria-hidden="true" /> {t('Add {name}', { name: tx(role.name) })}
                     </button>
                   </div>
                 </article>
@@ -277,46 +283,46 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
   };
 
   return (
-    <form className="card stack page" onSubmit={submit} aria-label="New role">
+    <form className="card stack page" onSubmit={submit} aria-label={t('New role')}>
       <div className="field">
-        <label htmlFor="role-name">Name</label>
+        <label htmlFor="role-name">{t('Name')}</label>
         <input
           id="role-name"
           className="input"
           value={name}
-          placeholder="Dialogue Polisher"
+          placeholder={t('Dialogue Polisher')}
           onChange={(event) => {
             setName(event.target.value);
           }}
         />
       </div>
       <div className="field">
-        <label htmlFor="role-summary">In one line</label>
+        <label htmlFor="role-summary">{t('In one line')}</label>
         <input
           id="role-summary"
           className="input"
           value={summary}
-          placeholder="Tightens dialogue without changing what is said."
+          placeholder={t('Tightens dialogue without changing what is said.')}
           onChange={(event) => {
             setSummary(event.target.value);
           }}
         />
       </div>
       <div className="field">
-        <label htmlFor="role-brief">Instructions</label>
+        <label htmlFor="role-brief">{t('Instructions')}</label>
         <textarea
           id="role-brief"
           className="input"
           rows={5}
           value={brief}
-          placeholder="What this agent does, how it works and what it must respect."
+          placeholder={t('What this agent does, how it works and what it must respect.')}
           onChange={(event) => {
             setBrief(event.target.value);
           }}
         />
       </div>
       <fieldset className="choices">
-        <legend>May use</legend>
+        <legend>{t('May use')}</legend>
         {groups.map((group) => (
           <label key={group} className="choice">
             <input
@@ -331,7 +337,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
         ))}
       </fieldset>
       <fieldset className="choices">
-        <legend>Beyond reading, may</legend>
+        <legend>{t('Beyond reading, may')}</legend>
         <label className="choice">
           <input
             type="checkbox"
@@ -340,7 +346,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
               setChange(!change);
             }}
           />
-          change things
+          {t('change things')}
         </label>
         <label className="choice">
           <input
@@ -350,7 +356,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
               setSpend(!spend);
             }}
           />
-          ask to spend money
+          {t('ask to spend money')}
         </label>
         <label className="choice">
           <input
@@ -360,7 +366,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
               setDestroy(!destroy);
             }}
           />
-          ask to delete things
+          {t('ask to delete things')}
         </label>
         <label className="choice">
           <input
@@ -370,7 +376,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
               setWebSearch(!webSearch);
             }}
           />
-          search the web
+          {t('search the web')}
         </label>
       </fieldset>
       {error !== null && (
@@ -383,10 +389,10 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
           className="button primary"
           disabled={name.trim() === '' || brief.trim() === '' || chosen.length === 0}
         >
-          Create the role
+          {t('Create the role')}
         </button>
         <button type="button" className="button quiet" onClick={onDone}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </form>
@@ -394,7 +400,7 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
 }
 
 function settingValue(value: unknown): string {
-  if (typeof value === 'boolean') return value ? 'On' : 'Off';
+  if (typeof value === 'boolean') return value ? t('On') : t('Off');
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
 }
@@ -411,32 +417,43 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
   return (
     <>
       <div className="view-head">
-        <h1>Settings</h1>
+        <h1>{t('Settings')}</h1>
         <span className="muted">
-          Everything here can also be changed by the coordinator, or from the command palette.
+          {t(
+            'Everything here can also be changed by the coordinator, or from the command palette.',
+          )}
         </span>
       </div>
       {settings.error !== null && <p className="error">{settings.error}</p>}
+      <section className="card stack" aria-labelledby="language-heading">
+        <h3 id="language-heading">{t('Language')}</h3>
+        <p className="muted">
+          {t(
+            'The language of Imp’s buttons, tips, guide and What’s new. Agents answer you in it too. Your films keep the language they are written in.',
+          )}
+        </p>
+        <LanguagePicker />
+      </section>
       <section className="card stack" aria-labelledby="settings-heading">
-        <h3 id="settings-heading">Models and preferences</h3>
+        <h3 id="settings-heading">{t('Models and preferences')}</h3>
         <dl className="settings-list">
           {shown.map((setting) => (
             <div key={setting.key} className="settings-row" title={setting.key}>
               <dt>{settingLabel(setting.key)}</dt>
               <dd className={typeof setting.value === 'string' ? 'mono' : undefined}>
                 {setting.key === ACTIVE_MIX_KEY
-                  ? (mixes?.mixes.find((mix) => mix.id === setting.value)?.name ?? 'None')
+                  ? (mixes?.mixes.find((mix) => mix.id === setting.value)?.name ?? t('None'))
                   : settingValue(setting.value)}
               </dd>
             </div>
           ))}
         </dl>
         {settings.data !== undefined && shown.length === 0 && (
-          <p className="muted">Nothing is set yet.</p>
+          <p className="muted">{t('Nothing is set yet.')}</p>
         )}
       </section>
       <section className="card stack" aria-labelledby="help-heading">
-        <h3 id="help-heading">Help</h3>
+        <h3 id="help-heading">{t('Help')}</h3>
         <TipsSwitch />
         <div className="row">
           <button
@@ -445,45 +462,50 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
               openHelp('getting-started');
             }}
           >
-            Open the guide
+            {t('Open the guide')}
           </button>
         </div>
       </section>
       <section className="card stack" aria-labelledby="backup-heading">
-        <h3 id="backup-heading">Save all and Load all</h3>
+        <h3 id="backup-heading">{t('Save all and Load all')}</h3>
         <BackupPanel />
       </section>
       <section className="card stack" aria-labelledby="key-heading">
-        <h3 id="key-heading">OpenRouter key</h3>
+        <h3 id="key-heading">{t('OpenRouter key')}</h3>
         <p className="muted">
           {servedByLocalServer()
-            ? 'Imp on this computer keeps the key in its own file beside your projects, readable only by your user account. The browser never holds it, and no command or agent can read it.'
-            : 'The key is kept encrypted in this browser, outside the data that commands and agents can read. The browser holds the encryption key in a form no page script can export.'}
+            ? t(
+                'Imp on this computer keeps the key in its own file beside your projects, readable only by your user account. The browser never holds it, and no command or agent can read it.',
+              )
+            : t(
+                'The key is kept encrypted in this browser, outside the data that commands and agents can read. The browser holds the encryption key in a form no page script can export.',
+              )}
         </p>
         <div className="row">
           <button className="button" onClick={onForgetKey}>
             {servedByLocalServer()
-              ? 'Remove the key from this computer'
-              : 'Remove the key from this browser'}
+              ? t('Remove the key from this computer')
+              : t('Remove the key from this browser')}
           </button>
         </div>
       </section>
       <section className="card stack" aria-labelledby="host-heading">
-        <h3 id="host-heading">Where Imp runs</h3>
+        <h3 id="host-heading">{t('Where Imp runs')}</h3>
         {servedByLocalServer() ? (
           <>
             <p className="muted">
-              Imp runs on this computer. Your projects and media are files in its data folder, and
-              every browser window you open here shows the same work.
+              {t(
+                'Imp runs on this computer. Your projects and media are files in its data folder, and every browser window you open here shows the same work.',
+              )}
             </p>
             <FfmpegOffer />
           </>
         ) : (
           <>
             <p className="muted">
-              Imp runs inside this browser, and your projects are kept in the browser&rsquo;s own
-              storage. You can also run it on your computer: your work is then kept as files in a
-              folder of yours, with room for large media. It needs Node.js 22 or newer.
+              {t(
+                'Imp runs inside this browser, and your projects are kept in the browser’s own storage. You can also run it on your computer: your work is then kept as files in a folder of yours, with room for large media. It needs Node.js 22 or newer.',
+              )}
             </p>
             <div className="row">
               <button
@@ -493,11 +515,11 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
                     {
                       suggestedName: 'imp-server.zip',
                       mediaType: 'application/zip',
-                      description: 'Imp for your computer',
+                      description: t('Imp for your computer'),
                     },
                     async () => {
                       const response = await fetch('./imp-server.zip');
-                      if (!response.ok) throw new Error('The download is not available here.');
+                      if (!response.ok) throw new Error(t('The download is not available here.'));
                       return response.blob();
                     },
                   ).catch((reason: unknown) => {
@@ -505,18 +527,30 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
                   });
                 }}
               >
-                <DownloadSimpleIcon aria-hidden="true" /> Download Imp for your computer
+                <DownloadSimpleIcon aria-hidden="true" /> {t('Download Imp for your computer')}
               </button>
             </div>
             {serverError !== null && <p className="error">{serverError}</p>}
             <p className="muted">
-              Unzip it, run <span className="mono">node imp.mjs</span> in the folder and open the
-              address it prints. Work done in the browser does not move over by itself.
+              {t(
+                'Unzip it, run {command} in the folder and open the address it prints. Work done in the browser does not move over by itself.',
+              )
+                .split('{command}')
+                .flatMap((part, index) =>
+                  index === 0
+                    ? [part]
+                    : [
+                        <span key={index} className="mono">
+                          node imp.mjs
+                        </span>,
+                        part,
+                      ],
+                )}
             </p>
             <p className="muted">
-              The download is not signed. If your computer warns about it, confirm once: on a Mac in
-              System Settings, Privacy &amp; Security, Open Anyway; on Windows with More info, Run
-              anyway.{' '}
+              {t(
+                'The download is not signed. If your computer warns about it, confirm once: on a Mac in System Settings, Privacy & Security, Open Anyway; on Windows with More info, Run anyway.',
+              )}{' '}
               <button
                 type="button"
                 className="link-button"
@@ -524,7 +558,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
                   openHelp('where-imp-runs');
                 }}
               >
-                How to open it
+                {t('How to open it')}
               </button>
             </p>
           </>
@@ -536,7 +570,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
 
 /** One command in the activity strip: when, who, what, and how it went. */
 function activityLine(entry: z.infer<typeof ActivityEntry>): string {
-  return `${new Date(entry.at).toLocaleTimeString()} · ${
+  return `${new Date(entry.at).toLocaleTimeString(currentLanguage())} · ${
     entry.actor.kind === 'user' ? 'you' : entry.actor.role
   } · ${entry.commandId} · ${entry.outcome}`;
 }
@@ -553,10 +587,10 @@ export function ActivityStrip(): ReactElement {
   const latest = activity.data?.entries ?? [];
   const [first] = latest;
   return (
-    <footer className={`strip mono${open ? ' open' : ''}`} aria-label="Activity">
+    <footer className={`strip mono${open ? ' open' : ''}`} aria-label={t('Activity')}>
       {first === undefined ? (
         <span className="strip-line">
-          Nothing has happened yet. Every command will be listed here with who ran it.
+          {t('Nothing has happened yet. Every command will be listed here with who ran it.')}
         </span>
       ) : (
         <>
@@ -570,10 +604,10 @@ export function ActivityStrip(): ReactElement {
             }}
           >
             <span className="strip-line" data-outcome={open ? undefined : first.outcome}>
-              {open ? 'Recent commands, newest first' : activityLine(first)}
+              {open ? t('Recent commands, newest first') : activityLine(first)}
             </span>
             <span className="strip-more">
-              {open ? 'Hide' : `Recent ${String(latest.length)}`}
+              {open ? t('Hide') : t('Recent {count}', { count: String(latest.length) })}
               <CaretUpIcon aria-hidden="true" />
             </span>
           </button>

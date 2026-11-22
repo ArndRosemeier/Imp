@@ -17,6 +17,7 @@ import { GuideText } from './GuideText.js';
 import { ReportProblem } from './ReportProblem.js';
 import { OPEN_HELP, useHelpState, useTopic, useTopics, type TopicListing } from './help.js';
 import { ImpSpinner } from '../ImpMark.js';
+import { t } from '../../i18n/i18n.js';
 
 const AREA_ORDER = ['workspace'];
 
@@ -58,7 +59,7 @@ export function TipsSwitch(): ReactElement {
           id={id}
           type="checkbox"
           role="switch"
-          aria-label="Show tips"
+          aria-label={t('Show tips')}
           checked={enabled}
           onChange={() => {
             set(!enabled);
@@ -68,11 +69,11 @@ export function TipsSwitch(): ReactElement {
           <span className="switch-thumb" />
         </span>
         <span className="switch-label">
-          <strong>Show tips</strong>
+          <strong>{t('Show tips')}</strong>
           <span className="muted">
             {enabled
-              ? 'A short tip the first time each stage opens.'
-              : 'All tips are off. This guide stays here.'}
+              ? t('A short tip the first time each stage opens.')
+              : t('All tips are off. This guide stays here.')}
           </span>
         </span>
       </label>
@@ -83,18 +84,18 @@ export function TipsSwitch(): ReactElement {
             set(true, true);
           }}
         >
-          Show closed tips again
+          {t('Show closed tips again')}
         </button>
       )}
     </div>
   );
 }
 
-const EXAMPLES = [
-  'How do I make my first film?',
-  'What does a 4 second clip cost?',
-  'How do I add a dissolve between two shots?',
-  'Turn off all tips',
+const examples = (): string[] => [
+  t('How do I make my first film?'),
+  t('What does a 4 second clip cost?'),
+  t('How do I add a dissolve between two shots?'),
+  t('Turn off all tips'),
 ];
 
 /**
@@ -136,10 +137,10 @@ function AskImp({ context }: { context: string }): ReactElement {
         {problem ??
           state.error ??
           (model === null ? (
-            'Choose a coordinator model first.'
+            t('Choose a coordinator model first.')
           ) : (
             <>
-              <ImpSpinner /> One moment…
+              <ImpSpinner /> {t('One moment…')}
             </>
           ))}
       </p>
@@ -148,16 +149,17 @@ function AskImp({ context }: { context: string }): ReactElement {
   return (
     <CrewPanel
       member={guide}
-      context={`${context} The person is asking for help from the Help panel.`}
+      // For the agent, in English like all its instructions.
+      context={`${context} The person is asking for help from the Help panel.`} // i18n-ignore
       intro={(suggest) => (
         <div className="ask-intro stack">
           <p>
-            Ask me anything about Imp, in your own words. I answer from the guide, and do the step
-            for you if you like. Mischief, yes; surprise bills, never: I always ask before spending
-            money.
+            {t(
+              'Ask me anything about Imp, in your own words. I answer from the guide, and do the step for you if you like. Mischief, yes; surprise bills, never: I always ask before spending money.',
+            )}
           </p>
-          <div className="ask-examples" role="group" aria-label="Example questions">
-            {EXAMPLES.map((example) => (
+          <div className="ask-examples" role="group" aria-label={t('Example questions')}>
+            {examples().map((example) => (
               <button
                 key={example}
                 type="button"
@@ -215,7 +217,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
       <button
         className="button quiet help-toggle"
         aria-haspopup="dialog"
-        title="Help and guide"
+        title={t('Help and guide')}
         onClick={() => {
           setChosen(null);
           setTab('ask');
@@ -224,7 +226,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
         }}
       >
         <QuestionIcon aria-hidden="true" size={18} />
-        <span className="label">Help</span>
+        <span className="label">{t('Help')}</span>
       </button>
       {/* A tap on the dimmed backdrop closes the panel, as Escape does; a tablet has no Escape key. */}
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events */}
@@ -239,12 +241,16 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
       >
         <header className="help-head">
           <div className="stack help-heading">
-            <span className="eyebrow">Help</span>
+            <span className="eyebrow">{t('Help')}</span>
             <h2 id="help-title">
-              {tab === 'ask' ? 'Ask Imp' : tab === 'guide' ? 'The Imp guide' : 'Report a problem'}
+              {tab === 'ask'
+                ? t('Ask Imp')
+                : tab === 'guide'
+                  ? t('The Imp guide')
+                  : t('Report a problem')}
             </h2>
           </div>
-          <div className="help-tabs" role="tablist" aria-label="Help">
+          <div className="help-tabs" role="tablist" aria-label={t('Help')}>
             <button
               role="tab"
               aria-selected={tab === 'ask'}
@@ -253,7 +259,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
                 setTab('ask');
               }}
             >
-              <ChatTeardropTextIcon aria-hidden="true" size={16} /> Ask Imp
+              <ChatTeardropTextIcon aria-hidden="true" size={16} /> {t('Ask Imp')}
             </button>
             <button
               role="tab"
@@ -263,7 +269,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
                 setTab('guide');
               }}
             >
-              <BookOpenTextIcon aria-hidden="true" size={16} /> Guide
+              <BookOpenTextIcon aria-hidden="true" size={16} /> {t('Guide')}
             </button>
             <button
               role="tab"
@@ -273,12 +279,12 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
                 setTab('report');
               }}
             >
-              <LifebuoyIcon aria-hidden="true" size={16} /> Report a problem
+              <LifebuoyIcon aria-hidden="true" size={16} /> {t('Report a problem')}
             </button>
           </div>
           <button
             className="button quiet icon"
-            aria-label="Close"
+            aria-label={t('Close')}
             onClick={() => dialog.current?.close()}
           >
             <XIcon aria-hidden="true" size={18} />
@@ -295,15 +301,15 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
           </div>
         )}
         <div className="help-layout" hidden={tab !== 'guide'}>
-          <nav className="help-index" aria-label="Guide pages">
+          <nav className="help-index" aria-label={t('Guide pages')}>
             <label className="help-search" htmlFor={searchId}>
               <MagnifyingGlassIcon aria-hidden="true" size={16} />
-              <span className="sr-only">Search the guide</span>
+              <span className="sr-only">{t('Search the guide')}</span>
               <input
                 id={searchId}
                 className="input"
                 type="search"
-                placeholder="Search the guide"
+                placeholder={t('Search the guide')}
                 value={query}
                 onChange={(event) => {
                   setQuery(event.target.value);
@@ -312,11 +318,13 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
               />
             </label>
             {listed.length === 0 && topics.data !== undefined && (
-              <p className="muted help-none">Nothing in the guide matches. Try fewer words.</p>
+              <p className="muted help-none">
+                {t('Nothing in the guide matches. Try fewer words.')}
+              </p>
             )}
             {groups(listed).map((group) => (
               <div key={group.area} className="help-group">
-                <span className="eyebrow">{group.area === 'workspace' ? 'Imp' : 'Stages'}</span>
+                <span className="eyebrow">{group.area === 'workspace' ? 'Imp' : t('Stages')}</span>
                 <ul>
                   {group.topics.map((entry) => (
                     <li key={entry.id}>
@@ -343,7 +351,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
                 setChosen(null);
               }}
             >
-              <ArrowLeftIcon aria-hidden="true" /> All pages
+              <ArrowLeftIcon aria-hidden="true" /> {t('All pages')}
             </button>
             {topic.error !== null && <p className="error">{topic.error}</p>}
             {page !== null && page !== undefined && (
@@ -358,7 +366,7 @@ export function HelpPanel({ context }: { context: string }): ReactElement {
         <footer className="help-foot">
           <TipsSwitch />
           <a className="help-web" href="./docs/index.html" target="_blank" rel="noreferrer">
-            The guide on the web <ArrowSquareOutIcon aria-hidden="true" size={14} />
+            {t('The guide on the web')} <ArrowSquareOutIcon aria-hidden="true" size={14} />
           </a>
         </footer>
       </dialog>

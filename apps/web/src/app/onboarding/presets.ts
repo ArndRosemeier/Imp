@@ -1,4 +1,5 @@
 import type { ModelInfo } from '@imp/providers';
+import { t } from '../../i18n/i18n.js';
 
 /**
  * The model mixes offered on the first run. Each slot lists families in the
@@ -24,8 +25,12 @@ const WORDS: Rule = [/^elevenlabs\/scribe-v\d+$/, /^openai\/whisper-large-v3-tur
 const PLANS: readonly { id: StarterMix['id']; name: string; notes: string; plan: Plan }[] = [
   {
     id: 'starter',
-    name: 'Starter',
-    notes: 'Cheap models for learning and drafts. A short film costs a few dollars.',
+    get name(): string {
+      return t('Starter');
+    },
+    get notes(): string {
+      return t('Cheap models for learning and drafts. A short film costs a few dollars.');
+    },
     plan: {
       'coordinator.model': [/^~anthropic\/claude-haiku-latest$/, /^~google\/gemini-flash-latest$/],
       'video.model': [/^google\/veo-[\d.]+-lite$/, /^bytedance\/seedance-\d+(\.\d+)?-mini$/],
@@ -38,8 +43,12 @@ const PLANS: readonly { id: StarterMix['id']; name: string; notes: string; plan:
   },
   {
     id: 'balanced',
-    name: 'Balanced',
-    notes: 'Sharper clips and a stronger coordinator. Good for finished shorts.',
+    get name(): string {
+      return t('Balanced');
+    },
+    get notes(): string {
+      return t('Sharper clips and a stronger coordinator. Good for finished shorts.');
+    },
     plan: {
       'coordinator.model': [/^~anthropic\/claude-sonnet-latest$/, /^~google\/gemini-pro-latest$/],
       'video.model': [
@@ -56,8 +65,12 @@ const PLANS: readonly { id: StarterMix['id']; name: string; notes: string; plan:
   },
   {
     id: 'best',
-    name: 'Best',
-    notes: 'The strongest models for the final film. Clips cost several times more.',
+    get name(): string {
+      return t('Best');
+    },
+    get notes(): string {
+      return t('The strongest models for the final film. Clips cost several times more.');
+    },
     plan: {
       'coordinator.model': [
         /^~anthropic\/claude-opus-latest$/,

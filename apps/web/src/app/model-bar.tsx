@@ -8,6 +8,7 @@ import { useId, useState, type ReactElement, type ReactNode } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { ModelPicker, type Act, type useModelSetting } from './movie.js';
+import { currentLanguage, t } from '../i18n/i18n.js';
 
 export const ModelMixes = z.object({
   mixes: z.array(
@@ -50,11 +51,13 @@ function shortName(choice: StageModel['choice']): string | null {
   return name.includes(': ') ? name.slice(name.indexOf(': ') + 2) : name;
 }
 
-/** "video model", "video and voice models": what the chip asks for while models are missing. */
+/** "Choose video model", "Choose video and voice models": what the chip asks for while models are missing. */
 function chooseText(labels: readonly string[]): string {
-  const last = labels.at(-1) ?? '';
-  const head = labels.slice(0, -1);
-  return `${head.length === 0 ? '' : `${head.join(', ')} and `}${last} model${labels.length > 1 ? 's' : ''}`;
+  // English writes the kinds in lower case inside a sentence; German keeps its nouns capitalised.
+  const words = currentLanguage() === 'en' ? labels.map((label) => label.toLowerCase()) : labels;
+  const last = words.at(-1) ?? '';
+  if (words.length <= 1) return t('Choose {label} model', { label: last });
+  return t('Choose {labels} and {last} models', { labels: words.slice(0, -1).join(', '), last });
 }
 
 /**
@@ -98,7 +101,7 @@ export function ModelBar({
   };
 
   return (
-    <section className={`model-bar${shown ? ' open' : ''}`} aria-label="Models">
+    <section className={`model-bar${shown ? ' open' : ''}`} aria-label={t('Models')}>
       <button
         type="button"
         className={`model-chip${missing ? ' missing' : ''}`}
@@ -109,17 +112,15 @@ export function ModelBar({
         }}
       >
         <SlidersHorizontalIcon aria-hidden="true" />
-        <span className="model-chip-mix">{active?.name ?? 'Models'}</span>
+        <span className="model-chip-mix">{active?.name ?? t('Models')}</span>
         {active !== null && mixes?.changed === true && (
-          <span className="model-chip-flag">changed</span>
+          <span className="model-chip-flag">{t('changed')}</span>
         )}
         <span className="model-chip-models">
           {missing
-            ? `Choose ${chooseText(
-                models
-                  .filter((model) => model.choice.model === null)
-                  .map((model) => model.label.toLowerCase()),
-              )}`
+            ? chooseText(
+                models.filter((model) => model.choice.model === null).map((model) => model.label),
+              )
             : names.join(' · ')}
         </span>
         <CaretDownIcon aria-hidden="true" className="model-chip-caret" />
@@ -127,8 +128,8 @@ export function ModelBar({
       {shown && (
         <div id={panelId} className="model-panel stack">
           {mixes !== undefined && mixes.mixes.length > 0 && (
-            <div className="model-mixes row wrap" role="group" aria-label="Model mixes">
-              <span className="eyebrow">Mixes</span>
+            <div className="model-mixes row wrap" role="group" aria-label={t('Model mixes')}>
+              <span className="eyebrow">{t('Mixes')}</span>
               {mixes.mixes.map((mix) => (
                 <button
                   key={mix.id}
@@ -137,7 +138,11 @@ export function ModelBar({
                   aria-pressed={mix.id === mixes.active}
                   title={mix.notes || undefined}
                   onClick={() => {
-                    run('models.mix.apply', { id: mix.id }, `Using “${mix.name}”.`);
+                    run(
+                      'models.mix.apply',
+                      { id: mix.id },
+                      t('Using “{name}”.', { name: mix.name }),
+                    );
                   }}
                 >
                   {mix.id === mixes.active && <CheckIcon aria-hidden="true" />} {mix.name}
@@ -150,7 +155,7 @@ export function ModelBar({
               <ModelPicker
                 key={model.id}
                 id={model.id}
-                label={`${model.label} model`}
+                label={t('{label} model', { label: model.label })}
                 empty={model.empty}
                 setting={model.setting}
                 choice={model.choice}
@@ -168,11 +173,11 @@ export function ModelBar({
                   run(
                     'models.mix.save',
                     { id: active.id },
-                    `“${active.name}” now holds these models.`,
+                    t('“{name}” now holds these models.', { name: active.name }),
                   );
                 }}
               >
-                <FloppyDiskIcon aria-hidden="true" /> Update “{active.name}”
+                <FloppyDiskIcon aria-hidden="true" /> {t('Update “{name}”', { name: active.name })}
               </button>
             )}
             {naming ? (
@@ -184,19 +189,19 @@ export function ModelBar({
                   run(
                     'models.mix.save',
                     { name: name.trim() },
-                    `Saved “${name.trim()}” in the library.`,
+                    t('Saved “{value}” in the library.', { value: name.trim() }),
                   );
                   setNaming(false);
                   setName('');
                 }}
               >
                 <label className="sr-only" htmlFor={nameId}>
-                  Name of the mix
+                  {t('Name of the mix')}
                 </label>
                 <input
                   id={nameId}
                   className="input"
-                  placeholder="Name, e.g. Cheap drafts"
+                  placeholder={t('Name, e.g. Cheap drafts')}
                   value={name}
                   // eslint-disable-next-line jsx-a11y/no-autofocus -- the person just asked to name it
                   autoFocus
@@ -205,7 +210,7 @@ export function ModelBar({
                   }}
                 />
                 <button type="submit" className="button small" disabled={name.trim() === ''}>
-                  Save
+                  {t('Save')}
                 </button>
                 <button
                   type="button"
@@ -214,7 +219,7 @@ export function ModelBar({
                     setNaming(false);
                   }}
                 >
-                  Cancel
+                  {t('Cancel')}
                 </button>
               </form>
             ) : (
@@ -226,7 +231,7 @@ export function ModelBar({
                   setNaming(true);
                 }}
               >
-                <FloppyDiskIcon aria-hidden="true" /> Save all models as a mix
+                <FloppyDiskIcon aria-hidden="true" /> {t('Save all models as a mix')}
               </button>
             )}
           </div>

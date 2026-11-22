@@ -61,7 +61,10 @@ async function connect(): Promise<ImpClient> {
   const lost = new Promise<never>((_, reject) => {
     worker.addEventListener('error', (event) => {
       reject(
-        new Error(`its core did not load${event.message === '' ? '' : ` (${event.message})`}`),
+        new Error(
+          // For the error screen, which shows before any language is chosen.
+          `its core did not load${event.message === '' ? '' : ` (${event.message})`}`, // i18n-ignore
+        ),
       );
     });
   });

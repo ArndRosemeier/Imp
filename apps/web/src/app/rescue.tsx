@@ -2,6 +2,7 @@ import { placePicture } from '@imp/mode-movie';
 import { useId, type KeyboardEvent, type PointerEvent, type ReactElement } from 'react';
 import type { Item } from './cut-player.js';
 import { NumberField } from './NumberField.js';
+import { fixed, t } from '../i18n/i18n.js';
 
 type Run = (id: string, input: Record<string, unknown>) => Promise<unknown>;
 
@@ -102,7 +103,7 @@ export function RescueTools({
   return (
     <section className="stack rescue" aria-labelledby={titleId}>
       <div className="row spread wrap">
-        <h4 id={titleId}>Speed, freeze and zoom</h4>
+        <h4 id={titleId}>{t('Speed, freeze and zoom')}</h4>
         {!isPlain(item) && (
           <button
             className="button small quiet"
@@ -110,17 +111,17 @@ export function RescueTools({
               set({ speed: 1, reverse: false, holdSeconds: 0, zoom: 1, zoomTo: null });
             }}
           >
-            Play as filmed
+            {t('Play as filmed')}
           </button>
         )}
       </div>
       <div className="row wrap rescue-speed">
-        <span className="segmented" role="group" aria-label="Speed">
+        <span className="segmented" role="group" aria-label={t('Speed')}>
           {SPEEDS.map((speed) => (
             <button
               key={speed.value}
               aria-pressed={item.speed === speed.value}
-              aria-label={`${String(speed.value)} times speed`}
+              aria-label={t('{value} times speed', { value: String(speed.value) })}
               onClick={() => {
                 set({ speed: speed.value });
               }}
@@ -136,18 +137,27 @@ export function RescueTools({
             set({ reverse: !item.reverse });
           }}
         >
-          Reverse
+          {t('Reverse')}
         </button>
       </div>
       {(item.speed !== 1 || item.reverse) && (
         <p className="muted small">
-          {item.reverse ? 'Backwards' : item.speed < 1 ? 'Slowed' : 'Sped up'}, this shot&apos;s own
-          sound and dialogue are silent. Lay sound for it on the audio lane.
+          {item.reverse
+            ? t(
+                'Played backwards, this shot’s own sound and dialogue are silent. Lay sound for it on the audio lane.',
+              )
+            : item.speed < 1
+              ? t(
+                  'Slowed, this shot’s own sound and dialogue are silent. Lay sound for it on the audio lane.',
+                )
+              : t(
+                  'Sped up, this shot’s own sound and dialogue are silent. Lay sound for it on the audio lane.',
+                )}
         </p>
       )}
       <div className="row wrap rescue-freeze">
         <NumberField
-          label="Hold last frame (s)"
+          label={t('Hold last frame (s)')}
           value={item.holdSeconds}
           step={0.5}
           max={30}
@@ -160,8 +170,10 @@ export function RescueTools({
           disabled={!canFreeze}
           title={
             canFreeze
-              ? `Freeze ${String(into)} s into this shot for 2 seconds, then play on.`
-              : 'Put the playhead inside the moving part of this shot to freeze there.'
+              ? t('Freeze {into} s into this shot for 2 seconds, then play on.', {
+                  into: String(into),
+                })
+              : t('Put the playhead inside the moving part of this shot to freeze there.')
           }
           onClick={() => {
             void run('movie.edit.item.freeze', {
@@ -171,14 +183,15 @@ export function RescueTools({
             });
           }}
         >
-          Freeze at playhead
+          {t('Freeze at playhead')}
         </button>
       </div>
       <div className="rescue-zoom">
         <div className="stack rescue-zoom-fields">
           <label className="field compact">
             <span>
-              Zoom {item.zoom.toFixed(2)}×{pushing ? ` to ${zoomEnd.toFixed(2)}×` : ''}
+              {t('Zoom {value}×', { value: fixed(item.zoom, 2) })}
+              {pushing ? ` ${t('to {value}×', { value: fixed(zoomEnd, 2) })}` : ''}
             </span>
             <input
               type="range"
@@ -186,7 +199,7 @@ export function RescueTools({
               max={2.5}
               step={0.05}
               value={item.zoom}
-              aria-label="Zoom"
+              aria-label={t('Zoom')}
               onChange={(event) => {
                 set({ zoom: Number(event.target.value) });
               }}
@@ -204,18 +217,18 @@ export function RescueTools({
                 });
               }}
             />
-            <span>Move over the shot</span>
+            <span>{t('Move over the shot')}</span>
           </label>
           {pushing && (
             <label className="field compact">
-              <span>Ends at {zoomEnd.toFixed(2)}×</span>
+              <span>{t('Ends at {value}×', { value: fixed(zoomEnd, 2) })}</span>
               <input
                 type="range"
                 min={1}
                 max={2.5}
                 step={0.05}
                 value={zoomEnd}
-                aria-label="Zoom at the end"
+                aria-label={t('Zoom at the end')}
                 onChange={(event) => {
                   set({ zoomTo: Number(event.target.value) });
                 }}
@@ -227,12 +240,15 @@ export function RescueTools({
           className="focus-pad"
           role="slider"
           tabIndex={0}
-          aria-label="Point to zoom on"
-          aria-valuetext={`${String(Math.round(item.focusX * 100))}% across, ${String(Math.round(item.focusY * 100))}% down`}
+          aria-label={t('Point to zoom on')}
+          aria-valuetext={t('{value}% across, {value2}% down', {
+            value: String(Math.round(item.focusX * 100)),
+            value2: String(Math.round(item.focusY * 100)),
+          })}
           aria-valuenow={Math.round(item.focusX * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
-          title="Tap where the zoom should look"
+          title={t('Tap where the zoom should look')}
           onPointerUp={moveFocus}
           onKeyDown={nudge}
         >
