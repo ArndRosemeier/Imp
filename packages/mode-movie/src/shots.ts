@@ -221,6 +221,16 @@ export function describeSetting(setting: ShotSetting): { where: string; things: 
 }
 
 /**
+ * Whether the recorded dialogue of a shot is laid over its clip instead of
+ * spoken in it: only for a voice-only speaker, since a voice from elsewhere
+ * does not match the lips of someone on screen.
+ */
+export function isDialogueApart(shot: Shot, cast: readonly Character[]): boolean {
+  const speaker = cast.find((character) => character.id === shot.speakerId);
+  return shot.dialogue !== null && shot.line.trim() !== '' && speaker?.voiceOnly === true;
+}
+
+/**
  * What is sent to the video model. The line goes in as written and is framed
  * by who says it and how, because models take the emotion from the words and
  * not from the situation; the bodies are directed in a sentence of their own.
@@ -233,6 +243,8 @@ export function clipPrompt(
   dialogueApart = false,
   /** Where it happens and which objects are seen. */
   setting: ShotSetting = { objects: [] },
+  /** Whether the clip has sound of its own. */
+  audio = true,
 ): string {
   const { where, things } = describeSetting(setting);
   const speaker = cast.find((character) => character.id === shot.speakerId);
@@ -258,6 +270,11 @@ export function clipPrompt(
     ...things,
     shot.performance === '' ? '' : `Performance: ${shot.performance}`,
     said,
+    !audio
+      ? ''
+      : shot.line.trim() === '' || dialogueApart || speaker?.voiceOnly === true
+        ? 'Sound: only the natural sounds of the scene, no speech and no music.'
+        : 'Sound: the voice and the natural sounds of the scene, no music.',
     tone === '' ? '' : `Visual style: ${tone}`,
   ]
     .map((part) => part.trim())
@@ -512,7 +529,7 @@ export function createShotCommands(
     id: 'movie.shot.clip.generate',
     title: 'Generate clip',
     description:
-      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). When the shot has dialogue (movie.shot.dialogue.generate) the clip is made silent and long enough for it; the voice is played over it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip, which is kept as a take (movie.shot.take.list) and can be put back. Costs money at the video model, more than anything else here.',
+      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). Clips have sound of their own unless silence is asked for, and the model speaks the line itself, so it matches the lips. Only a line of a voice-only character (a narrator, a voice off screen) with recorded dialogue (movie.shot.dialogue.generate) is laid over the clip, which is made long enough for it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip, which is kept as a take (movie.shot.take.list) and can be put back. Costs money at the video model, more than anything else here.',
     effect: 'spend',
     input: z.object({
       ...At,
@@ -538,7 +555,7 @@ export function createShotCommands(
         .boolean()
         .optional()
         .describe(
-          'Whether the clip has sound of its own, in which the model invents the voice. Defaults to no when the shot has dialogue, and to yes when it has a line without dialogue.',
+          'Whether the clip has sound of its own: the sounds of the scene and the spoken line. Defaults to yes. Only pass false when the person wants the clip silent.',
         ),
       portraits: z
         .boolean()
@@ -557,7 +574,8 @@ export function createShotCommands(
     estimate: async ({ runtime }, input) => {
       const { shot } = await loadShot(runtime.store, 'movie.shot.clip.generate', input);
       const model = await chosenModel(runtime.store, VIDEO_MODEL_SETTING, input.model);
-      const dialogueApart = shot.dialogue !== null && shot.line.trim() !== '';
+      const cast = await readCast(runtime.store, input.projectId, shot);
+      const dialogueApart = isDialogueApart(shot, cast);
       const wanted =
         input.durationSeconds ??
         (dialogueApart && typeof shot.dialogue?.durationSeconds === 'number'
@@ -569,7 +587,7 @@ export function createShotCommands(
         model,
         seconds: fitDuration(info?.video, wanted),
         resolution: input.resolution,
-        audio: input.audio ?? (dialogueApart ? false : shot.line.trim() !== ''),
+        audio: input.audio ?? true,
       };
     },
     handler: async ({ runtime }, input) => {
@@ -600,9 +618,11 @@ export function createShotCommands(
       const cast = await readCast(runtime.store, input.projectId, shot);
       const development = await runtime.store.get(movieDevelopmentKey(input.projectId));
       const tone = development === undefined ? '' : Development.parse(development).tone;
-      const dialogueApart = shot.dialogue !== null && shot.line.trim() !== '';
+      const dialogueApart = isDialogueApart(shot, cast);
+      // Sound unless silence is asked for: the model makes the voice, matched to the lips.
+      const audio = input.audio ?? true;
       const setting = await readSetting(runtime.store, input.projectId, shot);
-      const prompt = clipPrompt(shot, cast, tone, dialogueApart, setting);
+      const prompt = clipPrompt(shot, cast, tone, dialogueApart, setting, audio);
       const durationSeconds = fitDuration(
         info?.video,
         input.durationSeconds ??
@@ -610,8 +630,6 @@ export function createShotCommands(
             ? Math.ceil(shot.dialogue.durationSeconds + 0.5)
             : 4),
       );
-      const audio = input.audio ?? (dialogueApart ? false : shot.line.trim() !== '');
-
       const references: MediaInput[] = [];
       const guides: string[] = [];
       let portraitCount = 0;
@@ -703,6 +721,7 @@ export function createShotCommands(
         error: job.error,
         durationSeconds,
         silent: !audio,
+        voiceApart: dialogueApart,
         startFrameId: used.frameId,
         costUsd: job.costUsd,
         createdAt: runtime.now().toISOString(),
@@ -844,6 +863,7 @@ export function createShotCommands(
           error: null,
           durationSeconds: input.durationSeconds ?? null,
           silent: false,
+          voiceApart: false,
           startFrameId: null,
           costUsd: null,
           createdAt: runtime.now().toISOString(),
@@ -961,7 +981,7 @@ export function createShotCommands(
     id: 'movie.shot.dialogue.generate',
     title: 'Record dialogue',
     description:
-      "Records the line of a shot in the voice of its speaker, directed by the voice written for the character and the shot's delivery, and keeps it as the dialogue of the shot, replacing an earlier one. Clips are then made silent and as long as the dialogue, and the dialogue is played over them. The speaker and a line must be set. Costs a little at the speech model.",
+      "Records the line of a shot in the voice of its speaker, directed by the voice written for the character and the shot's delivery, and keeps it as the dialogue of the shot, replacing an earlier one. For a voice-only character (a narrator, a voice off screen), clips are then made as long as the dialogue and it is played over them. On-screen characters speak in the clip itself, so the lips match; their recording is kept for the audio lane. The speaker and a line must be set. Costs a little at the speech model.",
     effect: 'spend',
     input: z.object({
       ...At,

@@ -4,6 +4,7 @@ import {
   Grade,
   NEUTRAL_GRADE,
   NEUTRAL_LOOK,
+  dialogueOver,
   pieceMatrix,
   placePicture,
   shadeAt,
@@ -547,7 +548,9 @@ export class CutPlayer {
     if (
       speaker !== null &&
       dialogue !== undefined &&
-      shot?.clip?.silent === true &&
+      shot?.clip !== undefined &&
+      shot.clip !== null &&
+      dialogueOver(shot.clip) &&
       item.ownSound &&
       moving
     ) {

@@ -45,11 +45,18 @@ describe('describeVideoModel', () => {
       describeVideoModel(
         model({ durationsSeconds: [4, 5, 6, 7, 8], nativeAudio: false, frameImages: [] }),
       ).notes,
-    ).toEqual(['4–8 s', 'silent']);
+    ).toEqual(['4–8 s', 'no sound']);
     expect(describeVideoModel(model({ durationsSeconds: [5], nativeAudio: null })).notes).toEqual([
       '5 s',
       'start picture',
     ]);
+  });
+
+  it('turns away a model that makes no sound', () => {
+    expect(describeVideoModel(model({ nativeAudio: false }))).toMatchObject({
+      fits: false,
+      problem: expect.stringContaining('no sound') as string,
+    });
   });
 
   it('gives a model that says nothing the benefit of the doubt', () => {
