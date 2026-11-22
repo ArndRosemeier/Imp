@@ -1,0 +1,1 @@
+**See your shots on the timeline.** Each piece on the Edit stage's picture lane now starts with a still from its clip, taken where the piece begins (or ends, when it plays backwards), so a cut can be read at a glance instead of by its descriptions.

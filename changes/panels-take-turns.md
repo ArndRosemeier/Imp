@@ -1,0 +1,1 @@
+**More room for the stage.** The library and the crew panel now take turns whenever showing both would squeeze the stage, such as on a 1440 or 1600 pixel wide screen: opening one hides the other. On wide screens both stay open side by side.

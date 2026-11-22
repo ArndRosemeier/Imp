@@ -207,7 +207,15 @@ describe('App', () => {
     ).toBeTruthy();
     // The setup itself went through commands, so it shows in the activity strip.
     const strip = screen.getByRole('contentinfo', { name: 'Activity' });
-    expect(await within(strip).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+    // One line with the latest command; a tap opens the recent ones.
+    const toggle = await within(strip).findByRole('button', { name: /Recent/ });
+    expect(within(strip).queryByRole('list')).toBeNull();
+    await user.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const recent = await within(strip).findByRole('list');
+    expect(await within(recent).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+    await user.click(toggle);
+    expect(within(strip).queryByRole('list')).toBeNull();
   });
 
   it('starts with a model mix and no tips, for someone who knows their way around', async () => {
@@ -483,6 +491,39 @@ describe('App', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Script' }));
     expect(await screen.findByRole('tab', { name: '1 · Harbour, dusk' })).toBeTruthy();
+  });
+
+  it('lets the library and the crew take turns only when the stage would get too narrow', async () => {
+    const { user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    const shell = (): string | null | undefined =>
+      document.querySelector('.shell')?.getAttribute('data-crew');
+    const width = window.innerWidth;
+    try {
+      // A wide screen has room for both.
+      window.innerWidth = 2400;
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+      await screen.findByRole('complementary', { name: 'Library' });
+      expect(shell()).toBe('open');
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+
+      // A 1440 px screen does not: opening the library hides the crew, and the other way round.
+      window.innerWidth = 1440;
+      await user.click(screen.getByRole('button', { name: 'Library' }));
+      await screen.findByRole('complementary', { name: 'Library' });
+      expect(shell()).toBe('closed');
+      await user.click(screen.getByRole('button', { name: 'Crew panel' }));
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('complementary', { name: 'Library' })).toBeNull();
+      });
+      expect(shell()).toBe('open');
+    } finally {
+      window.innerWidth = width;
+    }
   });
 
   it('resizes the side panels with the keyboard and remembers the widths', async () => {
@@ -812,6 +853,9 @@ describe('App', () => {
     });
     const first = await screen.findByRole('button', { name: /Shot 1: The lamp turns/ });
     expect(screen.getByRole('button', { name: /Shot 2: Mara at the stairs/ })).toBeTruthy();
+    // Each piece shows a still from the start of the stretch of its clip it uses.
+    const thumb = first.querySelector('video.block-thumb');
+    expect(thumb?.getAttribute('src')).toMatch(/^blob:test\/\d+#t=0\.10$/);
     expect(screen.getAllByText(/0:08/).length).toBeGreaterThan(0);
     // jsdom cannot record video, so export says so instead of offering a broken button.
     // Export and help live in menus, so the picture and the timeline share one screen.
@@ -882,15 +926,18 @@ describe('App', () => {
     expect(screen.getByText('Open')).toBeTruthy();
     expect(screen.getAllByText('0/5').length).toBeGreaterThan(0);
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Storm' }));
     await user.click(screen.getByRole('button', { name: 'Duplicate: Storm' }));
     expect(await screen.findByRole('heading', { name: 'Storm (2)' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Storm (2)' }));
     await user.click(screen.getByRole('button', { name: 'Rename: Storm (2)' }));
     const field = screen.getByLabelText('Project name');
     await user.clear(field);
     await user.type(field, 'Squall{Enter}');
     expect(await screen.findByRole('heading', { name: 'Squall' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall' }));
     await user.click(screen.getByRole('button', { name: 'Save as template: Squall' }));
     await user.click(await screen.findByRole('button', { name: /Save template/ }));
     expect(await screen.findByText(/Saved the template “Squall template”/)).toBeTruthy();
@@ -901,6 +948,7 @@ describe('App', () => {
     HTMLAnchorElement.prototype.click = () => {
       saved += 1;
     };
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall' }));
     await user.click(screen.getByRole('button', { name: 'Export to a file: Squall' }));
     expect(await screen.findByText(/Saved Squall\.imp\.zip/)).toBeTruthy();
     expect(saved).toBe(1);
@@ -917,6 +965,7 @@ describe('App', () => {
     await user.upload(screen.getByLabelText('Project file to import'), picked);
     expect(await screen.findByRole('heading', { name: 'Squall (2)' })).toBeTruthy();
 
+    await user.click(screen.getByRole('button', { name: 'Actions for Squall (2)' }));
     await user.click(screen.getByRole('button', { name: 'Delete: Squall (2)' }));
     await user.click(await screen.findByRole('button', { name: /Delete for good/ }));
     await vi.waitFor(() => {
@@ -1367,6 +1416,11 @@ describe('App', () => {
     const { user } = start();
     await completeSetup(user);
     await user.click(screen.getByRole('button', { name: 'Settings' }));
+    // Settings read as words; what the app keeps for itself stays out of the list.
+    const list = await screen.findByRole('region', { name: 'Models and preferences' });
+    expect(await within(list).findByText('Coordinator model')).toBeTruthy();
+    expect(within(list).getByText('vendor/writer')).toBeTruthy();
+    expect(within(list).queryByText(/coordinator\.member/)).toBeNull();
     const link = await screen.findByRole('link', { name: /Download Imp for your computer/ });
     expect(link.getAttribute('href')).toBe('./imp-server.zip');
 
