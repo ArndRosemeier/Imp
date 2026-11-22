@@ -1,5 +1,6 @@
 import { CommandError, defineCommand, type Command, type KeyValueStore, patchOf } from '@imp/core';
 import { z } from 'zod';
+import { forgetConversations } from './conversations.js';
 import {
   ADDED_ROLE_PREFIX,
   CUSTOM_ROLE_PREFIX,
@@ -9,8 +10,6 @@ import {
 } from './role.js';
 
 const CREW_PREFIX = 'crew/';
-/** Where the conversation with each crew member is kept, by member id. */
-export const CONVERSATION_PREFIX = 'conversations/';
 
 export const CrewMember = z.object({
   id: z.string(),
@@ -437,7 +436,7 @@ export function createCrewCommands(
     id: 'crew.dismiss',
     title: 'Dismiss agent',
     description:
-      'Removes an agent from the crew, with the conversation held with it. Work the agent produced is kept.',
+      'Removes an agent from the crew, with the conversations held with it in every project. Work the agent produced is kept.',
     effect: 'write',
     input: z.object({ id: z.string() }),
     output: z.object({ id: z.string(), dismissed: z.boolean() }),
@@ -445,7 +444,7 @@ export function createCrewCommands(
       const existed = (await readCrewMember(runtime.store, id)) !== undefined;
       await runtime.store.batch([
         { type: 'delete', key: `${CREW_PREFIX}${id}` },
-        { type: 'delete', key: `${CONVERSATION_PREFIX}${id}` },
+        ...(await forgetConversations(runtime.store, [id])),
       ]);
       return { id, dismissed: existed };
     },

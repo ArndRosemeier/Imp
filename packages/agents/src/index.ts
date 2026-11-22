@@ -10,6 +10,12 @@ export {
 } from './commands.js';
 export { CrewMember, createCrewCommands, readCrewMember, type CrewCommandOptions } from './crew.js';
 export {
+  CONVERSATION_PREFIX,
+  conversationKey,
+  conversationPrefix,
+  currentConversationProject,
+} from './conversations.js';
+export {
   ACTIVE_MIX_SETTING,
   createModelMixCommands,
   MODEL_MIX_PREFIX,
