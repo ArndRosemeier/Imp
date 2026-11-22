@@ -67,6 +67,20 @@ async function currentModels(
  * pictures, effects, music, transcripts), kept under a name so a whole set
  * can be swapped at once, such as a cheap draft mix and a final one.
  */
+/** Where people meet model mixes and what they call them, for command lookup. */
+const KEYWORDS = [
+  'library',
+  'Mixes tab',
+  'Models chip',
+  'model preset',
+  'model set',
+  'model settings',
+  'generation models',
+  'reuse',
+  'store',
+  'keep',
+] as const;
+
 export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Command[] {
   const known = new Set(slots.map((slot) => slot.setting));
   const slotList = slots.map((slot) => `${slot.setting} (${slot.label})`).join(', ');
@@ -79,7 +93,8 @@ export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Co
   const list = defineCommand({
     id: 'models.mix.list',
     title: 'List model mixes',
-    description: `Returns the model mixes saved under a name, which mix was applied last (active), and whether the models set now still match it (changed). A mix names a model for some of: ${slotList}.`,
+    keywords: KEYWORDS,
+    description: `Returns the model mixes saved under a name (the library's Mixes tab and the Models chip; shared by every project), which mix was applied last (active), and whether the models set now still match it (changed). A mix names a model for some of: ${slotList}.`,
     effect: 'read',
     input: z.object({}),
     output: z.object({
@@ -110,8 +125,9 @@ export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Co
   const save = defineCommand({
     id: 'models.mix.save',
     title: 'Save model mix',
+    keywords: KEYWORDS,
     description:
-      'Saves a model mix under a name. Without models it keeps the models set now; with models (setting key to model id, ids from models.list) it keeps those. Pass the id of a mix to overwrite it. Saving does not change the models in use; models.mix.apply does.',
+      'Saves a model mix under a name in the library (its Mixes tab), shared by every project; use it, not a text note, to keep a set of generation models. The model of each agent on the crew is kept by crew.saved.save instead. Without models it keeps the models set now; with models (setting key to model id, ids from models.list) it keeps those. Pass the id of a mix to overwrite it. Saving does not change the models in use; models.mix.apply does.',
     effect: 'write',
     input: z.object({
       name: z.string().trim().min(1).optional().describe('Required for a new mix.'),
@@ -154,6 +170,7 @@ export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Co
   const apply = defineCommand({
     id: 'models.mix.apply',
     title: 'Use model mix',
+    keywords: KEYWORDS,
     description:
       "Sets every model the mix names, at once, and makes it the active mix. The coordinator's own model changes too when the mix names one for agents. Slots the mix leaves out keep their model.",
     effect: 'write',
@@ -191,6 +208,7 @@ export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Co
   const remove = defineCommand({
     id: 'models.mix.delete',
     title: 'Delete model mix',
+    keywords: KEYWORDS,
     description: 'Deletes a saved model mix. The models in use stay as they are.',
     effect: 'destructive',
     input: z.object({ id: z.string() }),

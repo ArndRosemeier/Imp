@@ -57,6 +57,19 @@ async function requireSaved(store: KeyValueStore, commandId: string, id: string)
   return SavedCrew.parse(stored);
 }
 
+/** Where people meet saved crews and what they call them, for command lookup. */
+const KEYWORDS = [
+  'library',
+  'Crews tab',
+  'crew preset',
+  'crew template',
+  'team',
+  'reuse',
+  'store',
+  'keep',
+  'custom roles',
+] as const;
+
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
 /**
@@ -67,8 +80,9 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const list = defineCommand({
     id: 'crew.saved.list',
     title: 'List saved crews',
+    keywords: KEYWORDS,
     description:
-      'Returns the crews saved under a name, with who is on each. They belong to the workspace, so every project can load them.',
+      'Returns the crews saved under a name, with who is on each. They are kept in the library (its Crews tab) and belong to the workspace, so every project can load them.',
     effect: 'read',
     input: z.object({ query: z.string().default('').describe('Words to look for in names.') }),
     output: z.object({ crews: z.array(Summary) }),
@@ -101,6 +115,7 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const get = defineCommand({
     id: 'crew.saved.get',
     title: 'Read saved crew',
+    keywords: KEYWORDS,
     description:
       'Returns one saved crew whole: each agent with role, model, budget and web search.',
     effect: 'read',
@@ -112,8 +127,9 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const save = defineCommand({
     id: 'crew.saved.save',
     title: 'Save the crew',
+    keywords: KEYWORDS,
     description:
-      'Saves everyone on the current crew under a name: role, name, model, budget and web search, plus the custom roles they hold. Pass the id of a saved crew to overwrite it with the current crew. Conversations are not saved.',
+      'Saves everyone on the current crew under a name in the library (its Crews tab): role, name, model, budget and web search, plus copies of the custom roles they hold. It is a real preset that crew.saved.load hires again in any project, so use it, not a text note, when someone wants to keep or reuse a crew. Pass the id of a saved crew to overwrite it with the current crew. Conversations are not saved.',
     effect: 'write',
     input: z.object({
       name: z.string().trim().min(1).optional().describe('Required for a new saved crew.'),
@@ -168,6 +184,7 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const load = defineCommand({
     id: 'crew.saved.load',
     title: 'Load a saved crew',
+    keywords: KEYWORDS,
     description:
       'Hires the agents of a saved crew. With replace true (the default) the current agents are dismissed first, with their conversations; the coordinator always stays. With replace false they join the current crew. Custom roles the crew needs are brought back if they were deleted.',
     effect: 'write',
@@ -236,6 +253,7 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const update = defineCommand({
     id: 'crew.saved.update',
     title: 'Rename saved crew',
+    keywords: KEYWORDS,
     description:
       'Changes the name or notes of a saved crew. To change who is on it, use crew.saved.save with its id.',
     effect: 'write',
@@ -261,6 +279,7 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
   const remove = defineCommand({
     id: 'crew.saved.delete',
     title: 'Delete saved crew',
+    keywords: KEYWORDS,
     description: 'Deletes a saved crew. The agents on the current crew are not touched.',
     effect: 'destructive',
     input: z.object({ id: z.string() }),
