@@ -11,6 +11,8 @@ import { connectImp, createHttpPort, type EventStream, type ImpClient, type Port
 import { LEGACY_KEY_NAME, openBrowserSecretStore } from './host/secrets.js';
 import { servedByLocalServer } from './host/served.js';
 import { followVisualViewport } from './app/viewport.js';
+import { registerUpdater } from './app/updates.js';
+import release from 'virtual:imp-release';
 import './styles/tokens.css';
 import './styles/app.css';
 
@@ -65,10 +67,13 @@ async function connect(): Promise<ImpClient> {
   });
   return connectImp(worker as unknown as Port, secrets, lost);
 }
+// Installed copies (an iPad home screen) open the newest published version, not an old stored one.
+if (!release.preview && !servedByLocalServer()) registerUpdater();
+
 const imp = await connect();
 
 createRoot(root).render(
   <StrictMode>
-    <App imp={imp} />
+    <App imp={imp} {...(release.preview ? {} : { published: release.version })} />
   </StrictMode>,
 );
