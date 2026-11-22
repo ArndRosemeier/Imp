@@ -151,14 +151,24 @@ export const Clip = z.object({
   error: z.string().nullable(),
   /** The length it was asked for, in seconds. Null for clips made before this was kept. */
   durationSeconds: z.number().nullable().default(null),
-  /** Whether the shot's dialogue was recorded apart, so the clip itself is silent. */
+  /**
+   * Whether the clip was made without sound of its own, because silence was
+   * asked for. Clips made before sound was the default were silent whenever
+   * the dialogue was recorded apart.
+   */
   silent: z.boolean().default(false),
+  /** Whether the shot's recorded dialogue plays over the clip: lines of voice-only characters. */
+  voiceApart: z.boolean().default(false),
   /** The key frame the clip was made to start on, or null when it was made from words and guides. */
   startFrameId: z.string().nullable().default(null),
   costUsd: z.number().nullable(),
   createdAt: z.iso.datetime(),
 });
 export type Clip = z.infer<typeof Clip>;
+
+/** Whether the recorded dialogue of the shot plays over a clip. */
+export const dialogueOver = (clip: Pick<Clip, 'silent' | 'voiceApart'>): boolean =>
+  clip.voiceApart || clip.silent;
 
 /**
  * The spoken line of a shot, recorded in the voice of its speaker. Video

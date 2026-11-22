@@ -59,6 +59,7 @@ const clip = (blobKey: string, durationSeconds: number | null = 4) => ({
   portraits: 0,
   guides: [],
   silent: false,
+  voiceApart: false,
   startFrameId: null,
   costUsd: null,
   createdAt: '2026-11-21T10:00:00.000Z',

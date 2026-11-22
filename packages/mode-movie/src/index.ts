@@ -30,6 +30,7 @@ export {
   Character,
   CharacterImage,
   Clip,
+  dialogueOver,
   KeyFrame,
   DialogueTake,
   Development,
