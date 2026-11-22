@@ -1,4 +1,4 @@
-import { CommandRegistry, defineCommand, settingsCommands } from '@imp/core';
+import { CommandRegistry, defineCommand, projectCommands, settingsCommands } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
@@ -64,6 +64,7 @@ function setup(replies: ScriptedChatReply[]) {
   const registry = new CommandRegistry({ runtime });
   registry.register(
     ...settingsCommands,
+    ...projectCommands,
     tag,
     look,
     ...createCrewCommands(catalog),
@@ -206,6 +207,22 @@ describe('the work board', () => {
       askedBy: { kind: 'agent', id: coordinator.id, name: 'Coordinator' },
       parentId: asking?.id,
     });
+  });
+
+  it('moves with a run that opens a project itself', async () => {
+    const { run, hire, board, provider } = setup([]);
+    const coordinator = await hire('coordinator');
+    const project = (await run('project.create', { name: 'Storm', mode: 'movie' })) as {
+      id: string;
+    };
+    provider.script(
+      { toolCalls: [toolCall('c1', 'project__open', { projectId: project.id })] },
+      { content: 'Opened it.' },
+    );
+    await run('crew.ask', { memberId: coordinator.id, task: 'Open the storm film.' });
+    const { projectId, recent } = await board();
+    expect(projectId).toBe(project.id);
+    expect(recent[0]).toMatchObject({ memberId: coordinator.id, projectId, status: 'completed' });
   });
 
   it('cuts long texts in the list and has them whole in crew.work.get', async () => {

@@ -91,6 +91,8 @@ export interface AgentRunOptions {
    * that what it is doing right now can be shown while it works.
    */
   readonly onStep?: (step: AgentStep) => Promise<void>;
+  /** Called after each command the agent ran successfully, with its id. */
+  readonly onCommand?: (commandId: string) => void;
 }
 
 /** What a working agent is doing at this moment, with what the run has cost so far. */
@@ -275,6 +277,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
           note: 'The user must approve this before it runs. It has been put in front of them.',
         });
       }
+      options.onCommand?.(commandId);
       const content = JSON.stringify({ status: 'ok', output: result.output });
       const attachments = attachmentsOf(result.output);
       if (attachments.length === 0) return content;

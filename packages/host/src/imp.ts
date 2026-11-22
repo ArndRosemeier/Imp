@@ -7,6 +7,7 @@ import {
   createModelCommands,
   createModelMixCommands,
   createSavedCrewCommands,
+  createSpendAllowance,
   createSpendCommands,
   createSpendLedger,
   withSpendLedger,
@@ -167,7 +168,8 @@ export function createImp(options: ImpOptions): Imp {
     guideRole,
     ...modes.flatMap((mode) => mode.roles),
   ]);
-  const registry = new CommandRegistry({ runtime });
+  // Agents spend cents without stopping to ask, within the allowance the person sets.
+  const registry = new CommandRegistry({ runtime, autoApprove: createSpendAllowance(provider) });
   registry.register(
     ...settingsCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),

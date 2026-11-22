@@ -215,6 +215,8 @@ export interface WorkTrackerOptions {
 export interface WorkTracker {
   readonly id: string;
   step(step: AgentStep): Promise<void>;
+  /** Files the run under another project, when it opened one itself and moved there. */
+  moveTo(projectId: string | null): Promise<void>;
   finish(result: {
     status: Exclude<WorkStatus, 'working'>;
     summary: string | null;
@@ -292,7 +294,7 @@ export async function startWork(
       return [
         ...(await describer.label(
           store,
-          run.projectId,
+          entry.projectId,
           subjects,
           (input ?? {}) as Record<string, unknown>,
         )),
@@ -350,6 +352,11 @@ export async function startWork(
           subjects: changes ? mergeSubjects(entry.subjects, subjects) : entry.subjects,
         };
       }
+      await writeWork(store, entry);
+    },
+    async moveTo(projectId) {
+      if (projectId === entry.projectId) return;
+      entry = { ...entry, projectId, updatedAt: options.now() };
       await writeWork(store, entry);
     },
     async finish(result) {

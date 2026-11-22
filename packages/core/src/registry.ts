@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { appendActivity, type ActivityEntry } from './activity.js';
 import type { Actor } from './actor.js';
-import type { Command, TypedCommand } from './command.js';
+import type { Command, CommandContext, TypedCommand } from './command.js';
 import { CommandError } from './errors.js';
 import { defaultPolicy, type ExecutionPolicy } from './policy.js';
 import type { CoreRuntime } from './runtime.js';
@@ -17,9 +17,20 @@ export interface ExecuteOptions {
   readonly approved?: boolean;
 }
 
+/**
+ * Lets a step the policy would put to a person run without asking, such as an
+ * agent's spending within the allowance the person set. Never lifts a `deny`.
+ */
+export type AutoApproval = (
+  context: CommandContext,
+  command: Command,
+  rawInput: unknown,
+) => Promise<boolean>;
+
 export interface CommandRegistryOptions {
   readonly runtime: CoreRuntime;
   readonly policy?: ExecutionPolicy;
+  readonly autoApprove?: AutoApproval;
 }
 
 /**
@@ -30,10 +41,12 @@ export class CommandRegistry {
   readonly #commands = new Map<string, Command>();
   readonly #runtime: CoreRuntime;
   readonly #policy: ExecutionPolicy;
+  readonly #autoApprove: AutoApproval | undefined;
 
   constructor(options: CommandRegistryOptions) {
     this.#runtime = options.runtime;
     this.#policy = options.policy ?? defaultPolicy;
+    this.#autoApprove = options.autoApprove;
   }
 
   register(...commands: readonly Command[]): this {
@@ -94,6 +107,16 @@ export class CommandRegistry {
     return this.#run(id, rawInput, options, (context, raw) => command.run(context, raw));
   }
 
+  /** True when the step may run without asking. A failing check asks, as if there were none. */
+  async #allowed(command: Command, actor: Actor, rawInput: unknown): Promise<boolean> {
+    if (this.#autoApprove === undefined) return false;
+    try {
+      return await this.#autoApprove({ actor, runtime: this.#runtime }, command, rawInput);
+    } catch {
+      return false;
+    }
+  }
+
   async #run<T>(
     id: string,
     rawInput: unknown,
@@ -124,7 +147,11 @@ export class CommandRegistry {
       await record('denied');
       throw new CommandError('denied', id, `${actor.kind} "${actor.id}" may not run "${id}".`);
     }
-    if (decision === 'needs-approval' && options.approved !== true) {
+    if (
+      decision === 'needs-approval' &&
+      options.approved !== true &&
+      !(await this.#allowed(command, actor, rawInput))
+    ) {
       await record('needs-approval');
       return { status: 'needs-approval', commandId: id, input: rawInput };
     }
