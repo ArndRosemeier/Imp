@@ -454,7 +454,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
         )}
       </section>
       <section className="card stack" aria-labelledby="always-heading">
-        <h3 id="always-heading">What agents do without asking</h3>
+        <h3 id="always-heading">{t('What agents do without asking')}</h3>
         <AlwaysAllowed />
       </section>
       <section className="card stack" aria-labelledby="help-heading">

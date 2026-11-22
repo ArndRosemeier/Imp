@@ -19,6 +19,8 @@ import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive, type Live } from './context.js';
 import { HornedBadge, ImpSpinner } from './ImpMark.js';
 import { formatUsd, Price, useEstimate, type Estimate } from './spend.js';
+import { t, tx } from '../i18n/i18n.js';
+import { Marked } from '../i18n/Marked.js';
 
 /** Opens the approvals dialog from anywhere, such as an activity view. */
 export const OPEN_APPROVALS = 'imp:open-approvals';
@@ -64,7 +66,7 @@ function useFields(input: unknown): { key: string; label: string; value: string 
   const entries: [string, unknown][] = isRecord(input) ? Object.entries(input) : [['input', input]];
   return entries.map(([key, value]) => ({
     key,
-    label: key === 'memberId' ? 'crew member' : key,
+    label: key === 'memberId' ? t('crew member') : key,
     value:
       key === 'memberId'
         ? (crew.data?.crew.find((member) => member.id === value)?.name ?? String(value))
@@ -89,7 +91,7 @@ export function ApprovalRequest({
     <>
       <div className="row spread wrap">
         <span>
-          <strong>{title}</strong> <span className="mono muted">{commandId}</span>
+          <strong>{tx(title)}</strong> <span className="mono muted">{commandId}</span>
         </span>
         {isRecord(input) && <Price command={commandId} input={input} />}
       </div>
@@ -120,9 +122,15 @@ type Outcome =
   | { state: 'failed'; note: string };
 
 const OUTCOME_WORDS: Readonly<Record<Exclude<Outcome['state'], 'failed'>, string>> = {
-  working: 'Deciding',
-  approved: 'Approved',
-  declined: 'Declined',
+  get working(): string {
+    return t('Deciding');
+  },
+  get approved(): string {
+    return t('Approved');
+  },
+  get declined(): string {
+    return t('Declined');
+  },
 };
 
 function ApprovalRow({
@@ -173,13 +181,13 @@ function ApprovalRow({
             className="approvals-check"
             checked={approve}
             disabled={locked}
-            aria-label={`Approve ${item.title}`}
+            aria-label={t('Approve {title}', { title: tx(item.title) })}
             onChange={onToggle}
           />
           <span className="approvals-what">
             <span className="approvals-title">
-              {item.title}
-              {risky && <span className="approvals-effect">deletes</span>}
+              {tx(item.title)}
+              {risky && <span className="approvals-effect">{t('deletes')}</span>}
             </span>
             <span className="approvals-summary">
               {summary || <span className="mono">{item.commandId}</span>}
@@ -195,7 +203,7 @@ function ApprovalRow({
             </span>
           ) : outcome.state === 'failed' ? (
             <span className="approvals-outcome" data-state="failed">
-              <WarningIcon aria-hidden="true" /> Failed
+              <WarningIcon aria-hidden="true" /> {t('Failed')}
             </span>
           ) : (
             <span className="approvals-outcome" data-state={outcome.state}>
@@ -213,7 +221,9 @@ function ApprovalRow({
             aria-expanded={open}
             aria-controls={detailsId}
             aria-label={
-              open ? `Hide the details of ${item.title}` : `Show the details of ${item.title}`
+              open
+                ? t('Hide the details of {title}', { title: tx(item.title) })
+                : t('Show the details of {title}', { title: tx(item.title) })
             }
             onClick={() => {
               setOpen(!open);
@@ -227,7 +237,7 @@ function ApprovalRow({
       <div id={detailsId} className="approvals-details" hidden={!open}>
         <dl className="request">
           <div>
-            <dt>command</dt>
+            <dt>{t('command')}</dt>
             <dd className="mono">{item.commandId}</dd>
           </div>
           {fields.map((field) => (
@@ -249,12 +259,12 @@ function ApprovalRow({
             }}
           />
           <span>
-            Always allow <strong>{item.title}</strong>
+            <Marked text={t('Always allow **{title}**', { title: tx(item.title) })} />
             <span className="muted">
               {' '}
               {risky
-                ? '· agents will delete without asking'
-                : '· agents will spend on this without asking'}
+                ? t('· agents will delete without asking')
+                : t('· agents will spend on this without asking')}
             </span>
           </span>
         </label>
@@ -437,21 +447,24 @@ export function Approvals(): ReactElement {
 
   const heading =
     phase === 'done'
-      ? 'Decided'
+      ? t('Decided')
       : shown.length === 1
-        ? 'One request is waiting'
-        : `${String(shown.length)} requests are waiting`;
+        ? t('One request is waiting')
+        : t('{count} requests are waiting', { count: String(shown.length) });
 
   const primaryLabel =
     declinedCount === 0
       ? shown.length === 1
-        ? 'Approve'
-        : `Approve all ${String(shown.length)}`
+        ? t('Approve')
+        : t('Approve all {count}', { count: String(shown.length) })
       : approvedCount === 0
         ? shown.length === 1
-          ? 'Decline'
-          : `Decline all ${String(shown.length)}`
-        : `Approve ${String(approvedCount)} · decline ${String(declinedCount)}`;
+          ? t('Decline')
+          : t('Decline all {count}', { count: String(shown.length) })
+        : t('Approve {approvedCount} · decline {declinedCount}', {
+            approvedCount: String(approvedCount),
+            declinedCount: String(declinedCount),
+          });
 
   return (
     // A tap on the dimmed backdrop closes the dialog, as Escape does; a tablet has no Escape key.
@@ -480,17 +493,19 @@ export function Approvals(): ReactElement {
           )}
         </HornedBadge>
         <div className="stack approvals-heading">
-          <span className="eyebrow">Needs your approval</span>
+          <span className="eyebrow">{t('Needs your approval')}</span>
           <h2 id="approvals-title">{heading}</h2>
           {shown.length > 0 && (
             <span className="muted">
-              Asked by {askers.join(', ')}. Agents ask before they spend money or delete anything.
+              {t('Asked by {names}. Agents ask before they spend money or delete anything.', {
+                names: askers.join(', '),
+              })}
             </span>
           )}
         </div>
         <button
           className="button quiet icon"
-          aria-label="Close"
+          aria-label={t('Close')}
           disabled={phase === 'working'}
           onClick={close}
         >
@@ -513,23 +528,26 @@ export function Approvals(): ReactElement {
               onChange={toggleAll}
             />
             <span>
-              {approvedCount} of {shown.length} picked to approve
+              {t('{approvedCount} of {count} picked to approve', {
+                approvedCount,
+                count: shown.length,
+              })}
             </span>
           </label>
-          <span className="muted small">Unpicked requests are declined.</span>
+          <span className="muted small">{t('Unpicked requests are declined.')}</span>
         </div>
       )}
 
       <div className="approvals-body">
         {waiting.error !== null && <p className="error">{waiting.error}</p>}
         {shown.length === 0 && waiting.data !== undefined && (
-          <p className="muted">Nothing is waiting for you.</p>
+          <p className="muted">{t('Nothing is waiting for you.')}</p>
         )}
         {[...groups].map(([memberId, items]) => (
           <section
             key={memberId}
             className="approvals-group"
-            aria-label={`Asked by ${items[0]?.memberName ?? ''}`}
+            aria-label={t('Asked by {name}', { name: items[0]?.memberName ?? '' })}
           >
             {groups.size > 1 && (
               <h3 className="approvals-asker">
@@ -572,21 +590,23 @@ export function Approvals(): ReactElement {
           <div className="approvals-total" aria-live="polite">
             {phase === 'review' ? (
               <>
-                <span className="eyebrow">If approved</span>
+                <span className="eyebrow">{t('If approved')}</span>
                 <span className="approvals-sum">
                   {approvedCount === 0 ? '$0.00' : `≈ ${formatUsd(total)}`}
-                  {unknown && approvedCount > 0 && <span className="muted"> + unpriced</span>}
+                  {unknown && approvedCount > 0 && (
+                    <span className="muted"> {t('+ unpriced')}</span>
+                  )}
                 </span>
               </>
             ) : phase === 'working' ? (
               <span className="row">
-                <ImpSpinner /> Working through your decisions
+                <ImpSpinner /> {t('Working through your decisions')}
               </span>
             ) : (
               <span>
                 {[...outcomes.values()].some((outcome) => outcome.state === 'failed')
-                  ? 'Done, with problems shown above.'
-                  : 'Done. The crew goes on.'}
+                  ? t('Done, with problems shown above.')
+                  : t('Done. The crew goes on.')}
               </span>
             )}
           </div>
@@ -600,7 +620,7 @@ export function Approvals(): ReactElement {
                     void decide('none');
                   }}
                 >
-                  <XIcon aria-hidden="true" /> Decline all
+                  <XIcon aria-hidden="true" /> {t('Decline all')}
                 </button>
               )}
               <button
@@ -620,7 +640,7 @@ export function Approvals(): ReactElement {
             </div>
           ) : (
             <button type="button" className="button" disabled={phase === 'working'} onClick={close}>
-              Close
+              {t('Close')}
             </button>
           )}
         </footer>
@@ -640,17 +660,18 @@ export function AlwaysAllowed(): ReactElement {
   return (
     <div className="stack">
       <p className="muted">
-        Agents ask before they spend money or delete anything. What you always allow, they do
-        without asking. Only you can change this list; agents cannot.
+        {t(
+          'Agents ask before they spend money or delete anything. What you always allow, they do without asking. Only you can change this list; agents cannot.',
+        )}
       </p>
       {commands.length === 0 ? (
-        <p className="muted small">Nothing is always allowed. Agents ask every time.</p>
+        <p className="muted small">{t('Nothing is always allowed. Agents ask every time.')}</p>
       ) : (
         <ul className="always-list">
           {commands.map((command) => (
             <li key={command.commandId}>
               <span className="stack">
-                <strong>{command.title}</strong>
+                <strong>{tx(command.title)}</strong>
                 <span className="mono muted small">{command.commandId}</span>
               </span>
               <button
@@ -666,7 +687,7 @@ export function AlwaysAllowed(): ReactElement {
                   });
                 }}
               >
-                Ask again
+                {t('Ask again')}
               </button>
             </li>
           ))}

@@ -492,13 +492,15 @@ export function CrewPanel({
         >
           <StampIcon aria-hidden="true" size={20} />
           <span className="stack">
-            <strong>Review all {everyone.length} requests at once</strong>
+            <strong>{t('Review all {count} requests at once', { count: everyone.length })}</strong>
             <span className="muted small">
               {elsewhere > 0 && approvals.length === 0
-                ? `Other crew members are waiting on you.`
+                ? t('Other crew members are waiting on you.')
                 : elsewhere > 0
-                  ? `${String(elsewhere)} of them from other crew members.`
-                  : 'Approve or decline them together.'}
+                  ? t('{elsewhere} of them from other crew members.', {
+                      elsewhere: String(elsewhere),
+                    })
+                  : t('Approve or decline them together.')}
             </span>
           </span>
         </button>
