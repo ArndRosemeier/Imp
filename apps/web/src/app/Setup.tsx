@@ -3,6 +3,7 @@ import type { ModelInfo } from '@imp/providers';
 import { ArrowRightIcon } from '@phosphor-icons/react';
 import { useEffect, useId, useState, type SyntheticEvent, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp } from './context.js';
+import { ImpMark } from './ImpMark.js';
 
 /** Models an agent can run on: they write text and accept tools. */
 export function agentModels(models: readonly ModelInfo[]): ModelInfo[] {
@@ -82,7 +83,10 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
   return (
     <main className="setup">
       <div className="setup-panel">
-        <div className="wordmark">Imp</div>
+        <div className="wordmark">
+          <ImpMark />
+          Imp
+        </div>
         <div className="steps" aria-hidden="true">
           <span data-done="true" />
           <span data-done={hasKey} />
