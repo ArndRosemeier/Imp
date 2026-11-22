@@ -2,6 +2,7 @@ import {
   coordinatorRole,
   guideRole,
   createAgentCommands,
+  type WorkSubject,
   createCrewCommands,
   createModelCommands,
   createModelMixCommands,
@@ -219,7 +220,24 @@ export function createImp(options: ImpOptions): Imp {
       { setting: TRANSCRIPTION_MODEL_SETTING, label: 'Transcripts' },
     ]),
     ...(options.ffmpeg === undefined ? [] : createFfmpegCommands(options.ffmpeg)),
-    ...createAgentCommands({ registry, provider, roles }),
+    ...createAgentCommands({
+      registry,
+      provider,
+      roles,
+      work: {
+        stageOf: (commandId) =>
+          modes.map((mode) => mode.work?.stageOf(commandId)).find((stage) => stage !== undefined),
+        label: async (store, projectId, subjects, input) => {
+          let named: readonly WorkSubject[] = subjects;
+          for (const mode of modes) {
+            if (mode.work?.label !== undefined) {
+              named = await mode.work.label(store, projectId, named, input);
+            }
+          }
+          return named;
+        },
+      },
+    }),
     ...createSpendCommands({ registry, provider }),
     // Save all and Load all. The key is not in the store, so it is never in a backup.
     ...createBackupCommands({
