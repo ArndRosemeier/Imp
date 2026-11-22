@@ -614,7 +614,7 @@ function KindPanel({
     cast: Cast.parse(await runCommand(imp, 'movie.character.list', { projectId: project.id }))
       .characters,
   }));
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const items = listed.data?.items ?? [];
   const element = items.find((candidate) => candidate.id === selectedId) ?? items[0];
@@ -627,7 +627,7 @@ function KindPanel({
 
   return (
     <>
-      <Problem text={listed.error ?? error} />
+      <Problem text={listed.error ?? error} retry={retry} />
       <div className="chips" role="tablist" aria-label={text.tab}>
         {items.map((candidate) => (
           <button
@@ -665,7 +665,7 @@ function KindPanel({
 
 /** Production design: the places and objects of the film, each drawn from every side it is seen from. */
 export function DesignView({ project }: { project: Project }): ReactElement {
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const images = useModelSetting(IMAGE_MODEL_SETTING, 'image');
   const [kind, setKind] = useState<WorldKind>('location');
   return (
@@ -710,7 +710,7 @@ export function DesignView({ project }: { project: Project }): ReactElement {
           },
         ]}
       />
-      <Problem text={error ?? images.error} />
+      <Problem text={error ?? images.error} retry={retry} />
       <KindPanel key={kind} project={project} kind={kind} model={images.model} />
     </>
   );

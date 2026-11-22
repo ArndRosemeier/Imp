@@ -152,6 +152,33 @@ describe('crew.ask', () => {
     ]);
   });
 
+  it('retries a failed run without repeating the message', async () => {
+    const { run, hire, provider, conversation } = setup([
+      new ProviderError('network', 'fake', 'Imp could not reach OpenRouter.'),
+      { content: 'Here it is.' },
+    ]);
+    const coordinator = await hire('coordinator');
+    const failed = AgentRunSchema.parse(
+      await run('crew.ask', { memberId: coordinator.id, task: 'Write a logline.' }),
+    );
+    expect(failed).toMatchObject({ status: 'failed', error: 'Imp could not reach OpenRouter.' });
+    expect(await conversation(coordinator.id)).toMatchObject({
+      lastStatus: 'failed',
+      messages: [{ role: 'user', content: 'Write a logline.' }],
+    });
+
+    // Without a task, the run goes again from the message that never got an answer.
+    const retried = AgentRunSchema.parse(await run('crew.ask', { memberId: coordinator.id }));
+    expect(retried).toMatchObject({ status: 'completed', finalText: 'Here it is.' });
+    expect(provider.requests[1]?.messages.map((message) => message.role)).toEqual([
+      'system',
+      'user',
+    ]);
+    const stored = await conversation(coordinator.id);
+    expect(stored).toMatchObject({ lastStatus: 'completed', lastError: null });
+    expect(stored.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+  });
+
   it('records a failed run and adds up what the conversation cost', async () => {
     const usage = { promptTokens: 10, cachedPromptTokens: 4, completionTokens: 2, costUsd: 0.01 };
     const { run, hire, conversation } = setup([

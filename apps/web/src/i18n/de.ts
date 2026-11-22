@@ -4,6 +4,12 @@
 // playhead = Abspielkopf, track or lane = Spur, pickup = Nachdreh, Save all = Alles sichern.
 
 export const de: Readonly<Record<string, string>> = {
+  // app/retry.tsx
+  Retry: 'Erneut versuchen',
+  'Trying again': 'Neuer Versuch läuft',
+  // app/CrewPanel.tsx (retry)
+  '{name} did not get your message': '{name} hat deine Nachricht nicht bekommen',
+  'The last message did not go through.': 'Die letzte Nachricht ist nicht angekommen.',
   // app/App.tsx
   'Imp could not start: {error}': 'Imp konnte nicht starten: {error}',
   // app/Approvals.tsx

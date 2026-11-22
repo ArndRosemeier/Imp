@@ -29,6 +29,7 @@ import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
 import { SceneScript, ScriptFiles } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
+import { canRetry, RetryNote, type Retry } from './retry.js';
 import { t, tn } from '../i18n/i18n.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
@@ -65,29 +66,54 @@ export const moviePrefix = (project: Project): string => `projects/${project.id}
 export function useAct(project: Project): {
   act: (id: string, input: Record<string, unknown>) => Promise<unknown>;
   error: string | null;
+  /** Sends the command that failed again, when the failure was outside Imp. */
+  retry: Retry | null;
 } {
   const imp = useImp();
   const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState<Retry | null>(null);
+  const attempt = async (
+    id: string,
+    input: Record<string, unknown>,
+    again: boolean,
+  ): Promise<unknown> => {
+    // A retry keeps its note up while it tries, so the spinner shows where the person pressed.
+    if (!again) {
+      setError(null);
+      setRetry(null);
+    }
+    try {
+      const output = await runCommand(imp, id, { projectId: project.id, ...input });
+      setError(null);
+      setRetry(null);
+      return output;
+    } catch (reason) {
+      const text = messageOf(reason);
+      setError(text);
+      setRetry(canRetry(reason) ? { text, run: () => attempt(id, input, true) } : null);
+      return undefined;
+    }
+  };
   return {
     error,
-    act: async (id, input) => {
-      setError(null);
-      try {
-        return await runCommand(imp, id, { projectId: project.id, ...input });
-      } catch (reason) {
-        setError(messageOf(reason));
-        return undefined;
-      }
-    },
+    retry,
+    act: (id, input) => attempt(id, input, false),
   };
 }
 
-export function Problem({ text }: { text: string | null }): ReactElement | null {
-  return text === null ? null : (
-    <p className="error" role="alert">
-      {text}
-    </p>
-  );
+/**
+ * A failure shown above a view. When it is the one a retry belongs to, it
+ * comes with a Retry button that sends the same command again.
+ */
+export function Problem({
+  text,
+  retry = null,
+}: {
+  text: string | null;
+  retry?: Retry | null;
+}): ReactElement | null {
+  if (text === null) return null;
+  return <RetryNote text={text} onRetry={retry?.text === text ? retry.run : undefined} />;
 }
 
 /** Shown in place of a stage while no movie project is open. */
@@ -190,7 +216,7 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
   const development = useLive([moviePrefix(project)], async (imp) =>
     Development.parse(await runCommand(imp, 'movie.development.get', { projectId: project.id })),
   );
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   return (
     <>
       <div className="view-head">
@@ -201,7 +227,7 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
           )}
         </span>
       </div>
-      <Problem text={development.error ?? error} />
+      <Problem text={development.error ?? error} retry={retry} />
       {development.data !== undefined && (
         <div className="card stack page">
           {DEVELOPMENT_FIELDS.map(({ key, label, rows, placeholder }) => (
@@ -226,7 +252,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
       await runCommand(imp, 'movie.scene.list', { projectId: project.id, full: true }),
     ),
   );
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const world = useWorld(project);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const scenes = listed.data?.scenes ?? [];
@@ -278,7 +304,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
         </span>
       </div>
       <ScriptFiles project={project} onImported={setSelectedId} />
-      <Problem text={listed.error ?? error} />
+      <Problem text={listed.error ?? error} retry={retry} />
       <div className="chips" role="tablist" aria-label={t('Scenes')}>
         {scenes.map((candidate) => (
           <button
@@ -798,7 +824,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
       await runCommand(imp, 'movie.character.list', { projectId: project.id, full: true }),
     ),
   );
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const images = useModelSetting(IMAGE_MODEL_SETTING, 'image');
   const speech = useModelSetting(SPEECH_MODEL_SETTING, 'speech');
   const characters = listed.data?.characters ?? [];
@@ -837,7 +863,7 @@ export function CastingView({ project }: { project: Project }): ReactElement {
           },
         ]}
       />
-      <Problem text={listed.error ?? error ?? images.error ?? speech.error} />
+      <Problem text={listed.error ?? error ?? images.error ?? speech.error} retry={retry} />
       {listed.data !== undefined && characters.length === 0 && (
         <EmptyState
           icon={UsersThreeIcon}

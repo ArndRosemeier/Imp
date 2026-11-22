@@ -5,6 +5,7 @@ export type { HttpFetch, HttpRequest, HttpResponse } from './http.js';
 export {
   OPENROUTER_ID,
   createOpenRouterProvider,
+  refusalMessage,
   type OpenRouterOptions,
 } from './openrouter/provider.js';
 export {

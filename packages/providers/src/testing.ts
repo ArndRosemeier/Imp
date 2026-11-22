@@ -22,7 +22,7 @@ export interface RecordedHttpCall {
 /** A `fetch` that answers from a queue and records what it was asked. */
 export function createScriptedFetch(
   replies: readonly (
-    | { status: number; body: unknown; contentType?: string }
+    | { status: number; body: unknown; contentType?: string; headers?: Record<string, string> }
     | { status: number; bytes: Uint8Array; contentType: string }
     | Error
   )[],
@@ -45,6 +45,8 @@ export function createScriptedFetch(
       ok: reply.status >= 200 && reply.status < 300,
       status: reply.status,
       contentType: reply.contentType ?? 'application/json',
+      header: (name: string) =>
+        (reply as { headers?: Record<string, string> }).headers?.[name.toLowerCase()] ?? null,
       text: () => Promise.resolve(text),
       bytes: () =>
         Promise.resolve(

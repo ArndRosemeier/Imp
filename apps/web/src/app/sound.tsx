@@ -136,7 +136,7 @@ export function SoundView({ project }: { project: Project }): ReactElement {
   const outline = useLive([`${moviePrefix(project)}scenes/`], async (imp) =>
     Scenes.parse(await runCommand(imp, 'movie.scene.list', { projectId: project.id })),
   );
-  const { act, error } = useAct(project);
+  const { act, error, retry } = useAct(project);
   const effects = useModelSetting(EFFECT_MODEL_SETTING, 'speech');
   const music = useModelSetting(MUSIC_MODEL_SETTING, 'audio');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -183,7 +183,10 @@ export function SoundView({ project }: { project: Project }): ReactElement {
           'Effects are made by speech models, and not every one of them can: a model that cannot reads the description aloud instead.',
         )}
       />
-      <Problem text={outline.error ?? listed.error ?? error ?? effects.error ?? music.error} />
+      <Problem
+        text={outline.error ?? listed.error ?? error ?? effects.error ?? music.error}
+        retry={retry}
+      />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId === undefined ? (
         outline.data !== undefined && (

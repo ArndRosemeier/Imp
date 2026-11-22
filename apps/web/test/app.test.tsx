@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { MemoryKeyValueStore, settingsGet, type JsonValue, type ReleaseNotes } from '@imp/core';
+import { ProviderError } from '@imp/providers';
 import { createFakeProvider } from '@imp/providers/testing';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -526,6 +527,30 @@ describe('App: setup and agents', () => {
     await user.click(screen.getByRole('button', { name: 'Continue where Coordinator stopped' }));
     expect(await screen.findByText('Logline written.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Continue where/ })).toBeNull();
+  });
+
+  it('retries a message that did not reach the model, without sending it twice', async () => {
+    const { provider, user } = start([
+      new ProviderError(
+        'network',
+        'openrouter',
+        'Imp could not reach OpenRouter. Check the internet connection, then try again.',
+      ),
+    ]);
+    await completeSetup(user);
+    await user.type(screen.getByLabelText('Message to Coordinator'), 'Write the logline.');
+    await user.click(screen.getByRole('button', { name: /Send/ }));
+    expect(await screen.findByText('Coordinator did not get your message')).toBeTruthy();
+    expect(screen.getByText(/could not reach OpenRouter/)).toBeTruthy();
+
+    provider.script({ content: 'Logline written.' });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Logline written.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    // The message is in the conversation once, and the model was sent it once more, not twice.
+    expect(screen.getAllByText('Write the logline.')).toHaveLength(1);
+    const retried = provider.requests.at(-1)?.messages ?? [];
+    expect(retried.filter((message) => message.role === 'user')).toHaveLength(1);
   });
 
   it('keeps the conversation across a restart and resumes after an approval', async () => {

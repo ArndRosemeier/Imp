@@ -55,7 +55,63 @@ export interface OpenRouterOptions {
   readonly baseUrl?: string;
   /** Shown on OpenRouter's side as the calling application. */
   readonly appName?: string;
+  /**
+   * How long a chat answer may take before it counts as lost, so that a
+   * connection that hangs ends in an error that can be retried. Five minutes
+   * by default: long answers from thinking models take a few.
+   */
+  readonly chatTimeoutMs?: number;
+  /**
+   * The waits before each automatic retry of a request that failed on the
+   * way (no connection, a dropped connection, OpenRouter busy or failing).
+   * Empty turns automatic retries off. Defaults to 1 s, 3 s and 8 s, each
+   * with a little jitter; OpenRouter's own Retry-After is used when longer.
+   */
+  readonly retryDelaysMs?: readonly number[];
+  /** How a wait is made. Tests replace it so that they need not wait. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
+
+/** The platform's timers. The package compiles without browser or Node type libraries. */
+const timers = globalThis as unknown as {
+  setTimeout(run: () => void, ms: number): unknown;
+  clearTimeout(id: unknown): void;
+};
+
+const DEFAULT_RETRY_DELAYS_MS: readonly number[] = [1000, 3000, 8000];
+/** The longest Retry-After that is waited for. Longer means it is better to tell the person. */
+const MAX_RETRY_AFTER_MS = 20_000;
+const realSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    timers.setTimeout(resolve, ms);
+  });
+
+/**
+ * Which failures a request may be sent again after. A new video job costs
+ * real money, so it is sent again only when OpenRouter answered that it did
+ * not take it (busy or failing); after a lost connection it may have been
+ * started, and the person decides.
+ */
+type RetryPolicy = 'transient' | 'refused-only';
+
+function worthRetrying(error: ProviderError, policy: RetryPolicy): boolean {
+  if (!error.retryable) return false;
+  return policy === 'transient' || error.status !== null;
+}
+
+/** The browser's or Node's own words for a failed connection, kept for finding the cause. */
+function causeText(cause: unknown): string {
+  if (!(cause instanceof Error)) return '';
+  const inner = (cause as { cause?: unknown }).cause;
+  const code =
+    inner instanceof Error ? ((inner as { code?: unknown }).code ?? inner.message) : undefined;
+  const said = [cause.message, typeof code === 'string' ? code : undefined]
+    .filter((part) => part !== undefined && part !== '')
+    .join(': ');
+  return said === '' ? '' : ` (${said})`;
+}
+
+const DEFAULT_CHAT_TIMEOUT_MS = 5 * 60_000;
 
 const KNOWN_MODALITIES: ReadonlySet<string> = new Set(MODALITIES);
 
@@ -215,8 +271,82 @@ function kindForStatus(status: number): ProviderErrorKind {
   if (status === 401 || status === 403) return 'auth';
   if (status === 402) return 'insufficient_credit';
   if (status === 429) return 'rate_limit';
-  if (status >= 500) return 'unavailable';
+  if (status === 408 || status >= 500) return 'unavailable';
   return 'bad_request';
+}
+
+/** The longest stretch of OpenRouter's own words kept in a message. Some are pages of JSON. */
+const DETAIL_CHARS = 240;
+
+function shortDetail(detail: string): string {
+  const flat = detail.replace(/\s+/g, ' ').trim();
+  return flat.length > DETAIL_CHARS ? `${flat.slice(0, DETAIL_CHARS - 1)}…` : flat;
+}
+
+/**
+ * A refusal in words a person can act on: what went wrong and what to do,
+ * with OpenRouter's own reason after it when it gave one.
+ */
+export function refusalMessage(
+  kind: ProviderErrorKind,
+  status: number,
+  detail: string | null,
+): string {
+  const said = detail === null || detail === '' ? null : shortDetail(detail);
+  const because = said === null ? '' : ` OpenRouter said: "${said}"`;
+  switch (kind) {
+    case 'auth':
+      return `OpenRouter did not accept the API key. Check it in Settings.${because}`;
+    case 'insufficient_credit':
+      return `The OpenRouter account has run out of credit. Add credit on openrouter.ai, then try again.${because}`;
+    case 'rate_limit':
+      return `OpenRouter is limiting requests right now. Wait a moment, then try again.${because}`;
+    case 'unavailable':
+      return `OpenRouter or the model had a problem on their side (error ${String(status)}). Try again in a moment, or pick another model.${because}`;
+    default:
+      return `OpenRouter refused the request: ${said ?? `error ${String(status)}`}`;
+  }
+}
+
+/** OpenRouter's Retry-After, in seconds or as a date, as milliseconds from now. */
+function retryAfterMs(value: string | null): number | undefined {
+  if (value === null || value.trim() === '') return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const when = Date.parse(value);
+  return Number.isNaN(when) ? undefined : Math.max(0, when - Date.now());
+}
+
+/** A model that failed after OpenRouter took the request. */
+function upstreamMessage(detail: string): string {
+  return `The model had a problem on its side and gave no answer. Try again in a moment, or pick another model. OpenRouter said: "${shortDetail(detail)}"`;
+}
+
+/** Waits for a request, but not longer than `ms`: a hung connection becomes an error. */
+async function withinTime<T>(work: Promise<T>, ms: number): Promise<T> {
+  const minutes = Math.round(ms / 60_000);
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  const span =
+    minutes >= 1
+      ? `${String(minutes)} minute${minutes === 1 ? '' : 's'}`
+      : `${String(seconds)} second${seconds === 1 ? '' : 's'}`;
+  let timer: unknown;
+  const late = new Promise<never>((_, reject) => {
+    timer = timers.setTimeout(() => {
+      reject(
+        new ProviderError(
+          'network',
+          OPENROUTER_ID,
+          `The model did not answer within ${span}. The connection may have dropped. Try again.`,
+        ),
+      );
+    }, ms);
+  });
+  try {
+    return await Promise.race([work, late]);
+  } finally {
+    timers.clearTimeout(timer);
+  }
 }
 
 /** Talks to OpenRouter's HTTP API. Holds no state besides its options. */
@@ -238,7 +368,40 @@ function audioTypeOf(bytes: Uint8Array): string | undefined {
 export function createOpenRouterProvider(options: OpenRouterOptions): GenerationProvider {
   const baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
 
-  async function send(
+  /**
+   * Sends a request, and sends it again after a short wait when it failed on
+   * the way. Most "could not reach" failures are a connection that the
+   * browser kept open and the network had quietly dropped; the next request
+   * opens a new one and goes through.
+   */
+  async function send(...args: Parameters<typeof sendOnce>): ReturnType<typeof sendOnce> {
+    const [path, method, , call] = args;
+    const policy: RetryPolicy =
+      method === 'POST' && path === '/videos' ? 'refused-only' : 'transient';
+    const delays = options.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
+    const sleep = options.sleep ?? realSleep;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await sendOnce(...args);
+      } catch (error) {
+        const delay = delays[attempt];
+        if (
+          delay === undefined ||
+          !(error instanceof ProviderError) ||
+          !worthRetrying(error, policy) ||
+          call.signal?.aborted === true
+        ) {
+          throw error;
+        }
+        const asked = (error as { retryAfterMs?: number }).retryAfterMs;
+        if (asked !== undefined && asked > MAX_RETRY_AFTER_MS) throw error;
+        const jitter = Math.round(delay * 0.2 * Math.random());
+        await sleep(Math.max(delay + jitter, asked ?? 0));
+      }
+    }
+  }
+
+  async function sendOnce(
     path: string,
     method: 'GET' | 'POST',
     body: unknown,
@@ -272,6 +435,15 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         ...(call.signal === undefined ? {} : { signal: call.signal }),
       });
+    } catch (cause) {
+      throw new ProviderError(
+        'network',
+        OPENROUTER_ID,
+        `Imp could not reach OpenRouter. Check the internet connection, then try again.${causeText(cause)}`,
+        { cause },
+      );
+    }
+    try {
       // A refusal is JSON even where the answer is binary.
       if (binary && response.ok) {
         bytes = await response.bytes();
@@ -280,7 +452,12 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         text = await response.text();
       }
     } catch (cause) {
-      throw new ProviderError('network', OPENROUTER_ID, 'Could not reach OpenRouter.', { cause });
+      throw new ProviderError(
+        'network',
+        OPENROUTER_ID,
+        `The connection to OpenRouter dropped while the answer was coming in. Try again.${causeText(cause)}`,
+        { cause },
+      );
     }
 
     let json: unknown;
@@ -292,13 +469,27 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
 
     if (!response.ok) {
       const parsed = ErrorResponse.safeParse(json);
-      const detail = parsed.success ? parsed.data.error.message : `HTTP ${String(response.status)}`;
-      throw new ProviderError(
-        kindForStatus(response.status),
+      const kind = kindForStatus(response.status);
+      const refused = new ProviderError(
+        kind,
         OPENROUTER_ID,
-        `OpenRouter refused the request: ${detail}`,
+        refusalMessage(kind, response.status, parsed.success ? parsed.data.error.message : null),
         { status: response.status },
       );
+      const after = retryAfterMs(response.header?.('retry-after') ?? null);
+      throw after === undefined ? refused : Object.assign(refused, { retryAfterMs: after });
+    }
+    // A chat model that fails after OpenRouter took the request is answered with an error
+    // under 200. It is as passing as a busy server, so it is sent again in the same way.
+    if (path === '/chat/completions' && !binary) {
+      const failed = ErrorResponse.safeParse(json);
+      if (failed.success && !(typeof json === 'object' && json !== null && 'choices' in json)) {
+        throw new ProviderError(
+          'unavailable',
+          OPENROUTER_ID,
+          upstreamMessage(failed.data.error.message),
+        );
+      }
     }
     return { json, text, bytes, contentType: response.contentType };
   }
@@ -386,7 +577,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         throw new ProviderError(
           'unavailable',
           OPENROUTER_ID,
-          `OpenRouter reported an error: ${failure.data.error.message}`,
+          upstreamMessage(failure.data.error.message),
         );
       }
       const chunk = AudioStreamChunk.safeParse(json);
@@ -430,7 +621,7 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         error.success ? 'unavailable' : 'invalid_response',
         OPENROUTER_ID,
         error.success
-          ? `OpenRouter reported an error: ${error.data.error.message}`
+          ? upstreamMessage(error.data.error.message)
           : `OpenRouter returned ${what} in an unexpected shape.`,
         { cause: parsed.error },
       );
@@ -480,7 +671,10 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
         ...(request.maxOutputTokens === undefined ? {} : { max_tokens: request.maxOutputTokens }),
       };
-      const json = await sendJson('/chat/completions', 'POST', body, call, true);
+      const json = await withinTime(
+        sendJson('/chat/completions', 'POST', body, call, true),
+        options.chatTimeoutMs ?? DEFAULT_CHAT_TIMEOUT_MS,
+      );
       const completion = parse(ChatCompletionResponse, json, 'a chat completion');
       const choice = completion.choices[0];
       if (choice === undefined) {
