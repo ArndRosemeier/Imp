@@ -28,6 +28,7 @@ import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
 import { movieProjectSupport } from './project.js';
 import { createCharacterVoiceCommands } from './voice.js';
+import { movieWork } from './work.js';
 
 const SCOPE = {
   prefixes: ['movie.', 'world.', 'library.', 'project.list', 'project.resources.', 'media.'],
@@ -379,6 +380,7 @@ export function createMovieMode(options: {
     ],
     project: movieProjectSupport,
     library: [movieLibrarySource],
+    work: movieWork,
     // The pictures of the world are drawn in the film's tone.
     visualStyle: async (store, projectId) => {
       const stored = await store.get(movieDevelopmentKey(projectId));

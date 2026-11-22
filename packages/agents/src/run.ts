@@ -86,7 +86,23 @@ export interface AgentRunOptions {
   readonly onProgress?: (messages: readonly ChatMessage[]) => Promise<void>;
   /** Where the media that commands show the agent is read from. Without it, nothing is shown. */
   readonly blobs?: BlobStore;
+  /**
+   * Called before each model call and before each command the agent runs, so
+   * that what it is doing right now can be shown while it works.
+   */
+  readonly onStep?: (step: AgentStep) => Promise<void>;
 }
+
+/** What a working agent is doing at this moment, with what the run has cost so far. */
+export type AgentStep =
+  | { readonly kind: 'thinking'; readonly steps: number; readonly costUsd: number }
+  | {
+      readonly kind: 'command';
+      readonly commandId: string;
+      readonly input: unknown;
+      readonly steps: number;
+      readonly costUsd: number;
+    };
 
 const DEFAULT_MAX_STEPS = 20;
 /** Tool results longer than this are not carried into the next run. */
@@ -249,6 +265,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     if (!registry.has(commandId) || !isInScope(registry.get(commandId), role.scope)) {
       return JSON.stringify({ error: `"${commandId}" is not a command you can run.` });
     }
+    await options.onStep?.({ kind: 'command', commandId, input, steps, costUsd });
     try {
       const result = await registry.executeById(commandId, input, { actor });
       if (result.status === 'needs-approval') {
@@ -305,6 +322,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     }
 
     steps += 1;
+    await options.onStep?.({ kind: 'thinking', steps, costUsd });
     let response;
     try {
       response = await provider.chat(
