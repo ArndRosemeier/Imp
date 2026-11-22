@@ -39,6 +39,7 @@ import { BackupWatcher } from './backup.js';
 import { CopyQuestions, ProjectsView } from './projects.js';
 import { LibraryDragProvider } from './library/drag.js';
 import { LibraryPanel } from './library/LibraryPanel.js';
+import { FilmNotices, SHOW_FILMS } from './films.js';
 import { SpendTotal } from './spend.js';
 import { STAGE_ICONS } from './stage-icons.js';
 import { t, tx } from '../i18n/i18n.js';
@@ -229,6 +230,18 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     window.addEventListener(TALK_TO, onTalk);
     return () => {
       window.removeEventListener(TALK_TO, onTalk);
+    };
+  });
+
+  // A film's Watch button or a chat card opens the library on its Films shelf, on a stage.
+  useEffect(() => {
+    const onShowFilms = (): void => {
+      openLibrary(true);
+      if (view === 'projects') setView(stages[0]?.id ?? 'crew');
+    };
+    window.addEventListener(SHOW_FILMS, onShowFilms);
+    return () => {
+      window.removeEventListener(SHOW_FILMS, onShowFilms);
     };
   });
 
@@ -493,6 +506,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
           )}
           <ActivityStrip />
           <BackupWatcher />
+          <FilmNotices projectId={project?.mode === 'movie' ? project.id : null} />
           <Resizer label={t('Resize the navigation')} side="left" width={navWidth} />
           {crewOpen && (
             <Resizer

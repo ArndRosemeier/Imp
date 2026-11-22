@@ -6,6 +6,7 @@ import {
   type CrewMember,
 } from '@imp/agents';
 import { fromToolName, READY_REPORT_KEY, ReadyReport } from '@imp/core';
+import type { FilmExport } from '@imp/mode-movie';
 import {
   BroomIcon,
   BugIcon,
@@ -20,6 +21,7 @@ import {
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
@@ -28,6 +30,8 @@ import {
 } from 'react';
 import { z } from 'zod';
 import { setAttachment, useAttachment } from './attachment.js';
+import { FilmCard, showFilms, useFilms } from './films.js';
+import { filmCardPlaces } from './film-mentions.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { ASK_COORDINATOR } from './help/help.js';
 import {
@@ -145,6 +149,27 @@ export function CrewPanel({
 
   const conversation = live.data;
   const messages = conversation?.messages ?? [];
+  // A film an agent made gets a card to play and save it, under the reply that names it.
+  const films = useFilms(shownProject)?.exports;
+  const filmPlaces = useMemo(() => {
+    const said = conversation?.messages ?? [];
+    if (films === undefined || films.length === 0) return new Map<number, FilmExport[]>();
+    const results = new Map<string, string>();
+    for (const message of said) {
+      if (message.role === 'tool') results.set(message.toolCallId, message.content);
+    }
+    return filmCardPlaces(
+      said.map((message) =>
+        message.role !== 'assistant'
+          ? ''
+          : [
+              message.content ?? '',
+              ...(message.toolCalls ?? []).map((call) => results.get(call.id) ?? ''),
+            ].join('\n'),
+      ),
+      films,
+    );
+  }, [conversation?.messages, films]);
   const approvals = conversation?.pendingApprovals ?? [];
   const everyone = useWaitingApprovals().data ?? [];
   const elsewhere = everyone.filter((item) => item.memberId !== member.id).length;
@@ -430,6 +455,20 @@ export function CrewPanel({
                     </div>
                   );
                 })}
+                {shownProject !== null &&
+                  filmPlaces.get(index)?.map((film) => (
+                    <FilmCard key={film.id} projectId={shownProject} film={film}>
+                      <button
+                        type="button"
+                        className="button quiet small"
+                        onClick={() => {
+                          showFilms(film.id);
+                        }}
+                      >
+                        {t('In the Library')}
+                      </button>
+                    </FilmCard>
+                  ))}
               </div>
             );
           }

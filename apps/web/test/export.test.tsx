@@ -86,7 +86,7 @@ describe('exporting from the Edit screen', () => {
     });
     stepped.release();
     expect(await screen.findByText('Storm-film.mp4')).toBeTruthy();
-    expect(screen.getByText(/1920×1080 24 fps/)).toBeTruthy();
+    expect(screen.getByText(/by you · 0:03 · 1920×1080 24 fps/)).toBeTruthy();
 
     const saved: Blob[] = [];
     URL.createObjectURL = (blob: Blob | MediaSource) => {
@@ -97,7 +97,7 @@ describe('exporting from the Edit screen', () => {
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => undefined);
-    await user.click(screen.getByRole('button', { name: /Download/ }));
+    await user.click(screen.getByRole('button', { name: /Save as/ }));
     await vi.waitFor(() => {
       expect(saved).toHaveLength(1);
     });

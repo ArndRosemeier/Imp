@@ -1,6 +1,7 @@
 // Shared set-up for the App workflow tests. They are split over several files so
 // that the test runner can walk them in parallel.
 import { MemoryKeyValueStore, type ReleaseNotes } from '@imp/core';
+import type { FilmRenderer } from '@imp/mode-movie';
 import type { ModelInfo } from '@imp/providers';
 import { createFakeProvider, type ScriptedChatReply } from '@imp/providers/testing';
 import { cleanup, render, screen } from '@testing-library/react';
@@ -34,7 +35,11 @@ export interface Started {
   readonly user: ReturnType<typeof userEvent.setup>;
 }
 
-export function start(replies: readonly ScriptedChatReply[] = [], release?: ReleaseNotes): Started {
+export function start(
+  replies: readonly ScriptedChatReply[] = [],
+  release?: ReleaseNotes,
+  filmRenderer?: FilmRenderer,
+): Started {
   const provider = createFakeProvider({
     replies,
     models: [
@@ -52,6 +57,7 @@ export function start(replies: readonly ScriptedChatReply[] = [], release?: Rele
     secrets: createLocalSecretStore(),
     provider,
     ...(release === undefined ? {} : { release }),
+    ...(filmRenderer === undefined ? {} : { filmRenderer }),
   });
   render(<App imp={connect(imp)} />);
   return { imp, provider, user: userEvent.setup() };

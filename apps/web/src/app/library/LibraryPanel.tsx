@@ -8,6 +8,7 @@ import {
   CopyIcon,
   DotsSixVerticalIcon,
   FileTextIcon,
+  FilmReelIcon,
   FilmStripIcon,
   HandGrabbingIcon,
   ImageIcon,
@@ -40,6 +41,7 @@ import { useBlobUrl } from '../movie.js';
 import { actionsFor } from './actions.js';
 import { CrewShelf, useSavedCrewCount } from './crews.js';
 import { MixShelf } from './mixes.js';
+import { FilmShelf, SHOW_FILMS, takeFilmsRequest, useFilmCount } from '../films.js';
 import { useModelMixes } from '../model-bar.js';
 import { useDragSource, useLibraryDrag } from './drag.js';
 import { formatDuration, Listing, openWhereMade, type Asset } from './model.js';
@@ -644,8 +646,15 @@ export function LibraryPanel({
   const [debounced, setDebounced] = useState('');
   const [modality, setModality] = useState<string | null>(null);
   // The Crews and Mixes tabs show saved crews or model mixes in place of assets.
-  const [shelf, setShelf] = useState<'crews' | 'mixes' | null>(null);
+  // A request for the Films shelf (from a notice or a chat card) may have opened the library.
+  const [opening] = useState(takeFilmsRequest);
+  const [shelf, setShelf] = useState<'crews' | 'mixes' | 'films' | null>(
+    opening === null ? null : 'films',
+  );
+  const [playingFilm, setPlayingFilm] = useState<string | null>(opening?.filmId ?? null);
   const crews = shelf !== null;
+  const movie = project.mode === 'movie';
+  const filmCount = useFilmCount(movie ? project.id : null);
   const crewCount = useSavedCrewCount();
   const mixCount = useModelMixes().data?.mixes.length;
   const [kind, setKind] = useState<string | null>(null);
@@ -657,6 +666,20 @@ export function LibraryPanel({
   const [error, setError] = useState<string | null>(null);
   const [fileOver, setFileOver] = useState(false);
   const preview = usePreview();
+
+  useEffect(() => {
+    const onShow = (): void => {
+      const request = takeFilmsRequest();
+      if (request === null) return;
+      setShelf('films');
+      setSelectedId(null);
+      setPlayingFilm(request.filmId);
+    };
+    window.addEventListener(SHOW_FILMS, onShow);
+    return () => {
+      window.removeEventListener(SHOW_FILMS, onShow);
+    };
+  }, []);
 
   // A finished import says so for a moment; errors stay until dismissed.
   useEffect(() => {
@@ -864,11 +887,13 @@ export function LibraryPanel({
               type="search"
               className="input"
               placeholder={
-                shelf === 'crews'
-                  ? t('Search saved crews')
-                  : shelf === 'mixes'
-                    ? t('Search model mixes')
-                    : t('Search names, words, tags')
+                shelf === 'films'
+                  ? t('Search films')
+                  : shelf === 'crews'
+                    ? t('Search saved crews')
+                    : shelf === 'mixes'
+                      ? t('Search model mixes')
+                      : t('Search names, words, tags')
               }
               value={query}
               onChange={(event) => {
@@ -914,6 +939,24 @@ export function LibraryPanel({
                 </button>
               );
             })}
+            {movie && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={shelf === 'films'}
+                aria-label={t('Films, {value}', { value: String(filmCount ?? 0) })}
+                title={t('Rendered films')}
+                className="library-modality"
+                onClick={() => {
+                  setShelf('films');
+                  setPlayingFilm(null);
+                }}
+              >
+                <FilmReelIcon aria-hidden="true" />
+                <span className="label">{t('Films')}</span>
+                <span className="count">{filmCount ?? 0}</span>
+              </button>
+            )}
             <button
               type="button"
               role="tab"
@@ -945,7 +988,9 @@ export function LibraryPanel({
               <span className="count">{mixCount ?? 0}</span>
             </button>
           </div>
-          {shelf === 'mixes' ? (
+          {shelf === 'films' ? (
+            <FilmShelf projectId={project.id} query={debounced} playing={playingFilm} />
+          ) : shelf === 'mixes' ? (
             <MixShelf
               query={debounced}
               onStatus={(message, failed = false) => {

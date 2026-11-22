@@ -666,8 +666,6 @@ export const de: Readonly<Record<string, string>> = {
   'Films are rendered to MP4 in the background, faster than real time. You can keep working or switch tabs while it runs, and the Film Editor can export too.':
     'Filme werden im Hintergrund als MP4 gerendert, schneller als in Echtzeit. Du kannst währenddessen weiterarbeiten oder den Tab wechseln, und der Cutter kann ebenfalls exportieren.',
   'Rendered films': 'Gerenderte Filme',
-  '{durationSeconds} · {width}×{height} {fps} fps · {sizeBytes}':
-    '{durationSeconds} · {width}×{height} {fps} fps · {sizeBytes}',
   Cancelled: 'Abgebrochen',
   'Failed: {error}': 'Fehlgeschlagen: {error}',
   '{count} item not ready.': '{count} Stück nicht fertig.',
@@ -684,6 +682,26 @@ export const de: Readonly<Record<string, string>> = {
     'Dieser Browser kann kein Video aufnehmen. Versuch es mit einem aktuellen Chrome, Edge oder Safari.',
   'Films cannot be rendered in the background here, so the cut is played through once in real time and recorded as {value}. Keep this tab visible until it finishes.':
     'Filme können hier nicht im Hintergrund gerendert werden. Deshalb wird der Schnitt einmal in Echtzeit abgespielt und als {value} aufgenommen. Lass diesen Tab sichtbar, bis er fertig ist.',
+  'All films in the Library': 'Alle Filme in der Bibliothek',
+  // app/films.tsx
+  'by you': 'von dir',
+  'Rendering · {done} of {length}': 'Wird gerendert · {done} von {length}',
+  '{when} · {who} · {length} · {width}×{height} {fps} fps · {size}':
+    '{when} · {who} · {length} · {width}×{height} {fps} fps · {size}',
+  'Save as…': 'Speichern unter …',
+  'Delete this film?': 'Diesen Film löschen?',
+  'Leaves out changes proposed for {count} scene that were not kept yet.':
+    'Ohne die vorgeschlagenen Änderungen an {count} Szene, die noch nicht übernommen sind.',
+  'Leaves out changes proposed for {count} scenes that were not kept yet.':
+    'Ohne die vorgeschlagenen Änderungen an {count} Szenen, die noch nicht übernommen sind.',
+  'No films yet. Export one from the Edit stage, or ask the coordinator or the Film Editor to make one. Every film made lands here.':
+    'Noch keine Filme. Exportiere einen im Schnitt, oder bitte den Koordinator oder den Cutter darum. Jeder fertige Film landet hier.',
+  Films: 'Filme',
+  'Films, {value}': 'Filme, {value}',
+  'Search films': 'Filme durchsuchen',
+  'In the Library': 'In der Bibliothek',
+  '{name} finished a film': '{name} hat einen Film fertig',
+  '{name} could not finish a film': '{name} konnte einen Film nicht fertigstellen',
   // app/FfmpegOffer.tsx
   'ffmpeg is installed on this computer, so films render in the background and clip sound can be heard.':
     'ffmpeg ist auf diesem Computer installiert: Filme werden im Hintergrund gerendert, und der Ton in Clips ist zu hören.',

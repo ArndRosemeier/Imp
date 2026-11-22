@@ -234,7 +234,11 @@ The **Film Editor** can cut too. Its changes arrive as a **proposal**, like trac
 
 ## Export
 
-Export renders the scene or the whole film as an MP4 file, faster than real time: in the browser, or with ffmpeg on the local server, where Imp offers to download ffmpeg if it is missing.`,
+Export renders the scene or the whole film as an MP4 file, faster than real time: in the browser, or with ffmpeg on the local server, where Imp offers to download ffmpeg if it is missing.
+
+## Where films end up
+
+Every finished film is kept in the project. Find them all in the **Library** under **Films**, and the latest in the **Export** panel. Each shows when it was made, by whom and how long it runs, with **Play** and **Save as…**, which asks where to save the MP4. When an agent finishes a film, a notice with **Watch** appears, and its reply in the chat carries the same card.`,
 };
 
 export const audioGuide: GuideTopic = {
