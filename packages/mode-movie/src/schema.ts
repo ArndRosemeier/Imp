@@ -21,7 +21,11 @@ export const Scene = z.object({
   position: z.number().int().positive(),
   heading: z.string().describe('The slug line, for example "INT. LIGHTHOUSE, LAMP ROOM - NIGHT".'),
   summary: z.string().describe('What happens in the scene, in a sentence or two.'),
-  body: z.string().describe('The scene in screenplay form: action lines and dialogue.'),
+  body: z
+    .string()
+    .describe(
+      'The scene in Fountain screenplay form, without its heading: action paragraphs, a CHARACTER name in capitals on its own line above their dialogue, (how it is said) in brackets on its own line, TRANSITIONS TO:.',
+    ),
   locationId: z
     .string()
     .nullable()

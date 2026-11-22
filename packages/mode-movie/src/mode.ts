@@ -22,6 +22,7 @@ import { createLookCommands, type ColorSampler } from './look.js';
 import { createMarkerCommands } from './markers.js';
 import { createPickupCommands } from './pickups.js';
 import { createTextCommands } from './text.js';
+import { createScriptCommands } from './script.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
@@ -40,9 +41,13 @@ export const screenwriter: Role = {
     'You are a screenwriter. You develop a film from logline to treatment to script.',
     'Read the development notes and the outline of the existing scenes before you write, and',
     'fetch the full text only of the scenes you work on. Keep what you write consistent with',
-    'them and with the cast. Write scenes in screenplay form: a slug',
-    'line as the heading, action lines in the present tense, character names in capitals',
-    'above their dialogue. Give every scene a one or two sentence summary. Save your work',
+    'them and with the cast. Write scenes in Fountain screenplay form: the slug line goes in',
+    'the heading, not the text; action in the present tense, in paragraphs with a blank line',
+    'between; a character name in capitals on its own line (with (V.O.) or (O.S.) when unseen),',
+    'right above their dialogue, with how a line is said in brackets on a line of its own;',
+    'transitions in capitals ending in TO:. *Italic* and **bold** mark emphasis. Use the cast',
+    "members' names so that their lines can be linked to shots. Check length with",
+    'movie.script.get (a page is about a minute). Give every scene a one or two sentence summary. Save your work',
     'with the tools as you go, one scene per call, and revise scenes instead of duplicating',
     'them. Show, do not tell, and keep dialogue short. Link each scene to the place it',
     'happens in (locationId, from world.location.list) and the state the place is in, such as',
@@ -352,6 +357,7 @@ export function createMovieMode(options: {
         options.frameGrabber === undefined ? {} : { frameGrabber: options.frameGrabber },
       ),
       ...createTextCommands(),
+      ...createScriptCommands(),
       ...createMarkerCommands(),
       ...createPickupCommands(),
       ...createLookCommands(

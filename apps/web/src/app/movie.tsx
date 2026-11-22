@@ -24,8 +24,34 @@ import { ScenePlace, useWorld } from './place.js';
 import { useLibraryDrop } from './library/drag.js';
 import { ModelBar } from './model-bar.js';
 import { Price } from './spend.js';
+import { SceneScript, ScriptFiles } from './screenplay.js';
 
 const SceneList = z.object({ scenes: z.array(Scene) });
+const ScriptLength = z.object({ pages: z.number(), minutes: z.number() });
+const ShotNumbers = z.object({
+  shots: z.array(z.object({ id: z.string(), position: z.number() })),
+});
+
+/** Pages as scripts count them: in eighths, "1 4/8 pages". */
+export function pagesText(pages: number): string {
+  const eighths = Math.max(1, Math.round(pages * 8));
+  const whole = Math.floor(eighths / 8);
+  const rest = eighths % 8;
+  const words =
+    whole === 0
+      ? `${String(rest)}/8`
+      : rest === 0
+        ? String(whole)
+        : `${String(whole)} ${String(rest)}/8`;
+  return `${words} ${eighths === 8 ? 'page' : 'pages'}`;
+}
+
+/** A running time in whole minutes, or under a minute. */
+export function minutesText(minutes: number): string {
+  if (minutes < 1) return 'under a minute';
+  const whole = Math.round(minutes);
+  return whole === 1 ? '1 minute' : `${String(whole)} minutes`;
+}
 const CharacterList = z.object({ characters: z.array(Character) });
 
 export const moviePrefix = (project: Project): string => `projects/${project.id}/movie/`;
@@ -170,6 +196,28 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const scenes = listed.data?.scenes ?? [];
   const scene = scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0];
+  const sceneId = scene?.id;
+  const extra = useLive(
+    [moviePrefix(project), `${moviePrefix(project)}scenes/${sceneId ?? ''}`],
+    async (imp) => ({
+      length: ScriptLength.parse(
+        await runCommand(imp, 'movie.script.get', { projectId: project.id }),
+      ),
+      cast: CharacterList.parse(
+        await runCommand(imp, 'movie.character.list', { projectId: project.id, full: true }),
+      ).characters.map((character) => character.name),
+      shots:
+        sceneId === undefined
+          ? []
+          : ShotNumbers.parse(
+              await runCommand(imp, 'movie.shot.list', { projectId: project.id, sceneId }),
+            ).shots,
+    }),
+  );
+  const shotNumbers = new Map(
+    (extra.data?.shots ?? []).map((shot) => [shot.id, shot.position] as const),
+  );
+  const length = extra.data?.length;
 
   const add = (): void => {
     void act('movie.scene.create', { heading: '' }).then((created) => {
@@ -183,8 +231,15 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
         <h1>Script</h1>
         <span className="muted">
           {scenes.length === 1 ? '1 scene' : `${String(scenes.length)} scenes`}
+          {length !== undefined && length.pages > 0 && (
+            <>
+              {' · '}
+              {pagesText(length.pages)} · about {minutesText(length.minutes)}
+            </>
+          )}
         </span>
       </div>
+      <ScriptFiles project={project} onImported={setSelectedId} />
       <Problem text={listed.error ?? error} />
       <div className="chips" role="tablist" aria-label="Scenes">
         {scenes.map((candidate) => (
@@ -224,6 +279,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             label="Scene heading"
             hideLabel
             script
+            heading
             value={scene.heading}
             placeholder="INT. LOCATION - TIME"
             onCommit={(heading) => act('movie.scene.update', { sceneId: scene.id, heading })}
@@ -241,13 +297,14 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             placeholder="What happens in this scene, in a sentence or two."
             onCommit={(summary) => act('movie.scene.update', { sceneId: scene.id, summary })}
           />
-          <EditableField
-            label="Scene text"
-            script
-            rows={16}
-            value={scene.body}
-            placeholder="Action lines and dialogue."
-            onCommit={(body) => act('movie.scene.update', { sceneId: scene.id, body })}
+          <SceneScript
+            project={project}
+            sceneId={scene.id}
+            heading={scene.heading}
+            body={scene.body}
+            cast={extra.data?.cast ?? []}
+            shotNumbers={shotNumbers}
+            act={act}
           />
           <div className="row spread wrap">
             <div className="row">

@@ -649,7 +649,7 @@ dialog.palette::backdrop {
 .input.script {
   font: 15px/1.6 var(--font-script);
 }
-input.input.script {
+input.input.script.heading {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -5918,4 +5918,198 @@ dialog.spend-dialog {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* The script as a screenplay page: Courier, 60 letters to the line, parts indented as scripts are. */
+.script-files {
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+.scene-script {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  container-type: inline-size;
+}
+.scene-script .segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+}
+.scene-script-body {
+  display: grid;
+  gap: var(--space-3);
+}
+@container (min-width: 900px) {
+  .scene-script-body.writing {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .scene-script-body.writing .screenplay {
+    position: sticky;
+    top: var(--space-3);
+  }
+}
+.screenplay {
+  container-type: inline-size;
+  cursor: text;
+}
+.screenplay-page {
+  /* 60 letters of action plus margins fill the page at any width. */
+  font-family: var(--font-script);
+  font-size: clamp(11px, 2.05cqi, 17px);
+  line-height: 1.25;
+  width: 100%;
+  max-width: 80ch;
+  margin: 0 auto;
+  padding: 3.5em 8ch 4em 11ch;
+  background: color-mix(in srgb, var(--surface-raised) 70%, var(--ground));
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.03) inset,
+    0 12px 32px rgb(0 0 0 / 0.25);
+  color: var(--ink);
+  min-height: 24em;
+}
+.sp {
+  margin: 0;
+  white-space: pre-wrap;
+  max-width: 60ch;
+  position: relative;
+}
+.sp + .sp {
+  margin-top: 1.25em;
+}
+.sp-heading {
+  font-weight: 700;
+}
+.sp + .sp-heading {
+  margin-top: 2.5em;
+}
+.sp-character {
+  margin-left: 22ch;
+  max-width: 38ch;
+}
+.sp-character + .sp,
+.sp-parenthetical + .sp-dialogue,
+.sp-dialogue + .sp-parenthetical,
+.sp-dialogue + .sp-dialogue,
+.sp-parenthetical + .sp-parenthetical {
+  margin-top: 0;
+}
+.sp-parenthetical {
+  margin-left: 16ch;
+  max-width: 25ch;
+}
+.sp-dialogue,
+.sp-lyric {
+  margin-left: 10ch;
+  max-width: 35ch;
+}
+.sp-lyric {
+  font-style: italic;
+}
+.sp-transition {
+  text-align: right;
+}
+.sp-centered {
+  text-align: center;
+}
+.sp-section,
+.sp-synopsis,
+.sp-note {
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 0.85em;
+}
+.sp-synopsis {
+  font-style: italic;
+}
+.sp-note {
+  border-left: 2px solid var(--accent);
+  padding-left: 1ch;
+}
+.sp-empty {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.sp-break {
+  border: none;
+  border-top: 1px dashed var(--line-strong);
+  margin: 2em -4ch;
+}
+.sp-shots {
+  position: absolute;
+  left: calc(100% + 2ch);
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-family: var(--font-body);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sp-shots.none {
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px dashed var(--line-strong);
+}
+.screenplay-writer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.sp-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.sp-tool {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.sp-tool[aria-pressed='true'] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.sp-name {
+  font-family: var(--font-script);
+  letter-spacing: 0.02em;
+}
+.sp-text {
+  min-height: 24em;
+  line-height: 1.45;
+  tab-size: 4;
+}
+.unscripted {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.unscripted h3 {
+  margin: 0 0 var(--space-1);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.unscripted ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+@media (pointer: coarse) {
+  .sp-tool,
+  .scene-script .segmented button {
+    min-height: var(--hit);
+  }
 }

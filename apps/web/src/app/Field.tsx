@@ -13,6 +13,7 @@ export function EditableField({
   rows,
   placeholder,
   script = false,
+  heading = false,
   hideLabel = false,
 }: {
   label: string;
@@ -23,6 +24,8 @@ export function EditableField({
   placeholder?: string;
   /** Set in the screenplay typeface. */
   script?: boolean;
+  /** A scene heading: in capitals, as screenplays set them. */
+  heading?: boolean;
   hideLabel?: boolean;
 }): ReactElement {
   const id = useId();
@@ -36,7 +39,7 @@ export function EditableField({
 
   const shared = {
     id,
-    className: script ? 'input script' : 'input',
+    className: `input${script ? ' script' : ''}${heading ? ' heading' : ''}`,
     value: draft,
     placeholder,
     onChange: (event: { target: { value: string } }): void => {

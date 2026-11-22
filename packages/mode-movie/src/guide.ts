@@ -42,7 +42,25 @@ export const scriptGuide: GuideTopic = {
     title: 'Break the story into scenes',
     body: 'Each scene gets a place, a time of day, what happens and the lines. Ask the Screenwriter to draft them from Development, then rewrite whatever you like.',
   },
-  body: `The Script stage holds the film's **scenes** in order. Each scene has a heading (place and time of day), a summary of what happens, the screenplay with action and dialogue, and optionally the location from Design where it happens.
+  body: `The Script stage holds the film's **scenes** in order. Each scene has a heading (place and time of day), a summary of what happens, the screenplay with action and dialogue, and optionally the location from Design where it happens. The header shows how long the script runs: a page is about a minute of film.
+
+## Writing a scene
+
+Scenes are written in **Fountain**, the plain-text screenplay format that screenwriting apps use, and shown as a proper screenplay page. Switch between **Page** and **Write** above the scene.
+
+- A character's name in capitals on its own line speaks the lines under it. Add (V.O.) or (O.S.) when they are not seen.
+- How a line is said goes in brackets on its own line: (whispering).
+- Transitions are in capitals and end in TO:, like CUT TO:.
+- *Italic* and **bold** mark emphasis.
+- In Write, **Tab** turns the line into the next part (action, character, direction, dialogue, transition) and Shift+Tab goes back. The buttons above the text do the same on a tablet, and the cast's names are one tap away.
+
+## Script and shots
+
+On the page, each line of dialogue shows the shot that speaks it, or "no shot". In Shots, **From the script** fills a shot's line, speaker and delivery from the script. Lines spoken in shots that are not in the script are listed under the scene, ready to add.
+
+## Files
+
+**Import** brings in a Fountain or Final Draft (.fdx) script as new scenes. **Download** writes the script as a PDF in the standard screenplay layout, as Fountain or as Final Draft.
 
 ## What to do here
 
@@ -205,6 +223,8 @@ export const editGuide: GuideTopic = {
 
 - Drag sounds from the Sound stage or the library onto the audio lane.
 - The text lane holds titles, lower thirds, captions, subtitles and credits.
+- Select a text to style single words (bold, italic, underline, a colour, smaller or bigger) and to drag it on the picture. It snaps to the centre and to the safe area, and turns red where some screens could cut it off.
+- Subtitles that are too fast to read are marked on the lane.
 
 ## Working with the Film Editor
 
