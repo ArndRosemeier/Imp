@@ -5,6 +5,16 @@ import { createCharacterImageCommands } from './images.js';
 import { Development, MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
+import {
+  audioGuide,
+  castingGuide,
+  designGuide,
+  developmentGuide,
+  editGuide,
+  scriptGuide,
+  shotsGuide,
+  soundGuide,
+} from './guide.js';
 import { createDefaultAudioCodec } from '@imp/audio';
 import { createFilmExportCommands, type FilmExportOptions } from './film.js';
 import { createReviewCommands, type FrameGrabber } from './edit-review.js';
@@ -320,14 +330,14 @@ export function createMovieMode(options: {
     summary:
       'Develop an idea, write the script, cast the characters, design the places and objects, shoot the clips and make the sound.',
     stages: [
-      { id: 'development', name: 'Development' },
-      { id: 'script', name: 'Script' },
-      { id: 'casting', name: 'Casting' },
-      { id: 'design', name: 'Design' },
-      { id: 'shots', name: 'Shots' },
-      { id: 'sound', name: 'Sound' },
-      { id: 'edit', name: 'Edit' },
-      { id: 'audio', name: 'Audio' },
+      { id: 'development', name: 'Development', guide: developmentGuide },
+      { id: 'script', name: 'Script', guide: scriptGuide },
+      { id: 'casting', name: 'Casting', guide: castingGuide },
+      { id: 'design', name: 'Design', guide: designGuide },
+      { id: 'shots', name: 'Shots', guide: shotsGuide },
+      { id: 'sound', name: 'Sound', guide: soundGuide },
+      { id: 'edit', name: 'Edit', guide: editGuide },
+      { id: 'audio', name: 'Audio', guide: audioGuide },
     ],
     commands: [
       ...movieCommands,

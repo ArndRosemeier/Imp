@@ -1,10 +1,15 @@
-import type { Command, KeyValueStore, LibrarySource, ProjectSupport } from '@imp/core';
+import type { Command, GuideTopic, KeyValueStore, LibrarySource, ProjectSupport } from '@imp/core';
 import type { Role } from './role.js';
 
 /** One step of a mode's workflow, shown in the navigation. Stages can be visited in any order. */
 export interface Stage {
   readonly id: string;
   readonly name: string;
+  /**
+   * The guide's page about this stage, with the tip shown the first time it
+   * opens. Its `area` must be the stage id.
+   */
+  readonly guide?: GuideTopic;
 }
 
 /**
@@ -35,6 +40,11 @@ export interface Mode {
 export function defineMode(mode: Mode): Mode {
   if (!/^[a-z][a-z0-9]*$/.test(mode.id)) {
     throw new TypeError(`Invalid mode id: "${mode.id}"`);
+  }
+  for (const stage of mode.stages) {
+    if (stage.guide !== undefined && stage.guide.area !== stage.id) {
+      throw new TypeError(`The guide page of stage "${stage.id}" must have area "${stage.id}".`);
+    }
   }
   for (const command of mode.commands) {
     if (!command.id.startsWith(`${mode.id}.`)) {

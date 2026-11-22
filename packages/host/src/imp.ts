@@ -19,6 +19,7 @@ import {
 import {
   activityCommands,
   CommandRegistry,
+  createHelpCommands,
   createLibraryCommands,
   mediaCommands,
   MemoryBlobStore,
@@ -47,6 +48,7 @@ import {
 } from '@imp/mode-movie';
 import { createWorldCommands, worldLibrarySource } from '@imp/world';
 import { createOpenRouterProvider, type GenerationProvider, type HttpFetch } from '@imp/providers';
+import { workspaceGuides } from './guide.js';
 import type { SecretStore } from './secrets.js';
 
 /** The assembled core of one host. The interface reaches it through `serveImp`. */
@@ -151,6 +153,11 @@ export function createImp(options: ImpOptions): Imp {
     ...settingsCommands,
     ...createReleaseCommands(options.release ?? UNKNOWN_RELEASE),
     ...activityCommands,
+    // The guide: Imp's pages about itself, and the stages' pages from each mode.
+    ...createHelpCommands([
+      ...workspaceGuides,
+      ...modes.flatMap((mode) => mode.stages.flatMap((stage) => stage.guide ?? [])),
+    ]),
     ...createProjectCommands(modes.map((mode) => ({ mode: mode.id, ...mode.project }))),
     ...mediaCommands,
     ...createLibraryCommands([
