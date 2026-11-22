@@ -1159,7 +1159,7 @@ describe('App', () => {
     );
     await user.click(within(cards).getByRole('button', { name: /Load/ }));
     const confirm = await within(cards).findByRole('group', { name: 'Replace the crew' });
-    expect(within(confirm).getByText(/Dismiss Bo, Ada/)).toBeTruthy();
+    expect(within(confirm).getByText(/Dismiss Ada, Bo/)).toBeTruthy();
     await user.click(within(confirm).getByRole('button', { name: 'Replace' }));
     await vi.waitFor(async () => {
       expect(await crew()).toEqual(before);

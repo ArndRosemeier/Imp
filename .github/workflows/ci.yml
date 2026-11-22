@@ -30,6 +30,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
+      # The local server renders films and reads clips with ffmpeg; its tests run it for real.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - run: pnpm test:coverage
       - run: pnpm --filter @imp/web build
       - run: pnpm --filter @imp/server build

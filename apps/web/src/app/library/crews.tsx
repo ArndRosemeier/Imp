@@ -258,7 +258,9 @@ export function CrewShelf({
   ).data?.crew;
   const replacing = (crew ?? [])
     .filter((member) => member.roleId !== 'coordinator')
-    .map((member) => member.name);
+    .map((member) => member.name)
+    // By name: agents hired in the same millisecond have no other order.
+    .sort((a, b) => a.localeCompare(b));
   const crews = saved.data?.crews ?? [];
 
   return (

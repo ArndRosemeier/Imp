@@ -12,7 +12,7 @@ import {
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type PointerEvent, type ReactElement } from 'react';
 import { z } from 'zod';
-import { drawLane, drawText } from '../host/text-draw.js';
+import { drawLane, drawText } from '@imp/host/film';
 import { loadTextFonts } from '../host/text-fonts.js';
 import { runCommand, useImp, useLive } from './context.js';
 import { clock, type Item, type Look } from './cut-player.js';
