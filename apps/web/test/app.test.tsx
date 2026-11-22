@@ -1183,6 +1183,79 @@ describe('App', () => {
     expect(await within(library).findByText(/No saved crews yet/)).toBeTruthy();
   });
 
+  it('keeps the models under a name, switches back to them from a stage chip and the library', async () => {
+    const { imp, user } = start();
+    await completeSetup(user);
+    await user.click(screen.getByRole('button', { name: 'Development' }));
+    await user.type(await screen.findByLabelText('Working title'), 'The Lighthouse Keeper');
+    await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+    await screen.findByLabelText('Logline');
+    await user.click(screen.getByRole('button', { name: 'Design' }));
+
+    // The chip opens by itself while a model is missing, and folds once it is chosen.
+    const bar = await screen.findByRole('region', { name: 'Models' });
+    const chip = within(bar).getByRole('button', { name: /Choose image model/ });
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    await screen.findByRole('option', { name: 'vendor/painter' });
+    await user.selectOptions(within(bar).getByLabelText('Image model'), 'vendor/painter');
+    await vi.waitFor(() => {
+      expect(chip.getAttribute('aria-expanded')).toBe('false');
+    });
+    expect(chip.textContent).toContain('painter');
+
+    await user.click(chip);
+    await user.click(within(bar).getByRole('button', { name: /Save all models as a mix/ }));
+    await user.type(within(bar).getByLabelText('Name of the mix'), 'Drafts');
+    await user.click(within(bar).getByRole('button', { name: 'Save' }));
+    expect(await within(bar).findByText(/Saved “Drafts”/)).toBeTruthy();
+    await vi.waitFor(() => {
+      expect(chip.textContent).toContain('Drafts');
+    });
+
+    // Another model in use: the chip says the mix was changed, and the mix brings it back.
+    const actor = { actor: { kind: 'user', id: 't' } } as const;
+    await imp.registry.executeById(
+      'settings.set',
+      { key: 'images.model', value: '~vendor/latest' },
+      actor,
+    );
+    expect(await within(bar).findByText('changed')).toBeTruthy();
+    await user.click(within(bar).getByRole('button', { name: /Drafts/, pressed: true }));
+    await vi.waitFor(() => {
+      expect(within(bar).queryByText('changed')).toBeNull();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Library' }));
+    const library = await screen.findByRole('complementary', { name: 'Library' });
+    await user.click(within(library).getByRole('tab', { name: 'Model mixes, 1' }));
+    const cards = await within(library).findByRole('list', { name: 'Model mixes' });
+    expect(await within(cards).findByText('in use')).toBeTruthy();
+    expect(within(cards).getByText('painter')).toBeTruthy();
+    await user.type(within(library).getByLabelText(/Save the models in use/), 'Final');
+    await user.click(within(library).getByRole('button', { name: /Save/ }));
+    expect(await within(cards).findByRole('heading', { name: /Final/ })).toBeTruthy();
+
+    await user.click(within(cards).getByRole('button', { name: 'Rename Drafts' }));
+    const name = within(cards).getByLabelText('Name');
+    await user.clear(name);
+    await user.type(name, 'Cheap');
+    await user.click(within(cards).getByRole('button', { name: 'Save' }));
+    expect(await within(cards).findByRole('heading', { name: 'Cheap' })).toBeTruthy();
+    await user.click(within(cards).getByRole('button', { name: 'Use Cheap' }));
+    expect(await within(library).findByText('Using Cheap.')).toBeTruthy();
+    await user.click(
+      within(cards).getByRole('button', { name: 'Update Cheap with the models in use' }),
+    );
+    await user.type(within(library).getByRole('searchbox'), 'nothing like it');
+    expect(await within(library).findByText('No model mix matches.')).toBeTruthy();
+    await user.clear(within(library).getByRole('searchbox'));
+    await user.click(await within(cards).findByRole('button', { name: 'Delete Cheap' }));
+    await user.click(within(cards).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => {
+      expect(within(cards).queryByRole('heading', { name: 'Cheap' })).toBeNull();
+    });
+  });
+
   it('says where it runs, and offers the download only when it runs in the browser', async () => {
     const { user } = start();
     await completeSetup(user);
