@@ -246,6 +246,7 @@ export function createCrewCommands(
 
   const roleCreate = defineCommand({
     id: 'crew.role.create',
+    keywords: ['custom role', 'new job', 'critic', 'advisor', 'reviewer', 'specialist'],
     title: 'Create role',
     description:
       'Defines a new role an agent can be hired for: its instructions and the commands it may use. Hire for it with crew.hire.',

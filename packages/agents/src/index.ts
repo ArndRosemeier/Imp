@@ -29,6 +29,7 @@ export {
   SavedCrewMember,
 } from './saved-crews.js';
 export { RoleCatalog, StoredRole, coordinatorRole, guideRole, type Role } from './role.js';
+export { findCommands, isDirect } from './discovery.js';
 export {
   runAgent,
   type AgentRunOptions,

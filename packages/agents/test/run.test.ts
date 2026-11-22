@@ -368,7 +368,7 @@ describe('runAgent', () => {
       );
       expect(results[2]).toEqual({
         matches: [],
-        note: expect.stringContaining('settings (2), vault (1)') as string,
+        note: expect.stringContaining('settings (3), vault (1)') as string,
       });
 
       expect(results[3]).toMatchObject({ status: 'ok' });

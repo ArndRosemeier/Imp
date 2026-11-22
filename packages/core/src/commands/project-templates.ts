@@ -105,8 +105,9 @@ export function createTemplateCommands(support: readonly ModeProjectSupport[]) {
   const saveTemplate = defineCommand({
     id: 'project.template.save',
     title: 'Save project as template',
+    keywords: ['starting point', 'reuse', 'preset', 'starter project'],
     description:
-      'Saves a copy of a project, files included, as a template that new projects can start from. Later changes to the project do not change the template.',
+      'Saves a copy of a project, files included, as a template that new projects can start from. Later changes to the project do not change the template. It does not keep the crew: save that with crew.saved.save.',
     effect: 'write',
     input: z.object({
       projectId: z.string().describe('The id of a project from project.list.'),

@@ -115,9 +115,10 @@ Agents ask before they spend money or delete something: an approval card appears
 - **Import** your own pictures, sounds, videos and texts, or drop files onto the library.
 - Drag an asset where it belongs: a picture onto a character to make it their portrait, a sound onto the Edit audio lane, a video onto a shot. On a tablet, hold it a moment first, or tap it and choose **Use in**.
 - Copy assets into another project.
-- The **Crews** tab keeps saved crews to load into any project.
+- The **Crews** tab keeps saved crews to load into any project. A saved crew keeps every agent with its model, budget and web search, and copies of the custom roles they hold, so it loads even after a role was deleted. Load it to replace the crew or to add to it.
+- The **Mixes** tab keeps model mixes: which model the agents think with and which makes pictures, voices, sound effects, music, clips and transcripts. Apply one to set them all at once; the Models chip on every stage does the same.
 
-Agents use the same library.`,
+Crews and mixes belong to the whole workspace, not to one project. Agents use the same library: ask the coordinator to "save this crew" or "save these models as a mix" and it does it.`,
   },
   {
     id: 'projects',

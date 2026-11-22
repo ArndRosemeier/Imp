@@ -129,7 +129,7 @@ export function createLibraryCommands(sources: readonly LibrarySource[]): readon
     id: 'library.list',
     title: 'Browse the library',
     description:
-      'Lists the assets of a project in one place: pictures (portraits, key frames, views of locations and objects), sounds (dialogue, effects, music, voices, recordings), clips and texts (scenes, notes, subtitles), generated, written or imported, with counts by modality, kind and tag. Search with words and filter by modality, kind, tag, origin or favorites. Texts are cut short; library.get returns one whole. Each asset has the blobKey to use it elsewhere: a sound with audio.region.insert, any medium with media.view.',
+      'Lists the assets of a project in one place: pictures (portraits, key frames, views of locations and objects), sounds (dialogue, effects, music, voices, recordings), clips and texts (scenes, notes, subtitles), generated, written or imported, with counts by modality, kind and tag. Search with words and filter by modality, kind, tag, origin or favorites. Texts are cut short; library.get returns one whole. Each asset has the blobKey to use it elsewhere: a sound with audio.region.insert, any medium with media.view. The library also has a Crews tab and a Mixes tab, shared by every project: saved crews are crew.saved.* and model mixes are models.mix.*.',
     effect: 'read',
     input: z.object({
       projectId: ProjectId,
@@ -356,7 +356,7 @@ export function createLibraryCommands(sources: readonly LibrarySource[]): readon
     id: 'library.text.create',
     title: 'Write text',
     description:
-      'Keeps a text in the library of a project: notes, research, a draft, subtitles, a shot list. Use library.update to change it later.',
+      'Keeps a text in the library of a project: notes, research, a draft, subtitles, a shot list. Use library.update to change it later. To keep a crew use crew.saved.save, and to keep a set of models use models.mix.save: those are real presets that load again in any project.',
     effect: 'write',
     input: z.object({
       projectId: ProjectId,

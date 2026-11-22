@@ -26,6 +26,12 @@ export interface CommandSpec<I extends z.ZodType, O extends z.ZodType> {
   readonly title: string;
   /** What the command does, written for an LLM choosing a tool. */
   readonly description: string;
+  /**
+   * Other words people and agents use for it, such as where it sits in the UI
+   * ("library", "Crews tab") or what they call the thing ("preset"). Only
+   * command lookup reads them.
+   */
+  readonly keywords?: readonly string[];
   readonly effect: Effect;
   readonly input: I;
   readonly output: O;
@@ -42,6 +48,8 @@ export interface Command {
   readonly id: string;
   readonly title: string;
   readonly description: string;
+  /** Extra search words for command lookup; see CommandSpec. */
+  readonly keywords?: readonly string[];
   readonly effect: Effect;
   readonly input: z.ZodType;
   readonly output: z.ZodType;
@@ -97,6 +105,7 @@ export function defineCommand<I extends z.ZodType, O extends z.ZodType>(
     id: spec.id,
     title: spec.title,
     description: spec.description,
+    ...(spec.keywords === undefined ? {} : { keywords: spec.keywords }),
     effect: spec.effect,
     input: spec.input,
     output: spec.output,
