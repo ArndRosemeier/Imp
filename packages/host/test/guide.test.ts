@@ -29,11 +29,8 @@ describe('the guide in every language', () => {
     it(`has every page and tip in ${language.english}`, () => {
       const missing = english.filter((page) => {
         const translated = pages.get(page.id);
-        return (
-          translated === undefined ||
-          translated.area !== page.area ||
-          (page.hint === undefined) !== (translated.hint === undefined)
-        );
+        if (translated?.area !== page.area) return true;
+        return (page.hint === undefined) !== (translated.hint === undefined);
       });
       expect(missing.map((page) => page.id)).toEqual([]);
     });
@@ -51,7 +48,9 @@ describe('the guide in every language', () => {
 
   it('answers help.topic in the language asked for, and in the chosen one by default', async () => {
     const run = async (id: string, input: unknown): Promise<{ title?: string }> => {
-      const result = await imp.registry.executeById(id, input, { actor: { kind: 'person' } });
+      const result = await imp.registry.executeById(id, input, {
+        actor: { kind: 'user', id: 'u' },
+      });
       if (result.status !== 'ok') throw new Error(`${id}: ${result.status}`);
       return result.output as { title?: string };
     };

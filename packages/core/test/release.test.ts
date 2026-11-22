@@ -73,7 +73,7 @@ describe('release commands', () => {
       ...createReleaseCommands(translated),
     );
     const run = (input: unknown) =>
-      registry.executeById('app.changelog', input, { actor: { kind: 'person' } });
+      registry.executeById('app.changelog', input, { actor: { kind: 'user', id: 'u' } });
     expect(await run({})).toMatchObject({
       output: { releases: [{ title: 'Ten' }, { title: 'Nine' }] },
     });
