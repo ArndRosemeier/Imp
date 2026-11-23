@@ -47,6 +47,7 @@ import { placeText } from './text-layout.js';
 import { readingSpeed } from './text-markup.js';
 import { FilmLook, Grade, NEUTRAL_LOOK } from './grade.js';
 import { dipOf, overlapSeconds } from './transitions.js';
+import { plannedShotSeconds } from './shot-length.js';
 import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
@@ -153,6 +154,12 @@ export async function readCut(
   return stored === undefined ? SceneCut.parse({ sceneId }) : SceneCut.parse(stored);
 }
 
+/** How long a shot is planned to hold, rounded for reading; null when nobody said. */
+export function plannedFor(shot: Shot): number | null {
+  const planned = plannedShotSeconds(shot, shot.clip?.voiceApart ?? false);
+  return planned === null ? null : round(planned);
+}
+
 /**
  * The items laid out in time, one after the other. A shot item lasts as long
  * as its clip less the trims, and a title as long as it says; items whose
@@ -202,6 +209,8 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       state,
       placeholder: item.kind === 'shot' && !ready && duration > 0,
       pickupReason: shot?.pickup?.reason ?? null,
+      plannedSeconds: item.kind === 'shot' && shot !== undefined ? plannedFor(shot) : null,
+      lengthReason: item.kind === 'shot' ? (shot?.lengthReason ?? '') : '',
       trimStartSeconds: item.trimStartSeconds,
       trimEndSeconds: item.trimEndSeconds,
       dialogueVolume: item.dialogueVolume,
@@ -307,6 +316,10 @@ export const LaidItem = z.object({
   placeholder: z.boolean(),
   /** Why the shot was asked for, when it is a pickup. */
   pickupReason: z.string().nullable(),
+  /** How long the shot is planned to hold in the cut, never shorter than its line; null when nobody said. */
+  plannedSeconds: z.number().nullable(),
+  /** Why it holds that long, in the words of whoever planned it. */
+  lengthReason: z.string(),
   trimStartSeconds: z.number(),
   trimEndSeconds: z.number(),
   dialogueVolume: z.number(),
@@ -1104,6 +1117,120 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     },
   });
 
+  const assemble = defineCommand({
+    id: 'movie.edit.assemble',
+    title: 'Trim shots to their planned length',
+    description:
+      'A first cut: trims each shot of a scene to how long it is planned to hold (its lengthSeconds, never shorter than its line), out of the slack its clip was made with. A sliver comes off the start, where generated clips settle in, and the rest off the end; a voice laid over the clip keeps its start. Pieces that are already trimmed are left alone unless retrim is set, and so are pieces off speed, reversed, split or used twice, and shots with no planned length. It is a starting point: then look at the cut with movie.edit.frames and move each in and out point to the best moment with movie.edit.item.set, such as cutting on a movement, a look or the end of a line. Returns what it did with each piece.',
+    effect: 'write',
+    input: z.object({
+      projectId: ProjectId,
+      sceneId: SceneId,
+      itemIds: z
+        .array(ItemId)
+        .min(1)
+        .optional()
+        .describe('The pieces to trim. Defaults to every piece of the scene.'),
+      retrim: z
+        .boolean()
+        .default(false)
+        .describe('Also trim pieces that are trimmed already, starting from the whole clip.'),
+    }),
+    output: z.object({
+      pieces: z.array(
+        z.object({
+          itemId: z.string(),
+          shot: z.number().nullable(),
+          trimmed: z.boolean(),
+          trimStartSeconds: z.number(),
+          trimEndSeconds: z.number(),
+          plannedSeconds: z.number().nullable(),
+          note: z.string(),
+        }),
+      ),
+    }),
+    handler: async ({ runtime, actor }, input) => {
+      const id = 'movie.edit.assemble';
+      const { cut, items } = await openCut({ runtime, actor }, id, input.projectId, input.sceneId);
+      for (const itemId of input.itemIds ?? []) indexOfItem(items, id, itemId);
+      const uses = new Map<string, number>();
+      for (const item of items) {
+        if (item.kind === 'shot') uses.set(item.shotId, (uses.get(item.shotId) ?? 0) + 1);
+      }
+      const pieces = [];
+      const next: CutItem[] = [];
+      for (const item of items) {
+        const chosen = input.itemIds === undefined || input.itemIds.includes(item.id);
+        if (!chosen || item.kind !== 'shot') {
+          next.push(item);
+          continue;
+        }
+        const shot = await loadShot(runtime.store, input.projectId, item.sceneId, item.shotId);
+        const row = {
+          itemId: item.id,
+          shot: shot?.position ?? null,
+          trimmed: false,
+          trimStartSeconds: item.trimStartSeconds,
+          trimEndSeconds: item.trimEndSeconds,
+          plannedSeconds: shot === undefined ? null : plannedFor(shot),
+        };
+        const leave = (note: string): void => {
+          pieces.push({ ...row, note });
+          next.push(item);
+        };
+        if (shot?.clip?.status !== 'ready') {
+          leave('Its clip is not ready.');
+          continue;
+        }
+        if (item.speed !== 1 || item.reverse) {
+          leave('It plays off speed or backwards; trim it by hand.');
+          continue;
+        }
+        if ((uses.get(item.shotId) ?? 0) > 1) {
+          leave('Its shot is split or used more than once; trim it by hand.');
+          continue;
+        }
+        if (!input.retrim && (item.trimStartSeconds > 0 || item.trimEndSeconds > 0)) {
+          leave('It is trimmed already.');
+          continue;
+        }
+        const planned = row.plannedSeconds;
+        if (planned === null) {
+          leave('The shot has no planned length; give it one in Shots, or trim it by eye.');
+          continue;
+        }
+        const slack = clipSeconds(shot) - planned;
+        if (slack < 0.1) {
+          const whole = { ...item, trimStartSeconds: 0, trimEndSeconds: 0 };
+          pieces.push({
+            ...row,
+            trimmed: item.trimStartSeconds > 0 || item.trimEndSeconds > 0,
+            trimStartSeconds: 0,
+            trimEndSeconds: 0,
+            note: 'The clip is no longer than planned, so it plays whole.',
+          });
+          next.push(whole);
+          continue;
+        }
+        // A recording laid over the clip starts with it, so its start stays.
+        const head = dialogueOver(shot.clip) ? 0 : round(Math.min(0.3, slack / 4));
+        const tail = round(slack - head);
+        pieces.push({
+          ...row,
+          trimmed: true,
+          trimStartSeconds: head,
+          trimEndSeconds: tail,
+          note: `Plays ${planned.toFixed(1)} of ${clipSeconds(shot).toFixed(1)} s.`,
+        });
+        next.push({ ...item, trimStartSeconds: head, trimEndSeconds: tail });
+      }
+      if (pieces.some((piece) => piece.trimmed)) {
+        await commitCut({ runtime, actor }, input.projectId, cut, withItems(cut, next));
+      }
+      return { pieces };
+    },
+  });
+
   const move = defineCommand({
     id: 'movie.edit.item.move',
     title: 'Move item',
@@ -1893,6 +2020,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     add,
     addTitle,
     setItem,
+    assemble,
     move,
     duplicate,
     remove,

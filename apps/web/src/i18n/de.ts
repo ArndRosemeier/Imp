@@ -577,6 +577,10 @@ export const de: Readonly<Record<string, string>> = {
   '{startsAtSeconds} · {value} s': '{startsAtSeconds} · {value} s',
   'The words on the card': 'Der Text auf der Karte',
   'Length (s)': 'Länge (s)',
+  'Trim the selected shot to its planned length':
+    'Gewählte Einstellung auf ihre geplante Länge kürzen',
+  'Trim every shot to its planned length': 'Alle Einstellungen auf ihre geplante Länge kürzen',
+  'Trim shots to their planned length': 'Einstellungen auf ihre geplante Länge kürzen',
   'Trim start (s)': 'Anfang trimmen (s)',
   'Trim end (s)': 'Ende trimmen (s)',
   'Dialogue volume': 'Dialoglautstärke',
@@ -976,6 +980,13 @@ export const de: Readonly<Record<string, string>> = {
   recorded: 'aufgenommen',
   'not recorded': 'nicht aufgenommen',
   Delivery: 'Vortrag',
+  'Holds in the cut (s)': 'Dauer im Schnitt (s)',
+  'How long the shot plays in the film. The clip is made a little longer, so the edit can cut it at its best moment.':
+    'Wie lange die Einstellung im Film läuft. Der Clip wird etwas länger erstellt, damit der Schnitt sie im besten Moment schneiden kann.',
+  'Not planned': 'Nicht geplant',
+  'Why that long': 'Warum so lang',
+  'A quick glance; lets the silence land; the walk to the door':
+    'Ein kurzer Blick; die Stille wirken lassen; der Gang zur Tür',
   'How it is said: hushed, tired, amused.': 'Wie es gesagt wird: leise, müde, belustigt.',
   'Volume (0 to 1)': 'Lautstärke (0 bis 1)',
   'Recording of {who}': 'Aufnahme von {who}',

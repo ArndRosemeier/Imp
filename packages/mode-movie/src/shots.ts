@@ -38,6 +38,12 @@ import {
   shotPrefix,
 } from './commands.js';
 import { asStartFrame, type FrameImageEncoder } from './frames.js';
+import {
+  CLIP_SLACK_SECONDS,
+  clipSecondsWanted,
+  DEFAULT_SHOT_SECONDS,
+  spokenSeconds,
+} from './shot-length.js';
 import { SPEECH_MODEL_SETTING, voiceDirection } from './voice.js';
 import { Character, Clip, Development, DialogueTake, MODE_ID, Scene, Shot } from './schema.js';
 
@@ -363,11 +369,6 @@ async function deleteDialogueFile(
   if (dialogue !== null) await runtime.blobs.delete(dialogue.blobKey);
 }
 
-/** Rough speaking time when the file's length cannot be read: about 2.5 words a second. */
-function spokenSeconds(line: string): number {
-  return Math.max(1, line.trim().split(/\s+/).length / 2.5);
-}
-
 /** What the provider knows of a model, or nothing when it cannot be asked. */
 async function findModel(provider: GenerationProvider, id: string): Promise<ModelInfo | undefined> {
   try {
@@ -387,7 +388,7 @@ export function createShotCommands(
     id: 'movie.shot.list',
     title: 'List shots',
     description:
-      'Returns the shots of a scene in order: id, what is seen, the line and whether there is dialogue and a clip. The details of a shot come from movie.shot.get.',
+      'Returns the shots of a scene in order: id, what is seen, the line, how long it holds in the cut (lengthSeconds, null when not planned) and whether there is dialogue and a clip. The details of a shot come from movie.shot.get.',
     effect: 'read',
     input: z.object({
       projectId: ProjectId,
@@ -398,7 +399,13 @@ export function createShotCommands(
       shots: z.array(
         z.union([
           Shot,
-          Shot.pick({ id: true, position: true, description: true, line: true }).extend({
+          Shot.pick({
+            id: true,
+            position: true,
+            description: true,
+            line: true,
+            lengthSeconds: true,
+          }).extend({
             dialogue: z.boolean(),
             clip: Clip.shape.status.nullable(),
           }),
@@ -416,6 +423,7 @@ export function createShotCommands(
                 position: shot.position,
                 description: shot.description,
                 line: shot.line,
+                lengthSeconds: shot.lengthSeconds,
                 dialogue: shot.dialogue !== null,
                 clip: shot.clip?.status ?? null,
               },
@@ -458,6 +466,8 @@ export function createShotCommands(
         speakerId: fields.speakerId ?? null,
         line: fields.line ?? '',
         delivery: fields.delivery ?? '',
+        lengthSeconds: fields.lengthSeconds ?? null,
+        lengthReason: fields.lengthReason ?? '',
         dialogue: null,
         frames: [],
         frameId: null,
@@ -500,6 +510,9 @@ export function createShotCommands(
         speakerId: changes.speakerId === undefined ? shot.speakerId : changes.speakerId,
         line: changes.line ?? shot.line,
         delivery: changes.delivery ?? shot.delivery,
+        lengthSeconds:
+          changes.lengthSeconds === undefined ? shot.lengthSeconds : changes.lengthSeconds,
+        lengthReason: changes.lengthReason ?? shot.lengthReason,
       };
       await requireShotSetting(runtime.store, 'movie.shot.update', projectId, next);
       await runtime.store.batch([{ type: 'put', key, value: next }]);
@@ -555,7 +568,7 @@ export function createShotCommands(
         .max(30)
         .optional()
         .describe(
-          'Seconds wanted. Defaults to the length of the dialogue, or 4. The nearest length the model makes is used.',
+          `Seconds wanted. Leave it out: the clip is then made ${String(CLIP_SLACK_SECONDS)} s longer than the shot holds in the cut (its lengthSeconds, never shorter than its line, or ${String(DEFAULT_SHOT_SECONDS)}), so the edit can trim it to its best moment. The nearest length the model makes at or above that is used.`,
         ),
       resolution: z.string().default('720p').describe('The nearest size the model makes is used.'),
       aspectRatio: z.string().default('16:9'),
@@ -584,11 +597,7 @@ export function createShotCommands(
       const model = await chosenModel(runtime.store, VIDEO_MODEL_SETTING, input.model);
       const cast = await readCast(runtime.store, input.projectId, shot);
       const dialogueApart = isDialogueApart(shot, cast);
-      const wanted =
-        input.durationSeconds ??
-        (dialogueApart && typeof shot.dialogue?.durationSeconds === 'number'
-          ? Math.ceil(shot.dialogue.durationSeconds + 0.5)
-          : 4);
+      const wanted = input.durationSeconds ?? clipSecondsWanted(shot, dialogueApart);
       const info = model === null ? undefined : await findModel(provider, model);
       return {
         kind: 'video',
@@ -633,10 +642,7 @@ export function createShotCommands(
       const prompt = clipPrompt(shot, cast, tone, dialogueApart, setting, audio);
       const durationSeconds = fitDuration(
         info?.video,
-        input.durationSeconds ??
-          (dialogueApart && typeof shot.dialogue?.durationSeconds === 'number'
-            ? Math.ceil(shot.dialogue.durationSeconds + 0.5)
-            : 4),
+        input.durationSeconds ?? clipSecondsWanted(shot, dialogueApart),
       );
       const references: MediaInput[] = [];
       const guides: string[] = [];

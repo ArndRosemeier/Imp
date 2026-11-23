@@ -20,6 +20,7 @@ import {
   QuestionIcon,
   SidebarSimpleIcon,
   SplitHorizontalIcon,
+  ArrowsInLineHorizontalIcon,
   XIcon,
   FilmReelIcon,
 } from '@phosphor-icons/react';
@@ -1640,6 +1641,20 @@ function SceneEditor({
               split,
               readOnly || !canSplit,
               'S',
+            )}
+            {tool(
+              item?.kind === 'shot'
+                ? t('Trim the selected shot to its planned length')
+                : t('Trim every shot to its planned length'),
+              <ArrowsInLineHorizontalIcon aria-hidden="true" />,
+              () => {
+                // A chosen piece is trimmed again from its whole clip; the scene keeps hand trims.
+                void run(
+                  'movie.edit.assemble',
+                  item?.kind === 'shot' ? { itemIds: [item.itemId], retrim: true } : {},
+                );
+              },
+              readOnly || !cut.items.some((piece) => piece.plannedSeconds !== null),
             )}
             {tool(
               t('Copy'),

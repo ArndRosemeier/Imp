@@ -6,7 +6,15 @@ import { createTestRuntime } from '@imp/core/testing';
 import { createFakeProvider } from '@imp/providers/testing';
 import { createWorldCommands } from '@imp/world';
 import { describe, expect, it } from 'vitest';
-import { createMovieMode, stillTimes, timecode, type FrameGrabber } from '../src/index.js';
+import {
+  clipSecondsWanted,
+  createMovieMode,
+  plannedShotSeconds,
+  Shot,
+  stillTimes,
+  timecode,
+  type FrameGrabber,
+} from '../src/index.js';
 
 const user = { kind: 'user', id: 'arnd' } as const;
 const editor = { kind: 'agent', id: 'ed', role: 'film-editor' } as const;
@@ -97,6 +105,91 @@ async function setup(frameGrabber?: FrameGrabber) {
     run('movie.edit.get', { ...at, ...(version === undefined ? {} : { version }) }, actor);
   return { runtime, registry, run, at, cut, shots, mara, scene, projectId };
 }
+
+describe('first cut', () => {
+  it('plans what a shot holds and makes its clip longer by the slack', () => {
+    const shot = Shot.parse({
+      id: 's',
+      sceneId: 'c',
+      position: 1,
+      description: 'Mara turns.',
+      characterIds: [],
+      performance: '',
+      speakerId: null,
+      line: '',
+      delivery: '',
+    });
+    expect(plannedShotSeconds(shot, false)).toBeNull();
+    expect(clipSecondsWanted(shot, false)).toBe(6);
+    const glance = { ...shot, lengthSeconds: 1.5 };
+    expect(plannedShotSeconds(glance, false)).toBe(1.5);
+    expect(clipSecondsWanted(glance, false)).toBe(3);
+    // A line on screen is never cut short by a plan shorter than it.
+    const speaking = {
+      ...glance,
+      speakerId: 'm',
+      line: 'One two three four five six seven eight.',
+    };
+    expect(plannedShotSeconds(speaking, false)).toBeCloseTo(4.2);
+    expect(clipSecondsWanted(speaking, false)).toBe(6);
+  });
+
+  it('trims each shot to its planned length as a proposal, and leaves the rest', async () => {
+    const { run, at, cut, shots } = await setup();
+    await run('movie.shot.update', {
+      ...at,
+      shotId: shots[0].id,
+      lengthSeconds: 2.5,
+      lengthReason: 'a glance up',
+    });
+    await run('movie.shot.update', { ...at, shotId: shots[1].id, lengthSeconds: 1 });
+
+    const { pieces } = await run('movie.edit.assemble', at, editor);
+    expect(pieces).toEqual([
+      expect.objectContaining({
+        itemId: shots[0].id,
+        shot: 1,
+        trimmed: true,
+        trimStartSeconds: 0.3,
+        trimEndSeconds: 1.2,
+        plannedSeconds: 2.5,
+      }),
+      // Her recorded line is laid over the clip from its start, so the start stays.
+      expect.objectContaining({
+        shot: 2,
+        trimmed: true,
+        trimStartSeconds: 0,
+        trimEndSeconds: 1.8,
+        plannedSeconds: 2.2,
+      }),
+      expect.objectContaining({
+        shot: 3,
+        trimmed: false,
+        note: expect.stringContaining('no planned'),
+      }),
+    ]);
+    expect((await cut()).items[0].trimStartSeconds).toBe(0);
+    const proposed = await cut(editor);
+    expect(proposed.items.map((item: any) => item.durationSeconds)).toEqual([2.5, 2.2, 4]);
+    const { text } = await run('movie.edit.edl', at, editor);
+    expect(text).toContain('planned 2.5 (a glance up)');
+
+    // Hand trims stay, unless asked to start again from the whole clip.
+    await run('movie.edit.item.set', { ...at, itemId: shots[0].id, trimEndSeconds: 0.5 }, editor);
+    const again = await run('movie.edit.assemble', { ...at, itemIds: [shots[0].id] }, editor);
+    expect(again.pieces).toEqual([
+      expect.objectContaining({ trimmed: false, note: 'It is trimmed already.' }),
+    ]);
+    const redone = await run(
+      'movie.edit.assemble',
+      { ...at, itemIds: [shots[0].id], retrim: true },
+      editor,
+    );
+    expect(redone.pieces[0]).toMatchObject({ trimmed: true, trimEndSeconds: 1.2 });
+    const { text: over } = await run('movie.edit.edl', at, user);
+    expect(over).toContain('planned 2.5 (a glance up), runs 1.5 over');
+  });
+});
 
 describe('agent drafts', () => {
   it('keeps an agent’s edits apart from the cut until the person keeps them', async () => {

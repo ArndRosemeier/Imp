@@ -146,6 +146,9 @@ async function requestPickup(
     speakerId: input.speakerId ?? null,
     line: input.line ?? '',
     delivery: input.delivery ?? '',
+    // The length the cut asked for is the length the shot is planned to hold.
+    lengthSeconds: input.seconds,
+    lengthReason: input.reason,
     pickup: {
       reason: input.reason,
       seconds: input.seconds,

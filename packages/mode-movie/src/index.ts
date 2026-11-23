@@ -170,6 +170,13 @@ export {
   VIDEO_MODEL_SETTING,
 } from './shots.js';
 export {
+  CLIP_SLACK_SECONDS,
+  clipSecondsWanted,
+  DEFAULT_SHOT_SECONDS,
+  plannedShotSeconds,
+  speechSeconds,
+} from './shot-length.js';
+export {
   createSoundCommands,
   EFFECT_MODEL_SETTING,
   MUSIC_MODEL_SETTING,
