@@ -1560,8 +1560,8 @@ export const de: Readonly<Record<string, string>> = {
   'Choose a model to make clips': 'Wähle ein Modell für Clips',
   'Choose a model to record dialogue': 'Wähle ein Modell für Dialoge',
   'Choose a model to paint key frames': 'Wähle ein Modell für Keyframes',
-  'Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the character and played over a silent clip; it is not lip-synced.':
-    'Videomodelle erfinden für jede Zeile eine Stimme. Darum wird der Dialog mit der Stimme der Figur aufgenommen und über einen stummen Clip gelegt; er ist nicht lippensynchron.',
+  'Clips come with their own sound: the video model speaks the lines of the characters on screen, so the lips match. Only a voice that is never seen, such as a narrator, is recorded on its own.':
+    'Clips bringen ihren eigenen Ton mit: Das Videomodell spricht die Sätze der Figuren im Bild selbst, so passen die Lippen. Nur eine Stimme, die nie zu sehen ist, etwa eine Erzählstimme, wird eigens aufgenommen.',
   'Write a scene first': 'Schreib zuerst eine Szene',
   'No scenes, no shots. Even mischief needs a plan.':
     'Keine Szenen, keine Einstellungen. Selbst Schabernack braucht einen Plan.',
@@ -2086,7 +2086,6 @@ export const de: Readonly<Record<string, string>> = {
   'Get asset': 'Element holen',
   'Get processed sound': 'Bearbeiteten Ton holen',
   'Give an agent a task': 'Einem Agenten eine Aufgabe geben',
-  'Gives scenes their sound effects and music.': 'Gibt Szenen ihre Soundeffekte und Musik.',
   'Guided path': 'Geführter Weg',
   'Hire agent': 'Agent einstellen',
   Imp: 'Imp',
@@ -2406,4 +2405,40 @@ export const de: Readonly<Record<string, string>> = {
   'Try again': 'Noch einmal versuchen',
   '{count} clip rendering': '{count} Clip in Arbeit',
   '{count} clips rendering': '{count} Clips in Arbeit',
+  Storyboard: 'Storyboard',
+  'First cut': 'Rohschnitt',
+  'Casting, design and the scenes wait until you sign off the treatment.':
+    'Casting, Ausstattung und die Szenen warten, bis du das Treatment freigibst.',
+  'The clips of this scene wait until you sign off its storyboard: frames cost cents, clips dollars.':
+    'Die Clips dieser Szene warten, bis du ihr Storyboard freigibst: Bilder kosten Cents, Clips Dollars.',
+  'Music and extra sound for this scene wait until you sign off its first cut.':
+    'Musik und zusätzlicher Ton für diese Szene warten, bis du ihren Rohschnitt freigibst.',
+  'Signed off on {date}. Press to take it back.':
+    'Am {date} freigegeben. Drücken, um es zurückzunehmen.',
+  '{name} signed off': '{name} freigegeben',
+  'Sign off {name}': '{name} freigeben',
+  'Checkpoint: {name}': 'Kontrollpunkt: {name}',
+  'Signed off on {date}. The crew goes on from here.':
+    'Am {date} freigegeben. Die Crew macht von hier aus weiter.',
+  'Your working style lets the crew go on without stopping here.':
+    'Mit deiner Arbeitsweise macht die Crew hier weiter, ohne anzuhalten.',
+  'Take back': 'Zurücknehmen',
+  'Sign off': 'Freigeben',
+  'Stop at each checkpoint for me': 'An jedem Kontrollpunkt auf mich warten',
+  'Stop only at the storyboard': 'Nur beim Storyboard auf mich warten',
+  'Make it all on its own': 'Alles selbst machen',
+  'How much the crew does on its own': 'Wie viel die Crew selbst macht',
+  'The crew stops at checkpoints for you to look before the next, more expensive step: the treatment, the storyboard of each scene and its first cut. Spending always keeps to the budget.':
+    'Die Crew hält an Kontrollpunkten an, damit du dir das Ergebnis ansiehst, bevor der nächste, teurere Schritt beginnt: beim Treatment, beim Storyboard jeder Szene und bei ihrem Rohschnitt. Ausgaben bleiben immer im Budget.',
+  'Adds music and the sounds the clips lack, where a scene needs them.':
+    'Ergänzt Musik und die Geräusche, die den Clips fehlen, wo eine Szene sie braucht.',
+  'Reopen a checkpoint': 'Kontrollpunkt wieder öffnen',
+  'Set the working style': 'Arbeitsweise festlegen',
+  'Show the checkpoints': 'Kontrollpunkte zeigen',
+  'Sign off a checkpoint': 'Kontrollpunkt freigeben',
+  "The person's sign-off of the first cut of this scene":
+    'Deine Freigabe des Rohschnitts dieser Szene',
+  "The person's sign-off of the storyboard of this scene":
+    'Deine Freigabe des Storyboards dieser Szene',
+  "The person's sign-off of the treatment": 'Deine Freigabe des Treatments',
 };

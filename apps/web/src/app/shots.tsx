@@ -28,6 +28,7 @@ import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
+import { CheckpointBar } from './checkpoints.js';
 import { formatUsd, Price } from './spend.js';
 import { useScriptLines } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
@@ -1251,7 +1252,7 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
           },
         ]}
         note={t(
-          'Video models invent a voice for any line. Dialogue is therefore recorded in the voice of the character and played over a silent clip; it is not lip-synced.',
+          'Clips come with their own sound: the video model speaks the lines of the characters on screen, so the lips match. Only a voice that is never seen, such as a narrator, is recorded on its own.',
         )}
       />
       <Problem
@@ -1259,6 +1260,9 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         retry={retry}
       />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
+      {sceneId !== undefined && shots.length > 0 && (
+        <CheckpointBar project={project} checkpointId="storyboard" itemId={sceneId} />
+      )}
       {elsewhere.length > 0 && (
         <div className="row wrap rendering-elsewhere">
           <span className="muted">{t('Rendering in other scenes:')}</span>

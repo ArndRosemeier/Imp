@@ -25,7 +25,11 @@ export const movieGuidesDe: readonly GuideTopic[] = [
 
 ## Lass die Crew ran
 
-Erzähl dem Koordinator die Geschichte in einem Satz. Er stellt einen **Drehbuchautor** ein, der die Entwicklung schreibt und mit den Szenen weitermachen kann. Danach kannst du jedes Wort ändern.
+Erzähl dem Koordinator die Geschichte in einem Satz. Er stellt einen **Drehbuchautor** ein, der die Entwicklung schreibt. Danach kannst du jedes Wort ändern.
+
+## Kontrollpunkte
+
+Die Crew hält an drei Stellen für dich an, damit nichts Teures entsteht, bevor du es gesehen hast: beim **Treatment** (hier), beim **Storyboard** jeder Szene (in Einstellungen) und beim **Rohschnitt** jeder Szene (im Schnitt). Drück **Freigeben**, wenn es passt; Casting, Ausstattung und die Szenen warten auf das Treatment, die Clips einer Szene auf ihr Storyboard. **Wie viel die Crew selbst macht** legt fest, wo sie anhält: an jedem Kontrollpunkt, nur beim Storyboard oder nirgends. Ausgaben bleiben immer im Budget.
 
 ## Tipps
 
@@ -161,18 +165,18 @@ Ein Clip von 4 Sekunden kostet je nach Modell und Auflösung etwa 15 bis 40 Cent
 
 ## Lass die Crew ran
 
-Der **Clip-Designer** plant Einstellungen aus dem Drehbuch und erstellt die Clips. Er fragt, bevor er Geld ausgibt.`,
+Der **Clip-Designer** plant zuerst die Einstellungen einer Szene und malt ihre Keyframes: Das ist das **Storyboard**. Sieh dir die Bilder der Reihe nach an und drück über den Einstellungen auf **Freigeben**, wenn die Szene funktioniert; erst dann entstehen ihre Clips, denn Bilder kosten Cents und Clips Dollars.`,
   },
   {
     id: 'stage-sound',
     area: 'sound',
     title: 'Ton',
-    summary: 'Soundeffekte und Musik für jede Szene.',
+    summary: 'Musik und zusätzlicher Ton, wo eine Szene mehr braucht, als ihre Clips mitbringen.',
     hint: {
-      title: 'Füg jeder Szene Effekte und Musik hinzu',
+      title: 'Clips bringen ihren eigenen Ton mit',
       body: 'Beschreib einen Ton („Wellen, die nachts an Felsen brechen“) oder ein Musikstück, und Imp erstellt es. Töne kommen in die Szene und lassen sich auf die Zeitleiste im Schnitt legen oder im Audio-Editor öffnen.',
     },
-    body: `Der Ton enthält die **Soundeffekte** und die **Musik** jeder Szene.
+    body: `Clips bringen ihren eigenen Ton mit: Stimmen, Geräusche und die Atmosphäre des Ortes. Ton enthält, was eine Szene darüber hinaus braucht: **Musik**, eine durchgehende **Atmo**, wo die Hintergründe der Clips an den Schnitten springen, oder einen **Effekt**, den kein Clip macht.
 
 ## Was du hier tust
 
@@ -188,7 +192,7 @@ Der **Clip-Designer** plant Einstellungen aus dem Drehbuch und erstellt die Clip
 
 ## Lass die Crew ran
 
-Der **Sounddesigner** liest jede Szene und erstellt, was sie braucht.`,
+Der **Sounddesigner** ergänzt Ton, wenn du darum bittest oder wenn dem Rohschnitt einer Szene etwas fehlt, sobald du ihn freigegeben hast.`,
   },
   {
     id: 'stage-edit',

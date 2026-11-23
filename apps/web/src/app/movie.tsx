@@ -1,3 +1,4 @@
+import { CheckpointBar, WorkingStyleField } from './checkpoints.js';
 import type { Project } from '@imp/core';
 import {
   Character,
@@ -229,6 +230,10 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
         </span>
       </div>
       <Problem text={development.error ?? error} retry={retry} />
+      <div className="card stack page">
+        <WorkingStyleField project={project} />
+      </div>
+      <CheckpointBar project={project} checkpointId="treatment" />
       {development.data !== undefined && (
         <div className="card stack page">
           {DEVELOPMENT_FIELDS.map(({ key, label, rows, placeholder }) => (

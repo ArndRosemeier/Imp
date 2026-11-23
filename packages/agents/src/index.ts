@@ -2,6 +2,7 @@ export {
   AgentRunSchema,
   ALWAYS_ALLOW_KEY,
   alwaysAllowed,
+  NEVER_ALWAYS,
   ChatMessageSchema,
   ConversationSchema,
   createAgentCommands,
@@ -56,6 +57,17 @@ export {
   type Need,
   type Role,
 } from './role.js';
+export {
+  checkpointNeed,
+  checkpointPassed,
+  checkpointsKey,
+  createCheckpointCommands,
+  inputField,
+  readWorkingStyle,
+  stopsAt,
+  WorkingStyle,
+  type Checkpoint,
+} from './checkpoints.js';
 export {
   createNeedCommands,
   NeedStatus,

@@ -8650,3 +8650,41 @@ dialog.approvals-dialog[open] {
     padding: 0 8px;
   }
 }
+
+/* Checkpoints: where the crew stops for the person to sign off what was made. */
+.checkpoint:not(.compact) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border-left: 3px solid var(--line-strong);
+}
+.checkpoint[data-state='waiting']:not(.compact) {
+  border-left-color: var(--accent);
+  background: var(--accent-wash);
+}
+.checkpoint[data-state='signed']:not(.compact) {
+  border-left-color: var(--ok);
+}
+.checkpoint-text {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.checkpoint-text strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.checkpoint[data-state='signed'] svg {
+  color: var(--ok);
+}
+.checkpoint .error {
+  flex-basis: 100%;
+}
+.working-style select {
+  max-width: 24rem;
+  min-height: var(--hit);
+}

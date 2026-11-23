@@ -227,3 +227,10 @@ export {
   UnscriptedLine,
 } from './script.js';
 export { movieStageOf, movieWork } from './work.js';
+export {
+  firstCutCheckpoint,
+  movieCheckpoints,
+  storyboardCheckpoint,
+  storyboardForClips,
+  treatmentCheckpoint,
+} from './needs.js';

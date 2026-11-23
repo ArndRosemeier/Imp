@@ -148,7 +148,7 @@ export interface AgentRunOptions {
    * Asked before each command: a reason the agent cannot run it yet, such as
    * a need of its role that is missing, or null when it can.
    */
-  readonly guard?: (commandId: string) => Promise<string | null>;
+  readonly guard?: (commandId: string, input: unknown) => Promise<string | null>;
   /**
    * Whether the agent can stop and report something missing (report_missing).
    * Crew members can; the coordinator, who arranges what is missing, cannot.
@@ -456,7 +456,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
         ...(note === null ? {} : { note }),
       });
     }
-    const refused = await options.guard?.(commandId);
+    const refused = await options.guard?.(commandId, input);
     if (refused !== undefined && refused !== null) {
       return JSON.stringify({ error: refused });
     }

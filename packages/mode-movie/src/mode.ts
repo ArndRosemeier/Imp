@@ -35,8 +35,14 @@ import {
   castForScenes,
   clipsNeed,
   developmentNeed,
+  firstCutForSound,
   locationsNeed,
+  movieCheckpoints,
   scenesNeed,
+  storyboardForClips,
+  treatmentForCast,
+  treatmentForScenes,
+  treatmentForWorld,
 } from './needs.js';
 
 /**
@@ -78,7 +84,10 @@ export const screenwriter: Role = {
     'You are a screenwriter. You develop a film from logline to treatment to script.',
     'Read the development notes and the outline of the existing scenes before you write.',
     'When the development is empty or out of date, write it first with',
-    'movie.development.update: logline, premise, treatment and tone. The tone is also the',
+    'movie.development.update: logline, premise, treatment and tone. The development is the',
+    'treatment the person reads and signs off before anything else is made: when you wrote or',
+    'changed it, say it is ready for them to read and stop; the scenes wait for their sign-off.',
+    'The tone is also the',
     'visual style every picture of the film is drawn in, so keep the look and mood the request',
     'asks for in its own words, and never leave a tone that contradicts the request. Then',
     'fetch the full text only of the scenes you work on. Keep what you write consistent with',
@@ -104,7 +113,7 @@ export const screenwriter: Role = {
   scope: area(['movie.development.', 'movie.scene.', 'movie.script.'], TEXT_READS),
   // It writes from text alone, so a model that takes only text is enough.
   sees: [],
-  needs: [castForScenes],
+  needs: [castForScenes, treatmentForScenes],
 };
 
 export const castingDirector: Role = {
@@ -136,7 +145,7 @@ export const castingDirector: Role = {
   // It picks portraits by looking at them, and listens to voices when its model can.
   sees: ['image', 'audio'],
   mustSee: ['image'],
-  needs: [developmentNeed],
+  needs: [developmentNeed, treatmentForCast],
 };
 
 export const clipDesigner: Role = {
@@ -153,7 +162,10 @@ export const clipDesigner: Role = {
     'the lengths with the rhythm of the scene: short shots quicken it, a long one lets a moment',
     'land; shots of one length in a row feel mechanical. Leave the clip length to the app: it',
     'makes each clip a little longer than the shot holds, so the edit can cut it at its best',
-    'moment. Video models do not act unless told to. They take the emotion of a',
+    'moment. Work a scene as a storyboard first: plan all of its shots, paint the key frame of',
+    'each (and the end frame where the end matters), judge them together in order, then say the',
+    'storyboard is ready for the person and stop. The clips of a scene wait until the person has',
+    'signed off its storyboard; only then make them, in order. Video models do not act unless told to. They take the emotion of a',
     'line from its wording and punctuation, not from the situation, so write each line the',
     'way it is said in that moment and give it a delivery; a line written flat is spoken flat',
     'even in a storm. They underplay bodies, so say in the performance who moves how, how',
@@ -199,7 +211,7 @@ export const clipDesigner: Role = {
   // It judges key frames by looking at them, and watches clips when its model can.
   sees: ['image', 'video'],
   mustSee: ['image'],
-  needs: [scenesNeed, castForClips, locationsNeed],
+  needs: [scenesNeed, castForClips, locationsNeed, storyboardForClips],
 };
 
 export const productionDesigner: Role = {
@@ -230,18 +242,21 @@ export const productionDesigner: Role = {
   scope: area(['world.']),
   sees: ['image'],
   mustSee: ['image'],
-  needs: [developmentNeed],
+  needs: [developmentNeed, treatmentForWorld],
 };
 
 export const soundDesigner: Role = {
   id: 'sound-designer',
   name: 'Sound Designer',
-  summary: 'Gives scenes their sound effects and music.',
+  summary: 'Adds music and the sounds the clips lack, where a scene needs them.',
   brief: [
-    'You are a sound designer for a film made with generated sound. You decide what a scene',
-    'sounds like beyond its dialogue, and make it. Read the scene and its shots first. List',
-    'what is heard: the ambience of the place, the noises of what happens, and music only',
-    'where the moment carries it. One entry is one sound; a model asked for a storm, a door',
+    'You are a sound designer for a film made from generated video. Clips come with their own',
+    'sound: the voices, the noises of what happens and the ambience of the place. That is',
+    'usually all a scene needs, so you add sound only where it is asked for or where the scene',
+    'truly lacks it: music where a moment carries it, a steady ambience bed under a scene whose',
+    "clips' own backgrounds jump at the cuts, or an effect no clip makes, such as something",
+    'heard off screen. Never remake what the clips already have. Watch or read the cut first',
+    '(movie.edit.edl), and work on a scene once its first cut is signed off. One entry is one sound; a model asked for a storm, a door',
     'and footsteps at once returns mud. Describe an effect by its source, its character and',
     'how it starts and ends, and never as an instruction. Describe music by instruments,',
     'tempo, mood and how it develops, and keep it under the dialogue. Write the sounds down',
@@ -254,7 +269,7 @@ export const soundDesigner: Role = {
   scope: area(['movie.sound.']),
   // It listens when its model can, and works from descriptions when it cannot.
   sees: ['audio'],
-  needs: [scenesNeed],
+  needs: [scenesNeed, firstCutForSound],
 };
 
 export const filmEditor: Role = {
@@ -301,9 +316,12 @@ export const filmEditor: Role = {
     'sound, so lay sound for it on the audio lane. Most cuts should stay straight cuts; item.set',
     'transition (dissolve, dip-black, dip-white, wipe) with transitionSeconds sets how a piece',
     'comes in after the one before, for a passage of time or a change of place. A dissolve or',
-    'wipe overlaps the pieces and shortens the scene. Lay ambience under a whole',
-    'scene (looped) and effects where they happen; keep music under the dialogue, around 0.3 to',
-    '0.5, with a fade in and out. An item whose clip is missing, pending, or whose dialogue is',
+    'wipe overlaps the pieces and shortens the scene. Clips carry their own sound, which is',
+    'usually all a cut needs; lay extra sound only where the scene asks for it, such as an',
+    "ambience bed (looped) where the clips' own backgrounds jump at the cuts, and keep music under",
+    'the dialogue, around 0.3 to 0.5, with a fade in and out. When the first cut of a scene is',
+    'done, say it is ready for the person to watch and stop: its first cut is a checkpoint they',
+    'sign off before music, extra sound and finishing. An item whose clip is missing, pending, or whose dialogue is',
     'not recorded or out of date is not ready: say which, and send that work to the person who',
     'makes it rather than cutting around it. Judge continuity across shots, such as the same',
     'look of a character, the same light and place within a scene, and levels between scenes,',
@@ -447,8 +465,8 @@ export function createMovieMode(options: {
       { id: 'casting', name: 'Casting', guide: castingGuide },
       { id: 'design', name: 'Design', guide: designGuide },
       { id: 'shots', name: 'Shots', guide: shotsGuide },
-      { id: 'sound', name: 'Sound', guide: soundGuide },
       { id: 'edit', name: 'Edit', guide: editGuide },
+      { id: 'sound', name: 'Sound', guide: soundGuide },
       { id: 'audio', name: 'Audio', guide: audioGuide },
     ],
     guideTranslations: { de: movieGuidesDe },
@@ -486,6 +504,7 @@ export function createMovieMode(options: {
     project: movieProjectSupport,
     library: [movieLibrarySource],
     work: movieWork,
+    checkpoints: movieCheckpoints,
     // The pictures of the world are drawn in the film's tone.
     visualStyle: async (store, projectId) => {
       const stored = await store.get(movieDevelopmentKey(projectId));
