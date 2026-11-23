@@ -50,7 +50,7 @@ Auf der Seite **Projekte** erstellt **Beispielfilm öffnen** eine Kopie von „D
 
 ## Der Koordinator
 
-Der Koordinator ist der Agent in der Leiste rechts. Sprich mit ihm wie mit einem Produzenten: Sag, was du willst, und er plant, stellt ein und verteilt die Arbeit. Er kann Optionen ändern und Dinge für dich einrichten.
+Der Koordinator ist der Agent in der Leiste rechts. Sprich mit ihm wie mit einem Produzenten: Sag, was du willst, und er plant, stellt ein und verteilt die Arbeit. Er kann Optionen ändern und Dinge für dich einrichten. Die Arbeit der Crew macht er nicht selbst, deshalb genügt ihm ein Modell, das nur Text liest und schreibt.
 
 ## Rollen
 
@@ -66,7 +66,17 @@ Unter **Weitere Rollen** auf der Seite **Crew** gibt es Extras, die erst zur Cre
 
 - **Kritiker**: sieht sich den Film an und hinterlässt Notizen auf der Zeitleiste.
 
-Leg auf der Seite **Crew** eigene Rollen an, etwa einen Berater oder einen zweiten Kritiker, und speichere eine ganze Crew in der Bibliothek, um sie in ein anderes Projekt zu laden.
+Leg auf der Seite **Crew** eigene Rollen an, etwa einen Berater oder einen zweiten Kritiker, und speichere eine ganze Crew in der Bibliothek, um sie in ein anderes Projekt zu laden. **Ändern** bei einer eigenen Rolle öffnet sie wieder.
+
+## Jede Rolle hat ihren eigenen Bereich
+
+Jede Rolle liest, was sie braucht, und ändert nur ihre eigene Arbeit: Der Drehbuchautor liest die Angaben zur Besetzung, kann aber keine Figuren anlegen, und der Casting-Direktor kann keine Szenen schreiben. Fehlt einem Crewmitglied etwas, etwa eine Figur, die die Szene braucht, hält es an und sagt, was fehlt, statt es zu erfinden; der Koordinator lässt es anlegen und lässt das Crewmitglied dann weitermachen.
+
+Eine Rolle sagt auch, was sie braucht, bevor sie anfängt. Der Drehbuchautor braucht eine Besetzung, bevor er Szenen schreibt, Casting-Direktor und Szenenbildner brauchen die Entwicklung, und der Cutter braucht Clips. Der Koordinator prüft das, bevor er Arbeit verteilt, und sorgt zuerst für das, was fehlt. Ein Film ohne Figuren kommt ohne Besetzung aus: Sag es dem Koordinator.
+
+## Passende Modelle
+
+Was eine Rolle sehen muss, bestimmt, welche Modelle zu ihr passen. Drehbuchautor und Koordinator arbeiten mit Text, also genügt jedes Modell, das Werkzeuge nutzen kann. Casting-Direktor, Szenenbildner, Clip-Designer, Cutter und Kritiker beurteilen Bilder und brauchen deshalb ein Modell, das Bilder sieht; wer sie mit einem anderen Modell einstellen will, wird abgewiesen, und angeboten werden nur passende Modelle. Die Websuche geht mit jedem Modell. Für eine eigene Rolle wählst du unter **Muss sehen**, was sie braucht.
 
 ## Gespräche gehören zu Projekten
 

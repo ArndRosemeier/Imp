@@ -28,13 +28,21 @@ export interface ToolScope {
   readonly effects?: readonly Effect[];
   /** Only commands whose id starts with one of these prefixes. Defaults to all. */
   readonly prefixes?: readonly string[];
+  /**
+   * Only commands that change something (any effect but read) whose id starts
+   * with one of these prefixes. It keeps a role to writing in its own area
+   * while it reads more widely. Defaults to everything `prefixes` allows.
+   */
+  readonly writes?: readonly string[];
 }
 
 /** True when `scope` exposes `command`. Agents are held to this at execution time too. */
 export function isInScope(command: Command, scope: ToolScope = {}): boolean {
   return (
     (scope.effects?.includes(command.effect) ?? true) &&
-    (scope.prefixes?.some((prefix) => command.id.startsWith(prefix)) ?? true)
+    (scope.prefixes?.some((prefix) => command.id.startsWith(prefix)) ?? true) &&
+    (command.effect === 'read' ||
+      (scope.writes?.some((prefix) => command.id.startsWith(prefix)) ?? true))
   );
 }
 

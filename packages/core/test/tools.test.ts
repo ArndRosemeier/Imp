@@ -5,6 +5,7 @@ import {
   defineCommand,
   fromToolName,
   inputSchemaOf,
+  isInScope,
   settingsCommands,
   toToolDefinitions,
   toToolName,
@@ -81,5 +82,28 @@ describe('parity', () => {
       expect(tool.function.description.length).toBeGreaterThanOrEqual(20);
       expect(tool.function.parameters).toHaveProperty('type', 'object');
     }
+  });
+});
+
+describe('a scope that keeps writing to an area', () => {
+  const command = (id: string, effect: 'read' | 'write' | 'spend') =>
+    defineCommand({
+      id,
+      title: id,
+      description: 'A command to test which scopes expose it.',
+      effect,
+      input: z.object({}),
+      output: z.object({}),
+      handler: () => Promise.resolve({}),
+    });
+
+  it('reads widely and changes only what `writes` names', () => {
+    const scope = { prefixes: ['story.'], writes: ['story.scene.'] };
+    expect(isInScope(command('story.cast.get', 'read'), scope)).toBe(true);
+    expect(isInScope(command('story.scene.write', 'write'), scope)).toBe(true);
+    expect(isInScope(command('story.cast.add', 'write'), scope)).toBe(false);
+    expect(isInScope(command('story.cast.picture', 'spend'), scope)).toBe(false);
+    // Left out, it writes wherever it reads, as before.
+    expect(isInScope(command('story.cast.add', 'write'), { prefixes: ['story.'] })).toBe(true);
   });
 });

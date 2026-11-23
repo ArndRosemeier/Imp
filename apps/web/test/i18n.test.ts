@@ -38,7 +38,9 @@ function wordsFromTheCore(): Set<string> {
   });
   const words = [
     ...imp.registry.list().map((command) => command.title),
-    ...imp.roles.list().flatMap((role) => [role.name, role.summary]),
+    ...imp.roles
+      .list()
+      .flatMap((role) => [role.name, role.summary, ...(role.needs ?? []).map((need) => need.name)]),
     ...imp.modes.flatMap((mode) => [
       mode.name,
       ...mode.stages.map((stage) => stage.name),

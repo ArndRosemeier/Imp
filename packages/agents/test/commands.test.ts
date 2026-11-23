@@ -15,6 +15,7 @@ import {
   alwaysAllowed,
   ConversationSchema,
   coordinatorRole,
+  COORDINATOR_WRITES,
   createAgentCommands,
   createCrewCommands,
   releaseInterruptedRuns,
@@ -501,10 +502,13 @@ describe('delegation', () => {
 });
 
 describe('coordinatorRole', () => {
-  it('may read and write, and ask to spend or delete', () => {
+  it('reads everything, changes only the workspace, and may ask to spend or delete', () => {
     expect(coordinatorRole.scope).toEqual({
       effects: ['read', 'write', 'spend', 'destructive'],
+      writes: COORDINATOR_WRITES,
     });
+    // It coordinates in words: a model that takes only text is enough.
+    expect(coordinatorRole.sees).toEqual([]);
   });
 });
 

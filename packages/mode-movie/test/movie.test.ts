@@ -1,4 +1,4 @@
-import { RoleCatalog } from '@imp/agents';
+import { modelProblem, RoleCatalog, roleCanUse, showsMedia } from '@imp/agents';
 import {
   CommandRegistry,
   isInScope,
@@ -84,17 +84,84 @@ describe('the movie mode', () => {
     const outside = projectCommands.filter((command: Command) =>
       isInScope(command, screenwriter.scope),
     );
-    expect(outside.map((command) => command.id).sort()).toEqual([
-      'project.list',
-      'project.resources.copy',
-      'project.resources.list',
-      'project.resources.request.get',
-      'project.resources.request.list',
-      'project.resources.request.resolve',
-    ]);
-    expect(movieMode.commands.every((command) => isInScope(command, castingDirector.scope))).toBe(
-      true,
+    expect(outside.map((command) => command.id).sort()).toEqual(['project.list']);
+    // The Casting Director reads the whole film and changes only the cast.
+    const casting = movieMode.commands.filter((command) =>
+      isInScope(command, castingDirector.scope),
     );
+    expect(casting.filter((command) => command.effect === 'read').length).toBe(
+      movieMode.commands.filter((command) => command.effect === 'read').length,
+    );
+    expect(
+      casting
+        .filter((command) => command.effect !== 'read')
+        .every((command) => command.id.startsWith('movie.character.')),
+    ).toBe(true);
+  });
+
+  it('gives every change to exactly the roles whose work it is', () => {
+    const movieMode = createMovieMode({ provider: createFakeProvider({}) });
+    const all = [
+      ...movieMode.commands,
+      ...createWorldCommands({ provider: createFakeProvider({}) }),
+    ];
+    const writers = (id: string): string[] =>
+      movieMode.roles
+        .filter((role) => {
+          const command = all.find((candidate) => candidate.id === id);
+          return command !== undefined && roleCanUse(role, command);
+        })
+        .map((role) => role.id);
+    // The Screenwriter writes the story, and never characters or places.
+    expect(writers('movie.scene.update')).toEqual(['screenwriter']);
+    expect(writers('movie.development.update')).toEqual(['screenwriter']);
+    expect(writers('movie.character.create')).toEqual(['casting-director']);
+    expect(writers('movie.character.update')).toEqual(['casting-director']);
+    expect(writers('world.location.create')).toEqual(['production-designer']);
+    expect(writers('movie.shot.clip.generate')).toEqual(['clip-designer']);
+    expect(writers('movie.sound.generate')).toEqual(['sound-designer']);
+    expect(writers('movie.edit.item.split')).toEqual(['film-editor']);
+    expect(writers('movie.edit.marker.add')).toEqual(['film-editor', 'critic']);
+    // Every change in the mode has a role whose work it is.
+    const orphans = all
+      .filter((command) => command.effect !== 'read')
+      .filter((command) => writers(command.id).length === 0)
+      .map((command) => command.id);
+    expect(orphans).toEqual([]);
+  });
+
+  it('lets the Screenwriter work with a text-only model, and checks models against roles', () => {
+    const movieMode = createMovieMode({ provider: createFakeProvider({}) });
+    const all = [
+      ...movieMode.commands,
+      ...createWorldCommands({ provider: createFakeProvider({}) }),
+    ];
+    // It reads the cast's details, but is never given a command that shows media.
+    expect(
+      all.some(
+        (command) => command.id === 'movie.character.get' && roleCanUse(screenwriter, command),
+      ),
+    ).toBe(true);
+    expect(
+      all
+        .filter((command) => showsMedia(command))
+        .some((command) => roleCanUse(screenwriter, command)),
+    ).toBe(false);
+    expect(
+      all.some((command) => command.id === 'movie.shot.get' && roleCanUse(screenwriter, command)),
+    ).toBe(false);
+    const textModel = {
+      id: 'text/only',
+      inputModalities: ['text' as const],
+      outputModalities: ['text' as const],
+      supportsTools: true,
+    };
+    expect(modelProblem(screenwriter, textModel)).toBeNull();
+    expect(modelProblem(castingDirector, textModel)).toMatch(/pictures/);
+    expect(modelProblem(screenwriter, { ...textModel, supportsTools: false })).toMatch(/tools/);
+    expect(
+      modelProblem(castingDirector, { ...textModel, inputModalities: ['text', 'image'] }),
+    ).toBeNull();
   });
 
   it('refuses projects that do not exist or belong to another mode', async () => {

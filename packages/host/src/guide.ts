@@ -48,7 +48,7 @@ On the **Projects** screen, **Open the sample film** makes a copy of "The Last L
 
 ## The coordinator
 
-The coordinator is the agent in the panel on the right. Talk to it like a producer: say what you want, and it plans, hires and hands out the work. It can change settings and set things up for you.
+The coordinator is the agent in the panel on the right. Talk to it like a producer: say what you want, and it plans, hires and hands out the work. It can change settings and set things up for you. It does not do the crew's work itself, so a model that only reads and writes text is enough for it.
 
 ## Roles
 
@@ -64,7 +64,17 @@ Under **More roles** on the **Crew** page are extras that are not part of the us
 
 - **Critic**: watches the film and leaves notes on the timeline.
 
-Define roles of your own on the **Crew** page, such as an advisor or a second critic, and save a whole crew to the library to load it into another project.
+Define roles of your own on the **Crew** page, such as an advisor or a second critic, and save a whole crew to the library to load it into another project. **Change** on a custom role opens it again.
+
+## Each role has its own area
+
+Every role reads what it needs and changes only its own work: the Screenwriter reads the cast's details but cannot make characters, and the Casting Director cannot write scenes. When a crew member finds something missing, such as a character the scene needs, it stops and says what is missing instead of making it up; the coordinator has it made, then lets the crew member continue.
+
+A role also says what it needs before it starts. The Screenwriter needs a cast before it writes scenes, the Casting Director and the Production Designer need the development, and the Film Editor needs clips. The coordinator checks this before it hands out work and arranges what is missing first. A film with no characters can go without a cast: tell the coordinator.
+
+## Models that fit
+
+What a role must see decides which models fit it. The Screenwriter and the coordinator work from text, so any model that can use tools will do. The Casting Director, the Production Designer, the Clip Designer, the Film Editor and the Critic judge pictures, so they need a model that sees pictures; hiring one with a model that does not is refused, and only the models that fit are offered. Web search works with any model. For a role of your own, choose under **Must see** what it needs.
 
 ## Chats belong to projects
 

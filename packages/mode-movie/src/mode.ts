@@ -30,10 +30,45 @@ import { movieProjectSupport } from './project.js';
 import { movieGuidesDe } from './guide.de.js';
 import { createCharacterVoiceCommands } from './voice.js';
 import { movieWork } from './work.js';
+import {
+  castForClips,
+  castForScenes,
+  clipsNeed,
+  developmentNeed,
+  locationsNeed,
+  scenesNeed,
+} from './needs.js';
 
-const SCOPE = {
-  prefixes: ['movie.', 'world.', 'library.', 'project.list', 'project.resources.', 'media.'],
-} as const;
+/**
+ * What the crew reads: the whole film, so that each one's work fits the rest.
+ * Each role writes only in its own area (`writes`), so that a piece of work is
+ * always made by the role whose work it is; one that finds a piece missing
+ * reports it to the coordinator instead of making it up.
+ */
+const READS = ['movie.', 'world.', 'library.', 'project.list', 'project.resources.', 'media.'];
+/**
+ * The Screenwriter works from text alone, so a text-only model is enough: it
+ * reads the story, the cast's details and the places, and never a picture,
+ * a clip or a sound.
+ */
+const TEXT_READS = [
+  'movie.development.',
+  'movie.scene.',
+  'movie.script.',
+  'movie.character.list',
+  'movie.character.get',
+  'world.location.list',
+  'world.location.get',
+  'world.object.list',
+  'world.object.get',
+  'library.list',
+  'library.get',
+  'project.list',
+];
+const area = (writes: readonly string[], reads: readonly string[] = READS) => ({
+  prefixes: [...reads],
+  writes: [...writes],
+});
 
 export const screenwriter: Role = {
   id: 'screenwriter',
@@ -59,10 +94,17 @@ export const screenwriter: Role = {
     '"OPENING IMAGE" or "The hero": rewrite them into the story in place, and ask to delete only',
     'the placeholders the story has no use for, once. Show, do not tell, and keep dialogue short. Link each scene to the place it',
     'happens in (locationId, from world.location.list) and the state the place is in, such as',
-    'night or after the fire; when a place or state does not exist yet, create it with only a',
-    'name and a description and leave its look to the Production Designer.',
+    "night or after the fire. Places are the Production Designer's work: when one does not exist",
+    'yet, leave locationId empty, describe the place in the slug line and the action, and list',
+    'the new places in your summary so that they can be designed and linked.',
+    "Characters are the Casting Director's work, not yours: write only characters who are in",
+    'the cast. When the scenes need someone who is not there yet, or there is no cast at all,',
+    'do not invent them: report it with report_missing and stop.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['movie.development.', 'movie.scene.', 'movie.script.'], TEXT_READS),
+  // It writes from text alone, so a model that takes only text is enough.
+  sees: [],
+  needs: [castForScenes],
 };
 
 export const castingDirector: Role = {
@@ -90,7 +132,11 @@ export const castingDirector: Role = {
     'directs the speaker. Listen to it with media.view if you can, and rewrite the voice and',
     'record again when it does not fit.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['movie.character.']),
+  // It picks portraits by looking at them, and listens to voices when its model can.
+  sees: ['image', 'audio'],
+  mustSee: ['image'],
+  needs: [developmentNeed],
 };
 
 export const clipDesigner: Role = {
@@ -119,8 +165,9 @@ export const clipDesigner: Role = {
     'is too calm, and change the shot before you ask to generate again.',
     "Each shot happens in its scene's location; give it the view of that location it is filmed",
     'from (viewId, from world.location.get), so that shots from different sides show one place,',
-    'and list the objects seen with their state. Ask the Production Designer for a view that is',
-    'missing rather than describing the room anew in the shot.',
+    'and list the objects seen with their state. A view, place or object that is missing is the',
+    "Production Designer's work, and a character who is missing the Casting Director's: report it",
+    'with report_missing rather than describing the room or the person anew in the shot.',
     'Before a clip, paint its key frame with movie.shot.frame.generate: a still of the first',
     'instant, drawn from the pictures of the place, the people and the objects. Look at it with',
     'media.view, judge the framing, the faces and the room against the other shots of the scene,',
@@ -131,7 +178,11 @@ export const clipDesigner: Role = {
     'long it should run. Make them like any shot, matched to the shots around them in the cut,',
     'and keep to the length asked for; the clip takes the place of its slate in the cut by itself.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['movie.shot.'], [...READS, 'models.list']),
+  // It judges key frames by looking at them, and watches clips when its model can.
+  sees: ['image', 'video'],
+  mustSee: ['image'],
+  needs: [scenesNeed, castForClips, locationsNeed],
 };
 
 export const productionDesigner: Role = {
@@ -159,7 +210,10 @@ export const productionDesigner: Role = {
     'where needed, and select the best as the key picture. Pictures cost money; make the words',
     'right first. If you cannot be shown images, say so and leave the choice to the user.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['world.']),
+  sees: ['image'],
+  mustSee: ['image'],
+  needs: [developmentNeed],
 };
 
 export const soundDesigner: Role = {
@@ -180,7 +234,10 @@ export const soundDesigner: Role = {
     'with silence; that is level, not a fault of the sound. Change the description before you',
     'generate again, and say plainly when a sound does not work.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['movie.sound.']),
+  // It listens when its model can, and works from descriptions when it cannot.
+  sees: ['audio'],
+  needs: [scenesNeed],
 };
 
 export const filmEditor: Role = {
@@ -246,7 +303,10 @@ export const filmEditor: Role = {
     'texts clear of faces and of each other, and on screen long enough to read: about 15',
     'letters a second.',
   ].join(' '),
-  scope: SCOPE,
+  scope: area(['movie.edit.', 'movie.shot.take.use']),
+  sees: ['image', 'audio', 'video'],
+  mustSee: ['image'],
+  needs: [clipsNeed],
 };
 
 export const critic: Role = {
@@ -300,7 +360,11 @@ export const critic: Role = {
     ],
     // Reading, and markers, which are the only thing it writes.
     effects: ['read', 'write'],
+    writes: ['movie.edit.marker.'],
   },
+  sees: ['image'],
+  mustSee: ['image'],
+  needs: [clipsNeed],
 };
 
 export const soundEditor: Role = {
@@ -324,7 +388,8 @@ export const soundEditor: Role = {
     'can. Each change is a step the person can undo, and they can take back your whole pass at',
     'once, so work in clear steps and say what you changed and why, by time.',
   ].join(' '),
-  scope: { prefixes: ['movie.', 'library.', 'project.list', 'media.', 'audio.'] },
+  scope: area(['audio.'], ['movie.', 'library.', 'project.list', 'media.', 'audio.']),
+  sees: ['audio'],
 };
 
 /**

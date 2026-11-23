@@ -288,6 +288,13 @@ const STATUS: Record<
     icon: WarningCircleIcon,
     tone: 'danger',
   },
+  blocked: {
+    get label(): string {
+      return t('Something is missing');
+    },
+    icon: HandPalmIcon,
+    tone: 'wait',
+  },
 };
 
 function useStageNames(): (stage: string) => string {

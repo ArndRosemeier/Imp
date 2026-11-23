@@ -1,5 +1,13 @@
-import { isInScope, MemoryBlobStore, MemoryKeyValueStore, toToolName } from '@imp/core';
-import { coordinatorRole, findCommands, guideRole, isDirect, type Role } from '@imp/agents';
+import { MemoryBlobStore, MemoryKeyValueStore, toToolName } from '@imp/core';
+import {
+  coordinatorRole,
+  findCommands,
+  guideRole,
+  isDirect,
+  roleCanUse,
+  type Role,
+} from '@imp/agents';
+import { filmEditor } from '@imp/mode-movie';
 import { createFakeProvider } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
 import { createImp, createMemorySecretStore } from '../src/index.js';
@@ -18,7 +26,7 @@ function lookup(role: Role) {
     secrets: createMemorySecretStore(),
     provider: createFakeProvider({}),
   });
-  const inScope = imp.registry.list().filter((command) => isInScope(command, role.scope));
+  const inScope = imp.registry.list().filter((command) => roleCanUse(role, command));
   return (query: string): string[] => {
     const found = findCommands(inScope, query, (command) =>
       isDirect(command, role.direct) ? toToolName(command.id) : undefined,
@@ -48,12 +56,21 @@ const ASKS: readonly (readonly [string, string])[] = [
   ['import a picture into the library', 'library.import'],
   ['write a note', 'library.text.create'],
   ['save all backup', 'backup.save'],
-  ['export the film', 'movie.edit.export'],
   ['what is new in this version', 'app.changelog'],
   ['turn off tips', 'help.set'],
   ['report a problem', 'support.report.prepare'],
   ['set a budget so agents spend without asking', 'spend.allowance.set'],
   ['how much budget is left without approval', 'spend.allowance.get'],
+];
+
+/** Asks only some roles can act on: each role finds what is its own to do. */
+const ROLE_ASKS: readonly (readonly [Role, string, string])[] = [
+  [guideRole, 'export the film', 'movie.edit.export'],
+  [filmEditor, 'export the film', 'movie.edit.export'],
+  [coordinatorRole, 'what does the screenwriter need before writing', 'crew.needs'],
+  [coordinatorRole, 'check prerequisites before tasking', 'crew.needs'],
+  [coordinatorRole, 'this film has no characters, so no cast is needed', 'crew.needs.waive'],
+  [coordinatorRole, 'which models fit the casting director', 'models.list'],
 ];
 
 describe('finding commands by what people call them', () => {
@@ -63,6 +80,19 @@ describe('finding commands by what people call them', () => {
       expect(find(query)).toContain(id);
     });
   }
+
+  it.each(ROLE_ASKS.map(([role, query, id]) => [role.name, query, id, role] as const))(
+    '%s: "%s" finds %s',
+    (_name, query, id, role) => {
+      expect(lookup(role)(query)).toContain(id);
+    },
+  );
+
+  it('never offers the coordinator the work of the crew', () => {
+    const find = lookup(coordinatorRole);
+    expect(find('export the film')).not.toContain('movie.edit.export');
+    expect(find('write a scene')).not.toContain('movie.scene.create');
+  });
 
   it('finds every command by the title people see in the app', () => {
     const imp = createImp({

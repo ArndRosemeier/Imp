@@ -46,6 +46,7 @@ export const WorkStatus = z.enum([
   'budget-exhausted',
   'cancelled',
   'failed',
+  'blocked',
 ]);
 export type WorkStatus = z.infer<typeof WorkStatus>;
 

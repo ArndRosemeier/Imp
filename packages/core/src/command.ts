@@ -41,6 +41,12 @@ export interface CommandSpec<I extends z.ZodType, O extends z.ZodType> {
    * it can be priced first. Reads only; null when it cannot say.
    */
   readonly estimate?: (context: CommandContext, input: z.output<I>) => Promise<CostRequest | null>;
+  /**
+   * Refuses a call that cannot go ahead, by throwing a CommandError, before
+   * anyone is asked to approve it: a request the person would approve only
+   * to see it fail. Reads only.
+   */
+  readonly check?: (context: CommandContext, input: z.output<I>) => Promise<void>;
 }
 
 /** The type-erased form the registry stores and every caller can run. */
@@ -57,6 +63,8 @@ export interface Command {
   readonly run: (context: CommandContext, rawInput: unknown) => Promise<unknown>;
   /** What it would make, for pricing before it runs. Null for invalid input or when it cannot say. */
   readonly estimate?: (context: CommandContext, rawInput: unknown) => Promise<CostRequest | null>;
+  /** Refuses a call that cannot go ahead, before approval is asked; see CommandSpec. */
+  readonly check?: (context: CommandContext, rawInput: unknown) => Promise<void>;
 }
 
 /** A command that still remembers its input and output types, for typed callers. */
@@ -116,6 +124,16 @@ export function defineCommand<I extends z.ZodType, O extends z.ZodType>(
             const input = spec.input.safeParse(rawInput);
             if (!input.success || spec.estimate === undefined) return null;
             return spec.estimate(context, input.data);
+          },
+        }),
+    ...(spec.check === undefined
+      ? {}
+      : {
+          check: async (context: CommandContext, rawInput: unknown) => {
+            const input = spec.input.safeParse(rawInput);
+            // Invalid input is refused by run, with the details.
+            if (!input.success || spec.check === undefined) return;
+            await spec.check(context, input.data);
           },
         }),
     run: async (context, rawInput) => {

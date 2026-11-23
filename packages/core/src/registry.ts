@@ -147,6 +147,15 @@ export class CommandRegistry {
       await record('denied');
       throw new CommandError('denied', id, `${actor.kind} "${actor.id}" may not run "${id}".`);
     }
+    if (decision === 'needs-approval' && options.approved !== true && command.check !== undefined) {
+      // A call that cannot go ahead is refused now, not after someone approved it.
+      try {
+        await command.check({ actor, runtime: this.#runtime }, rawInput);
+      } catch (error) {
+        await record('failed', failureText(error));
+        throw error;
+      }
+    }
     if (
       decision === 'needs-approval' &&
       options.approved !== true &&

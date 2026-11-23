@@ -4,6 +4,7 @@ import { ActivityEntry } from '@imp/core';
 import {
   CaretUpIcon,
   DownloadSimpleIcon,
+  PencilSimpleIcon,
   PlusIcon,
   TrashIcon,
   UserPlusIcon,
@@ -14,7 +15,7 @@ import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
 import { ModelPanel } from './model-bar.js';
-import { AGENTS_MODEL_SETTING } from './model-choice.js';
+import { AGENTS_MODEL_SETTING, ModelChoice } from './model-choice.js';
 import { useModelSetting, type Act } from './movie.js';
 import {
   EFFECT_MODEL_SETTING,
@@ -43,6 +44,7 @@ const RoleList = z.object({
       summary: z.string(),
       custom: z.boolean(),
       extra: z.boolean().optional(),
+      modelInput: z.array(z.string()).default([]),
     }),
   ),
   extras: z.array(z.object({ id: z.string(), name: z.string(), summary: z.string() })),
@@ -64,7 +66,10 @@ export function CrewView(): ReactElement {
     return { value: await read('coordinator.member'), model: await read('coordinator.model') };
   });
   const [hireError, setHireError] = useState<string | null>(null);
+  // The role whose hire was refused for its model: it gets a choice of the models that fit.
+  const [picking, setPicking] = useState<string | null>(null);
   const [defining, setDefining] = useState(false);
+  const [editing, setEditing] = useState<RoleDetails | null>(null);
   const hiredRoles = new Set((crew.data?.crew ?? []).map((member) => member.roleId));
   const model = coordinator.data?.model;
 
@@ -155,6 +160,15 @@ export function CrewView(): ReactElement {
             }}
           />
         )}
+        {editing !== null && (
+          <RoleForm
+            key={editing.id}
+            initial={editing}
+            onDone={() => {
+              setEditing(null);
+            }}
+          />
+        )}
         <div className="grid">
           {(roles.data?.roles ?? []).map((role) => (
             <article key={role.id} className="card stack">
@@ -163,6 +177,11 @@ export function CrewView(): ReactElement {
                 {role.custom && <span className="tag neutral">{t('Custom')}</span>}
               </div>
               <p className="muted">{tx(role.summary)}</p>
+              <span className="muted">
+                {role.modelInput.includes('image')
+                  ? t('Needs a model that sees pictures')
+                  : t('A text-only model is enough')}
+              </span>
               <div className="row">
                 {hiredRoles.has(role.id) ? (
                   <span className="tag">{t('On the crew')}</span>
@@ -172,9 +191,12 @@ export function CrewView(): ReactElement {
                     disabled={typeof model !== 'string'}
                     onClick={() => {
                       setHireError(null);
+                      setPicking(null);
                       runCommand(imp, 'crew.hire', { roleId: role.id, model }).catch(
                         (error: unknown) => {
                           setHireError(messageOf(error));
+                          // Refused for its model: offer the ones that fit the role.
+                          if (role.modelInput.length > 0) setPicking(role.id);
                         },
                       );
                     }}
@@ -196,6 +218,24 @@ export function CrewView(): ReactElement {
                     {t('Put away')}
                   </button>
                 )}
+                {role.custom && (
+                  <button
+                    className="button quiet"
+                    onClick={() => {
+                      setHireError(null);
+                      runCommand(imp, 'crew.role.get', { id: role.id }).then(
+                        (details) => {
+                          setEditing(RoleDetails.parse(details));
+                        },
+                        (error: unknown) => {
+                          setHireError(messageOf(error));
+                        },
+                      );
+                    }}
+                  >
+                    <PencilSimpleIcon aria-hidden="true" /> {t('Change')}
+                  </button>
+                )}
                 {role.custom && !hiredRoles.has(role.id) && (
                   <ConfirmButton
                     label={t('Delete role')}
@@ -212,6 +252,26 @@ export function CrewView(): ReactElement {
                   </ConfirmButton>
                 )}
               </div>
+              {picking === role.id && !hiredRoles.has(role.id) && (
+                <ModelChoice
+                  id={`hire-model-${role.id}`}
+                  label={t('Hire with a model that fits')}
+                  empty={t('Choose a model')}
+                  output="text"
+                  tools
+                  role={role.id}
+                  value={null}
+                  onChoose={async (chosen) => {
+                    setHireError(null);
+                    try {
+                      await runCommand(imp, 'crew.hire', { roleId: role.id, model: chosen });
+                      setPicking(null);
+                    } catch (error: unknown) {
+                      setHireError(messageOf(error));
+                    }
+                  }}
+                />
+              )}
             </article>
           ))}
         </div>
@@ -253,48 +313,166 @@ export function CrewView(): ReactElement {
   );
 }
 
-/** Defines a custom role. What it may use is picked from the groups of commands that exist. */
-function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
+/** A custom role as crew.role.get returns it, to change it in the form. */
+const RoleDetails = z.object({
+  id: z.string(),
+  name: z.string(),
+  summary: z.string(),
+  brief: z.string(),
+  commands: z.array(z.string()),
+  writes: z.array(z.string()),
+  effects: z.array(z.string()),
+  webSearch: z.boolean(),
+  sees: z.array(z.string()).nullable(),
+  needs: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      description: z.string(),
+      providedBy: z.string().nullable(),
+    }),
+  ),
+});
+type RoleDetails = z.infer<typeof RoleDetails>;
+
+/** The needs any role has, which a custom role can share, from crew.needs. */
+const KnownNeeds = z.object({
+  roles: z.array(
+    z.object({
+      needs: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string(),
+          providedBy: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
+/** A checkbox in a list of choices. */
+function Choice({
+  checked,
+  disabled = false,
+  onToggle,
+  children,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  children: ReactElement | string;
+}): ReactElement {
+  return (
+    <label className="choice">
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} />
+      {children}
+    </label>
+  );
+}
+
+/**
+ * Defines a custom role, or changes one. Everything a role's scope holds is
+ * set here, as the coordinator sets it with crew.role.create: what it reads,
+ * what it may change (only its own area), what it must see (which decides
+ * the models that fit), web search, spending and deleting, and what it needs
+ * before it can start.
+ */
+function RoleForm({
+  initial,
+  onDone,
+}: {
+  initial?: RoleDetails;
+  onDone: () => void;
+}): ReactElement {
   const imp = useImp();
   const groups = [
-    ...new Set(imp.commands.map((command) => command.id.split('.')[0] ?? command.id)),
+    ...new Set(imp.commands.map((command) => `${command.id.split('.')[0] ?? command.id}.`)),
   ].sort();
-  const [name, setName] = useState('');
-  const [summary, setSummary] = useState('');
-  const [brief, setBrief] = useState('');
-  const [chosen, setChosen] = useState<readonly string[]>([]);
-  const [change, setChange] = useState(true);
-  const [spend, setSpend] = useState(false);
-  const [destroy, setDestroy] = useState(false);
-  const [webSearch, setWebSearch] = useState(false);
+  // A role an agent defined may name single commands; they stay choices of their own.
+  const options = [
+    ...new Set([...groups, ...(initial?.commands ?? []), ...(initial?.writes ?? [])]),
+  ];
+  const [name, setName] = useState(initial?.name ?? '');
+  const [summary, setSummary] = useState(initial?.summary ?? '');
+  const [brief, setBrief] = useState(initial?.brief ?? '');
+  const [reads, setReads] = useState<readonly string[]>(initial?.commands ?? []);
+  const [changes, setChanges] = useState<readonly string[]>(initial?.writes ?? []);
+  const [sees, setSees] = useState<readonly string[]>(initial?.sees ?? []);
+  const [needs, setNeeds] = useState<RoleDetails['needs']>(initial?.needs ?? []);
+  const [spend, setSpend] = useState(initial?.effects.includes('spend') ?? false);
+  const [destroy, setDestroy] = useState(initial?.effects.includes('destructive') ?? false);
+  const [webSearch, setWebSearch] = useState(initial?.webSearch ?? false);
   const [error, setError] = useState<string | null>(null);
+  const known = useLive(['roles/'], async (current) => {
+    const listed = KnownNeeds.parse(await runCommand(current, 'crew.needs', {}));
+    const byId = new Map<string, RoleDetails['needs'][number]>();
+    for (const need of listed.roles.flatMap((role) => role.needs)) {
+      if (!byId.has(need.id)) {
+        byId.set(need.id, {
+          id: need.id,
+          name: need.name,
+          description: need.description,
+          providedBy: need.providedBy,
+        });
+      }
+    }
+    return [...byId.values()];
+  });
+  const needOptions = [
+    ...needs,
+    ...(known.data ?? []).filter((need) => needs.every((chosen) => chosen.id !== need.id)),
+  ];
 
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
-    runCommand(imp, 'crew.role.create', {
+    const fields = {
       name: name.trim(),
       summary: summary.trim(),
       brief: brief.trim(),
-      commands: chosen.map((group) => `${group}.`),
+      commands: [...new Set([...reads, ...changes])],
+      writes: [...changes],
+      sees: [...sees],
+      needs: needs.map(({ providedBy, ...need }) => ({
+        ...need,
+        ...(providedBy === null ? {} : { providedBy }),
+      })),
       effects: [
         'read',
-        ...(change ? ['write'] : []),
+        ...(changes.length > 0 ? ['write'] : []),
         ...(spend ? ['spend'] : []),
         ...(destroy ? ['destructive'] : []),
       ],
       webSearch,
-    }).then(onDone, (reason: unknown) => {
+    };
+    runCommand(
+      imp,
+      initial === undefined ? 'crew.role.create' : 'crew.role.update',
+      initial === undefined ? fields : { id: initial.id, ...fields },
+    ).then(onDone, (reason: unknown) => {
       setError(messageOf(reason));
     });
   };
-  const toggle = (group: string): void => {
-    setChosen(
-      chosen.includes(group) ? chosen.filter((item) => item !== group) : [...chosen, group],
-    );
+  const toggle = (
+    list: readonly string[],
+    set: (next: readonly string[]) => void,
+    item: string,
+  ): void => {
+    set(list.includes(item) ? list.filter((other) => other !== item) : [...list, item]);
   };
+  const SEEN: readonly (readonly [string, string])[] = [
+    ['image', t('pictures')],
+    ['audio', t('sound')],
+    ['video', t('video')],
+  ];
+  const plain = (prefix: string): string => (prefix.endsWith('.') ? prefix.slice(0, -1) : prefix);
 
   return (
-    <form className="card stack page" onSubmit={submit} aria-label={t('New role')}>
+    <form
+      className="card stack page"
+      onSubmit={submit}
+      aria-label={initial === undefined ? t('New role') : t('Change role')}
+    >
       <div className="field">
         <label htmlFor="role-name">{t('Name')}</label>
         <input
@@ -333,62 +511,94 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
         />
       </div>
       <fieldset className="choices">
-        <legend>{t('May use')}</legend>
-        {groups.map((group) => (
-          <label key={group} className="choice">
-            <input
-              type="checkbox"
-              checked={chosen.includes(group)}
-              onChange={() => {
-                toggle(group);
-              }}
-            />
-            {group}
-          </label>
+        <legend>{t('May read')}</legend>
+        {options.map((option) => (
+          <Choice
+            key={option}
+            checked={reads.includes(option) || changes.includes(option)}
+            disabled={changes.includes(option)}
+            onToggle={() => {
+              toggle(reads, setReads, option);
+            }}
+          >
+            {plain(option)}
+          </Choice>
         ))}
       </fieldset>
       <fieldset className="choices">
-        <legend>{t('Beyond reading, may')}</legend>
-        <label className="choice">
-          <input
-            type="checkbox"
-            checked={change}
-            onChange={() => {
-              setChange(!change);
+        <legend>{t('May change (only its own area)')}</legend>
+        {options.map((option) => (
+          <Choice
+            key={option}
+            checked={changes.includes(option)}
+            onToggle={() => {
+              toggle(changes, setChanges, option);
             }}
-          />
-          {t('change things')}
-        </label>
-        <label className="choice">
-          <input
-            type="checkbox"
-            checked={spend}
-            onChange={() => {
-              setSpend(!spend);
+          >
+            {plain(option)}
+          </Choice>
+        ))}
+      </fieldset>
+      <fieldset className="choices">
+        <legend>{t('Must see (decides which models fit)')}</legend>
+        {SEEN.map(([kind, label]) => (
+          <Choice
+            key={kind}
+            checked={sees.includes(kind)}
+            onToggle={() => {
+              toggle(sees, setSees, kind);
             }}
-          />
-          {t('ask to spend money')}
-        </label>
-        <label className="choice">
-          <input
-            type="checkbox"
-            checked={destroy}
-            onChange={() => {
-              setDestroy(!destroy);
+          >
+            {label}
+          </Choice>
+        ))}
+        {sees.length === 0 && <span className="muted">{t('A text-only model is enough')}</span>}
+      </fieldset>
+      <fieldset className="choices">
+        <legend>{t('Needs before it starts')}</legend>
+        {needOptions.length === 0 && <span className="muted">{t('Nothing')}</span>}
+        {needOptions.map((need) => (
+          <Choice
+            key={need.id}
+            checked={needs.some((chosen) => chosen.id === need.id)}
+            onToggle={() => {
+              setNeeds(
+                needs.some((chosen) => chosen.id === need.id)
+                  ? needs.filter((chosen) => chosen.id !== need.id)
+                  : [...needs, need],
+              );
             }}
-          />
-          {t('ask to delete things')}
-        </label>
-        <label className="choice">
-          <input
-            type="checkbox"
-            checked={webSearch}
-            onChange={() => {
-              setWebSearch(!webSearch);
-            }}
-          />
+          >
+            {tx(need.name)}
+          </Choice>
+        ))}
+      </fieldset>
+      <fieldset className="choices">
+        <legend>{t('It may also')}</legend>
+        <Choice
+          checked={webSearch}
+          onToggle={() => {
+            setWebSearch(!webSearch);
+          }}
+        >
           {t('search the web')}
-        </label>
+        </Choice>
+        <Choice
+          checked={spend}
+          onToggle={() => {
+            setSpend(!spend);
+          }}
+        >
+          {t('ask to spend money')}
+        </Choice>
+        <Choice
+          checked={destroy}
+          onToggle={() => {
+            setDestroy(!destroy);
+          }}
+        >
+          {t('ask to delete things')}
+        </Choice>
       </fieldset>
       {error !== null && (
         <p className="error" role="alert">
@@ -398,9 +608,11 @@ function RoleForm({ onDone }: { onDone: () => void }): ReactElement {
       <div className="row">
         <button
           className="button primary"
-          disabled={name.trim() === '' || brief.trim() === '' || chosen.length === 0}
+          disabled={
+            name.trim() === '' || brief.trim() === '' || reads.length + changes.length === 0
+          }
         >
-          {t('Create the role')}
+          {initial === undefined ? t('Create the role') : t('Save the role')}
         </button>
         <button type="button" className="button quiet" onClick={onDone}>
           {t('Cancel')}

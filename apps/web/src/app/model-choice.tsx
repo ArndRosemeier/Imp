@@ -97,6 +97,7 @@ export function ModelChoice({
   empty,
   output,
   tools = false,
+  role,
   value,
   known = [],
   onChoose,
@@ -106,6 +107,8 @@ export function ModelChoice({
   empty: string;
   output: string;
   tools?: boolean;
+  /** A role id: only the models that can do its work are offered. */
+  role?: string;
   value: string | null;
   known?: readonly KnownModel[];
   onChoose: (model: string) => Promise<void> | void;
@@ -132,6 +135,7 @@ export function ModelChoice({
         runCommand(imp, 'models.list', {
           output,
           tools,
+          ...(role === undefined ? {} : { role }),
           ...(words === '' ? {} : { search: words }),
         }).then(
           (listed) => {
@@ -152,7 +156,7 @@ export function ModelChoice({
       current = false;
       window.clearTimeout(timer);
     };
-  }, [imp, open, query, output, tools]);
+  }, [imp, open, query, output, tools, role]);
 
   // A tap or click anywhere else closes the list.
   useEffect(() => {

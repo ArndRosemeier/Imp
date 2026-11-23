@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   activityList,
+  CommandError,
   CommandRegistry,
   defineCommand,
   readActivity,
@@ -209,6 +210,39 @@ describe('CommandRegistry', () => {
       expect((await readActivity(runtime.store)).map((entry) => entry.outcome)).toEqual([
         'needs-approval',
         'ok',
+      ]);
+    });
+
+    it('refuses a call its check turns down before anyone is asked to approve it', async () => {
+      const { registry, runtime } = setup();
+      const picky = defineCommand({
+        id: 'test.picky',
+        title: 'Picky',
+        description: 'A paid command that is refused unless it is ready.',
+        effect: 'spend',
+        input: z.object({ ready: z.boolean() }),
+        output: z.object({}),
+        check: ({ actor }, { ready }) =>
+          ready || actor.kind !== 'agent'
+            ? Promise.resolve()
+            : Promise.reject(new CommandError('invalid_input', 'test.picky', 'Not ready.')),
+        handler: () => Promise.resolve({}),
+      });
+      registry.register(picky);
+      await expect(
+        registry.executeById('test.picky', { ready: false }, { actor: agent }),
+      ).rejects.toThrow('Not ready.');
+      expect(
+        (await registry.executeById('test.picky', { ready: true }, { actor: agent })).status,
+      ).toBe('needs-approval');
+      // Invalid input is left to the run, which says what is wrong.
+      expect(
+        (await registry.executeById('test.picky', { ready: 'no' }, { actor: agent })).status,
+      ).toBe('needs-approval');
+      expect((await readActivity(runtime.store)).map((entry) => entry.outcome)).toEqual([
+        'failed',
+        'needs-approval',
+        'needs-approval',
       ]);
     });
   });

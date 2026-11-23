@@ -50,6 +50,7 @@ export function start(
       model('vendor/clips', { outputModalities: ['video'] }),
       model('vendor/composer', { outputModalities: ['text', 'audio'] }),
       model('vendor/no-tools', { supportsTools: false }),
+      model('vendor/seer', { inputModalities: ['text', 'image'] }),
     ],
   });
   const imp = createImp({
