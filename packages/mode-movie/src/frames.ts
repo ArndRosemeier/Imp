@@ -8,8 +8,8 @@ import {
 import { ProviderError, type GenerationProvider, type MediaInput } from '@imp/providers';
 import { IMAGE_MODEL_SETTING } from '@imp/world';
 import { z } from 'zod';
-import { movieDevelopmentKey } from './commands.js';
-import { Development, KeyFrame, type Character, type Shot } from './schema.js';
+import { KeyFrame, type Character, type Shot } from './schema.js';
+import { readFilmStyle, visualStyleOf } from './style.js';
 import {
   describeSetting,
   loadShot,
@@ -182,8 +182,10 @@ export function createFrameCommands(
         (character) => !character.voiceOnly,
       );
       const setting = await readSetting(runtime.store, input.projectId, shot);
-      const development = await runtime.store.get(movieDevelopmentKey(input.projectId));
-      const tone = development === undefined ? '' : Development.parse(development).tone;
+      // The film's look in words, and its chosen look picture as the last reference.
+      const tone = await visualStyleOf(runtime.store, input.projectId);
+      const filmStyle = await readFilmStyle(runtime.store, input.projectId);
+      const lookImage = filmStyle.images.find((image) => image.id === filmStyle.keyImageId);
 
       // The place first: it sets the composition. Then the people, then the objects.
       const world = settingGuides(setting);
@@ -199,6 +201,14 @@ export function createFrameCommands(
           : [{ blobKey: place.image.blobKey, name: `${place.name} (the place)` }]),
         ...portraits,
         ...objects.map((guide) => ({ blobKey: guide.image.blobKey, name: guide.name })),
+        ...(lookImage === undefined
+          ? []
+          : [
+              {
+                blobKey: lookImage.blobKey,
+                name: 'the look of the film (take only its colours, light and texture)',
+              },
+            ]),
       ];
       // What the frame must agree with goes first: the start of this shot for its end,
       // the end of the shot before for a cut on action.

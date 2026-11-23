@@ -11,7 +11,7 @@ export const Development = z.object({
   tone: z
     .string()
     .describe(
-      'Genre, mood and visual style. Every picture of the film (portraits, places, key frames) is drawn in this style.',
+      'Genre and mood. Every picture of the film is drawn in this mood, and in the visual style (movie.style) where one is written; a film without one is drawn in its tone alone.',
     ),
   treatment: z.string().describe('The story told in prose from beginning to end.'),
 });

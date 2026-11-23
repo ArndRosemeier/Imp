@@ -5,6 +5,7 @@ import {
   requireProject,
   type Command,
   type CoreRuntime,
+  type BlobStore,
   type KeyValueStore,
   patchOf,
   chosenModel,
@@ -36,6 +37,15 @@ export interface WorldCommandOptions {
    * The mode of the project knows where that is written (a film keeps it in its tone).
    */
   readonly style?: (store: KeyValueStore, projectId: string) => Promise<string>;
+  /**
+   * A picture that shows the look of a project, such as a film's chosen look
+   * picture, which goes with every picture of a place where the model takes it.
+   */
+  readonly styleReference?: (
+    store: KeyValueStore,
+    blobs: BlobStore,
+    projectId: string,
+  ) => Promise<MediaInput | undefined>;
 }
 
 const ProjectId = z.string().describe('The id of a project from project.list.');
@@ -149,6 +159,8 @@ export function worldImagePrompt(options: {
   readonly direction?: string | undefined;
   /** How many earlier pictures go with the prompt. */
   readonly references: number;
+  /** Whether a picture of the project's look goes with the prompt too, after the others. */
+  readonly styleReference?: boolean;
 }): string {
   const { element, view, state, parent, style, direction, references } = options;
   const isPlace = element.kind === 'location';
@@ -172,6 +184,9 @@ export function worldImagePrompt(options: {
         ? 'The reference images show this same place. Keep its architecture, materials, colours and the position of everything exactly as they are; only the camera position and the state described here may differ.'
         : 'The reference images show this same object. Keep its shape, proportions, materials and colours exactly; only the view and the state described here may differ.',
     style === '' ? '' : `Visual style: ${sentence(style)}`,
+    options.styleReference === true
+      ? 'The last reference image only shows the look of the film: take its colours, light and texture, not what is in it.'
+      : '',
     sentence(direction ?? ''),
     isPlace
       ? 'No people in the frame.'
@@ -585,6 +600,12 @@ function kindCommands(
           ? await readElement(runtime.store, input.projectId, 'location', element.parentId)
           : undefined;
       const style = (await options.style?.(runtime.store, input.projectId)) ?? '';
+      // A place is drawn in the look of the film too, after the pictures of itself.
+      const look =
+        element.kind === 'location' && references.length < MAX_IMAGE_REFERENCES
+          ? await options.styleReference?.(runtime.store, runtime.blobs, input.projectId)
+          : undefined;
+      if (look !== undefined) references.push(look);
       const promptFor = (count: number): string =>
         input.prompt ??
         worldImagePrompt({
@@ -594,7 +615,8 @@ function kindCommands(
           parent: parent?.kind === 'location' ? parent : undefined,
           style,
           direction: input.direction,
-          references: count,
+          references: look !== undefined && count > 0 ? count - 1 : count,
+          styleReference: look !== undefined && count > 0,
         });
 
       let used = references.length;

@@ -10,18 +10,19 @@ export const movieGuidesDe: readonly GuideTopic[] = [
     id: 'stage-development',
     area: 'development',
     title: 'Entwicklung',
-    summary: 'Die Idee des Films, bevor es ein Drehbuch gibt: Logline, Prämisse, Ton, Treatment.',
+    summary:
+      'Die Idee des Films, bevor es ein Drehbuch gibt: Logline, Prämisse, Ton, Treatment und die Bildsprache.',
     hint: {
       title: 'Fang mit der Idee an',
       body: 'Schreib eine Logline und die Geschichte in ein paar Absätzen, oder erzähl dem Koordinator deine Idee in einem Satz und lass den Drehbuchautor einen Entwurf schreiben. Alles Spätere baut auf dieser Seite auf.',
     },
-    body: `Die Entwicklung enthält, was der Film ist, bevor es ein Drehbuch gibt: die **Logline** (der Film in ein, zwei Sätzen), die **Prämisse** (die Ausgangslage, die Hauptfigur und was auf dem Spiel steht), den **Ton** (Genre, Stimmung und Bildsprache) und das **Treatment** (die Geschichte in Prosa, vom Anfang bis zum Ende).
+    body: `Die Entwicklung enthält, was der Film ist, bevor es ein Drehbuch gibt: die **Logline** (der Film in ein, zwei Sätzen), die **Prämisse** (die Ausgangslage, die Hauptfigur und was auf dem Spiel steht), den **Ton** (Genre und Stimmung) und das **Treatment** (die Geschichte in Prosa, vom Anfang bis zum Ende).
 
 ## Was du hier tust
 
 1. Schreib die Logline: Wer will was, und was steht im Weg?
 2. Schreib die Prämisse und dann das Treatment.
-3. Beschreib die Bildsprache im Ton in Worten (zum Beispiel „körniger 16-mm-Film, kalte Blautöne, Handkamera“). Bilder der Welt werden darin gezeichnet, damit der Film wie ein Film aussieht.
+3. Leg die **Bildsprache** fest, die Look-Bibel des Films: Palette, Licht, Kamera und Zeit in ein paar konkreten Worten (zum Beispiel „kalte Blautöne und Natriumorange“, „körniger 16-mm-Film, Handkamera“), und mal ein **Look-Bild** oder zieh eins hinein. Jedes Porträt, jeder Ort und jedes Keyframe wird in dieser Bildsprache gemalt, mit dem gewählten Look-Bild daneben, damit der Film wie ein Film aussieht. Der **Szenenbildner** kann das für dich übernehmen.
 
 ## Lass die Crew ran
 

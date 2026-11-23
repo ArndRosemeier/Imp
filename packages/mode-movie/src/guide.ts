@@ -10,18 +10,19 @@ export const developmentGuide: GuideTopic = {
   id: 'stage-development',
   area: 'development',
   title: 'Development',
-  summary: 'The idea of the film before there is a script: logline, premise, tone, treatment.',
+  summary:
+    'The idea of the film before there is a script: logline, premise, tone, treatment and the visual style.',
   hint: {
     title: 'Start with the idea',
     body: 'Write a logline and the story in a few paragraphs, or tell the coordinator your idea in one sentence and let the Screenwriter draft it. Everything later builds on this page.',
   },
-  body: `Development holds what the film is before there is a script: the **logline** (the film in a sentence or two), the **premise** (the situation, the main character and what is at stake), the **tone** (genre, mood and visual style) and the **treatment** (the story in prose, beginning to end).
+  body: `Development holds what the film is before there is a script: the **logline** (the film in a sentence or two), the **premise** (the situation, the main character and what is at stake), the **tone** (genre and mood) and the **treatment** (the story in prose, beginning to end).
 
 ## What to do here
 
 1. Write the logline: who wants what, and what stands in the way.
 2. Write the premise and then the treatment.
-3. Put the visual style into the tone in words (for example "grainy 16mm, cold blues, handheld"). Pictures of the world are drawn in it, so the film looks like one film.
+3. Set the **visual style**, the film's look bible: palette, light, camera and era in a few concrete words (for example "cold blues and sodium orange", "grainy 16mm, handheld"), and paint or drop in a **look picture**. Every portrait, place and key frame is drawn in that style with the chosen look picture beside it, so the film looks like one film. The **Production Designer** can do it for you.
 
 ## Let the crew do it
 

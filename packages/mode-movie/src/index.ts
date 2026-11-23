@@ -234,3 +234,13 @@ export {
   storyboardForClips,
   treatmentCheckpoint,
 } from './needs.js';
+export {
+  createStyleCommands,
+  FilmStyle,
+  readFilmStyle,
+  StyleImage,
+  styleKey,
+  styleReference,
+  styleWords,
+  visualStyleOf,
+} from './style.js';

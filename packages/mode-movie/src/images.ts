@@ -1,8 +1,9 @@
 import { CommandError, defineCommand, requireProject, type Command, chosenModel } from '@imp/core';
 import { ProviderError, type GenerationProvider } from '@imp/providers';
 import { z } from 'zod';
-import { characterPrefix, movieDevelopmentKey } from './commands.js';
-import { Character, CharacterImage, Development, MODE_ID } from './schema.js';
+import { characterPrefix } from './commands.js';
+import { Character, CharacterImage, MODE_ID } from './schema.js';
+import { styleReference, visualStyleOf } from './style.js';
 
 import { IMAGE_MODEL_SETTING } from '@imp/world';
 
@@ -14,13 +15,17 @@ const ProjectId = z.string().describe('The id of a movie project from project.li
 /** What is sent to the image model when the caller gives no prompt of their own. */
 export function portraitPrompt(
   character: Character,
-  tone: string,
+  style: string,
   direction: string | undefined,
+  withLook = false,
 ): string {
   return [
     `Character portrait of ${character.name}${character.part === '' ? '' : `, ${character.part}`}.`,
     character.appearance === '' ? character.description : character.appearance,
-    tone === '' ? '' : `Visual style: ${tone}`,
+    style === '' ? '' : `Visual style: ${style}`,
+    withLook
+      ? 'The reference image only shows the look of the film: take its colours, light and texture, not the person or what is in it.'
+      : '',
     direction ?? '',
   ]
     .map((part) => part.trim())
@@ -49,7 +54,7 @@ export function createCharacterImageCommands(provider: GenerationProvider): read
     id: 'movie.character.image.generate',
     title: 'Generate character image',
     description:
-      'Makes a picture of a character from its appearance and the tone of the film, and adds it to the character. The first image becomes the portrait. Costs money at the image model.',
+      'Makes a picture of a character from its appearance and the visual style of the film (movie.style), with the chosen look picture as a reference where the model takes one, and adds it to the character. The first image becomes the portrait. Costs money at the image model.',
     effect: 'spend',
     input: z.object({
       projectId: ProjectId,
@@ -93,17 +98,34 @@ export function createCharacterImageCommands(provider: GenerationProvider): read
           `No image model is chosen. Set the setting "${IMAGE_MODEL_SETTING}" to an id from models.list with output "image", or pass a model.`,
         );
       }
-      const development = await runtime.store.get(movieDevelopmentKey(input.projectId));
-      const tone = development === undefined ? '' : Development.parse(development).tone;
-      const prompt = input.prompt ?? portraitPrompt(character, tone, input.direction);
+      const style = await visualStyleOf(runtime.store, input.projectId);
+      // The look picture of the film goes along where the model takes one; one that takes no
+      // pictures refuses, which costs nothing, and the portrait is drawn from the words alone.
+      const look = await styleReference(runtime.store, runtime.blobs, input.projectId);
+      const promptFor = (withLook: boolean): string =>
+        input.prompt ?? portraitPrompt(character, style, input.direction, withLook);
+      let prompt = promptFor(look !== undefined);
 
       let generated;
       try {
-        generated = await provider.generateImage({
-          model,
-          prompt,
-          aspectRatio: input.aspectRatio,
-        });
+        const request = { model, aspectRatio: input.aspectRatio };
+        try {
+          generated = await provider.generateImage(
+            look === undefined
+              ? { ...request, prompt }
+              : { ...request, prompt, references: [look] },
+          );
+        } catch (error) {
+          if (
+            !(error instanceof ProviderError) ||
+            error.kind !== 'bad_request' ||
+            look === undefined
+          ) {
+            throw error;
+          }
+          prompt = promptFor(false);
+          generated = await provider.generateImage({ ...request, prompt });
+        }
       } catch (error) {
         if (!(error instanceof ProviderError)) throw error;
         throw new CommandError('handler_failed', id, `No image was made: ${error.message}`, {
