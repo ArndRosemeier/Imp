@@ -361,8 +361,15 @@ async function readAlwaysAllowed(store: KeyValueStore): Promise<string[]> {
 export const alwaysAllowed: AutoApproval = async ({ runtime }, command) =>
   !NEVER_ALWAYS.has(command.id) && (await readAlwaysAllowed(runtime.store)).includes(command.id);
 
-/** Commands that ask every time: an agent that may raise its own budget needs no approval at all. */
-const NEVER_ALWAYS: ReadonlySet<string> = new Set(['spend.allowance.set']);
+/**
+ * Commands that ask every time: an agent that may raise its own budget, sign off its own
+ * work or let itself past the checkpoints needs no approval at all.
+ */
+export const NEVER_ALWAYS: ReadonlySet<string> = new Set([
+  'spend.allowance.set',
+  'project.checkpoint.approve',
+  'project.checkpoint.style',
+]);
 
 /** One request waiting for the user, with who asked for it. */
 export const WaitingApprovalSchema = z.object({
@@ -436,8 +443,10 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     projectId: string | null,
   ): Promise<NeedStatus[]> {
     const needs = await needStatus(store, role, projectId);
+    // A sign-off of the person's holds back only the commands it is for: the role does the
+    // work before it, such as the storyboard before the clips.
     const blocking = needs.filter(
-      (need) => need.state === 'missing' && !input.without.includes(need.id),
+      (need) => need.state === 'missing' && !need.byPerson && !input.without.includes(need.id),
     );
     if (actor.kind === 'agent' && input.task !== undefined && blocking.length > 0) {
       const names = await roleNames(roles, store);
@@ -555,11 +564,19 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
 
       const names = await roleNames(roles, store);
       const needs = await refuseUnready(actor, store, input, role, member.name, projectId);
-      const guard = async (commandId: string): Promise<string | null> => {
+      const guard = async (commandId: string, commandInput?: unknown): Promise<string | null> => {
         if (projectId === null) return null;
         for (const need of role.needs ?? []) {
           if (need.before?.some((prefix) => commandId.startsWith(prefix)) !== true) continue;
-          const [status] = await needStatus(store, { ...role, needs: [need] }, projectId);
+          const [status] = await needStatus(
+            store,
+            { ...role, needs: [need] },
+            projectId,
+            commandInput,
+          );
+          if (status?.state === 'missing' && status.byPerson) {
+            return `${commandId} waits for ${status.name}, which is not given yet. Do not try to get around it: finish what you can do before it, say that it is ready for the person to look at, and stop. The coordinator asks them (project.checkpoint.approve).`;
+          }
           if (status?.state === 'missing') {
             return `${commandId} needs ${describeNeed(status, names)}, which is not there yet. Do not make it yourself or make it up: call report_missing with what is missing and stop.`;
           }

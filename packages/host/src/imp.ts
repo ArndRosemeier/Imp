@@ -1,5 +1,6 @@
 import {
   coordinatorRole,
+  createCheckpointCommands,
   globalCoordinatorRole,
   guideRole,
   createAgentCommands,
@@ -228,6 +229,9 @@ export function createImp(options: ImpOptions): Imp {
       models: () => provider.listModels(),
     }),
     ...createNeedCommands(roles),
+    ...createCheckpointCommands(
+      modes.map((mode) => ({ mode: mode.id, checkpoints: mode.checkpoints ?? [] })),
+    ),
     ...createSavedCrewCommands(roles),
     ...createModelMixCommands([
       { setting: 'coordinator.model', label: 'Agents' },

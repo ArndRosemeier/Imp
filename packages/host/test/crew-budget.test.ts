@@ -38,6 +38,7 @@ describe('a crew member spending within the budget', () => {
     await run('project.open', { projectId });
     if (imageModel !== null) await run('settings.set', { key: 'images.model', value: imageModel });
     await run('movie.development.update', { projectId, logline: 'A storm.' });
+    await run('project.checkpoint.approve', { projectId, checkpointId: 'treatment' });
     const { id: characterId } = await run<{ id: string }>('movie.character.create', {
       projectId,
       name: 'Mara',

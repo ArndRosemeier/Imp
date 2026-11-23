@@ -419,6 +419,12 @@ describe('App: setup and agents', () => {
       { need: 'cast', reason: 'No people in this film.' },
       { actor: { kind: 'user', id: 'local' } },
     );
+    // The scenes wait for the person's sign-off of the treatment.
+    await imp.registry.executeById(
+      'project.checkpoint.approve',
+      { projectId, checkpointId: 'treatment' },
+      { actor: { kind: 'user', id: 'local' } },
+    );
 
     await user.click(screen.getByRole('button', { name: 'Crew' }));
     await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));

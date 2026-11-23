@@ -76,8 +76,8 @@ describe('the movie mode', () => {
       'casting',
       'design',
       'shots',
-      'sound',
       'edit',
+      'sound',
       'audio',
     ]);
     expect(() => new RoleCatalog(movieMode.roles)).not.toThrow();

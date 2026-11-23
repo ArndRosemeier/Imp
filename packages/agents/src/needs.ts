@@ -41,6 +41,11 @@ export const NeedStatus = z.object({
     'met: it is there. missing: it is not, and the role cannot do the work that needs it. waived: this project goes without it. unchecked: Imp cannot check it; judge it from the project.',
   ),
   waivedBecause: z.string().nullable(),
+  byPerson: z
+    .boolean()
+    .describe(
+      'Only the person provides it, such as their sign-off of a checkpoint: it cannot be waived.',
+    ),
 });
 export type NeedStatus = z.infer<typeof NeedStatus>;
 
@@ -49,17 +54,19 @@ export async function needStatus(
   store: KeyValueStore,
   role: Role,
   projectId: string | null,
+  /** The input of the command it is checked for, when it is checked before one. */
+  input?: unknown,
 ): Promise<NeedStatus[]> {
   const waived = projectId === null ? {} : await readWaivedNeeds(store, projectId);
   return Promise.all(
     (role.needs ?? []).map(async (need: Need): Promise<NeedStatus> => {
-      const because = waived[need.id];
+      const because = need.byPerson === true ? undefined : waived[need.id];
       const state: NeedState =
         because !== undefined
           ? 'waived'
           : need.check === undefined || projectId === null
             ? 'unchecked'
-            : (await need.check(store, projectId))
+            : (await need.check(store, projectId, input))
               ? 'met'
               : 'missing';
       return {
@@ -70,6 +77,7 @@ export async function needStatus(
         before: need.before === undefined ? null : [...need.before],
         state,
         waivedBecause: because ?? null,
+        byPerson: need.byPerson === true,
       };
     }),
   );
@@ -93,17 +101,24 @@ export function needsNote(
   if (statuses.length === 0) return undefined;
   const lines = statuses.map((need) => {
     const state =
-      need.state === 'waived'
-        ? `this project goes without it${need.waivedBecause === '' ? '' : ` (${need.waivedBecause ?? ''})`}`
-        : need.state === 'unchecked'
-          ? 'check it yourself'
-          : need.state;
+      need.byPerson && need.state === 'missing'
+        ? `not yet, so ${need.before?.join(', ') ?? 'that work'} waits for it`
+        : need.state === 'waived'
+          ? `this project goes without it${need.waivedBecause === '' ? '' : ` (${need.waivedBecause ?? ''})`}`
+          : need.state === 'unchecked'
+            ? 'check it yourself'
+            : need.state;
     return `- ${describeNeed(need, roleName)}: ${state}`;
   });
   return [
     'What your work needs:',
     ...lines,
     'When something your task needs is missing, do not make it yourself and do not make it up: call report_missing and stop.',
+    ...(statuses.some((need) => need.byPerson && need.state === 'missing')
+      ? [
+          "What waits for the person's sign-off is not missing work: do everything before it, say that it is ready for them to look at, and stop.",
+        ]
+      : []),
   ].join('\n');
 }
 
@@ -184,6 +199,18 @@ export function createNeedCommands(roles: RoleCatalog): readonly Command[] {
       const known = new Set(
         (await roles.all(store)).flatMap((role) => (role.needs ?? []).map(({ id }) => id)),
       );
+      const byPerson = new Set(
+        (await roles.all(store)).flatMap((role) =>
+          (role.needs ?? []).filter((entry) => entry.byPerson === true).map(({ id }) => id),
+        ),
+      );
+      if (byPerson.has(need)) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.needs.waive',
+          `"${need}" is the person's sign-off, which cannot be waived. Ask them with project.checkpoint.approve, or have them change the working style (project.checkpoint.style).`,
+        );
+      }
       if (!known.has(need)) {
         throw new CommandError('invalid_input', 'crew.needs.waive', `No role needs "${need}".`, {
           details: [`need: the needs are ${[...known].sort().join(', ')}`],

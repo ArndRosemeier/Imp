@@ -1,4 +1,4 @@
-import type { Need } from '@imp/agents';
+import { checkpointNeed, inputField, type Checkpoint, type Need } from '@imp/agents';
 import type { KeyValueStore } from '@imp/core';
 import { readWorld } from '@imp/world';
 import { characterPrefix, movieDevelopmentKey, readScenes, shotPrefix } from './commands.js';
@@ -79,3 +79,84 @@ export const clipsNeed: Need = {
       (entry) => Shot.safeParse(entry.value).data?.clip?.status === 'ready',
     ),
 };
+
+/**
+ * Where the crew stops for the person: the treatment before anything is cast,
+ * designed or written into scenes; the storyboard of a scene (its shots and
+ * their key frames) before its clips, which cost far more than frames; and
+ * the first cut of a scene before its sound and finishing.
+ */
+export const treatmentCheckpoint: Checkpoint = {
+  id: 'treatment',
+  name: 'Treatment',
+  description:
+    'The development: logline, premise, tone and treatment, the film every later step is built on. Casting, design and writing the scenes wait for it.',
+  stage: 'development',
+};
+
+export const storyboardCheckpoint: Checkpoint = {
+  id: 'storyboard',
+  name: 'Storyboard',
+  description:
+    'The shots of a scene with their lengths, joins and key frames, looked at in order before any clip of the scene is made. Frames cost cents and clips dollars, so this is where a scene is changed cheaply. The clips of a scene wait for it.',
+  stage: 'shots',
+  per: { name: 'scene', plural: 'scenes' },
+  main: true,
+};
+
+export const firstCutCheckpoint: Checkpoint = {
+  id: 'first-cut',
+  name: 'First cut',
+  description:
+    'The first cut of a scene: its clips trimmed and joined, played with their own sound. Extra sound effects and music for the scene wait for it.',
+  stage: 'edit',
+  per: { name: 'scene', plural: 'scenes' },
+};
+
+export const movieCheckpoints: readonly Checkpoint[] = [
+  treatmentCheckpoint,
+  storyboardCheckpoint,
+  firstCutCheckpoint,
+];
+
+const sceneOf = inputField('sceneId');
+
+/** The Screenwriter writes the development freely and the scenes once the treatment is signed off. */
+export const treatmentForScenes = checkpointNeed(treatmentCheckpoint, [
+  'movie.scene.create',
+  'movie.scene.update',
+  'movie.script.import',
+]);
+
+export const treatmentForCast = checkpointNeed(treatmentCheckpoint, [
+  'movie.character.create',
+  'movie.character.update',
+  'movie.character.image.generate',
+  'movie.character.voice.generate',
+]);
+
+export const treatmentForWorld = checkpointNeed(treatmentCheckpoint, [
+  'world.location.create',
+  'world.location.update',
+  'world.location.view.',
+  'world.location.state.',
+  'world.location.image.generate',
+  'world.object.create',
+  'world.object.update',
+  'world.object.state.',
+  'world.object.image.generate',
+]);
+
+/** Clips, and recorded lines laid over them, wait for the storyboard of their scene. */
+export const storyboardForClips = checkpointNeed(
+  storyboardCheckpoint,
+  ['movie.shot.clip.generate', 'movie.shot.dialogue.generate'],
+  sceneOf,
+);
+
+/** Extra sound for a scene waits for its first cut, which plays with the clips' own sound. */
+export const firstCutForSound = checkpointNeed(
+  firstCutCheckpoint,
+  ['movie.sound.generate'],
+  sceneOf,
+);

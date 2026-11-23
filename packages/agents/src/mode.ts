@@ -6,6 +6,7 @@ import type {
   LibrarySource,
   ProjectSupport,
 } from '@imp/core';
+import type { Checkpoint } from './checkpoints.js';
 import type { Role } from './role.js';
 import type { WorkDescriber } from './work.js';
 
@@ -49,6 +50,11 @@ export interface Mode {
    * to, and names for the scenes, shots and others agents work on.
    */
   readonly work?: WorkDescriber;
+  /**
+   * Where the crew stops for the person to look before the next, more
+   * expensive stage, in workflow order. Each sits on one of the stages.
+   */
+  readonly checkpoints?: readonly Checkpoint[];
 }
 
 /** Checks a mode's own consistency once, at start-up, instead of failing later in use. */
@@ -71,6 +77,13 @@ export function defineMode(mode: Mode): Mode {
   const stageIds = new Set(mode.stages.map((stage) => stage.id));
   if (stageIds.size !== mode.stages.length) {
     throw new TypeError(`Mode "${mode.id}" lists a stage twice.`);
+  }
+  for (const checkpoint of mode.checkpoints ?? []) {
+    if (!stageIds.has(checkpoint.stage)) {
+      throw new TypeError(
+        `Checkpoint "${checkpoint.id}" of mode "${mode.id}" is on an unknown stage "${checkpoint.stage}".`,
+      );
+    }
   }
   return mode;
 }

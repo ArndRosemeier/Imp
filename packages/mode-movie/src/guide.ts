@@ -25,7 +25,11 @@ export const developmentGuide: GuideTopic = {
 
 ## Let the crew do it
 
-Tell the coordinator the story in a sentence. It hires a **Screenwriter**, who writes the development and can go on to the scenes. You can change every word afterwards.
+Tell the coordinator the story in a sentence. It hires a **Screenwriter**, who writes the development. You can change every word afterwards.
+
+## Checkpoints
+
+The crew stops for you at three points, so that nothing expensive is made before you have looked: the **treatment** (here), the **storyboard** of each scene (in Shots) and the **first cut** of each scene (in Edit). Press **Sign off** when it is right; casting, design and the scenes wait for the treatment, the clips of a scene for its storyboard. **How much the crew does on its own** sets where it stops: at each checkpoint, only at the storyboard, or nowhere. Spending always keeps to the budget.
 
 ## Tips
 
@@ -165,19 +169,19 @@ A 4 second clip costs roughly 15 to 40 cents depending on the model and resoluti
 
 ## Let the crew do it
 
-The **Clip Designer** plans shots from the script and makes the clips. It asks before spending.`,
+The **Clip Designer** plans the shots of a scene and paints their key frames first: that is the **storyboard**. Look at the frames in order and press **Sign off** above the shots when the scene works; only then are its clips made, because frames cost cents and clips dollars.`,
 };
 
 export const soundGuide: GuideTopic = {
   id: 'stage-sound',
   area: 'sound',
   title: 'Sound',
-  summary: 'Sound effects and music for each scene.',
+  summary: 'Music and extra sound, where a scene needs more than its clips bring.',
   hint: {
-    title: 'Add effects and music per scene',
+    title: 'Clips bring their own sound',
     body: 'Describe a sound ("waves breaking on rocks at night") or a piece of music and Imp makes it. Sounds go into the scene and can be placed on the Edit timeline or opened in the audio editor.',
   },
-  body: `Sound holds the **sound effects** and **music** of each scene.
+  body: `Clips come with their own sound: voices, noises and the ambience of the place. Sound holds what a scene needs beyond that: **music**, a steady **ambience bed** where the clips' backgrounds jump at the cuts, or an **effect** no clip makes.
 
 ## What to do here
 
@@ -193,7 +197,7 @@ export const soundGuide: GuideTopic = {
 
 ## Let the crew do it
 
-The **Sound Designer** reads each scene and makes what it needs.`,
+The **Sound Designer** adds sound when you ask for it, or where a scene's first cut lacks it, once you have signed that cut off.`,
 };
 
 export const editGuide: GuideTopic = {

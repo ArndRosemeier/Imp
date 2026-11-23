@@ -141,6 +141,7 @@ describe('the interface in every language', () => {
 
 /** Words German writes just like English: loanwords and names. */
 const SAME_IN = new Set<string>([
+  'Storyboard',
   'Limiter',
   'Radio',
   'Monster',

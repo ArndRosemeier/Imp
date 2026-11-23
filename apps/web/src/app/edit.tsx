@@ -1,3 +1,4 @@
+import { CheckpointBar } from './checkpoints.js';
 import type { Project } from '@imp/core';
 import {
   ArrowCounterClockwiseIcon,
@@ -2029,6 +2030,9 @@ export function EditView({ project }: { project: Project }): ReactElement {
         )}
         {rendering > 0 && <RenderingBadge count={rendering} />}
         <span className="edit-head-tools">
+          {sceneId !== undefined && (
+            <CheckpointBar project={project} checkpointId="first-cut" itemId={sceneId} compact />
+          )}
           {look !== undefined && (
             <Popover
               label={t('Look of the whole film')}

@@ -28,9 +28,16 @@ export interface Need {
   readonly before?: readonly string[];
   /**
    * Whether the open project has it. Left out, it cannot be checked by Imp,
-   * and the coordinator judges it from what it reads.
+   * and the coordinator judges it from what it reads. Before a command it is
+   * given the command's input, so that a need can hold for one part of the
+   * project only, such as one scene.
    */
-  readonly check?: (store: KeyValueStore, projectId: string) => Promise<boolean>;
+  readonly check?: (store: KeyValueStore, projectId: string, input?: unknown) => Promise<boolean>;
+  /**
+   * Provided by the person alone, such as their sign-off of a checkpoint: no
+   * role makes it, and no agent can waive it or give a task without it.
+   */
+  readonly byPerson?: boolean;
 }
 
 /**
@@ -312,6 +319,7 @@ export const COORDINATOR_WRITES: readonly string[] = [
   'crew.work.',
   'project.rename',
   'project.export',
+  'project.checkpoint.',
   'project.resources.',
   'spend.',
   'help.hint.',
@@ -435,10 +443,20 @@ export const coordinatorRole: Role = {
     "Giving a task costs money. Paid steps run without asking until the project's budget the",
     'user set is used up (spend.allowance.get); after that they are put to the user. To change',
     'the budget, run spend.allowance.set: the user is asked to approve it every time.',
-    "Prefer doing over asking, and ask only when a choice is truly the user's. When the user",
-    'asks you to make something by yourself, such as a whole film from one prompt, carry on to',
-    'the end without stopping to ask about steps that fit the budget: do them and say what',
-    'they cost. Crew members are told the open project.',
+    'A project being created or opened is not a request to make anything: start work only when',
+    'the user asks for it, and when they have not said what they want, ask. Work stage by stage',
+    'and stop at the checkpoints (project.checkpoint.list): for a film, the treatment, the',
+    'storyboard of each scene and the first cut of each scene. At a checkpoint, show the user',
+    'what was made, briefly, and ask them to sign it off with project.checkpoint.approve (it',
+    'is put in front of them); what waits for it cannot start before. The working style says',
+    'where the crew stops: "each" checkpoint (the default), only the "main" one, or "none".',
+    'When the user asks you to make something by yourself, such as a whole film from one',
+    'prompt, ask to change the working style once with project.checkpoint.style, then carry on',
+    'up to the next checkpoint that still stops, without asking about steps that fit the',
+    'budget. Within a stage, prefer doing over asking, and ask only when a choice is truly the',
+    "user's. Ask for only what the work needs: clips come with their own sound, so give the",
+    'Sound Designer work only when the user asks for music or sound, or the first cut shows a',
+    'scene lacks it. Crew members are told the open project.',
     "Put the user's own words about how the work should look and feel into every task you",
     'give, and before pictures are made check that the project keeps the same style (for a',
     'film, the tone in its development, which every picture is drawn in); if it does not, have',
@@ -482,11 +500,13 @@ export const globalCoordinatorRole: Role = {
     'project it comes from. Do what it asks and reply with what you did, briefly, for that',
     'coordinator to tell the user.',
     'You do not do the work inside a project (writing, casting, shots, sound, editing) and you',
-    'cannot change it. When the user wants something made, such as a whole film from one',
-    'prompt, create or open the project first (project.create, project.open), then give the',
-    "work to the project's coordinator with crew.ask (its member id is in your context), in",
-    "one task that carries the user's own words; it plans the work with the crew there. Tell",
-    'the user the project is open and its coordinator is on it.',
+    'cannot change it. Creating a project is only that: when the user asks for a project,',
+    'create it, open it and tell them it is ready, and ask what they want to do first; do not',
+    'start work in it they did not ask for. When the user asks for something to be made in it,',
+    "such as a film from a description, give that to the project's coordinator with crew.ask",
+    "(its member id is in your context), in one task that carries the user's own words; it",
+    'works with the crew there and stops at the checkpoints for the user. Tell the user the',
+    'project is open and its coordinator is on it.',
     'Prefer doing over asking. Deleting and spending are put to the user for approval; before',
     'spending say what it will cost (spend.estimate). When the user asks how Imp works, read',
     'the guide (help.topics, help.topic) instead of guessing. Before you say Imp cannot do',
