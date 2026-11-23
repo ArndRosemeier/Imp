@@ -827,6 +827,115 @@ input.input.script.heading {
   flex: none;
   padding: var(--space-4) 22px 0;
 }
+/* Which chat: the one for all projects, or the open project's. Each has its colour. */
+.chat-scope {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1);
+  margin: var(--space-4) 22px 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--ground);
+}
+.chat-scope button {
+  --scope: var(--accent);
+  --scope-wash: var(--accent-wash);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: calc(var(--hit) - 8px);
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.chat-scope button[data-scope='all'] {
+  --scope: var(--scope-all);
+  --scope-wash: var(--scope-all-wash);
+}
+.chat-scope button[aria-selected='true'] {
+  border-color: var(--scope);
+  background: var(--scope-wash);
+  color: var(--scope);
+  font-weight: 600;
+}
+.chat-scope button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.chat-scope-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-scope + .crew-switch,
+.chat-scope ~ .crew-panel .crew-head {
+  padding-top: var(--space-3);
+}
+.chat-place {
+  --scope: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--scope);
+}
+.chat-place[data-scope='all'] {
+  --scope: var(--scope-all);
+}
+.crew-panel[data-scope='all'] .crew-head {
+  box-shadow: inset 3px 0 0 var(--scope-all);
+}
+.crew-panel[data-scope='project'] .crew-head {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.passed-on {
+  gap: var(--space-1);
+}
+.passed-note {
+  --scope: var(--accent);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--scope);
+  font-size: 12px;
+  padding-left: 2px;
+}
+.passed-note[data-scope='all'] {
+  --scope: var(--scope-all);
+  flex-wrap: nowrap;
+}
+.passed-note > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.passed-note > .button {
+  flex: none;
+}
+.bubble[data-from='coordinator'] {
+  align-self: flex-end;
+  max-width: 88%;
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--ink);
+}
 .crew-switch + .crew-panel .crew-head,
 .crew-switch ~ .crew-panel .crew-head {
   padding-top: var(--space-4);
@@ -8421,6 +8530,13 @@ dialog.approvals-dialog[open] {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 28ch;
+}
+
+/* The chat for all projects sends in its own colour too. */
+.crew-panel[data-scope='all'] .composer .button.primary {
+  background: var(--scope-all);
+  border-color: var(--scope-all);
+  color: var(--accent-ink);
 }
 
 /* Choices folded under a button: clip options, export options. */

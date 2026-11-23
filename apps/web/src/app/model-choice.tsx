@@ -1,4 +1,5 @@
 import { CaretDownIcon, CheckIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
+import { GLOBAL_COORDINATOR_ROLE } from '@imp/agents';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp } from './context.js';
@@ -62,8 +63,8 @@ function priceText(model: Option): string | null {
 }
 
 /**
- * Sets the model a setting names. The agents' model is also the coordinator's
- * own, so changing it changes the coordinator too, as using a mix does.
+ * Sets the model a setting names. The agents' model is also the coordinators'
+ * own, so changing it changes both coordinators too, as using a mix does.
  */
 export async function chooseModel(
   run: (id: string, input: Record<string, unknown>) => Promise<unknown>,
@@ -78,6 +79,14 @@ export async function chooseModel(
   if (member.success && typeof member.data.value === 'string') {
     await run('crew.update', { id: member.data.value, model });
   }
+  // The Imp coordinator, for all projects, runs on the agents' model too.
+  const crew = z
+    .object({ crew: z.array(z.object({ id: z.string(), roleId: z.string() })) })
+    .safeParse(await run('crew.list', {}));
+  const global = crew.success
+    ? crew.data.crew.find((candidate) => candidate.roleId === GLOBAL_COORDINATOR_ROLE)
+    : undefined;
+  if (global !== undefined) await run('crew.update', { id: global.id, model });
 }
 
 /** Touch screens get no keyboard thrown up just for opening the list. */

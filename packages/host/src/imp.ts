@@ -1,5 +1,6 @@
 import {
   coordinatorRole,
+  globalCoordinatorRole,
   guideRole,
   createAgentCommands,
   type WorkSubject,
@@ -170,6 +171,7 @@ export function createImp(options: ImpOptions): Imp {
   ];
   const roles = new RoleCatalog([
     coordinatorRole,
+    globalCoordinatorRole,
     guideRole,
     ...modes.flatMap((mode) => mode.roles),
   ]);

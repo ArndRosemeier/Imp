@@ -13,6 +13,8 @@ import {
   ConversationSchema,
   conversationKey,
   coordinatorRole,
+  globalCoordinatorRole,
+  guideRole,
   createAgentCommands,
   createCrewCommands,
   releaseInterruptedRuns,
@@ -32,7 +34,7 @@ const artist: Role = {
 function setup(replies: ScriptedChatReply[] = []) {
   const runtime = createTestRuntime();
   const provider = createFakeProvider({ replies });
-  const roles = new RoleCatalog([coordinatorRole, artist]);
+  const roles = new RoleCatalog([coordinatorRole, globalCoordinatorRole, guideRole, artist]);
   const registry = new CommandRegistry({ runtime });
   let release: () => void = () => undefined;
   const gate = new Promise<void>((resolve) => {
@@ -316,7 +318,7 @@ describe('a run that opens a project', () => {
       { content: 'Made it.' },
     ]);
     await addProject('p1', 'Dragon bakery');
-    const coordinator = await hire('coordinator');
+    const coordinator = await hire('guide');
     await run('crew.ask', { memberId: coordinator.id, task: 'Make a whole film.' });
     const now = await conversation(coordinator.id);
     expect(now.projectId).toBe('p1');
@@ -332,7 +334,7 @@ describe('a run that opens a project', () => {
       { content: 'Opened it.' },
     ]);
     await addProject('p1', 'Dragon bakery');
-    const coordinator = await hire('coordinator');
+    const coordinator = await hire('guide');
     await open('p1');
     await run('crew.ask', { memberId: coordinator.id, task: 'Hello.' });
     await open(null);

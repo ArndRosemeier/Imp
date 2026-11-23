@@ -43,12 +43,17 @@ On the **Projects** screen, **Open the sample film** makes a copy of "The Last L
     id: 'crew-and-agents',
     area: 'workspace',
     title: 'The crew: working with AI agents',
-    summary: 'The coordinator, the roles you can hire, and how to give them work.',
+    summary: 'The two coordinators, the roles you can hire, and how to give them work.',
     body: `Imp's AI agents are called the **crew**. Each is hired for a role and runs on a model of your choice.
 
-## The coordinator
+## The coordinators
 
-The coordinator is the agent in the panel on the right. Talk to it like a producer: say what you want, and it plans, hires and hands out the work. It can change settings and set things up for you. It does not do the crew's work itself, so a model that only reads and writes text is enough for it.
+The panel on the right has two chats, switched at its top, each in its own colour.
+
+- **Your project** (amber, with the project's name): the project's **coordinator**. Talk to it like a producer: say what you want, and it plans, hires and hands out the work in this project.
+- **All projects** (blue): the **Imp coordinator**. It looks after what concerns every project: settings and models, model mixes, saved crews and roles, and creating, copying, opening or deleting projects, templates and backups. The start screen shows it. Ask it to make a film and it creates the project and hands the work to that project's coordinator.
+
+When you ask a project's coordinator for something that concerns all projects, such as switching the language, it passes it on to the Imp coordinator. Its chat says **Passed to the Imp coordinator**, and the Imp coordinator's chat shows the ask with **Passed on from** and the project's name. Neither does the crew's work itself, so a model that only reads and writes text is enough for both; they run on the agents' model.
 
 ## Roles
 
@@ -78,7 +83,7 @@ What a role must see decides which models fit it. The Screenwriter and the coord
 
 ## Chats belong to projects
 
-Each project has its own chat with the coordinator and with every crew member. When you open another project, its chats come up, and the agents only remember what was said in that project. The crew itself is the same in every project, and the coordinator can still look after things across projects, such as the library, saved crews and your other projects. On the start screen, with no project open, agents talk in a chat of their own.
+Each project has its own chat with the coordinator and with every crew member. When you open another project, its chats come up, and the agents only remember what was said in that project. The crew itself is the same in every project. The Imp coordinator keeps one chat for all projects, whichever project is open.
 
 **Clear chat** at the top of a chat forgets it for the current project, after asking; other projects keep theirs. What the agent made stays.
 
@@ -134,7 +139,7 @@ Agents ask before they delete something, and before they spend beyond the budget
 - The **Crews** tab keeps saved crews to load into any project. A saved crew keeps every agent with its model, budget and web search, and copies of the custom roles they hold, so it loads even after a role was deleted. Load it to replace the crew or to add to it.
 - The **Mixes** tab keeps model mixes: which model the agents think with and which makes pictures, voices, sound effects, music, clips and transcripts. Apply one to set them all at once; the Models chip on every stage does the same.
 
-Crews and mixes belong to the whole workspace, not to one project. Agents use the same library: ask the coordinator to "save this crew" or "save these models as a mix" and it does it.`,
+Crews and mixes belong to the whole workspace, not to one project. Agents use the same library: ask a coordinator to "save this crew" or "save these models as a mix" and the Imp coordinator does it.`,
   },
   {
     id: 'projects',
@@ -162,7 +167,7 @@ The project switcher at the top of the screen changes the open project from anyw
 
 ## Where they are
 
-On the **Projects** screen under **Save all / Load all**, and under **Settings**. The coordinator can do both too: ask it to save everything, and Imp offers you the file to keep.
+On the **Projects** screen under **Save all / Load all**, and under **Settings**. The Imp coordinator can do both too: ask it to save everything, and Imp offers you the file to keep.
 
 ## Saving
 

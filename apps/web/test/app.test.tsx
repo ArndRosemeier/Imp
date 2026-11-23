@@ -130,9 +130,18 @@ describe('App: setup and agents', () => {
       { actor: { kind: 'user', id: 't' } },
     );
     expect(stored).toMatchObject({ output: { value: 'vendor/writer' } });
+    // The start screen shows the Imp coordinator, for all projects; the project coordinator waits.
     expect(
-      screen.getByRole('complementary', { name: /Conversation with Coordinator/ }),
+      await screen.findByRole('complementary', { name: /Conversation with Imp coordinator/ }),
     ).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /All projects/ }).getAttribute('aria-selected')).toBe(
+      'true',
+    );
+    expect(screen.getByRole('tab', { name: /No project open/ })).toHaveProperty('disabled', true);
+    const crew = (await imp.store.list('crew/')).map(
+      (entry) => (entry.value as { roleId: string; model: string }).roleId,
+    );
+    expect(crew.sort()).toEqual(['coordinator', 'global-coordinator']);
     // The setup itself went through commands, so it shows in the activity strip.
     const strip = screen.getByRole('contentinfo', { name: 'Activity' });
     // One line with the latest command; a tap opens the recent ones.
@@ -141,7 +150,7 @@ describe('App: setup and agents', () => {
     await user.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     const recent = await within(strip).findByRole('list');
-    expect(await within(recent).findByText(/you · crew\.hire · ok/)).toBeTruthy();
+    expect((await within(recent).findAllByText(/you · crew\.hire · ok/)).length).toBe(2);
     await user.click(toggle);
     expect(within(strip).queryByRole('list')).toBeNull();
   });
@@ -243,16 +252,16 @@ describe('App: setup and agents', () => {
       { content: 'The **theme** is `dark` now.' },
     ]);
     await completeSetup(user);
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Make it dark.');
+    await user.type(await screen.findByLabelText('Message to Imp coordinator'), 'Make it dark.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
 
-    const panel = screen.getByRole('complementary', { name: /Conversation with Coordinator/ });
+    const panel = screen.getByRole('complementary', { name: /Conversation with Imp coordinator/ });
     expect(await within(panel).findByText(/settings\.set/)).toBeTruthy();
     expect((await screen.findByText('theme', { selector: 'strong' })).tagName).toBe('STRONG');
     expect(screen.getByText('dark', { selector: 'code' })).toBeTruthy();
     expect(await imp.store.get('settings/theme')).toBe('dark');
     const strip = screen.getByRole('contentinfo', { name: 'Activity' });
-    expect(await within(strip).findByText(/coordinator · settings\.set · ok/)).toBeTruthy();
+    expect(await within(strip).findByText(/global-coordinator · settings\.set · ok/)).toBeTruthy();
   });
 
   it('runs any command from the palette with a generated form', async () => {
@@ -506,12 +515,16 @@ describe('App: setup and agents', () => {
   it('continues an agent run that was cut off', async () => {
     const { imp, provider, user } = start([{ content: 'Hello.' }]);
     await completeSetup(user);
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Hi.');
+    await user.type(await screen.findByLabelText('Message to Imp coordinator'), 'Hi.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
     expect(await screen.findByText('Hello.')).toBeTruthy();
 
     // The tab closed part way: the task was saved, the answer never came.
-    const memberId = (await imp.store.get('settings/coordinator.member')) as string;
+    const global = (await imp.store.list('crew/'))
+      .map((entry) => entry.value as { id: string; roleId: string })
+      .find((member) => member.roleId === 'global-coordinator');
+    if (global === undefined) throw new Error('an Imp coordinator expected');
+    const memberId = global.id;
     const key = `conversations/${memberId}`;
     const saved = (await imp.store.get(key)) as { messages: JsonValue[] };
     await imp.store.batch([
@@ -529,7 +542,9 @@ describe('App: setup and agents', () => {
     render(<App imp={connect(imp)} />);
     expect(await screen.findByText(/The last run was interrupted/)).toBeTruthy();
     provider.script({ content: 'Logline written.' });
-    await user.click(screen.getByRole('button', { name: 'Continue where Coordinator stopped' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Continue where Imp coordinator stopped' }),
+    );
     expect(await screen.findByText('Logline written.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Continue where/ })).toBeNull();
   });
@@ -543,9 +558,12 @@ describe('App: setup and agents', () => {
       ),
     ]);
     await completeSetup(user);
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Write the logline.');
+    await user.type(
+      await screen.findByLabelText('Message to Imp coordinator'),
+      'Write the logline.',
+    );
     await user.click(screen.getByRole('button', { name: /Send/ }));
-    expect(await screen.findByText('Coordinator did not get your message')).toBeTruthy();
+    expect(await screen.findByText('Imp coordinator did not get your message')).toBeTruthy();
     expect(screen.getByText(/could not reach OpenRouter/)).toBeTruthy();
 
     provider.script({ content: 'Logline written.' });
@@ -574,7 +592,7 @@ describe('App: setup and agents', () => {
     ]);
     await completeSetup(user);
     // Deleting is put to the person first; declining lets the coordinator carry on.
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Delete it.');
+    await user.type(await screen.findByLabelText('Message to Imp coordinator'), 'Delete it.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
     const deleting = await screen.findByRole('region', { name: 'Needs your approval' });
     expect(within(deleting).getByText('Delete project')).toBeTruthy();
@@ -588,7 +606,18 @@ describe('App: setup and agents', () => {
     expect(await screen.findByText('Waiting for you.')).toBeTruthy();
     expect(screen.getByText('Delete it.')).toBeTruthy();
 
-    // Hiring a specialist and handing it work goes through an approval and then continues.
+    // Hiring a specialist and handing it work goes through an approval and then continues,
+    // in a project, where the crew works.
+    const created = await imp.registry.executeById(
+      'project.create',
+      { name: 'Keeper', mode: 'movie' },
+      { actor: { kind: 'user', id: 't' } },
+    );
+    await imp.registry.executeById(
+      'project.open',
+      { projectId: (created as { output: { id: string } }).output.id },
+      { actor: { kind: 'user', id: 't' } },
+    );
     await user.click(await screen.findByRole('button', { name: 'Crew' }));
     await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));
     await screen.findByLabelText('Talking to');
@@ -596,7 +625,7 @@ describe('App: setup and agents', () => {
     const writer = crew
       .map((entry) => entry.value as { id: string; roleId: string })
       .find((member) => member.roleId === 'screenwriter');
-    const args = { memberId: writer?.id ?? '', task: 'Write a scene.' };
+    const args = { memberId: writer?.id ?? '', task: 'Write a scene.', without: ['cast'] };
     // With no budget without approval, every paid step asks.
     await imp.store.batch([{ type: 'put', key: 'settings/spend.allowance.project', value: 0 }]);
     provider.script(

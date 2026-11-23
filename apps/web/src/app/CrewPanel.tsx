@@ -2,15 +2,20 @@ import {
   AgentRunSchema,
   conversationKey,
   ConversationSchema,
+  passedOnFrom,
   type AgentRun,
   type CrewMember,
 } from '@imp/agents';
 import { fromToolName, READY_REPORT_KEY, ReadyReport } from '@imp/core';
 import type { FilmExport } from '@imp/mode-movie';
 import {
+  ArrowBendDownRightIcon,
+  ArrowBendUpRightIcon,
   BroomIcon,
   BugIcon,
   CheckIcon,
+  FolderSimpleIcon,
+  GlobeHemisphereWestIcon,
   PaperclipIcon,
   PaperPlaneRightIcon,
   PlayIcon,
@@ -43,6 +48,7 @@ import {
 import { ImpSpinner } from './ImpMark.js';
 import { RetryNote } from './retry.js';
 import { RichText } from './RichText.js';
+import { talkTo } from './work.js';
 import { formatUsd } from './spend.js';
 import { servedByLocalServer } from '../host/served.js';
 import { t, tx } from '../i18n/i18n.js';
@@ -88,19 +94,42 @@ function actionOf(call: { name: string; arguments?: unknown }): string {
   return call.name === 'find_commands' ? t('looked up commands') : fromToolName(call.name);
 }
 
+/** The crew member a tool call gives a task to, when it is crew.ask. */
+function askedMember(call: { name: string; arguments?: unknown }): string | null {
+  const args = call.arguments as { id?: unknown; input?: unknown; memberId?: unknown } | null;
+  const asked =
+    call.name === 'run_command' && args?.id === 'crew.ask'
+      ? (args.input as { memberId?: unknown } | null)?.memberId
+      : fromToolName(call.name) === 'crew.ask'
+        ? args?.memberId
+        : undefined;
+  return typeof asked === 'string' ? asked : null;
+}
+
+/** Which chat a panel is: the Imp coordinator's for all projects, or one in a project. */
+export type ChatPlace = { kind: 'all' } | { kind: 'project'; name: string | null };
+
 /**
  * The conversation with one crew member, with what it did and what it asks
  * approval for. Everything shown is read from the store, so it survives a
  * reload and updates while the agent works.
  */
 export function CrewPanel({
+  id,
   member,
+  place,
+  globalCoordinatorId,
   context,
   hidden = false,
   intro,
   takesSuggestions = false,
 }: {
+  id?: string;
   member: CrewMember;
+  /** Shown in the head, so that it is always clear which chat this is. */
+  place?: ChatPlace;
+  /** The Imp coordinator, to show where the coordinator passed something on to. */
+  globalCoordinatorId?: string | undefined;
   /** What the agent should know about where the user is, sent with every message. */
   context: string;
   hidden?: boolean;
@@ -346,11 +375,28 @@ export function CrewPanel({
 
   return (
     <aside
+      id={id}
       className="crew-panel"
+      data-scope={place?.kind}
       aria-label={t('Conversation with {name}', { name: tx(member.name) })}
       hidden={hidden}
     >
       <div className="crew-head stack">
+        {place !== undefined && (
+          <span className="chat-place" data-scope={place.kind}>
+            {place.kind === 'all' ? (
+              <>
+                <GlobeHemisphereWestIcon aria-hidden="true" size={14} />
+                {t('All projects')}
+              </>
+            ) : (
+              <>
+                <FolderSimpleIcon aria-hidden="true" size={14} />
+                {place.name ?? t('Outside projects')}
+              </>
+            )}
+          </span>
+        )}
         <div className="row spread">
           <h2>{tx(member.name)}</h2>
           <span
@@ -435,6 +481,20 @@ export function CrewPanel({
           ))}
         {messages.map((message, index) => {
           if (message.role === 'user') {
+            const from = passedOnFrom(message.context);
+            if (from !== null) {
+              return (
+                <div key={index} className="stack passed-on">
+                  <span className="passed-note" data-scope="project">
+                    <ArrowBendDownRightIcon aria-hidden="true" />
+                    {t('Passed on from {project}', { project: from.name })}
+                  </span>
+                  <div className="bubble" data-from="coordinator">
+                    {message.content}
+                  </div>
+                </div>
+              );
+            }
             return (
               <div key={index} className="bubble" data-from="user">
                 {message.content}
@@ -453,6 +513,30 @@ export function CrewPanel({
                   const result = messages.find(
                     (candidate) => candidate.role === 'tool' && candidate.toolCallId === call.id,
                   );
+                  if (
+                    globalCoordinatorId !== undefined &&
+                    askedMember(call) === globalCoordinatorId
+                  ) {
+                    return (
+                      <div key={call.id} className="passed-note row" data-scope="all">
+                        <ArrowBendUpRightIcon aria-hidden="true" />
+                        <span>
+                          {result === undefined
+                            ? t('Passing this on to the Imp coordinator (all projects)')
+                            : t('Passed to the Imp coordinator (all projects)')}
+                        </span>
+                        <button
+                          type="button"
+                          className="button quiet small"
+                          onClick={() => {
+                            talkTo(globalCoordinatorId);
+                          }}
+                        >
+                          {t('Open that chat')}
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={call.id} className="action-line mono">
                       <WrenchIcon aria-hidden="true" />

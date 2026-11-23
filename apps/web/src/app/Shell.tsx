@@ -4,13 +4,15 @@ import { ImpMark } from './ImpMark.js';
 import { aliasOfTheVisit } from './imp-names.js';
 import { ShotsView } from './shots.js';
 import { SoundView } from './sound.js';
-import { CrewMember } from '@imp/agents';
+import { CrewMember, GLOBAL_COORDINATOR_ROLE } from '@imp/agents';
 import { Project } from '@imp/core';
 import {
   BooksIcon,
   ChatsCircleIcon,
   FilmSlateIcon,
+  FolderSimpleIcon,
   GearSixIcon,
+  GlobeHemisphereWestIcon,
   MagnifyingGlassIcon,
   MoonIcon,
   PlusIcon,
@@ -19,7 +21,14 @@ import {
   UsersThreeIcon,
   type Icon,
 } from '@phosphor-icons/react';
-import { useCallback, useEffect, useState, type CSSProperties, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from 'react';
 import { z } from 'zod';
 import { CommandPalette } from './CommandPalette.js';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
@@ -166,12 +175,20 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const imp = useImp();
   const [view, setViewState] = useState(() => localStorage.getItem('imp.view') ?? 'projects');
   const setView = (next: string): void => {
+    if ((next === 'projects') !== (view === 'projects')) {
+      setChatScope(next === 'projects' ? 'all' : 'project');
+    }
     setViewState(next);
     localStorage.setItem('imp.view', next);
   };
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [talkingTo, setTalkingTo] = useState<string | null>(null);
+  // Which chat the crew panel shows: the Imp coordinator's, for all projects, or the open
+  // project's. The start screen starts on the one for all projects, a stage on the project's.
+  const [chatScope, setChatScope] = useState<'all' | 'project'>(() =>
+    view === 'projects' ? 'all' : 'project',
+  );
   const [theme, toggleTheme] = useTheme();
   const [crewOpen, toggleCrew] = useCrewOpen();
   const [libraryOpen, setLibraryOpen] = useStoredFlag('imp.library.open', () => false);
@@ -202,16 +219,42 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
       crew,
       projects,
       coordinator: crew.find((member) => member.id === coordinatorId) ?? null,
+      globalCoordinator: crew.find((member) => member.roleId === GLOBAL_COORDINATOR_ROLE) ?? null,
       project: projects.find((project) => project.id === projectId) ?? projects.at(-1) ?? null,
     };
   });
-  const crew = state.data?.crew ?? [];
+  const everyone = state.data?.crew ?? [];
+  const globalCoordinator = state.data?.globalCoordinator ?? null;
+  // The project's crew; the Imp coordinator has a chat of its own.
+  const crew = everyone.filter((member) => member.id !== globalCoordinator?.id);
   const projects = state.data?.projects ?? [];
   const project = state.data?.project ?? null;
   const mode = imp.modes.find((candidate) => candidate.id === (project?.mode ?? 'movie'));
   const stages = mode?.stages ?? [];
   const active =
     crew.find((member) => member.id === talkingTo) ?? state.data?.coordinator ?? crew[0];
+  // Without a project there is only the chat for all projects.
+  const scope =
+    globalCoordinator !== null && (chatScope === 'all' || project === null) ? 'all' : 'project';
+
+  // Every Imp has an Imp coordinator for what concerns all projects. One set up before it
+  // existed gets it on the agents' model, like the coordinator's.
+  const hiring = useRef(false);
+  const projectCoordinator = state.data?.coordinator ?? null;
+  useEffect(() => {
+    if (state.data === undefined || globalCoordinator !== null || projectCoordinator === null) {
+      return;
+    }
+    if (hiring.current) return;
+    hiring.current = true;
+    runCommand(imp, 'crew.hire', {
+      roleId: GLOBAL_COORDINATOR_ROLE,
+      model: projectCoordinator.model,
+      budgetUsdPerRun: projectCoordinator.budgetUsdPerRun,
+    }).catch((error: unknown) => {
+      console.error(messageOf(error));
+    });
+  }, [imp, state.data, globalCoordinator, projectCoordinator]);
 
   const openProject = (id: string): void => {
     runCommand(imp, 'project.open', { projectId: id }).catch((error: unknown) => {
@@ -239,7 +282,12 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
     const onTalk = (event: Event): void => {
       const memberId = (event as CustomEvent<unknown>).detail;
       if (typeof memberId !== 'string') return;
-      setTalkingTo(memberId);
+      if (memberId === globalCoordinator?.id) {
+        setChatScope('all');
+      } else {
+        setChatScope('project');
+        setTalkingTo(memberId);
+      }
       if (!crewOpen) switchCrew();
     };
     window.addEventListener(TALK_TO, onTalk);
@@ -264,6 +312,7 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
   const coordinatorId = state.data?.coordinator?.id;
   useEffect(() => {
     const onSuggest = (): void => {
+      setChatScope('project');
       if (coordinatorId !== undefined) setTalkingTo(coordinatorId);
       if (!crewOpen) switchCrew();
     };
@@ -531,8 +580,44 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               width={crewWidth}
             />
           )}
-          <div className="crew" id="crew-panel">
-            {crew.length > 1 && (
+          <div className="crew" id="crew-panel" data-scope={scope}>
+            {globalCoordinator !== null && (
+              <div className="chat-scope" role="tablist" aria-label={t('Which chat')}>
+                <button
+                  type="button"
+                  role="tab"
+                  data-scope="all"
+                  aria-selected={scope === 'all'}
+                  aria-controls="chat-all"
+                  title={t('The Imp coordinator: settings, models, crews and projects')}
+                  onClick={() => {
+                    setChatScope('all');
+                  }}
+                >
+                  <GlobeHemisphereWestIcon aria-hidden="true" size={16} />
+                  <span>{t('All projects')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  data-scope="project"
+                  aria-selected={scope === 'project'}
+                  disabled={project === null}
+                  title={
+                    project === null
+                      ? t('Open a project to talk about it')
+                      : t('The crew of {project}', { project: project.name })
+                  }
+                  onClick={() => {
+                    setChatScope('project');
+                  }}
+                >
+                  <FolderSimpleIcon aria-hidden="true" size={16} />
+                  <span className="chat-scope-name">{project?.name ?? t('No project open')}</span>
+                </button>
+              </div>
+            )}
+            {scope === 'project' && crew.length > 1 && (
               <div className="field crew-switch">
                 <label htmlFor="talking-to">{t('Talking to')}</label>
                 <select
@@ -545,22 +630,41 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
                 >
                   {crew.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
-                      {candidate.name}
+                      {tx(candidate.name)}
                     </option>
                   ))}
                 </select>
               </div>
             )}
+            {globalCoordinator !== null && (
+              <CrewPanel
+                key={globalCoordinator.id}
+                id="chat-all"
+                member={globalCoordinator}
+                place={{ kind: 'all' }}
+                context={context}
+                hidden={scope !== 'all'}
+                intro={() => (
+                  <p className="muted">
+                    {t(
+                      'The Imp coordinator looks after what concerns all projects: settings, models, saved crews, roles, and creating, copying or deleting projects. It hands the work inside a project to that project’s coordinator, and project coordinators pass such asks on to it.',
+                    )}
+                  </p>
+                )}
+              />
+            )}
             {crew.map((member) => (
               <CrewPanel
                 key={member.id}
                 member={member}
+                place={{ kind: 'project', name: project?.name ?? null }}
+                globalCoordinatorId={globalCoordinator?.id}
                 context={context}
-                hidden={member.id !== active?.id}
+                hidden={scope !== 'project' || member.id !== active?.id}
                 takesSuggestions={member.id === state.data?.coordinator?.id}
               />
             ))}
-            {crew.length === 0 && (
+            {crew.length === 0 && scope === 'project' && (
               <div className="crew-head">
                 <p className="muted">
                   {state.error ?? t('Nobody is on the crew. Hire someone from the Crew view.')}

@@ -15,6 +15,8 @@ import {
   alwaysAllowed,
   ConversationSchema,
   coordinatorRole,
+  globalCoordinatorRole,
+  guideRole,
   COORDINATOR_WRITES,
   createAgentCommands,
   createCrewCommands,
@@ -41,7 +43,10 @@ const generate = defineCommand({
   handler: (_context, { prompt }) => Promise.resolve({ url: `made:${prompt}` }),
 });
 
-function setup(replies: ScriptedChatReply[], roles = [coordinatorRole, artist]) {
+function setup(
+  replies: ScriptedChatReply[],
+  roles: Role[] = [coordinatorRole, globalCoordinatorRole, guideRole, artist],
+) {
   const runtime = createTestRuntime();
   const provider = createFakeProvider({ replies });
   const catalog = new RoleCatalog(roles);
@@ -49,7 +54,9 @@ function setup(replies: ScriptedChatReply[], roles = [coordinatorRole, artist]) 
   registry.register(
     ...settingsCommands,
     generate,
-    ...createCrewCommands(new RoleCatalog([coordinatorRole, artist])),
+    ...createCrewCommands(
+      new RoleCatalog([coordinatorRole, globalCoordinatorRole, guideRole, artist]),
+    ),
     ...createAgentCommands({ registry, provider, roles: catalog }),
   );
   const run = async (
@@ -86,7 +93,8 @@ describe('crew.ask', () => {
       { content: 'Theme set.' },
       { content: 'It is still dark.' },
     ]);
-    const coordinator = await hire('coordinator');
+    // Ask Imp changes settings itself; the project's coordinator passes that on.
+    const coordinator = await hire('guide');
     expect(await conversation(coordinator.id)).toMatchObject({ messages: [], running: false });
 
     const first = AgentRunSchema.parse(

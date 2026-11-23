@@ -20,11 +20,11 @@ describe('deciding many requests at once', () => {
       { content: 'One gone, one kept.' },
     ]);
     await completeSetup(user);
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Tidy up.');
+    await user.type(await screen.findByLabelText('Message to Imp coordinator'), 'Tidy up.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
 
     const dialog = await screen.findByRole('dialog', { name: '2 requests are waiting' });
-    expect(within(dialog).getByText(/Asked by Coordinator/)).toBeTruthy();
+    expect(within(dialog).getByText(/Asked by Imp coordinator/)).toBeTruthy();
     expect(
       within(dialog).getAllByRole('checkbox', { name: 'Approve Delete project' }),
     ).toHaveLength(2);
@@ -43,7 +43,7 @@ describe('deciding many requests at once', () => {
     // Out of the way at once, even while what was approved still runs.
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    // The coordinator goes on once everything it asked for is decided.
+    // The Imp coordinator goes on once everything it asked for is decided.
     expect(await screen.findByText('One gone, one kept.')).toBeTruthy();
     expect(screen.getByText('Approved: project.delete')).toBeTruthy();
     expect(screen.getByText('Declined: project.delete')).toBeTruthy();
@@ -61,7 +61,7 @@ describe('deciding many requests at once', () => {
       { content: 'Nothing deleted.' },
     ]);
     await completeSetup(user);
-    // In a project the conversations are kept with it, and those are the ones watched.
+    // In a project, the Imp coordinator's requests are watched too.
     const opened = await imp.registry.executeById(
       'project.create',
       { name: 'Short', mode: 'movie' },
@@ -71,7 +71,7 @@ describe('deciding many requests at once', () => {
     await imp.store.batch([
       { type: 'put', key: 'settings/project.current', value: (opened.output as { id: string }).id },
     ]);
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Tidy up.');
+    await user.type(await screen.findByLabelText('Message to Imp coordinator'), 'Tidy up.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
     const dialog = await screen.findByRole('dialog', { name: '3 requests are waiting' });
     await user.click(within(dialog).getByRole('button', { name: 'Close' }));

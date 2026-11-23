@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   coordinatorRole,
+  globalCoordinatorRole,
+  guideRole,
   createAgentCommands,
   createCrewCommands,
   KEPT_FINISHED_WORK,
@@ -60,7 +62,7 @@ const describer: WorkDescriber = {
 function setup(replies: ScriptedChatReply[]) {
   const runtime = createTestRuntime();
   const provider = createFakeProvider({ replies });
-  const catalog = new RoleCatalog([coordinatorRole, artist]);
+  const catalog = new RoleCatalog([coordinatorRole, globalCoordinatorRole, guideRole, artist]);
   const registry = new CommandRegistry({ runtime });
   registry.register(
     ...settingsCommands,
@@ -211,7 +213,8 @@ describe('the work board', () => {
 
   it('moves with a run that opens a project itself', async () => {
     const { run, hire, board, provider } = setup([]);
-    const coordinator = await hire('coordinator');
+    // Ask Imp can open a project; a project's coordinator passes that on.
+    const coordinator = await hire('guide');
     const project = (await run('project.create', { name: 'Storm', mode: 'movie' })) as {
       id: string;
     };

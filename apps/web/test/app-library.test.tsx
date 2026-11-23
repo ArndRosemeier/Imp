@@ -192,7 +192,8 @@ describe('App: library, crew and help', () => {
     expect(await within(cards).findByRole('heading', { name: 'Drama team' })).toBeTruthy();
     await user.click(within(cards).getByRole('button', { name: /Add to crew/ }));
     await vi.waitFor(async () => {
-      expect(await crew()).toHaveLength(before.length * 2 - 1);
+      // Both coordinators stay as they are: one of each.
+      expect(await crew()).toHaveLength(before.length * 2 - 2);
     });
     await user.click(
       within(cards).getByRole('button', { name: 'Update Drama team with the current crew' }),
@@ -312,11 +313,12 @@ describe('App: library, crew and help', () => {
     });
     expect(within(models).queryByRole('listbox')).toBeNull();
 
-    // The agents' model is the coordinator's own, so it changes too.
+    // The agents' model is both coordinators' own, so they change too.
     await chooseModel(user, within(models).getByLabelText('Agents model'), '~vendor/latest');
     await vi.waitFor(async () => {
       const crew = await imp.store.list('crew/');
       expect(crew.map((entry) => (entry.value as { model: string }).model)).toEqual([
+        '~vendor/latest',
         '~vendor/latest',
       ]);
     });
@@ -442,7 +444,8 @@ describe('App: library, crew and help', () => {
       { content: 'Select the shot on the Edit stage and choose Dissolve in its inspector.' },
     ]);
     await completeSetup(user);
-    expect((await imp.store.list('crew/')).length).toBe(1);
+    // The two coordinators: for the projects and for all of them.
+    expect((await imp.store.list('crew/')).length).toBe(2);
 
     await user.click(screen.getByRole('button', { name: /Help/ }));
     const panel = await screen.findByRole('dialog', { name: 'Ask Imp' });
@@ -455,6 +458,7 @@ describe('App: library, crew and help', () => {
     const crew = await imp.store.list('crew/');
     expect(crew.map((entry) => (entry.value as { roleId: string }).roleId).sort()).toEqual([
       'coordinator',
+      'global-coordinator',
       'guide',
     ]);
   });
@@ -513,7 +517,9 @@ describe('App: library, crew and help', () => {
     expect(box).toHaveProperty('checked', false);
     await user.click(box);
     await vi.waitFor(async () => {
-      const [member] = await imp.store.list('crew/');
+      const member = (await imp.store.list('crew/')).find(
+        (entry) => (entry.value as { roleId: string }).roleId === 'coordinator',
+      );
       expect(member?.value).toMatchObject({ webSearch: true });
     });
     await vi.waitFor(() => {
@@ -542,7 +548,7 @@ describe('App: library, crew and help', () => {
     await user.click(within(form).getByRole('button', { name: /Create the role/ }));
 
     await user.click(await screen.findByRole('button', { name: /Hire Dialogue Polisher/ }));
-    await screen.findByLabelText('Talking to');
+    await screen.findByRole('checkbox', { name: 'Dialogue Polisher can search the web' });
     expect(await imp.store.get('roles/dialogue-polisher')).toMatchObject({
       scope: { prefixes: ['movie.'], writes: [], effects: ['read', 'destructive'] },
       sees: [],

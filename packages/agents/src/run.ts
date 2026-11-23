@@ -28,7 +28,7 @@ import {
   isDirect,
   RUN_TOOL,
 } from './discovery.js';
-import { roleCanUse, type Role } from './role.js';
+import { passOnNote, roleCanUse, type Role } from './role.js';
 
 export interface PendingApproval {
   readonly commandId: string;
@@ -343,6 +343,21 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
   const inScope = registry.list().filter((command) => roleCanUse(role, command));
   const hidden = inScope.filter((command) => !isDirect(command, role.direct));
+  // What another agent does for this one, so that a lookup shows whom to pass it to.
+  const passedOn = registry
+    .list()
+    .filter((command) => !roleCanUse(role, command) && passOnNote(role, command) !== null);
+  const elsewhere = (query: string): Record<string, unknown> => {
+    const { matches } = findCommands(passedOn, query) as { matches: { id: string }[] };
+    const first = matches[0];
+    if (first === undefined) return {};
+    return {
+      elsewhere: {
+        commands: matches.slice(0, 3).map((match) => match.id),
+        note: passOnNote(role, registry.get(first.id)),
+      },
+    };
+  };
   const canReport = options.canReport ?? false;
   const tools = [
     ...toToolDefinitions(inScope.filter((command) => isDirect(command, role.direct))),
@@ -434,7 +449,11 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
 
   async function runText(commandId: string, input: unknown): Promise<string | ToolOutcome> {
     if (!registry.has(commandId) || !roleCanUse(role, registry.get(commandId))) {
-      return JSON.stringify({ error: `"${commandId}" is not a command you can run.` });
+      const note = registry.has(commandId) ? passOnNote(role, registry.get(commandId)) : null;
+      return JSON.stringify({
+        error: `"${commandId}" is not a command you can run.`,
+        ...(note === null ? {} : { note }),
+      });
     }
     const refused = await options.guard?.(commandId);
     if (refused !== undefined && refused !== null) {
@@ -501,13 +520,10 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
       const given = call.arguments as { query?: unknown; id?: unknown; input?: unknown } | null;
       const text = (value: unknown): string => (typeof value === 'string' ? value : '');
       if (call.name === FIND_TOOL) {
-        return {
-          content: JSON.stringify(
-            findCommands(inScope, text(given?.query), (command) =>
-              isDirect(command, role.direct) ? toToolName(command.id) : undefined,
-            ),
-          ),
-        };
+        const found = findCommands(inScope, text(given?.query), (command) =>
+          isDirect(command, role.direct) ? toToolName(command.id) : undefined,
+        ) as Record<string, unknown>;
+        return { content: JSON.stringify({ ...found, ...elsewhere(text(given?.query)) }) };
       }
       return run(text(given?.id), given?.input ?? {});
     }

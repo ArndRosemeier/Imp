@@ -32,7 +32,7 @@ const AlwaysList = z.object({
 });
 const CrewNames = z.object({ crew: z.array(z.object({ id: z.string(), name: z.string() })) });
 
-/** Everything the crew is waiting on in the open project, kept current. */
+/** Everything the crew is waiting on in the open project and in the Imp coordinator's chat, kept current. */
 export function useWaitingApprovals(): Live<readonly WaitingApproval[]> {
   // Each project keeps its own conversations, so the ones to watch follow the open project.
   const current = useLive(['settings/project.current'], async (imp) => {
@@ -43,7 +43,8 @@ export function useWaitingApprovals(): Live<readonly WaitingApproval[]> {
   });
   const conversations = conversationPrefix(current.data ?? null);
   return useLive(
-    ['crew/', conversations, 'settings/project.current'],
+    // The Imp coordinator keeps its one chat outside the projects, whatever project is open.
+    ['crew/', conversations, conversationPrefix(null), 'settings/project.current'],
     async (imp) => WaitingList.parse(await runCommand(imp, 'crew.approvals.list', {})).approvals,
   );
 }

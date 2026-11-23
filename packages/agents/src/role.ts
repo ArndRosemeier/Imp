@@ -81,6 +81,28 @@ export interface Role {
    * stays small. A critic is one.
    */
   readonly optional?: boolean;
+  /**
+   * Work outside the role's scope that another agent does, with what to tell
+   * the agent when it tries: a project's coordinator passes what concerns all
+   * projects to the Imp coordinator. `writes` names commands that change
+   * something, `prefixes` any command.
+   */
+  readonly passOn?: {
+    readonly writes?: readonly string[];
+    readonly prefixes?: readonly string[];
+    readonly note: string;
+  };
+}
+
+/** What a role is told when it tries `command` outside its scope, or null. */
+export function passOnNote(role: Role, command: Command): string | null {
+  const pass = role.passOn;
+  if (pass === undefined) return null;
+  const matches = (prefixes: readonly string[] | undefined) =>
+    prefixes?.some((prefix) => command.id.startsWith(prefix)) === true;
+  if (matches(pass.prefixes)) return pass.note;
+  if (command.effect !== 'read' && matches(pass.writes)) return pass.note;
+  return null;
 }
 
 /** What an agent can be shown besides text. */
@@ -272,12 +294,37 @@ export class RoleCatalog {
 }
 
 /**
- * What the coordinator changes itself: the workspace, the projects and the
- * crew. The work of a mode (a script, a cast, a clip) belongs to the crew
- * member whose role it is, so the coordinator gives it to them instead of
- * doing it, and needs nothing but text to coordinate.
+ * What a project's coordinator changes itself: the crew's work in the open
+ * project and what belongs to it. The work of a mode (a script, a cast, a
+ * clip) belongs to the crew member whose role it is, so the coordinator gives
+ * it to them instead of doing it, and needs nothing but text to coordinate.
+ * What concerns every project (settings, models, saved crews, custom roles,
+ * creating, copying, opening or deleting projects, backups) is the Imp
+ * coordinator's, to whom it passes such asks.
  */
 export const COORDINATOR_WRITES: readonly string[] = [
+  'crew.ask',
+  'crew.hire',
+  'crew.update',
+  'crew.dismiss',
+  'crew.needs',
+  'crew.conversation.',
+  'crew.work.',
+  'project.rename',
+  'project.export',
+  'project.resources.',
+  'spend.',
+  'help.hint.',
+  'library.',
+  'support.',
+];
+
+/**
+ * What the Imp coordinator changes: everything that concerns all projects.
+ * It never does the work inside a project; it hands that to the project's
+ * coordinator.
+ */
+export const GLOBAL_COORDINATOR_WRITES: readonly string[] = [
   'crew.',
   'project.',
   'settings.',
@@ -287,29 +334,94 @@ export const COORDINATOR_WRITES: readonly string[] = [
   'library.',
   'backup.',
   'support.',
+  'system.',
+];
+
+/** The commands that concern all projects, which a project's coordinator passes on. */
+export const GLOBAL_ONLY_WRITES: readonly string[] = [
+  'crew.role.',
+  'crew.saved.',
+  'project.create',
+  'project.delete',
+  'project.duplicate',
+  'project.import',
+  'project.open',
+  'project.template.',
+  'settings.',
+  'models.',
+  'help.set',
+  'backup.',
+  'system.',
 ];
 
 /**
- * The agent the user talks to. It has no mechanism of its own: it plans and
- * delegates through the same commands a person uses. It reads everything,
- * changes the workspace, the projects and the crew, may ask to spend, and
- * leaves the work itself to the crew.
+ * What the Imp coordinator reads: the workspace and the projects as a whole,
+ * never the work inside one, which is the project coordinator's to look at.
+ */
+const GLOBAL_COORDINATOR_READS: readonly string[] = [
+  ...GLOBAL_COORDINATOR_WRITES,
+  'app.',
+  'activity.',
+];
+
+/** The role of the coordinator for all projects, of which a workspace has one. */
+export const GLOBAL_COORDINATOR_ROLE = 'global-coordinator';
+
+/**
+ * Who a message in the Imp coordinator's chat was passed on from, as the
+ * first line of the message's context: `Passed on by the coordinator of the
+ * project "<name>" (projectId "<id>").` The chat shows it as a note.
+ */
+export const PASSED_ON = 'Passed on by the coordinator of the project ';
+
+/** The project a message was passed on from, read from its context, or null. */
+export function passedOnFrom(context: string | undefined): { name: string; id: string } | null {
+  if (context?.startsWith(PASSED_ON) !== true) return null;
+  const match = /^(".*") \(projectId "([^"]+)"\)\.$/.exec(
+    context.slice(PASSED_ON.length).split('\n')[0] ?? '',
+  );
+  if (match === null) return null;
+  try {
+    const name = JSON.parse(match[1] ?? '') as unknown;
+    return typeof name === 'string' ? { name, id: match[2] ?? '' } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The context line that marks a message passed on from a project. */
+export function passedOnLine(project: { name: string; id: string }): string {
+  return `${PASSED_ON}${JSON.stringify(project.name)} (projectId "${project.id}").`;
+}
+
+/**
+ * The agent the user talks to about one project. It has no mechanism of its
+ * own: it plans and delegates through the same commands a person uses. It
+ * reads everything, hires and directs the crew, may ask to spend, leaves the
+ * work itself to the crew, and passes what concerns all projects to the Imp
+ * coordinator.
  */
 export const coordinatorRole: Role = {
   id: 'coordinator',
   name: 'Coordinator',
-  summary: 'Talks with you, plans the work, hires the crew and keeps things moving.',
+  summary:
+    'Talks with you about a project, plans the work, hires the crew and keeps things moving.',
   brief: [
-    'You are the coordinator of this workspace. The user tells you what they want to make.',
+    'You are the coordinator of the open project. The user tells you what they want to make.',
     'You coordinate: you plan the work, set things up and give each piece of it to the crew',
     'member whose role it is. You do not do their work yourself; you cannot write scenes, make',
     'characters, places, shots or sounds, or edit, and you never need to see a picture or hear',
     'a sound, since judging them is the work of whoever made them. Look at the current state',
-    'with the read tools, and carry out setup and organisation yourself: adjust settings, pick',
-    'models from models.list (never guess a model id), see which roles exist, and hire crew',
-    'members for the work, one per role the work needs, each on a model that fits its role',
-    '(models.list with role lists only those: a role that judges pictures needs a model that',
-    'sees them, while a writer works with any).',
+    'with the read tools, and hire crew members for the work, one per role the work needs,',
+    'each on a model that fits its role (models.list with role lists only those: a role that',
+    'judges pictures needs a model that sees them, while a writer works with any; never guess',
+    'a model id).',
+    'What concerns all projects is not yours to change: settings and the models Imp uses,',
+    'model mixes, saved crews, custom roles, creating, copying, opening, importing or deleting',
+    'projects, templates and backups. Pass such an ask on to the Imp coordinator, who works for',
+    'all projects, with crew.ask (its member id is in your context), in one task that says',
+    "everything, including the user's words; then tell the user it was passed to the Imp",
+    'coordinator and what came back. Do the rest of the work yourself as usual.',
     'Work in order. Before you give a crew member a task, check what its role needs with',
     'crew.needs (for example the Screenwriter needs a cast before it writes scenes, and the',
     'Casting Director needs the development). When something is missing, first give the work',
@@ -326,30 +438,71 @@ export const coordinatorRole: Role = {
     "Prefer doing over asking, and ask only when a choice is truly the user's. When the user",
     'asks you to make something by yourself, such as a whole film from one prompt, carry on to',
     'the end without stopping to ask about steps that fit the budget: do them and say what',
-    'they cost. Crew members are told the open project; open or create the project first.',
+    'they cost. Crew members are told the open project.',
     "Put the user's own words about how the work should look and feel into every task you",
     'give, and before pictures are made check that the project keeps the same style (for a',
     'film, the tone in its development, which every picture is drawn in); if it does not, have',
     'the one who writes it set it right first. Be brief and concrete.',
     'When the user asks how Imp works, read the guide (help.topics, help.topic) instead of',
     'guessing, and before spending say what it will cost (spend.estimate).',
-    'Imp keeps reusable things of its own, shared by every project: saved crews',
-    '(crew.saved.*, the Crews tab of the library; they keep each agent with model, budget and',
-    'web search, plus copies of their custom roles, and load again with crew.saved.load),',
-    'model mixes (models.mix.*, the Mixes tab and the Models chip) and project templates',
-    '(project.template.*, which keep a project but not its crew). When the user wants to keep',
-    'or reuse a crew or a set of models, save it there, never as a text note.',
-    'When no role covers some work, create one with crew.role.create: give it only the',
-    'commands of its own area to change (writes) and what it needs (needs).',
     'Before you say Imp cannot do something, look it up with find_commands: anything the',
-    'user can do in the app, you or a crew member can do with a command.',
+    'user can do in the app, you, a crew member or the Imp coordinator can do with a command.',
   ].join(' '),
   // Spending and deleting are in scope so that they can be asked for; the policy still puts
   // them to the user. It reads everything; it changes only what is its own to change.
   scope: { effects: ['read', 'write', 'spend', 'destructive'], writes: COORDINATOR_WRITES },
   // It coordinates in words, so a model that takes only text is enough.
   sees: [],
+  direct: ['crew.', 'project.', 'models.list', 'help.'],
+  passOn: {
+    writes: GLOBAL_ONLY_WRITES,
+    note: "This concerns all projects, so it is the Imp coordinator's to do. Pass the ask on to it with crew.ask (its member id is in your context), then tell the user it was passed on.",
+  },
+};
+
+/**
+ * The coordinator for all projects, which the user talks to on the start
+ * screen and under "All projects": settings, models, saved crews, custom
+ * roles, the library across projects, and creating, copying, opening or
+ * deleting projects. It talks in one chat of its own, whatever project is
+ * open, and hands the work inside a project to that project's coordinator.
+ */
+export const globalCoordinatorRole: Role = {
+  id: GLOBAL_COORDINATOR_ROLE,
+  name: 'Imp coordinator',
+  summary: 'Looks after everything that concerns all projects: settings, models, crews, projects.',
+  brief: [
+    'You are the Imp coordinator: you look after what concerns all projects of this Imp, not',
+    'the work inside one. That is the settings and the models Imp uses (pick them from',
+    'models.list, never guess an id), model mixes (models.mix.*), the crew and the roles',
+    '(crew.hire, crew.role.*), saved crews (crew.saved.*), the library across projects,',
+    'creating, copying, opening, importing, exporting and deleting projects, templates',
+    '(project.template.*), backups and problem reports. Each project has a coordinator of its',
+    'own for its work, and they pass you what concerns all projects: such a message says which',
+    'project it comes from. Do what it asks and reply with what you did, briefly, for that',
+    'coordinator to tell the user.',
+    'You do not do the work inside a project (writing, casting, shots, sound, editing) and you',
+    'cannot change it. When the user wants something made, such as a whole film from one',
+    'prompt, create or open the project first (project.create, project.open), then give the',
+    "work to the project's coordinator with crew.ask (its member id is in your context), in",
+    "one task that carries the user's own words; it plans the work with the crew there. Tell",
+    'the user the project is open and its coordinator is on it.',
+    'Prefer doing over asking. Deleting and spending are put to the user for approval; before',
+    'spending say what it will cost (spend.estimate). When the user asks how Imp works, read',
+    'the guide (help.topics, help.topic) instead of guessing. Before you say Imp cannot do',
+    'something, look it up with find_commands. Be brief and concrete.',
+  ].join(' '),
+  scope: {
+    effects: ['read', 'write', 'spend', 'destructive'],
+    prefixes: GLOBAL_COORDINATOR_READS,
+    writes: GLOBAL_COORDINATOR_WRITES,
+  },
+  sees: [],
   direct: ['crew.', 'project.', 'settings.', 'models.', 'help.'],
+  passOn: {
+    prefixes: [''],
+    note: "This is work inside a project, which is the project's coordinator's to do. Open the project, then give the work to its coordinator with crew.ask (its member id is in your context).",
+  },
 };
 
 /**
