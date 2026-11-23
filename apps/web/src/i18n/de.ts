@@ -2441,4 +2441,12 @@ export const de: Readonly<Record<string, string>> = {
   "The person's sign-off of the storyboard of this scene":
     'Deine Freigabe des Storyboards dieser Szene',
   "The person's sign-off of the treatment": 'Deine Freigabe des Treatments',
+  'Carries on': 'Geht weiter',
+  'Go to shot {position}': 'Zu Einstellung {position}',
+  'Key frame of a shot with no clip yet': 'Keyframe einer Einstellung, die noch keinen Clip hat',
+  'No key frame': 'Kein Keyframe',
+  'carries on': 'geht weiter',
+  'cut on action': 'Schnitt in der Bewegung',
+  '{painted} of {count} shots have a key frame · {seconds} s planned':
+    '{painted} von {count} Einstellungen haben ein Keyframe · {seconds} s geplant',
 };

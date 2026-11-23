@@ -21,12 +21,12 @@ import {
   type CoreRuntime,
 } from '@imp/core';
 import { z } from 'zod';
-import { filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
+import { characterPrefix, filmExportPrefix, movieSceneKey, shotPrefix } from './commands.js';
 import { itemsOf, laidOut, readCut, readDraft, readFilmLook, requireScene } from './edit.js';
 import { pieceMatrix, type ColorMatrix } from './grade.js';
 import { createSceneAudioLink } from './scene-audio.js';
 import { slateText } from './pickups.js';
-import { MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
+import { Character, MODE_ID, Scene, Shot, type TextKind, type TextStyle } from './schema.js';
 import type { PieceTiming, Punch } from './piece-time.js';
 import type { Dip } from './transitions.js';
 import { styleOf } from './text-layout.js';
@@ -59,6 +59,16 @@ export type FilmPicture = FilmEdges &
         readonly timing?: PieceTiming;
         readonly punch?: Punch;
         /** The colour matrix of its grade and the film's look; left out, its colours stay. */
+        readonly matrix?: ColorMatrix;
+      }
+    | {
+        /** A still picture, such as the key frame of a shot with no clip yet in an animatic. */
+        readonly kind: 'still';
+        readonly startSeconds: number;
+        readonly durationSeconds: number;
+        readonly blobKey: string;
+        readonly fadeInSeconds: number;
+        readonly fadeOutSeconds: number;
         readonly matrix?: ColorMatrix;
       }
     | {
@@ -272,6 +282,8 @@ export async function planFilm(
   scenes: PlannedScene[];
   durationSeconds: number;
   notReady: z.infer<typeof NotReady>[];
+  /** The lines of the stills of an animatic, shown as captions since no clip speaks them. */
+  captions: FilmText[];
 }> {
   const store = runtime.store;
   const shots = new Map(
@@ -280,10 +292,16 @@ export async function planFilm(
       return [shot.id, shot] as const;
     }),
   );
-  const titleStyle = styleOf(await readStyles(store, projectId), {
-    styleId: 'title',
-    kind: 'title',
-  });
+  const styles = await readStyles(store, projectId);
+  const titleStyle = styleOf(styles, { styleId: 'title', kind: 'title' });
+  const captionStyle = styleOf(styles, { styleId: 'subtitle', kind: 'subtitle' });
+  const names = new Map(
+    (await store.list(characterPrefix(projectId))).map((entry) => {
+      const character = Character.parse(entry.value);
+      return [character.id, character.name] as const;
+    }),
+  );
+  const captions: FilmText[] = [];
   const pictures: FilmPicture[] = [];
   const scenes: PlannedScene[] = [];
   const notReady: z.infer<typeof NotReady>[] = [];
@@ -312,6 +330,28 @@ export async function planFilm(
       };
       if (item.kind === 'title') {
         pictures.push({ kind: 'title', text: item.text, style: titleStyle, ...common });
+        continue;
+      }
+      if (item.still !== null) {
+        const matrix = pieceMatrix(item.grade, look);
+        pictures.push({
+          kind: 'still',
+          blobKey: item.still.blobKey,
+          ...common,
+          ...(matrix === null ? {} : { matrix }),
+        });
+        if (item.still.line !== '') {
+          const who = item.still.speakerId === null ? undefined : names.get(item.still.speakerId);
+          captions.push({
+            startSeconds: common.startSeconds,
+            durationSeconds: common.durationSeconds,
+            kind: 'caption',
+            text: who === undefined ? item.still.line : `${who}: ${item.still.line}`,
+            style: captionStyle,
+            x: null,
+            y: null,
+          });
+        }
         continue;
       }
       if (item.placeholder) {
@@ -343,7 +383,7 @@ export async function planFilm(
     scenes.push({ sceneId, startSeconds: at, durationSeconds: laid.totalSeconds });
     at += laid.totalSeconds;
   }
-  return { pictures, scenes, durationSeconds: at, notReady };
+  return { pictures, scenes, durationSeconds: at, notReady, captions };
 }
 
 /** The same file with other effects is another sound. */
@@ -640,7 +680,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
             height: RESOLUTIONS[input.resolution],
             fps: input.fps ?? null,
             pictures: plan.pictures,
-            texts,
+            texts: [...plan.captions, ...texts],
           },
           clip: async (blobKey) => (await runtime.blobs.get(blobKey))?.bytes,
           mix: (startFrame, frames) => mix.mix(startFrame, frames),

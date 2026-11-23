@@ -1163,6 +1163,19 @@ function SceneEditor({
               playsInline
               style={screenStyle(playback.look.screens?.[1] ?? HIDDEN, 1)}
             />
+            {playback.look.still !== undefined && (
+              <div
+                className="preview-still"
+                style={{ opacity: playback.look.still.level }}
+                aria-label={t('Key frame of a shot with no clip yet')}
+                role="img"
+              >
+                <img src={playback.look.still.url} alt="" />
+                {playback.look.still.line !== '' && (
+                  <p className="preview-still-line">{playback.look.still.line}</p>
+                )}
+              </div>
+            )}
             <GradeFilters screens={playback.look.screens} />
             <div
               className="preview-wash"

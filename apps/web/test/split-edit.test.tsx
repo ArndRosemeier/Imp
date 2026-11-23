@@ -16,6 +16,7 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   label: '',
   state: 'ready',
   placeholder: false,
+  still: null,
   pickupReason: null,
   plannedSeconds: null,
   lengthReason: '',

@@ -18,6 +18,7 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   label: 'Wide on the sea',
   state: 'ready',
   placeholder: false,
+  still: null,
   pickupReason: null,
   plannedSeconds: null,
   lengthReason: '',

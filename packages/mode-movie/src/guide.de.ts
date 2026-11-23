@@ -211,6 +211,10 @@ Der **Sounddesigner** ergänzt Ton, wenn du darum bittest oder wenn dem Rohschni
 - Öffne eine Szene, um ihre **Zeitleiste** zu sehen: Bilder auf einer Spur, Ton auf eigenen Spuren, Text auf einer weiteren.
 - Die Wiedergabe läuft von einer Szene in die nächste weiter, sodass du den Film am Stück ansehen kannst.
 
+## Das Animatic
+
+Solange eine Einstellung noch keinen Clip hat, steht ihr Keyframe im Schnitt als Standbild, so lange, wie die Einstellung halten soll, mit ihrem Satz darunter. Eine in Einstellungen geplante Szene läuft hier darum als **Animatic**: Sieh sie dir an und ändere Reihenfolge oder Längen, solange das nichts kostet. Exportiert ergibt sie einen Film aus Standbildern. Jeder Clip nimmt den Platz seines Standbilds ein, sobald er fertig ist.
+
 ## Schneiden
 
 - Kürze ein Stück, indem du seine Ränder ziehst; teile es am Abspielkopf; zieh Stücke, um sie umzuordnen.

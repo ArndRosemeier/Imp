@@ -140,6 +140,38 @@ class FrameReader {
   }
 }
 
+/** The pixels of a still picture, such as a key frame in an animatic: one frame, as RGBA. */
+async function readStill(
+  command: string,
+  file: string,
+  info: ClipInfo,
+): Promise<Uint8Array | undefined> {
+  const child = spawn(
+    command,
+    [
+      '-nostdin',
+      '-v',
+      'error',
+      '-i',
+      file,
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgba',
+      'pipe:1',
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'] },
+  );
+  const reader = new FrameReader(child, info.width * info.height * 4);
+  try {
+    return await reader.next();
+  } finally {
+    reader.stop();
+  }
+}
+
 /**
  * The frames of a clip at the times a picture shows, in order. Times that only
  * rise (or hold) are read from one forward pass; times that only fall (a
@@ -365,6 +397,21 @@ export function createFfmpegFilmRenderer(options: FfmpegFilmOptions): FilmRender
             .reduce((sum, p) => sum + p.durationSeconds, 0),
         });
       }
+      // The stills, read once each: they set no size of their own unless there are no clips.
+      const stills = new Map<string, { pixels: Uint8Array; info: ClipInfo }>();
+      for (const key of new Set(pictures.flatMap((p) => (p.kind === 'still' ? [p.blobKey] : [])))) {
+        const bytes = await job.clip(key);
+        if (bytes === undefined) continue;
+        const file = join(folder, `still-${String(stills.size)}`);
+        await writeFile(file, bytes);
+        const info = parseClipInfo((await run(command, ['-hide_banner', '-i', file])).stderr);
+        if (info === undefined) continue;
+        const pixels = await readStill(command, file, info);
+        if (pixels !== undefined) stills.set(key, { pixels, info });
+      }
+      if (probed.length === 0) {
+        for (const { info } of stills.values()) probed.push({ ...info, fps: 24, seconds: 1 });
+      }
       const { width, height, fps } = chooseFormat(probed, plan.height, plan.fps);
 
       // The sound first, whole, as a raw file the encoder reads beside the picture.
@@ -451,7 +498,7 @@ export function createFfmpegFilmRenderer(options: FfmpegFilmOptions): FilmRender
         readonly frames?: ClipFrames;
       }
       const openLayer = (picture: FilmPicture, first: number, end: number): Layer => {
-        if (picture.kind === 'title') return { picture, end };
+        if (picture.kind === 'title' || picture.kind === 'still') return { picture, end };
         const clip = clips.get(picture.blobKey);
         if (clip === undefined) return { picture, end };
         const timing = picture.timing ?? {
@@ -488,6 +535,14 @@ export function createFfmpegFilmRenderer(options: FfmpegFilmOptions): FilmRender
             width,
             height,
           );
+        } else if (picture.kind === 'still') {
+          const still = stills.get(picture.blobKey);
+          if (still !== undefined) {
+            const { info } = still;
+            const at = placePicture(width, height, info.width, info.height, 1, 0.5, 0.5);
+            drawPicture(scratch, still.pixels, info.width, info.height, at);
+            if (picture.matrix !== undefined) applyMatrix(scratch.data, picture.matrix);
+          }
         } else if (on.frames !== undefined) {
           const timing = picture.timing;
           const sourceAt =

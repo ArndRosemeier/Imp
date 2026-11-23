@@ -447,6 +447,7 @@ export const coordinatorRole: Role = {
     'the user asks for it, and when they have not said what they want, ask. Work stage by stage',
     'and stop at the checkpoints (project.checkpoint.list): for a film, the treatment, the',
     'storyboard of each scene and the first cut of each scene. At a checkpoint, show the user',
+    'where to look (the storyboard is in Shots and plays as an animatic in Edit), say',
     'what was made, briefly, and ask them to sign it off with project.checkpoint.approve (it',
     'is put in front of them); what waits for it cannot start before. The working style says',
     'where the crew stops: "each" checkpoint (the default), only the "main" one, or "none".',
