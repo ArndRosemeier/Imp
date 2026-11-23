@@ -72,9 +72,9 @@ describe('the movie mode', () => {
     const movieMode = createMovieMode({ provider: createFakeProvider({}) });
     expect(movieMode.stages.map((stage) => stage.id)).toEqual([
       'development',
-      'script',
       'casting',
       'design',
+      'script',
       'shots',
       'edit',
       'sound',

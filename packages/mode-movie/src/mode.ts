@@ -23,6 +23,7 @@ import { createMarkerCommands } from './markers.js';
 import { createPickupCommands } from './pickups.js';
 import { createTextCommands } from './text.js';
 import { createScriptCommands } from './script.js';
+import { createScriptNoteCommands } from './script-notes.js';
 import { createFrameCommands, type FrameImageEncoder } from './frames.js';
 import { libraryCommands, movieLibrarySource } from './library.js';
 import { createSoundCommands } from './sounds.js';
@@ -112,6 +113,9 @@ export const screenwriter: Role = {
     "Characters are the Casting Director's work, not yours: write only characters who are in",
     'the cast. When the scenes need someone who is not there yet, or there is no cast at all,',
     'do not invent them: report it with report_missing and stop.',
+    'Script notes from a read-through (movie.script.note.list with open true) are for you: when',
+    'you revise a scene, deal with its open notes, mark each one done with movie.script.note.set,',
+    'and say in your summary which ones you left and why.',
   ].join(' '),
   scope: area(['movie.development.', 'movie.scene.', 'movie.script.'], TEXT_READS),
   // It writes from text alone, so a model that takes only text is enough.
@@ -375,12 +379,22 @@ export const filmEditor: Role = {
 export const critic: Role = {
   id: 'critic',
   name: 'Critic',
-  summary: 'Watches a scene or the film and leaves notes on the timeline. Changes nothing.',
+  summary:
+    'Reads the script before the shots and watches the cut after, and leaves notes. Changes nothing.',
   // Not in the default crew: offered once someone adds it (crew.role.add).
   optional: true,
   brief: [
     'You are a critic: a sharp, fair first audience for a film made from generated clips. You',
-    'watch and you write notes; you never change the film. Read the development notes for what',
+    'read and watch and you write notes; you never change the film. Your first job comes before',
+    'any picture is made: the read-through of the script. Read the development, then the scenes',
+    '(movie.scene.list, then movie.scene.get for the text), and judge them as a reader would:',
+    'whether the story is clear and holds, whether each scene earns its place and turns',
+    'something, whether a character wants something and acts like the same person, dialogue that',
+    'explains instead of plays, a scene that a few generated shots cannot tell. Leave each point',
+    'on its scene with movie.script.note.add, quoting the words where it is about a line; read',
+    'the open notes first with movie.script.note.list and do not repeat them. A change now costs',
+    'nothing; after the clips it costs money. Later, once there are clips, you watch the cut.',
+    'Read the development notes for what',
     'the film wants to be, then the scene or stretch you are asked about: movie.edit.edl reads a',
     'scene as text with times, movie.edit.film.edl the whole film, and movie.edit.frames shows',
     'stills of the pieces, which you look at with media.view. Judge what an audience notices:',
@@ -414,6 +428,8 @@ export const critic: Role = {
       'movie.edit.look.get',
       'movie.edit.pickup.list',
       'movie.edit.marker.',
+      'movie.script.get',
+      'movie.script.note.',
       'world.location.list',
       'world.location.get',
       'world.object.list',
@@ -421,13 +437,15 @@ export const critic: Role = {
       'project.list',
       'media.view',
     ],
-    // Reading, and markers, which are the only thing it writes.
+    // Reading, and notes on the script and the cut, which are the only things it writes.
     effects: ['read', 'write'],
-    writes: ['movie.edit.marker.'],
+    writes: ['movie.edit.marker.', 'movie.script.note.'],
   },
   sees: ['image'],
   mustSee: ['image'],
-  needs: [clipsNeed],
+  // It reads the script before there are clips, so written scenes are all it needs;
+  // watching a cut finds no clips by itself.
+  needs: [scenesNeed],
 };
 
 export const soundEditor: Role = {
@@ -477,9 +495,9 @@ export function createMovieMode(options: {
       'Develop an idea, write the script, cast the characters, design the places and objects, shoot the clips and make the sound.',
     stages: [
       { id: 'development', name: 'Development', guide: developmentGuide },
-      { id: 'script', name: 'Script', guide: scriptGuide },
       { id: 'casting', name: 'Casting', guide: castingGuide },
       { id: 'design', name: 'Design', guide: designGuide },
+      { id: 'script', name: 'Script', guide: scriptGuide },
       { id: 'shots', name: 'Shots', guide: shotsGuide },
       { id: 'edit', name: 'Edit', guide: editGuide },
       { id: 'sound', name: 'Sound', guide: soundGuide },
@@ -501,6 +519,7 @@ export function createMovieMode(options: {
       ),
       ...createTextCommands(),
       ...createScriptCommands(),
+      ...createScriptNoteCommands(),
       ...createMarkerCommands(),
       ...createPickupCommands(),
       ...createLookCommands(

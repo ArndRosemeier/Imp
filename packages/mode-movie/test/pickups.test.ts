@@ -204,7 +204,7 @@ describe('pickup shots', () => {
 });
 
 describe('the critic', () => {
-  it('may read the film and write markers, and nothing else', async () => {
+  it('may read the film and write markers and script notes, and nothing else', async () => {
     const { mode } = await setup();
     expect(mode.roles.map((role) => role.id)).toContain('critic');
     const prefixes = critic.scope.prefixes ?? [];
@@ -219,6 +219,9 @@ describe('the critic', () => {
       'movie.edit.marker.add',
       'movie.edit.marker.remove',
       'movie.edit.marker.set',
+      'movie.script.note.add',
+      'movie.script.note.remove',
+      'movie.script.note.set',
     ]);
     for (const id of ['movie.edit.edl', 'movie.edit.frames', 'movie.edit.film.edl', 'media.view']) {
       expect(prefixes.some((prefix) => id.startsWith(prefix))).toBe(true);

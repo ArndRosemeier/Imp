@@ -146,16 +146,6 @@ export async function summarizeMovie(
           ? phrase('Not started')
           : phrase('{done} of 4 parts written', { done: filled }),
       ]),
-      progress('script', 'Script', written, scenes.length, [
-        scenes.length === 0
-          ? phrase('No scenes')
-          : counted(
-              scenes.length,
-              '{done} of {total} scene written',
-              '{done} of {total} scenes written',
-              written,
-            ),
-      ]),
       progress(
         'casting',
         'Casting',
@@ -182,6 +172,16 @@ export async function summarizeMovie(
               phrase('{drawn} drawn', { drawn }),
             ],
       ),
+      progress('script', 'Script', written, scenes.length, [
+        scenes.length === 0
+          ? phrase('No scenes')
+          : counted(
+              scenes.length,
+              '{done} of {total} scene written',
+              '{done} of {total} scenes written',
+              written,
+            ),
+      ]),
       progress('shots', 'Shots', ready, shots.length, [
         shots.length === 0
           ? phrase('No shots')
@@ -192,16 +192,6 @@ export async function summarizeMovie(
               ready,
             ),
       ]),
-      progress('sound', 'Sound', made, sounds.length, [
-        sounds.length === 0
-          ? phrase('No sounds')
-          : counted(
-              sounds.length,
-              '{done} of {total} sound made',
-              '{done} of {total} sounds made',
-              made,
-            ),
-      ]),
       progress('edit', 'Edit', cut, scenes.length, [
         scenes.length === 0
           ? phrase('Nothing to cut')
@@ -210,6 +200,16 @@ export async function summarizeMovie(
               '{done} of {total} scene cut',
               '{done} of {total} scenes cut',
               cut,
+            ),
+      ]),
+      progress('sound', 'Sound', made, sounds.length, [
+        sounds.length === 0
+          ? phrase('No sounds')
+          : counted(
+              sounds.length,
+              '{done} of {total} sound made',
+              '{done} of {total} sounds made',
+              made,
             ),
       ]),
     ],
@@ -764,18 +764,18 @@ export const firstFilmPath: GuidedPath = {
       ask: 'Help me write the logline, premise and tone of this film. Ask me what it is about first.',
     },
     {
-      id: 'scene',
-      title: 'Write a scene',
-      body: 'In Script, write one scene: where it happens, what is done and said. One short scene is enough for a first film. Free, apart from a writer agent at a few cents.',
-      stage: 'script',
-      ask: 'Write the first scene of this film from the development, short enough for a first film.',
-    },
-    {
       id: 'cast',
       title: 'Cast a character',
       body: 'In Casting, describe how a character looks and make a portrait. The portrait keeps them the same in every clip. A portrait costs about a cent; the price is on the button.',
       stage: 'casting',
       ask: 'Cast the main character of this film: describe their appearance and make one portrait. Tell me the price first.',
+    },
+    {
+      id: 'scene',
+      title: 'Write a scene',
+      body: 'In Script, write one scene: where it happens, what is done and said. One short scene is enough for a first film. Free, apart from a writer agent at a few cents.',
+      stage: 'script',
+      ask: 'Write the first scene of this film from the development, short enough for a first film.',
     },
     {
       id: 'shots',
