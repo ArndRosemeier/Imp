@@ -37,6 +37,7 @@ import {
   Scene,
   SceneCut,
   Shot,
+  ShotJoin,
   dialogueOver,
   Sound,
   SoundPlacement,
@@ -48,6 +49,7 @@ import { readingSpeed } from './text-markup.js';
 import { FilmLook, Grade, NEUTRAL_LOOK } from './grade.js';
 import { dipOf, overlapSeconds } from './transitions.js';
 import { plannedShotSeconds } from './shot-length.js';
+import { outOfStep, shotBefore } from './joins.js';
 import { movingSeconds, pieceSeconds, playsOwnSound, splitTrims, zoomAt } from './piece-time.js';
 
 const ProjectId = z.string().describe('The id of a movie project from project.list.');
@@ -166,6 +168,15 @@ export function plannedFor(shot: Shot): number | null {
  * clip is not ready take no time and are not in the film.
  */
 async function layOut(store: KeyValueStore, projectId: string, items: readonly CutItem[]) {
+  const scenes = new Map<string, Shot[]>();
+  const shotAhead = async (sceneId: string, shot: Shot): Promise<Shot | undefined> => {
+    if (shot.clip?.continuesFrom === null || shot.clip?.continuesFrom === undefined) {
+      return undefined;
+    }
+    const shots = scenes.get(sceneId) ?? (await readShots(store, projectId, sceneId));
+    scenes.set(sceneId, shots);
+    return shotBefore(shots, shot);
+  };
   // First how long each piece is, then where it falls: a dissolve or wipe overlaps the one before.
   const pieces = [];
   for (const item of items) {
@@ -211,6 +222,9 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       pickupReason: shot?.pickup?.reason ?? null,
       plannedSeconds: item.kind === 'shot' && shot !== undefined ? plannedFor(shot) : null,
       lengthReason: item.kind === 'shot' ? (shot?.lengthReason ?? '') : '',
+      join: item.kind === 'shot' ? (shot?.join ?? 'cut') : 'cut',
+      cutReason: item.kind === 'shot' ? (shot?.cutReason ?? '') : '',
+      outOfStep: shot !== undefined && outOfStep(shot, await shotAhead(item.sceneId, shot)),
       trimStartSeconds: item.trimStartSeconds,
       trimEndSeconds: item.trimEndSeconds,
       dialogueVolume: item.dialogueVolume,
@@ -320,6 +334,11 @@ export const LaidItem = z.object({
   plannedSeconds: z.number().nullable(),
   /** Why it holds that long, in the words of whoever planned it. */
   lengthReason: z.string(),
+  /** How the shot comes after the shot before it in its scene, and why the cut is there. */
+  join: ShotJoin,
+  cutReason: z.string(),
+  /** A continuing shot whose clip was made from a clip of the shot before that has since been replaced. */
+  outOfStep: z.boolean(),
   trimStartSeconds: z.number(),
   trimEndSeconds: z.number(),
   dialogueVolume: z.number(),
@@ -1121,7 +1140,7 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
     id: 'movie.edit.assemble',
     title: 'Trim shots to their planned length',
     description:
-      'A first cut: trims each shot of a scene to how long it is planned to hold (its lengthSeconds, never shorter than its line), out of the slack its clip was made with. A sliver comes off the start, where generated clips settle in, and the rest off the end; a voice laid over the clip keeps its start. Pieces that are already trimmed are left alone unless retrim is set, and so are pieces off speed, reversed, split or used twice, and shots with no planned length. It is a starting point: then look at the cut with movie.edit.frames and move each in and out point to the best moment with movie.edit.item.set, such as cutting on a movement, a look or the end of a line. Returns what it did with each piece.',
+      'A first cut: trims each shot of a scene to how long it is planned to hold (its lengthSeconds, never shorter than its line), out of the slack its clip was made with. A sliver comes off the start, where generated clips settle in, and the rest off the end; a voice laid over the clip keeps its start, and where one clip carries on from the last frame of the piece before (a continuing shot), that join is never trimmed. Pieces that are already trimmed are left alone unless retrim is set, and so are pieces off speed, reversed, split or used twice, and shots with no planned length. It is a starting point: then look at the cut with movie.edit.frames and move each in and out point to the best moment with movie.edit.item.set, such as cutting on a movement, a look or the end of a line. Returns what it did with each piece.',
     effect: 'write',
     input: z.object({
       projectId: ProjectId,
@@ -1157,15 +1176,35 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
       for (const item of items) {
         if (item.kind === 'shot') uses.set(item.shotId, (uses.get(item.shotId) ?? 0) + 1);
       }
+      // A shot whose clip starts on the last frame of the piece before joins it frame to
+      // frame: trimming either side of that join would make the action jump.
+      const shotsOf: (Shot | undefined)[] = [];
+      for (const item of items) {
+        shotsOf.push(
+          item.kind === 'shot'
+            ? await loadShot(runtime.store, input.projectId, item.sceneId, item.shotId)
+            : undefined,
+        );
+      }
+      const carriesOn = (index: number): boolean => {
+        const from = shotsOf[index]?.clip?.continuesFrom;
+        const before = items[index - 1];
+        return (
+          from !== null &&
+          from !== undefined &&
+          before?.kind === 'shot' &&
+          before.shotId === from.shotId
+        );
+      };
       const pieces = [];
       const next: CutItem[] = [];
-      for (const item of items) {
+      for (const [index, item] of items.entries()) {
         const chosen = input.itemIds === undefined || input.itemIds.includes(item.id);
         if (!chosen || item.kind !== 'shot') {
           next.push(item);
           continue;
         }
-        const shot = await loadShot(runtime.store, input.projectId, item.sceneId, item.shotId);
+        const shot = shotsOf[index];
         const row = {
           itemId: item.id,
           shot: shot?.position ?? null,
@@ -1212,8 +1251,15 @@ export function createEditCommands(provider: GenerationProvider): readonly Comma
           next.push(whole);
           continue;
         }
-        // A recording laid over the clip starts with it, so its start stays.
-        const head = dialogueOver(shot.clip) ? 0 : round(Math.min(0.3, slack / 4));
+        // A recording laid over the clip starts with it, so its start stays, and so does
+        // the start of a clip that carries on from the one before.
+        const keepStart = dialogueOver(shot.clip) || carriesOn(index);
+        const keepEnd = index + 1 < items.length && carriesOn(index + 1);
+        if (keepStart && keepEnd) {
+          leave('It joins the pieces on both sides frame to frame, so it plays whole.');
+          continue;
+        }
+        const head = keepStart ? 0 : keepEnd ? round(slack) : round(Math.min(0.3, slack / 4));
         const tail = round(slack - head);
         pieces.push({
           ...row,

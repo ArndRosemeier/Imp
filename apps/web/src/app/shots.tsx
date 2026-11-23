@@ -276,21 +276,28 @@ function KeyFrames({
   shot,
   imageModel,
   act,
+  end = false,
 }: {
   shot: Shot;
   imageModel: string | null;
   act: Act;
+  /** The frames the clip lands on, instead of the ones it starts on. */
+  end?: boolean;
 }): ReactElement {
   const directionId = useId();
   const [direction, setDirection] = useState('');
   const [busy, setBusy] = useState(false);
   const at = { sceneId: shot.sceneId, shotId: shot.id };
-  const chosen = shot.frames.find((frame) => frame.id === shot.frameId);
+  const frames = end ? shot.endFrames : shot.frames;
+  const chosenId = end ? shot.endFrameId : shot.frameId;
+  const chosen = frames.find((frame) => frame.id === chosenId);
+  const which = end ? { end: true } : {};
   const paint = (event: SyntheticEvent): void => {
     event.preventDefault();
     setBusy(true);
     void act('movie.shot.frame.generate', {
       ...at,
+      ...which,
       ...(direction.trim() === '' ? {} : { direction: direction.trim() }),
     }).finally(() => {
       setBusy(false);
@@ -299,26 +306,36 @@ function KeyFrames({
   // A picture from the library becomes a key frame, the one the clip starts on.
   const frameBox = useRef<HTMLElement>(null);
   useLibraryDrop(frameBox, {
-    label: t('Shot {position}, key frame', { position: String(shot.position) }),
+    label: end
+      ? t('Shot {position}, end frame', { position: String(shot.position) })
+      : t('Shot {position}, key frame', { position: String(shot.position) }),
     accepts: (asset) => asset.modality === 'image' && asset.blobKey !== null,
     onDrop: async (asset) => {
-      await act('movie.shot.frame.fromFile', { ...at, blobKey: asset.blobKey });
+      await act('movie.shot.frame.fromFile', { ...at, ...which, blobKey: asset.blobKey });
     },
   });
   return (
     <section
       ref={frameBox}
       className="stack key-frames"
-      aria-label={t('Key frame of shot {position}', { position: String(shot.position) })}
+      aria-label={
+        end
+          ? t('End frame of shot {position}', { position: String(shot.position) })
+          : t('Key frame of shot {position}', { position: String(shot.position) })
+      }
     >
       <div className="row spread wrap">
-        <h4>{t('Key frame')}</h4>
+        <h4>{end ? t('End frame') : t('Key frame')}</h4>
         <span className="muted small">
-          {chosen === undefined
-            ? shot.frames.length === 0
-              ? t('The clip starts from words and pictures alone.')
-              : t('None chosen: the clip starts from words and pictures.')
-            : t('The clip starts exactly on this frame.')}
+          {end
+            ? chosen === undefined
+              ? t('Optional: where the clip lands. Without one, the model decides.')
+              : t('The clip ends on this frame, where the model takes one.')
+            : chosen === undefined
+              ? frames.length === 0
+                ? t('The clip starts from words and pictures alone.')
+                : t('None chosen: the clip starts from words and pictures.')
+              : t('The clip starts exactly on this frame.')}
         </span>
       </div>
       {(chosen !== undefined || busy) && (
@@ -326,7 +343,11 @@ function KeyFrames({
           {chosen !== undefined && (
             <FrameImage
               blobKey={chosen.blobKey}
-              alt={t('Key frame of shot {position}', { position: String(shot.position) })}
+              alt={
+                end
+                  ? t('End frame of shot {position}', { position: String(shot.position) })
+                  : t('Key frame of shot {position}', { position: String(shot.position) })
+              }
             />
           )}
           {busy && (
@@ -343,19 +364,28 @@ function KeyFrames({
             : t('Painted from {value}.', { value: chosen.guides.join(', ') })}
         </span>
       )}
-      {shot.frames.length > 0 && (
-        <div className="thumbs wide" role="group" aria-label={t('Key frames to choose from')}>
-          {shot.frames.map((frame, index) => (
+      {frames.length > 0 && (
+        <div
+          className="thumbs wide"
+          role="group"
+          aria-label={end ? t('End frames to choose from') : t('Key frames to choose from')}
+        >
+          {frames.map((frame, index) => (
             <button
               key={frame.id}
               className="thumb"
-              aria-pressed={frame.id === shot.frameId}
-              aria-label={t('Start the clip on frame {value}', { value: String(index + 1) })}
+              aria-pressed={frame.id === chosenId}
+              aria-label={
+                end
+                  ? t('End the clip on frame {value}', { value: String(index + 1) })
+                  : t('Start the clip on frame {value}', { value: String(index + 1) })
+              }
               title={frame.prompt}
               onClick={() => {
                 void act('movie.shot.frame.select', {
                   ...at,
-                  frameId: frame.id === shot.frameId ? null : frame.id,
+                  ...which,
+                  frameId: frame.id === chosenId ? null : frame.id,
                 });
               }}
             >
@@ -366,7 +396,7 @@ function KeyFrames({
       )}
       <form className="row portrait-make" onSubmit={paint}>
         <label className="sr-only" htmlFor={directionId}>
-          {t('Direction for the next key frame')}
+          {end ? t('Direction for the next end frame') : t('Direction for the next key frame')}
         </label>
         <input
           id={directionId}
@@ -389,7 +419,7 @@ function KeyFrames({
           }
         >
           <SparkleIcon aria-hidden="true" />{' '}
-          {shot.frames.length === 0 ? t('Paint frame') : t('Another')}
+          {frames.length === 0 ? (end ? t('Paint end frame') : t('Paint frame')) : t('Another')}
           <Price command="movie.shot.frame.generate" input={at} />
         </button>
       </form>
@@ -397,9 +427,11 @@ function KeyFrames({
         <div className="row">
           <ConfirmButton
             label={t('Delete frame')}
-            question={t('Delete this key frame for good?')}
+            question={
+              end ? t('Delete this end frame for good?') : t('Delete this key frame for good?')
+            }
             onConfirm={() => {
-              void act('movie.shot.frame.delete', { ...at, frameId: chosen.id });
+              void act('movie.shot.frame.delete', { ...at, ...which, frameId: chosen.id });
             }}
           >
             <TrashIcon aria-hidden="true" />
@@ -716,6 +748,7 @@ function ShotCard({
         )}
         onCommit={(performance) => change({ performance })}
       />
+      {shot.position > 1 && <ShotJoinField shot={shot} change={change} />}
       <ShotLength shot={shot} change={change} />
       <ShotPlace
         shot={shot}
@@ -817,7 +850,16 @@ function ShotCard({
         speechModel={speechModel}
         act={act}
       />
-      <KeyFrames shot={shot} imageModel={imageModel} act={act} />
+      {shot.join === 'continues' && shot.position > 1 ? (
+        <p className="muted small">
+          {t('The clip starts on the last frame of shot {position}, so it needs no key frame.', {
+            position: String(shot.position - 1),
+          })}
+        </p>
+      ) : (
+        <KeyFrames shot={shot} imageModel={imageModel} act={act} />
+      )}
+      <KeyFrames shot={shot} imageModel={imageModel} act={act} end />
       <div className="row wrap">
         <button
           className="button"
@@ -872,6 +914,7 @@ export interface ClipOptionValues {
   readonly audio: boolean;
   readonly portraits: boolean;
   readonly startFrame: boolean;
+  readonly endFrame: boolean;
 }
 
 export const DEFAULT_CLIP_OPTIONS: ClipOptionValues = {
@@ -881,6 +924,7 @@ export const DEFAULT_CLIP_OPTIONS: ClipOptionValues = {
   audio: true,
   portraits: true,
   startFrame: true,
+  endFrame: true,
 };
 
 const RESOLUTION_CHOICES = ['480p', '720p', '1080p'] as const;
@@ -897,7 +941,61 @@ export function clipOptionInput(options: ClipOptionValues): Record<string, unkno
   if (!options.audio) input['audio'] = false;
   if (!options.portraits) input['portraits'] = false;
   if (!options.startFrame) input['startFrame'] = false;
+  if (!options.endFrame) input['endFrame'] = false;
   return input;
+}
+
+/** How the shot comes after the one before it, and why the cut is there. */
+function ShotJoinField({
+  shot,
+  change,
+}: {
+  shot: Shot;
+  change: (patch: Record<string, unknown>) => Promise<unknown>;
+}): ReactElement {
+  const joinId = useId();
+  const choices = [
+    { value: 'cut', label: t('A new angle or place') },
+    { value: 'continues', label: t('Carries on the same take') },
+    { value: 'action', label: t('Cut on action') },
+  ] as const;
+  const notes: Record<Shot['join'], string> = {
+    cut: t('Its own key frame; nothing is shared with the shot before.'),
+    continues: t(
+      'Starts on the last frame of the shot before, so the action flows on. Made after that clip.',
+    ),
+    action: t(
+      'The same instant from a new angle: its key frame is painted to match where the shot before ends.',
+    ),
+  };
+  return (
+    <div className="row wrap shot-join">
+      <div className="field compact">
+        <label htmlFor={joinId}>{t('Comes after the shot before as')}</label>
+        <select
+          id={joinId}
+          className="select"
+          title={notes[shot.join]}
+          value={shot.join}
+          onChange={(event) => {
+            void change({ join: event.target.value });
+          }}
+        >
+          {choices.map((choice) => (
+            <option key={choice.value} value={choice.value}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <EditableField
+        label={t('Why cut here')}
+        value={shot.cutReason}
+        placeholder={t('On her look to the door; as he sits down; after the line')}
+        onCommit={(cutReason) => change({ cutReason })}
+      />
+    </div>
+  );
 }
 
 const LENGTH_CHOICES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30] as const;
@@ -1064,6 +1162,16 @@ function ClipOptions({
             }}
           />
           {t('Start on the key frame')}
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={value.endFrame}
+            onChange={(event) => {
+              set({ endFrame: event.target.checked });
+            }}
+          />
+          {t('End on the end frame')}
         </label>
       </div>
       <p className="muted small">

@@ -985,6 +985,34 @@ export const de: Readonly<Record<string, string>> = {
     'Wie lange die Einstellung im Film läuft. Der Clip wird etwas länger erstellt, damit der Schnitt sie im besten Moment schneiden kann.',
   'Not planned': 'Nicht geplant',
   'Why that long': 'Warum so lang',
+  'A new angle or place': 'Neuer Blickwinkel oder Ort',
+  'Carries on the same take': 'Führt dieselbe Aufnahme fort',
+  'Comes after the shot before as': 'Folgt auf die vorige Einstellung als',
+  'Cut on action': 'Schnitt in der Bewegung',
+  'Delete this end frame for good?': 'Dieses Schlussbild endgültig löschen?',
+  'Direction for the next end frame': 'Anweisung für das nächste Schlussbild',
+  'End frame': 'Schlussbild',
+  'End frame of shot {position}': 'Schlussbild von Einstellung {position}',
+  'End frames to choose from': 'Schlussbilder zur Auswahl',
+  'End on the end frame': 'Auf dem Schlussbild enden',
+  'End the clip on frame {value}': 'Clip auf Bild {value} enden lassen',
+  'Its own key frame; nothing is shared with the shot before.':
+    'Eigener Keyframe; nichts wird mit der vorigen Einstellung geteilt.',
+  'On her look to the door; as he sits down; after the line':
+    'Auf ihren Blick zur Tür; als er sich setzt; nach der Zeile',
+  'Optional: where the clip lands. Without one, the model decides.':
+    'Optional: wo der Clip landet. Ohne Schlussbild entscheidet das Modell.',
+  'Paint end frame': 'Schlussbild malen',
+  'Shot {position}, end frame': 'Einstellung {position}, Schlussbild',
+  'Starts on the last frame of the shot before, so the action flows on. Made after that clip.':
+    'Beginnt mit dem letzten Bild der vorigen Einstellung, damit die Handlung weiterfließt. Wird nach jenem Clip erstellt.',
+  'The clip ends on this frame, where the model takes one.':
+    'Der Clip endet auf diesem Bild, wo das Modell eines annimmt.',
+  'The clip starts on the last frame of shot {position}, so it needs no key frame.':
+    'Der Clip beginnt mit dem letzten Bild von Einstellung {position} und braucht deshalb keinen Keyframe.',
+  'The same instant from a new angle: its key frame is painted to match where the shot before ends.':
+    'Derselbe Moment aus neuem Blickwinkel: Der Keyframe wird passend zum Ende der vorigen Einstellung gemalt.',
+  'Why cut here': 'Warum hier schneiden',
   'A quick glance; lets the silence land; the walk to the door':
     'Ein kurzer Blick; die Stille wirken lassen; der Gang zur Tür',
   'How it is said: hushed, tired, amused.': 'Wie es gesagt wird: leise, müde, belustigt.',

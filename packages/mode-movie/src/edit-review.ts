@@ -149,6 +149,12 @@ export function edlText(
       notes.push(
         `clip ${item.trimStartSeconds.toFixed(2)}-${(item.sourceSeconds - item.trimEndSeconds).toFixed(2)} of ${item.sourceSeconds.toFixed(2)}`,
       );
+      if (item.index > 1 && item.join === 'continues') notes.push('carries on frame to frame');
+      if (item.index > 1 && item.join === 'action') notes.push('cut on action');
+      if (item.cutReason !== '') notes.push(`cut: ${item.cutReason}`);
+      if (item.outOfStep) {
+        notes.push('OUT OF STEP: made from an earlier clip of the shot before, make it again');
+      }
       if (item.plannedSeconds !== null) {
         const over = item.durationSeconds - item.plannedSeconds;
         notes.push(

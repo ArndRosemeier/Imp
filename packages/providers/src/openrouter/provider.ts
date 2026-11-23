@@ -812,9 +812,18 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         ...(request.references === undefined || request.references.length === 0
           ? {}
           : { input_references: request.references.map(toImagePart) }),
-        ...(request.firstFrame === undefined
+        ...(request.firstFrame === undefined && request.lastFrame === undefined
           ? {}
-          : { frame_images: [{ ...toImagePart(request.firstFrame), frame_type: 'first_frame' }] }),
+          : {
+              frame_images: [
+                ...(request.firstFrame === undefined
+                  ? []
+                  : [{ ...toImagePart(request.firstFrame), frame_type: 'first_frame' }]),
+                ...(request.lastFrame === undefined
+                  ? []
+                  : [{ ...toImagePart(request.lastFrame), frame_type: 'last_frame' }]),
+              ],
+            }),
       };
       return toVideoJob(await sendJson('/videos', 'POST', body, call, true));
     },
