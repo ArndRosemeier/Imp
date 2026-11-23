@@ -3,10 +3,13 @@ import type { ImpClient } from '@imp/host';
 import {
   ArrowClockwiseIcon,
   ArrowCounterClockwiseIcon,
+  ArrowsOutLineHorizontalIcon,
   ClipboardIcon,
   CopyIcon,
+  CopySimpleIcon,
   DownloadSimpleIcon,
   EqualizerIcon,
+  FlagIcon,
   MagnifyingGlassMinusIcon,
   MagnifyingGlassPlusIcon,
   PauseIcon,
@@ -19,6 +22,7 @@ import {
   TextTIcon,
   TrashIcon,
   WaveformIcon,
+  XIcon,
   type Icon,
 } from '@phosphor-icons/react';
 import {
@@ -972,6 +976,27 @@ function AudioEditor({
         });
       }
     },
+    insertSilence: () => {
+      // A selection makes room as long as itself at its start; otherwise a second at the playhead.
+      const seconds = range === null ? 1 : Math.round((range.to - range.from) * 1000) / 1000;
+      void edit('audio.edit.insertSilence', {
+        trackIds: targetTracks(),
+        atSeconds: range?.from ?? at,
+        seconds,
+      });
+    },
+    duplicate: () => {
+      if (picked !== undefined) void edit('audio.region.duplicate', { regionId: picked.region.id });
+    },
+    addMarker: () => {
+      void edit('audio.marker.add', {
+        atSeconds: Math.round(at * 1000) / 1000,
+        label: t('Marker {value}', { value: String(doc.markers.length + 1) }),
+      });
+    },
+    removeMarker: (markerId: string) => {
+      void edit('audio.marker.remove', { markerId });
+    },
     undo: (wholeRun = false) => {
       void edit('audio.history.undo', { wholeRun });
     },
@@ -1038,6 +1063,7 @@ function AudioEditor({
     else if (mod && key === 'v') run(actions.paste);
     else if (mod && key === 'l') run(actions.silence);
     else if (!mod && key === 's') run(actions.split);
+    else if (!mod && key === 'm') run(actions.addMarker);
     else if (!mod && key === 'r') {
       // The record button starts and stops; it lives in its own component.
       const editor = event.currentTarget;
@@ -1311,6 +1337,23 @@ function AudioEditor({
             disabled={range === null}
             onClick={actions.silence}
           />
+          <ToolButton
+            icon={ArrowsOutLineHorizontalIcon}
+            label={t('Insert silence (the selection’s length, or 1 s at the playhead)')}
+            onClick={actions.insertSilence}
+          />
+          <ToolButton
+            icon={CopySimpleIcon}
+            label={t('Duplicate region')}
+            disabled={picked === undefined}
+            onClick={actions.duplicate}
+          />
+          <ToolButton
+            icon={FlagIcon}
+            label={t('Add a marker at the playhead')}
+            keys="M"
+            onClick={actions.addMarker}
+          />
           <span className="tool-gap" />
           <ToolButton
             icon={ArrowCounterClockwiseIcon}
@@ -1505,6 +1548,19 @@ function AudioEditor({
                     title={marker.label}
                   >
                     {marker.label}
+                    <button
+                      type="button"
+                      className="marker-remove"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      aria-label={t('Remove marker {name}', { name: marker.label })}
+                      onClick={() => {
+                        actions.removeMarker(marker.id);
+                      }}
+                    >
+                      <XIcon aria-hidden="true" size={10} />
+                    </button>
                   </span>
                 ))}
               </div>
@@ -1723,7 +1779,7 @@ function AudioEditor({
       )}
       <p className="muted small shortcuts">
         {t(
-          'Space plays · R records · S splits at the playhead · drag across a track to select (two fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L silences · Ctrl+Z undoes',
+          'Space plays · R records · S splits at the playhead · M adds a marker · drag across a track to select (two fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L silences · Ctrl+Z undoes',
         )}
       </p>
     </div>

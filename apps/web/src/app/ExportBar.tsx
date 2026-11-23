@@ -7,7 +7,7 @@ import {
   StopIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { clock } from './cut-player.js';
 import { recordingFormat, recordScenes, type Progress } from './export.js';
@@ -69,6 +69,7 @@ function RenderedExports({
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [options, setOptions] = useState<ExportOptionValues>(DEFAULT_EXPORT_OPTIONS);
   const madeBy = useMadeBy();
   const rendering = exports.find((film) => film.status === 'rendering');
   const busy = starting || rendering !== undefined;
@@ -94,6 +95,7 @@ function RenderedExports({
     runCommand(imp, 'movie.edit.export', {
       projectId: project.id,
       ...(sceneIds === undefined ? {} : { sceneIds }),
+      ...exportOptionInput(options),
     })
       .catch((cause: unknown) => {
         const message = messageOf(cause);
@@ -174,6 +176,7 @@ function RenderedExports({
           </>
         )}
       </div>
+      <ExportOptions value={options} onChange={setOptions} />
       <p className="muted">
         {t(
           'Films are rendered to MP4 in the background, faster than real time. You can keep working or switch tabs while it runs, and the Film Editor can export too.',
@@ -238,6 +241,136 @@ function RenderedExports({
         </button>
       )}
     </div>
+  );
+}
+
+export interface ExportOptionValues {
+  readonly resolution: 'source' | '720p' | '1080p' | '2160p';
+  /** Frames per second, or null for the rate most clips have. */
+  readonly fps: number | null;
+  /** A short file name, or empty for "film" or the scene. */
+  readonly label: string;
+  /** Burn the subtitles into the picture. */
+  readonly subtitles: boolean;
+}
+
+export const DEFAULT_EXPORT_OPTIONS: ExportOptionValues = {
+  resolution: 'source',
+  fps: null,
+  label: '',
+  subtitles: true,
+};
+
+const RESOLUTIONS = ['source', '720p', '1080p', '2160p'] as const;
+const FRAME_RATES = [24, 25, 30, 50, 60] as const;
+
+/** Only what differs from the defaults goes to movie.edit.export. */
+export function exportOptionInput(options: ExportOptionValues): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+  if (options.resolution !== 'source') input['resolution'] = options.resolution;
+  if (options.fps !== null) input['fps'] = options.fps;
+  const label = options.label.trim();
+  if (label !== '') input['label'] = label.slice(0, 60);
+  if (!options.subtitles) input['subtitles'] = false;
+  return input;
+}
+
+function resolutionLabel(resolution: (typeof RESOLUTIONS)[number]): string {
+  if (resolution === 'source') return t('Like the clips');
+  if (resolution === '2160p') return t('2160p (4K)');
+  return resolution;
+}
+
+/** Size, frame rate, file name and subtitles of the next film, folded away under the buttons. */
+function ExportOptions({
+  value,
+  onChange,
+}: {
+  value: ExportOptionValues;
+  onChange: (next: ExportOptionValues) => void;
+}): ReactElement {
+  const sizeId = useId();
+  const fpsId = useId();
+  const nameId = useId();
+  const changed = Object.keys(exportOptionInput(value)).length;
+  const set = (patch: Partial<ExportOptionValues>): void => {
+    onChange({ ...value, ...patch });
+  };
+  return (
+    <details className="options-fold">
+      <summary>
+        {t('Export options')}
+        {changed > 0 && (
+          <span className="muted"> · {tn(changed, '{count} changed', '{count} changed')}</span>
+        )}
+      </summary>
+      <div className="row wrap">
+        <div className="field compact">
+          <label htmlFor={sizeId}>{t('Size')}</label>
+          <select
+            id={sizeId}
+            className="input"
+            value={value.resolution}
+            onChange={(event) => {
+              const next = RESOLUTIONS.find((choice) => choice === event.target.value);
+              if (next !== undefined) set({ resolution: next });
+            }}
+          >
+            {RESOLUTIONS.map((choice) => (
+              <option key={choice} value={choice}>
+                {resolutionLabel(choice)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field compact">
+          <label htmlFor={fpsId}>{t('Frames per second')}</label>
+          <select
+            id={fpsId}
+            className="input"
+            value={value.fps === null ? '' : String(value.fps)}
+            onChange={(event) => {
+              set({ fps: event.target.value === '' ? null : Number(event.target.value) });
+            }}
+          >
+            <option value="">{t('Like the clips')}</option>
+            {FRAME_RATES.map((fps) => (
+              <option key={fps} value={fps}>
+                {String(fps)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field compact wide">
+          <label htmlFor={nameId}>{t('File name')}</label>
+          <input
+            id={nameId}
+            className="input"
+            value={value.label}
+            maxLength={60}
+            placeholder={t('rough-cut-2')}
+            onChange={(event) => {
+              set({ label: event.target.value });
+            }}
+          />
+        </div>
+      </div>
+      <label className="choice">
+        <input
+          type="checkbox"
+          checked={value.subtitles}
+          onChange={(event) => {
+            set({ subtitles: event.target.checked });
+          }}
+        />
+        {t('Burn the subtitles into the picture')}
+      </label>
+      <p className="muted small">
+        {t(
+          'Leave the subtitles out for a film that gets a subtitle file instead. Other texts are always in the picture.',
+        )}
+      </p>
+    </details>
   );
 }
 

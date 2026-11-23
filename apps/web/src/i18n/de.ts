@@ -252,8 +252,8 @@ export const de: Readonly<Record<string, string>> = {
   '{name}, {startSeconds} to {endSeconds}': '{name}, {startSeconds} bis {endSeconds}',
   'Drag to move': 'Zum Verschieben ziehen',
   ' {value}{value2} dB': ' {value}{value2} dB',
-  'Space plays · R records · S splits at the playhead · drag across a track to select (two fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L silences · Ctrl+Z undoes':
-    'Leertaste spielt ab · R nimmt auf · S teilt am Abspielkopf · über eine Spur ziehen wählt aus (zwei Finger schieben und zoomen) · Strg+X, C, V schneiden aus, kopieren und fügen ein · Entf entfernt und schließt die Lücke · Strg+L schaltet stumm · Strg+Z macht rückgängig',
+  'Space plays · R records · S splits at the playhead · M adds a marker · drag across a track to select (two fingers pan and zoom) · Ctrl+X, C, V cut, copy and paste · Delete removes and closes the gap · Ctrl+L silences · Ctrl+Z undoes':
+    'Leertaste spielt ab · R nimmt auf · S teilt am Abspielkopf · M setzt eine Marke · über eine Spur ziehen wählt aus (zwei Finger schieben und zoomen) · Strg+X, C, V schneiden aus, kopieren und fügen ein · Entf entfernt und schließt die Lücke · Strg+L schaltet stumm · Strg+Z macht rückgängig',
   Effect: 'Effekt',
   Music: 'Musik',
   Voice: 'Stimme',
@@ -1360,7 +1360,6 @@ export const de: Readonly<Record<string, string>> = {
   'Transcript model': 'Transkriptionsmodell',
   'Agents cut drafts on the Edit stage': 'Agenten schneiden Entwürfe im Schnitt',
   Theme: 'Farbschema',
-  'Daily budget': 'Tagesbudget',
   'Budget without approval, per project': 'Budget ohne Rückfrage, pro Projekt',
   'Most per step without approval': 'Höchstens pro Schritt ohne Rückfrage',
   // app/Setup.tsx
@@ -1696,7 +1695,6 @@ export const de: Readonly<Record<string, string>> = {
   'Down (0 top, 1 bottom)': 'Senkrecht (0 oben, 1 unten)',
   'Back to the style’s place': 'Zurück an die Position des Stils',
   'Remove text': 'Text entfernen',
-  '{name}.srt': '{name}.srt',
   Subtitles: 'Untertitel',
   'The film has no subtitles yet: make them first.':
     'Der Film hat noch keine Untertitel: Erstell sie zuerst.',
@@ -1792,8 +1790,8 @@ export const de: Readonly<Record<string, string>> = {
   'Web search': 'Websuche',
   'Dismiss {name}': '{name} entlassen',
   'New role': 'Neue Rolle',
-  'Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator or run “Hire agent” from the command palette. You can define roles of your own, and so can the coordinator.':
-    'Wer hier eingestellt wird, nutzt das Modell des Koordinators. Für ein anderes Modell oder Budget frag den Koordinator oder führ „Agent einstellen“ aus der Befehlspalette aus. Du kannst eigene Rollen festlegen, und der Koordinator auch.',
+  'Hiring here uses the coordinator’s model. Change a member’s name, model or budget with Change on its card. You can define roles of your own, and so can the coordinator.':
+    'Wer hier eingestellt wird, nutzt das Modell des Koordinators. Name, Modell oder Budget eines Mitglieds änderst du mit „Ändern“ auf seiner Karte. Du kannst eigene Rollen festlegen, und der Koordinator auch.',
   Custom: 'Eigene',
   'On the crew': 'In der Crew',
   'Hire {name}': '{name} einstellen',
@@ -2308,4 +2306,53 @@ export const de: Readonly<Record<string, string>> = {
     'Der Imp-Koordinator: Optionen, Modelle, Crews und Projekte',
   'The crew of {project}': 'Die Crew von {project}',
   'Which chat': 'Welcher Chat',
+  // UI parity: what agents can change, people can change too
+  '.vtt': '.vtt',
+  '2160p (4K)': '2160p (4K)',
+  'Add a marker at the playhead': 'Marke am Abspielkopf setzen',
+  'Agents change the cut directly, without a draft.':
+    'Agenten ändern den Schnitt direkt, ohne Entwurf.',
+  'Agents’ changes to the cut wait as a draft for you to keep or discard':
+    'Änderungen der Agenten am Schnitt warten als Entwurf, den du behältst oder verwirfst',
+  'Aspect ratio': 'Seitenverhältnis',
+  Automatic: 'Automatisch',
+  'Burn the subtitles into the picture': 'Untertitel ins Bild einbrennen',
+  'Change {name}': '{name} ändern',
+  'Clip options': 'Clip-Optionen',
+  'Export options': 'Export-Optionen',
+  'File name': 'Dateiname',
+  'Frames per second': 'Bilder pro Sekunde',
+  'Goes without': 'Kommt ohne aus',
+  'Insert silence (the selection’s length, or 1 s at the playhead)':
+    'Stille einfügen (so lang wie die Auswahl, sonst 1 s am Abspielkopf)',
+  'Leave the subtitles out for a film that gets a subtitle file instead. Other texts are always in the picture.':
+    'Lass die Untertitel weg, wenn der Film stattdessen eine Untertiteldatei bekommt. Andere Texte sind immer im Bild.',
+  'Like the clips': 'Wie die Clips',
+  'Marker {value}': 'Marke {value}',
+  Missing: 'Fehlt',
+  'Most per run (US$)': 'Höchstens pro Lauf (US$)',
+  'Not checked': 'Nicht prüfbar',
+  'Number the scenes, as shooting scripts do': 'Szenen nummerieren, wie in Drehfassungen',
+  'Remove marker {name}': 'Marke {name} entfernen',
+  'Roles wait for these before they work. Tick “Goes without” for what this project does not have, such as a cast for a film with no characters.':
+    'Darauf warten Rollen, bevor sie arbeiten. Hak „Kommt ohne aus“ an für das, was dieses Projekt nicht hat, etwa eine Besetzung bei einem Film ohne Figuren.',
+  'Save the film’s subtitles as a WebVTT file, for web players':
+    'Die Untertitel des Films als WebVTT-Datei sichern, für Web-Player',
+  'Send the portraits as guides': 'Porträts als Vorlage mitschicken',
+  'Set in the Crew view': 'In der Crew-Ansicht festgelegt',
+  'Set {name} back to unchanged': '{name} auf unverändert zurücksetzen',
+  Size: 'Größe',
+  'Start on the key frame': 'Auf dem Schlüsselbild beginnen',
+  'Switch this off to let agents change the cut directly.':
+    'Schalt das aus, damit Agenten den Schnitt direkt ändern.',
+  'The model makes the nearest length and size it can. Leave the portraits out for models that refuse them.':
+    'Das Modell nimmt die nächste Länge und Größe, die es kann. Lass die Porträts weg bei Modellen, die sie ablehnen.',
+  There: 'Vorhanden',
+  'Title page and numbers': 'Titelseite und Nummern',
+  'What the crew needs in this project': 'Was die Crew in diesem Projekt braucht',
+  'With its own sound': 'Mit eigenem Ton',
+  'Written by': 'Geschrieben von',
+  'rough-cut-2': 'rohschnitt-2',
+  silent: 'stumm',
+  '{count} changed': '{count} geändert',
 };

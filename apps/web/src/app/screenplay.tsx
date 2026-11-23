@@ -15,7 +15,7 @@ import {
   PlusIcon,
   UploadSimpleIcon,
 } from '@phosphor-icons/react';
-import { useRef, useState, type ReactElement } from 'react';
+import { useId, useRef, useState, type ReactElement } from 'react';
 import { z } from 'zod';
 import { runCommand, useImp, useLive, type Live } from './context.js';
 import { moviePrefix, type Act } from './movie.js';
@@ -577,6 +577,9 @@ export function ScriptFiles({
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [author, setAuthor] = useState('');
+  const [sceneNumbers, setSceneNumbers] = useState(true);
+  const authorId = useId();
   const download = (format: 'pdf' | 'fountain' | 'fdx'): void => {
     setBusy(format);
     setError(null);
@@ -591,7 +594,12 @@ export function ScriptFiles({
           { suggestedName: `${fileSafe(project.name, 'script')}.${format}`, ...types[format] },
           async () => {
             const file = Exported.parse(
-              await runCommand(imp, 'movie.script.export', { projectId: project.id, format }),
+              await runCommand(imp, 'movie.script.export', {
+                projectId: project.id,
+                format,
+                ...(author.trim() === '' ? {} : { author: author.trim() }),
+                ...(sceneNumbers ? {} : { sceneNumbers: false }),
+              }),
             );
             const blob = await imp.blob(file.blobKey);
             if (blob === undefined) throw new Error(t('The file went missing.'));
@@ -674,6 +682,31 @@ export function ScriptFiles({
           <DownloadSimpleIcon aria-hidden="true" /> {busy === format ? t('Writing…') : name}
         </button>
       ))}
+      <details className="options-fold">
+        <summary>{t('Title page and numbers')}</summary>
+        <div className="field">
+          <label htmlFor={authorId}>{t('Written by')}</label>
+          <input
+            id={authorId}
+            className="input"
+            value={author}
+            maxLength={200}
+            onChange={(event) => {
+              setAuthor(event.target.value);
+            }}
+          />
+        </div>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={sceneNumbers}
+            onChange={(event) => {
+              setSceneNumbers(event.target.checked);
+            }}
+          />
+          {t('Number the scenes, as shooting scripts do')}
+        </label>
+      </details>
       {error !== null && (
         <p className="error" role="alert">
           {error}

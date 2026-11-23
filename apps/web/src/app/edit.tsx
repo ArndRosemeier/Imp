@@ -1514,6 +1514,30 @@ function SceneEditor({
                 />
                 {t('Repeat until the scene ends')}
               </label>
+              <div className="knob">
+                <span id={`edit-curve-${placement.id}`}>{t('Fade shape')}</span>
+                <span
+                  className="segmented"
+                  role="group"
+                  aria-labelledby={`edit-curve-${placement.id}`}
+                >
+                  {(['linear', 'smooth'] as const).map((curve) => (
+                    <button
+                      key={curve}
+                      type="button"
+                      aria-pressed={placement.fadeCurve === curve}
+                      onClick={() => {
+                        void run('movie.edit.sound.update', {
+                          placementId: placement.id,
+                          fadeCurve: curve,
+                        });
+                      }}
+                    >
+                      {curve === 'linear' ? t('Linear') : t('Smooth')}
+                    </button>
+                  ))}
+                </span>
+              </div>
               {!placement.recorded && (
                 <p className="muted">{t('There is no recording for this yet, so it is silent.')}</p>
               )}

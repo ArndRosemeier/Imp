@@ -9,13 +9,14 @@ import {
   TrashIcon,
   UserPlusIcon,
 } from '@phosphor-icons/react';
-import { useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useId, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { z } from 'zod';
 import { messageOf, runCommand, useImp, useLive } from './context.js';
 import { servedByLocalServer } from '../host/served.js';
 import { ConfirmButton } from './Field.js';
 import { ModelPanel } from './model-bar.js';
-import { AGENTS_MODEL_SETTING, ModelChoice } from './model-choice.js';
+import { AGENTS_MODEL_SETTING, chooseModel, ModelChoice } from './model-choice.js';
+import { NumberField } from './NumberField.js';
 import { useModelSetting, type Act } from './movie.js';
 import {
   EFFECT_MODEL_SETTING,
@@ -70,6 +71,8 @@ export function CrewView(): ReactElement {
   const [picking, setPicking] = useState<string | null>(null);
   const [defining, setDefining] = useState(false);
   const [editing, setEditing] = useState<RoleDetails | null>(null);
+  // The hired member whose name, model and budget are open for changing.
+  const [changing, setChanging] = useState<string | null>(null);
   const hiredRoles = new Set((crew.data?.crew ?? []).map((member) => member.roleId));
   const model = coordinator.data?.model;
 
@@ -112,6 +115,16 @@ export function CrewView(): ReactElement {
                 />
                 {t('Web search')}
               </label>
+              <button
+                className="button quiet"
+                aria-expanded={changing === member.id}
+                aria-label={t('Change {name}', { name: tx(member.name) })}
+                onClick={() => {
+                  setChanging(changing === member.id ? null : member.id);
+                }}
+              >
+                <PencilSimpleIcon aria-hidden="true" /> {t('Change')}
+              </button>
               {member.id !== coordinator.data?.value &&
                 member.roleId !== GLOBAL_COORDINATOR_ROLE && (
                   <button
@@ -127,9 +140,19 @@ export function CrewView(): ReactElement {
                   </button>
                 )}
             </div>
+            {changing === member.id && (
+              <MemberForm
+                member={member}
+                coordinator={member.id === coordinator.data?.value}
+                onDone={() => {
+                  setChanging(null);
+                }}
+              />
+            )}
           </article>
         ))}
       </div>
+      <ProjectNeeds />
       <section className="stack" aria-labelledby="roles-heading">
         <div className="row spread wrap">
           <h2 id="roles-heading">{t('Roles')}</h2>
@@ -146,7 +169,7 @@ export function CrewView(): ReactElement {
         </div>
         <p className="muted">
           {t(
-            'Hiring here uses the coordinator’s model. For another model or budget, ask the coordinator or run “Hire agent” from the command palette. You can define roles of your own, and so can the coordinator.',
+            'Hiring here uses the coordinator’s model. Change a member’s name, model or budget with Change on its card. You can define roles of your own, and so can the coordinator.',
           )}
         </p>
         {hireError !== null && (
@@ -353,6 +376,205 @@ const KnownNeeds = z.object({
 });
 
 /** A checkbox in a list of choices. */
+const NeedsInProject = z.object({
+  projectId: z.string().nullable(),
+  roles: z.array(
+    z.object({
+      needs: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string(),
+          state: z.enum(['met', 'missing', 'waived', 'unchecked']),
+          waivedBecause: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+type ProjectNeed = z.infer<typeof NeedsInProject>['roles'][number]['needs'][number];
+
+function needStateLabel(state: ProjectNeed['state']): string {
+  switch (state) {
+    case 'met':
+      return t('There');
+    case 'missing':
+      return t('Missing');
+    case 'waived':
+      return t('Goes without');
+    case 'unchecked':
+      return t('Not checked');
+  }
+}
+
+/**
+ * What the roles need before they work, and which of it the open project goes
+ * without (a film with no characters needs no cast), as crew.needs.waive says.
+ */
+function ProjectNeeds(): ReactElement | null {
+  const imp = useImp();
+  const open = useLive(['settings/project.current'], async (current) => {
+    const value = z
+      .object({ value: z.json() })
+      .parse(await runCommand(current, 'settings.get', { key: 'project.current' })).value;
+    return typeof value === 'string' ? value : null;
+  });
+  const projectId = open.data ?? null;
+  const needs = useLive(
+    ['roles/', 'roles-added/', ...(projectId === null ? [] : [`projects/${projectId}/`])],
+    async (current) => {
+      const listed = NeedsInProject.parse(await runCommand(current, 'crew.needs', {}));
+      const byId = new Map<string, ProjectNeed>();
+      for (const need of listed.roles.flatMap((role) => role.needs)) {
+        if (!byId.has(need.id)) byId.set(need.id, need);
+      }
+      return { projectId: listed.projectId, needs: [...byId.values()] };
+    },
+  );
+  const [error, setError] = useState<string | null>(null);
+  if (needs.data === undefined || needs.data.projectId === null || needs.data.needs.length === 0)
+    return null;
+  return (
+    <section className="stack" aria-labelledby="needs-heading">
+      <h2 id="needs-heading">{t('What the crew needs in this project')}</h2>
+      <p className="muted">
+        {t(
+          'Roles wait for these before they work. Tick “Goes without” for what this project does not have, such as a cast for a film with no characters.',
+        )}
+      </p>
+      <ul className="needs-list">
+        {needs.data.needs.map((need) => (
+          <li key={need.id} className="row spread wrap">
+            <span>
+              {tx(need.name)} <span className="tag neutral">{needStateLabel(need.state)}</span>
+              {need.waivedBecause !== null && need.waivedBecause !== '' && (
+                <span className="muted"> · {need.waivedBecause}</span>
+              )}
+            </span>
+            <label className="choice">
+              <input
+                type="checkbox"
+                checked={need.state === 'waived'}
+                onChange={(event) => {
+                  setError(null);
+                  runCommand(imp, 'crew.needs.waive', {
+                    need: need.id,
+                    waived: event.target.checked,
+                    reason: event.target.checked ? t('Set in the Crew view') : '',
+                  }).catch((cause: unknown) => {
+                    setError(messageOf(cause));
+                  });
+                }}
+              />
+              {t('Goes without')}
+            </label>
+          </li>
+        ))}
+      </ul>
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Changes a hired member's name, model and budget per run, as crew.update does for agents. */
+function MemberForm({
+  member,
+  coordinator,
+  onDone,
+}: {
+  member: z.infer<typeof CrewMember>;
+  /** The coordinator's model is the agents' model setting too, so both change together. */
+  coordinator: boolean;
+  onDone: () => void;
+}): ReactElement {
+  const imp = useImp();
+  const nameId = useId();
+  const [name, setName] = useState(member.name);
+  const [error, setError] = useState<string | null>(null);
+  const run = (input: Record<string, unknown>): void => {
+    setError(null);
+    runCommand(imp, 'crew.update', { id: member.id, ...input }).catch((cause: unknown) => {
+      setError(messageOf(cause));
+    });
+  };
+  return (
+    <form
+      className="stack member-form"
+      aria-label={t('Change {name}', { name: tx(member.name) })}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const trimmed = name.trim();
+        if (trimmed !== '' && trimmed !== member.name) run({ name: trimmed });
+        onDone();
+      }}
+    >
+      <div className="field">
+        <label htmlFor={nameId}>{t('Name')}</label>
+        <input
+          id={nameId}
+          className="input"
+          value={name}
+          maxLength={60}
+          onChange={(event) => {
+            setName(event.target.value);
+          }}
+          onBlur={() => {
+            const trimmed = name.trim();
+            if (trimmed !== '' && trimmed !== member.name) run({ name: trimmed });
+          }}
+        />
+      </div>
+      <ModelChoice
+        id={`member-model-${member.id}`}
+        label={t('Model')}
+        empty={t('Choose a model')}
+        output="text"
+        tools
+        role={member.roleId}
+        value={member.model}
+        onChoose={async (model) => {
+          setError(null);
+          try {
+            if (coordinator) {
+              await chooseModel(
+                (id, input) => runCommand(imp, id, input),
+                AGENTS_MODEL_SETTING,
+                model,
+              );
+            } else {
+              await runCommand(imp, 'crew.update', { id: member.id, model });
+            }
+          } catch (cause: unknown) {
+            setError(messageOf(cause));
+          }
+        }}
+      />
+      <NumberField
+        label={t('Most per run (US$)')}
+        value={member.budgetUsdPerRun}
+        step={0.1}
+        min={0.01}
+        max={100}
+        onCommit={(budgetUsdPerRun) => {
+          run({ budgetUsdPerRun });
+        }}
+      />
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="row">
+        <button className="button">{t('Done')}</button>
+      </div>
+    </form>
+  );
+}
+
 function Choice({
   checked,
   disabled = false,
@@ -623,6 +845,85 @@ function RoleForm({
   );
 }
 
+/** A number or text setting, stored when the field is left. */
+function PreferenceInput({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number | string;
+  onCommit: (value: number | string) => void;
+}): ReactElement {
+  const [typed, setTyped] = useState<string | null>(null);
+  const text = typed ?? String(value);
+  const numeric = typeof value === 'number';
+  return (
+    <input
+      className="input"
+      aria-label={label}
+      type={numeric ? 'number' : 'text'}
+      value={text}
+      onChange={(event) => {
+        setTyped(event.target.value);
+      }}
+      onBlur={() => {
+        setTyped(null);
+        if (numeric) {
+          const next = Number(text);
+          if (text.trim() !== '' && Number.isFinite(next) && next !== value) onCommit(next);
+        } else if (text !== value) {
+          onCommit(text);
+        }
+      }}
+    />
+  );
+}
+
+/** Whether agents' changes to the cut wait as a draft for the person (the default) or go in directly. */
+function DraftsSwitch(): ReactElement {
+  const imp = useImp();
+  const stored = useLive(
+    ['settings/edit.agent-drafts'],
+    async (current) =>
+      z
+        .object({ value: z.json() })
+        .parse(await runCommand(current, 'settings.get', { key: 'edit.agent-drafts' })).value,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const drafts = stored.data !== false;
+  return (
+    <div className="stack">
+      <label className="choice">
+        <input
+          type="checkbox"
+          checked={drafts}
+          disabled={stored.data === undefined}
+          onChange={() => {
+            setError(null);
+            runCommand(imp, 'settings.set', { key: 'edit.agent-drafts', value: !drafts }).catch(
+              (cause: unknown) => {
+                setError(messageOf(cause));
+              },
+            );
+          }}
+        />
+        {t('Agents’ changes to the cut wait as a draft for you to keep or discard')}
+      </label>
+      <p className="muted small">
+        {drafts
+          ? t('Switch this off to let agents change the cut directly.')
+          : t('Agents change the cut directly, without a draft.')}
+      </p>
+      {error !== null && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function settingValue(value: unknown): string {
   if (typeof value === 'boolean') return value ? t('On') : t('Off');
   if (typeof value === 'string') return value;
@@ -776,6 +1077,19 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
                     />
                     {settingValue(setting.value)}
                   </label>
+                ) : typeof setting.value === 'number' || typeof setting.value === 'string' ? (
+                  <PreferenceInput
+                    label={settingLabel(setting.key)}
+                    value={setting.value}
+                    onCommit={(value) => {
+                      setPreferenceError(null);
+                      runCommand(imp, 'settings.set', { key: setting.key, value }).catch(
+                        (error: unknown) => {
+                          setPreferenceError(messageOf(error));
+                        },
+                      );
+                    }}
+                  />
                 ) : (
                   settingValue(setting.value)
                 )}
@@ -794,6 +1108,7 @@ export function SettingsView({ onForgetKey }: { onForgetKey: () => void }): Reac
       </section>
       <section className="card stack" aria-labelledby="always-heading">
         <h3 id="always-heading">{t('What agents do without asking')}</h3>
+        <DraftsSwitch />
         <AllowanceFields />
         <AlwaysAllowed />
       </section>
