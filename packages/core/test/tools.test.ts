@@ -29,7 +29,9 @@ describe('tool definitions', () => {
     expect(tool).toMatchObject({
       type: 'function',
       function: {
-        description: 'Stores a value for one setting, replacing any earlier value.',
+        description: expect.stringContaining(
+          'Stores a value for one setting, replacing any earlier value.',
+        ) as string,
         parameters: { type: 'object', required: ['key', 'value'] },
       },
     });

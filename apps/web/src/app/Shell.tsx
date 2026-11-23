@@ -75,8 +75,19 @@ const SettingValue = z.object({ value: z.json() });
 const CrewList = z.object({ crew: z.array(CrewMember) });
 const ProjectList = z.object({ projects: z.array(Project) });
 
+/** The setting that holds the theme, so agents can switch it too. */
+const THEME_SETTING = 'ui.theme';
+
 function useTheme(): [string, () => void] {
-  const [theme, setTheme] = useState(() => localStorage.getItem('imp.theme') ?? 'dark');
+  const imp = useImp();
+  // The browser keeps a copy, so the first paint already has the right colours.
+  const [local, setLocal] = useState(() => localStorage.getItem('imp.theme') ?? 'dark');
+  const stored = useLive(
+    [`settings/${THEME_SETTING}`],
+    async (current) =>
+      SettingValue.parse(await runCommand(current, 'settings.get', { key: THEME_SETTING })).value,
+  );
+  const theme = stored.data === 'dark' || stored.data === 'light' ? stored.data : local;
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme;
     localStorage.setItem('imp.theme', theme);
@@ -84,7 +95,11 @@ function useTheme(): [string, () => void] {
   return [
     theme,
     () => {
-      setTheme(theme === 'dark' ? 'light' : 'dark');
+      const next = theme === 'dark' ? 'light' : 'dark';
+      setLocal(next);
+      runCommand(imp, 'settings.set', { key: THEME_SETTING, value: next }).catch(() => {
+        // The theme still changes in this browser; only the stored copy is missing.
+      });
     },
   ];
 }

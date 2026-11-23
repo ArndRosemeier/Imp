@@ -308,6 +308,17 @@ function ProjectCard({
         <div className="project-actions" ref={menuRef}>
           <button
             type="button"
+            className="button quiet small icon danger-quiet"
+            aria-label={t('Delete {name}', { name: entry.name })}
+            title={t('Delete project')}
+            onClick={() => {
+              onAct('delete');
+            }}
+          >
+            <TrashIcon aria-hidden="true" />
+          </button>
+          <button
+            type="button"
             className="button quiet small"
             aria-expanded={menu}
             aria-controls={`project-actions-${entry.id}`}
@@ -341,7 +352,7 @@ function ProjectCard({
                 onAct('export');
               })}
               {tool(
-                'Delete',
+                t('Delete project'),
                 <TrashIcon aria-hidden="true" />,
                 () => {
                   onAct('delete');
