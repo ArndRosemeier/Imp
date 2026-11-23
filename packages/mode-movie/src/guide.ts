@@ -63,6 +63,10 @@ Scenes are written in **Fountain**, the plain-text screenplay format that screen
 
 On the page, each line of dialogue shows the shot that speaks it, or "no shot". In Shots, **From the script** fills a shot's line, speaker and delivery from the script. Lines spoken in shots that are not in the script are listed under the scene, ready to add.
 
+## Read-through and notes
+
+Before any picture is made, have the script read through: the **Critic** (an extra role, added on the Crew page under More roles) reads the scenes and leaves **notes** under each one, such as a scene that does not turn or a line that explains too much. You can leave notes yourself too. The Screenwriter deals with the open notes when it revises a scene and marks them done. A change here costs nothing; after the clips it costs money.
+
 ## Files
 
 **Import** brings in a Fountain or Final Draft (.fdx) script as new scenes. **Download** writes the script as a PDF in the standard screenplay layout, as Fountain or as Final Draft.
@@ -241,7 +245,7 @@ Before a shot has its clip, its key frame stands in the cut as a still for as lo
 
 ## Working with the Film Editor
 
-The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic**, an extra role you add on the Crew page under More roles, watches the film and leaves markers.
+The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic**, an extra role you add on the Crew page under More roles, reads the script before the shots and watches the film after, leaving notes and markers.
 
 ## Export
 

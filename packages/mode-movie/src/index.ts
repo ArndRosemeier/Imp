@@ -244,3 +244,4 @@ export {
   styleWords,
   visualStyleOf,
 } from './style.js';
+export { createScriptNoteCommands, readScriptNotes, ScriptNote } from './script-notes.js';

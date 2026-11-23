@@ -223,12 +223,12 @@ describe('movie progress', () => {
     expect(blank.progress).toBe(0);
     expect(blank.summary.stages.map((s: { note: string }) => s.note)).toEqual([
       'Not started',
-      'No scenes',
       'No characters',
       'No locations or objects',
+      'No scenes',
       'No shots',
-      'No sounds',
       'Nothing to cut',
+      'No sounds',
     ]);
   });
 });

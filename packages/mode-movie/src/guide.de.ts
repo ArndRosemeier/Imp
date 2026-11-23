@@ -62,6 +62,10 @@ Szenen werden in **Fountain** geschrieben, dem Klartextformat für Drehbücher, 
 
 Auf der Seite zeigt jede Dialogzeile die Einstellung, die sie spricht, oder „keine Einstellung“. In den Einstellungen füllt **Aus dem Drehbuch** Zeile, Sprecher und Vortrag einer Einstellung aus dem Drehbuch. Zeilen, die in Einstellungen gesprochen werden, aber nicht im Drehbuch stehen, erscheinen unter der Szene, bereit zum Übernehmen.
 
+## Leseprobe und Notizen
+
+Bevor ein Bild entsteht, lass das Drehbuch lesen: Der **Kritiker** (eine Zusatzrolle, auf der Seite Crew unter Weitere Rollen hinzugefügt) liest die Szenen und hinterlässt unter jeder **Notizen**, etwa zu einer Szene, die nichts wendet, oder einer Zeile, die zu viel erklärt. Du kannst auch selbst Notizen schreiben. Der Drehbuchautor arbeitet die offenen Notizen ab, wenn er eine Szene überarbeitet, und hakt sie ab. Eine Änderung kostet hier nichts, nach den Clips kostet sie Geld.
+
 ## Dateien
 
 **Importieren** holt ein Drehbuch in Fountain oder Final Draft (.fdx) als neue Szenen herein. **Herunterladen** schreibt das Drehbuch als PDF im üblichen Drehbuchformat, als Fountain oder als Final Draft.
@@ -235,7 +239,7 @@ Solange eine Einstellung noch keinen Clip hat, steht ihr Keyframe im Schnitt als
 
 ## Mit dem Cutter arbeiten
 
-Der **Cutter** kann ebenfalls schneiden. Seine Änderungen kommen als **Vorschlag**, wie Änderungen im Überarbeitungsmodus: Spiel ihn ab und behalte oder verwirf dann jede Änderung. Markiere mit In und Out (I und O) einen Abschnitt, und deine nächste Nachricht bezieht sich nur auf diesen Abschnitt. Der **Kritiker**, eine Zusatzrolle, die du auf der Seite Crew unter Weitere Rollen hinzufügst, sieht sich den Film an und setzt Marker.
+Der **Cutter** kann ebenfalls schneiden. Seine Änderungen kommen als **Vorschlag**, wie Änderungen im Überarbeitungsmodus: Spiel ihn ab und behalte oder verwirf dann jede Änderung. Markiere mit In und Out (I und O) einen Abschnitt, und deine nächste Nachricht bezieht sich nur auf diesen Abschnitt. Der **Kritiker**, eine Zusatzrolle, die du auf der Seite Crew unter Weitere Rollen hinzufügst, liest das Drehbuch vor den Einstellungen und sieht sich den Film danach an, mit Notizen und Markern.
 
 ## Exportieren
 

@@ -1,5 +1,6 @@
 import { CheckpointBar, WorkingStyleField } from './checkpoints.js';
 import { LookBible } from './look-bible.js';
+import { ScriptNotes } from './script-notes.js';
 import type { Project } from '@imp/core';
 import {
   Character,
@@ -387,6 +388,7 @@ export function ScriptView({ project }: { project: Project }): ReactElement {
             shotNumbers={shotNumbers}
             act={act}
           />
+          <ScriptNotes project={project} sceneId={scene.id} />
           <div className="row spread wrap">
             <div className="row">
               <button
