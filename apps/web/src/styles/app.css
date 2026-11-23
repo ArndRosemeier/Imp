@@ -5010,6 +5010,66 @@ input[type='range'] {
   vertical-align: middle;
 }
 
+/* A clip being made: a badge on its shot and scene, a pin on the timeline where it will go. */
+.rendering-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 1px 8px 1px 5px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.rendering-badge.compact {
+  margin-left: 6px;
+  padding: 0 5px 0 3px;
+  gap: 3px;
+}
+.clip-rendering {
+  display: grid;
+  gap: var(--space-2);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line-strong));
+}
+.rendering-elsewhere {
+  align-items: center;
+  gap: var(--space-2);
+}
+.rendering-elsewhere .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lane .rendering-pin {
+  position: absolute;
+  top: -4px;
+  z-index: 3;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 20px;
+  padding: 0 6px 0 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line-strong));
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lane .rendering-pin.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* What's new: the version in the top bar and the panel it opens */
 .whats-new {
   position: relative;

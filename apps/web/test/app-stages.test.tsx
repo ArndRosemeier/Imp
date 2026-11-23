@@ -141,6 +141,71 @@ describe('App: stages', () => {
     }
   });
 
+  it('shows a clip an agent started as rendering, in Shots and in Edit, and fetches it from any stage', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const { imp, user } = start();
+      await completeSetup(user);
+      await user.click(screen.getByRole('button', { name: 'Development' }));
+      await user.type(await screen.findByLabelText('Working title'), 'Kobold cave');
+      await user.click(screen.getByRole('button', { name: /Start the movie/ }));
+      await screen.findByLabelText('Logline');
+
+      const actor = { kind: 'user', id: 'arnd' } as const;
+      const call = async (id: string, input: Record<string, unknown>) => {
+        const result = await imp.registry.executeById(id, input, { actor });
+        if (result.status !== 'ok') throw new Error(id);
+        return result.output as Record<string, string>;
+      };
+      const projects = (await call('project.list', {})) as unknown as {
+        projects: { id: string }[];
+      };
+      const projectId = projects.projects[0]?.id ?? '';
+      await call('settings.set', { key: 'video.model', value: 'vendor/clips' });
+      await call('movie.scene.create', { projectId, heading: 'INT. WINDING TUNNEL - NIGHT' });
+      const cave = await call('movie.scene.create', {
+        projectId,
+        heading: 'EXT. HILLSIDE - CAVE MOUTH - DAWN',
+      });
+      const shot = await call('movie.shot.create', {
+        projectId,
+        sceneId: cave['id'],
+        description: 'Wide on the cave mouth.',
+      });
+      // As an agent would: started, and nobody checks on it.
+      await call('movie.shot.clip.generate', {
+        projectId,
+        sceneId: cave['id'],
+        shotId: shot['id'],
+      });
+
+      // Shots opens on the first scene, and still says where a clip is being made.
+      await user.click(screen.getByRole('button', { name: 'Shots' }));
+      const tabs = await screen.findByRole('tablist', { name: 'Scenes' });
+      expect(await within(tabs).findByRole('status', { name: '1 clip rendering' })).toBeTruthy();
+      await user.click(await screen.findByRole('button', { name: 'Scene 2 · shot 1' }));
+      const card = await screen.findByRole('article', { name: 'Shot 1' });
+      expect(within(card).getByRole('status', { name: /^Rendering/ })).toBeTruthy();
+      expect(within(card).getByText(/Being made/)).toBeTruthy();
+
+      // Edit shows it on the timeline where it will go, and keeps checking on it there.
+      await user.click(screen.getByRole('button', { name: 'Edit' }));
+      expect(await screen.findByRole('status', { name: '1 clip rendering' })).toBeTruthy();
+      await user.click(await screen.findByRole('button', { name: /Scene 2|CAVE MOUTH/ }));
+      expect(await screen.findByRole('button', { name: 'Shot 1: clip being made' })).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Shot 1: clip being made' })).toBeNull();
+      });
+      expect(
+        await screen.findByRole('button', { name: /Shot 1: Wide on the cave mouth/ }),
+      ).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('cuts a film: copy, paste, undo, title cards and an overview', async () => {
     const { imp, user } = start();
     await completeSetup(user);
