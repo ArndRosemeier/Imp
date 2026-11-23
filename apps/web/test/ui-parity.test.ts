@@ -86,6 +86,7 @@ const AGENT_ONLY: Readonly<Record<string, string>> = {
   'movie.character.image.generate aspectRatio': 'portraits are made upright (3:4)',
   'world.location.image.generate aspectRatio': 'views are made in the film’s shape',
   'world.object.image.generate aspectRatio': 'object pictures are made square',
+  'movie.style.image.generate aspectRatio': 'look pictures are made in the film’s shape (16:9)',
 };
 
 function gaps(): string[] {

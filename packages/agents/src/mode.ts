@@ -1,4 +1,5 @@
 import type {
+  BlobStore,
   Command,
   GuideTopic,
   GuideTranslations,
@@ -43,6 +44,12 @@ export interface Mode {
    * for it outside the mode, such as the pictures of its world.
    */
   readonly visualStyle?: (store: KeyValueStore, projectId: string) => Promise<string>;
+  /** A picture of that style, which goes with the pictures of the world where a model takes one. */
+  readonly visualReference?: (
+    store: KeyValueStore,
+    blobs: BlobStore,
+    projectId: string,
+  ) => Promise<{ readonly bytes: Uint8Array; readonly mediaType: string } | undefined>;
   /** What the mode brings to the library: the assets its projects make. */
   readonly library?: readonly LibrarySource[];
   /**

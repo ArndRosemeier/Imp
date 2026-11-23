@@ -1,4 +1,5 @@
 import { CheckpointBar, WorkingStyleField } from './checkpoints.js';
+import { LookBible } from './look-bible.js';
 import type { Project } from '@imp/core';
 import {
   Character,
@@ -195,11 +196,13 @@ const DEVELOPMENT_FIELDS: readonly {
   {
     key: 'tone',
     get label(): string {
-      return t('Tone and style');
+      return t('Genre and mood');
     },
     rows: 3,
     get placeholder(): string {
-      return t('Genre, mood and visual style.');
+      return t(
+        'For example a slow-burn thriller, tense and lonely. The look itself goes in the visual style below.',
+      );
     },
   },
   {
@@ -248,6 +251,7 @@ export function DevelopmentView({ project }: { project: Project }): ReactElement
           ))}
         </div>
       )}
+      <LookBible project={project} />
     </>
   );
 }

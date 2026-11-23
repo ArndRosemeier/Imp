@@ -221,6 +221,11 @@ export function createImp(options: ImpOptions): Imp {
         const mode = modes.find((candidate) => candidate.id === project?.mode);
         return (await mode?.visualStyle?.(store, projectId)) ?? '';
       },
+      styleReference: async (store, blobs, projectId) => {
+        const project = await readProject(store, projectId);
+        const mode = modes.find((candidate) => candidate.id === project?.mode);
+        return mode?.visualReference?.(store, blobs, projectId);
+      },
     }),
     ...modes.flatMap((mode) => mode.commands),
     ...createModelCommands(provider, roles),

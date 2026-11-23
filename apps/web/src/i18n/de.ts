@@ -1062,8 +1062,6 @@ export const de: Readonly<Record<string, string>> = {
   Premise: 'Prämisse',
   'The situation, the main character and what is at stake.':
     'Die Ausgangslage, die Hauptfigur und was auf dem Spiel steht.',
-  'Tone and style': 'Ton und Stil',
-  'Genre, mood and visual style.': 'Genre, Stimmung und Bildsprache.',
   Treatment: 'Treatment',
   'The story told in prose from beginning to end.':
     'Die Geschichte in Prosa erzählt, vom Anfang bis zum Ende.',
@@ -2056,8 +2054,6 @@ export const de: Readonly<Record<string, string>> = {
   'Delete take': 'Take löschen',
   'Delete voice sample': 'Stimmprobe löschen',
   'Delete words': 'Wörter löschen',
-  'Designs the locations and objects and makes their reference pictures.':
-    'Entwirft die Orte und Objekte und erstellt ihre Referenzbilder.',
   'Development notes': 'Entwicklungsnotizen',
   'Develops the idea and writes the script, scene by scene.':
     'Entwickelt die Idee und schreibt das Drehbuch, Szene für Szene.',
@@ -2449,4 +2445,39 @@ export const de: Readonly<Record<string, string>> = {
   'cut on action': 'Schnitt in der Bewegung',
   '{painted} of {count} shots have a key frame · {seconds} s planned':
     '{painted} von {count} Einstellungen haben ein Keyframe · {seconds} s geplant',
+  '1970s Scottish coast, worn and practical.':
+    'Schottische Küste der 1970er, abgenutzt und praktisch.',
+  '35mm film grain, anamorphic, shallow focus, handheld.':
+    '35-mm-Filmkorn, anamorphotisch, geringe Schärfentiefe, Handkamera.',
+  'Camera and picture': 'Kamera und Bild',
+  'Change the visual style': 'Bildsprache ändern',
+  'Choose the look picture': 'Look-Bild wählen',
+  'Cold blues and sodium orange, no green.': 'Kalte Blautöne und Natriumorange, kein Grün.',
+  'Delete a look picture': 'Look-Bild löschen',
+  'Delete look picture': 'Look-Bild löschen',
+  'Delete this look picture for good?': 'Dieses Look-Bild endgültig löschen?',
+  'Direction for the next look picture': 'Anweisung für das nächste Look-Bild',
+  'Direction, e.g. a night exterior': 'Anweisung, z. B. eine Außenaufnahme bei Nacht',
+  'Era and place': 'Zeit und Ort',
+  'For example a slow-burn thriller, tense and lonely. The look itself goes in the visual style below.':
+    'Zum Beispiel ein langsamer Thriller, angespannt und einsam. Der Look selbst gehört unten in die Bildsprache.',
+  'How the film looks. Every portrait, place and key frame is drawn in it, with the chosen look picture beside it, so a long film keeps one look. The Production Designer can write it for you.':
+    'Wie der Film aussieht. Jedes Porträt, jeder Ort und jedes Keyframe wird darin gemalt, mit dem gewählten Look-Bild daneben, damit ein langer Film einen Look behält. Der Szenenbildner kann sie für dich schreiben.',
+  Light: 'Licht',
+  'Look pictures': 'Look-Bilder',
+  'Low key, hard side light, deep shadows.': 'Low Key, hartes Seitenlicht, tiefe Schatten.',
+  'No look picture yet. Paint one, or drop a picture from the library here.':
+    'Noch kein Look-Bild. Mal eins oder zieh ein Bild aus der Bibliothek hierher.',
+  'Paint a look picture': 'Look-Bild malen',
+  'Paint the look': 'Look malen',
+  Palette: 'Palette',
+  'Sets the look of the film, and designs its places and objects with their pictures.':
+    'Legt den Look des Films fest und entwirft seine Orte und Gegenstände mit ihren Bildern.',
+  'Show the visual style': 'Bildsprache zeigen',
+  'The chosen look picture': 'Das gewählte Look-Bild',
+  'The visual style': 'Die Bildsprache',
+  'Use a picture for the look': 'Ein Bild für den Look verwenden',
+  'Use look picture {value}': 'Look-Bild {value} verwenden',
+  'Visual style': 'Bildsprache',
+  'Genre and mood': 'Genre und Stimmung',
 };

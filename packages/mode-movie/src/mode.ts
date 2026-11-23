@@ -1,8 +1,8 @@
 import { defineMode, type Mode, type Role } from '@imp/agents';
 import type { GenerationProvider } from '@imp/providers';
-import { movieCommands, movieDevelopmentKey } from './commands.js';
+import { movieCommands } from './commands.js';
 import { createCharacterImageCommands } from './images.js';
-import { Development, MODE_ID } from './schema.js';
+import { MODE_ID } from './schema.js';
 import { createShotCommands } from './shots.js';
 import { createEditCommands } from './edit.js';
 import {
@@ -30,12 +30,14 @@ import { movieProjectSupport } from './project.js';
 import { movieGuidesDe } from './guide.de.js';
 import { createCharacterVoiceCommands } from './voice.js';
 import { movieWork } from './work.js';
+import { createStyleCommands, styleReference, visualStyleOf } from './style.js';
 import {
   castForClips,
   castForScenes,
   clipsNeed,
   developmentNeed,
   firstCutForSound,
+  lookNeed,
   locationsNeed,
   movieCheckpoints,
   scenesNeed,
@@ -87,9 +89,10 @@ export const screenwriter: Role = {
     'movie.development.update: logline, premise, treatment and tone. The development is the',
     'treatment the person reads and signs off before anything else is made: when you wrote or',
     'changed it, say it is ready for them to read and stop; the scenes wait for their sign-off.',
-    'The tone is also the',
-    'visual style every picture of the film is drawn in, so keep the look and mood the request',
-    'asks for in its own words, and never leave a tone that contradicts the request. Then',
+    'The tone is the genre and mood; it is also the mood every picture is drawn in, so keep the',
+    'mood the request asks for in its own words, and never leave a tone that contradicts it.',
+    "The look itself (palette, light, camera, era) is the Production Designer's visual style",
+    '(movie.style); pass on what the request says about it in your summary. Then',
     'fetch the full text only of the scenes you work on. Keep what you write consistent with',
     'them and with the cast. Write scenes in Fountain screenplay form: the slug line goes in',
     'the heading, not the text; action in the present tense, in paragraphs with a blank line',
@@ -131,9 +134,9 @@ export const castingDirector: Role = {
     'that is never seen gets voiceOnly set to true: it needs a voice but no appearance, and it is',
     'kept out of every clip. When asked for',
     'pictures, generate them with movie.character.image.generate; the appearance you wrote',
-    'is the prompt, so improve the appearance first if it is thin. The tone in the development',
-    'is added as the visual style: if it contradicts the look you were asked for, say so and',
-    'leave the pictures until it is right. Look at what',
+    'is the prompt, so improve the appearance first if it is thin. The visual style of the film',
+    '(movie.style.get) is added, with its look picture as a reference: if it contradicts the look',
+    'you were asked for, say so and leave the pictures until it is right. Look at what',
     'was made with media.view and judge it against the character: say what works, generate',
     'again with a direction where it does not, and select the best one as the portrait. If',
     'you cannot be shown images, say so and leave the choice to the user. When asked how a',
@@ -145,7 +148,7 @@ export const castingDirector: Role = {
   // It picks portraits by looking at them, and listens to voices when its model can.
   sees: ['image', 'audio'],
   mustSee: ['image'],
-  needs: [developmentNeed, treatmentForCast],
+  needs: [developmentNeed, treatmentForCast, lookNeed],
 };
 
 export const clipDesigner: Role = {
@@ -213,15 +216,23 @@ export const clipDesigner: Role = {
   // It judges key frames by looking at them, and watches clips when its model can.
   sees: ['image', 'video'],
   mustSee: ['image'],
-  needs: [scenesNeed, castForClips, locationsNeed, storyboardForClips],
+  needs: [scenesNeed, castForClips, locationsNeed, lookNeed, storyboardForClips],
 };
 
 export const productionDesigner: Role = {
   id: 'production-designer',
   name: 'Production Designer',
-  summary: 'Designs the locations and objects and makes their reference pictures.',
+  summary: 'Sets the look of the film, and designs its places and objects with their pictures.',
   brief: [
-    'You are a production designer for a film made with generated images and video. You define',
+    'You are a production designer for a film made with generated images and video. You set',
+    'the look of the film first, its look bible, before anyone draws a picture: with',
+    'movie.style.update write its palette, light, camera and era in a few concrete words each,',
+    'from the person\'s words and the development ("cold blues and sodium orange", not',
+    '"nice colours"). Then paint a look picture with movie.style.image.generate, judge it with',
+    'media.view, make another with a direction where it is off, and choose the best with',
+    'movie.style.image.select: every portrait, place picture and key frame is drawn in that',
+    'style and gets that picture as a reference, which is what makes hundreds of clips look like',
+    'one film. Say when the look is ready for the person to see. Then you define',
     'the places the story happens in and the objects that matter to it, so that every clip',
     'shows the same place and the same object. Read the development notes and the script',
     'outline first, and the scenes a place or object appears in when you need detail.',
@@ -241,7 +252,7 @@ export const productionDesigner: Role = {
     'where needed, and select the best as the key picture. Pictures cost money; make the words',
     'right first. If you cannot be shown images, say so and leave the choice to the user.',
   ].join(' '),
-  scope: area(['world.']),
+  scope: area(['world.', 'movie.style.']),
   sees: ['image'],
   mustSee: ['image'],
   needs: [developmentNeed, treatmentForWorld],
@@ -482,6 +493,7 @@ export function createMovieMode(options: {
       ...createShotCommands(options.provider, options.frameImage, options.frameGrabber),
       ...createFrameCommands(options.provider, options.frameImage, options.frameGrabber),
       ...createSoundCommands(options.provider),
+      ...createStyleCommands(options.provider),
       ...createEditCommands(options.provider),
       ...createFilmExportCommands(options.film ?? { codec: createDefaultAudioCodec() }),
       ...createReviewCommands(
@@ -510,10 +522,8 @@ export function createMovieMode(options: {
     library: [movieLibrarySource],
     work: movieWork,
     checkpoints: movieCheckpoints,
-    // The pictures of the world are drawn in the film's tone.
-    visualStyle: async (store, projectId) => {
-      const stored = await store.get(movieDevelopmentKey(projectId));
-      return stored === undefined ? '' : Development.parse(stored).tone;
-    },
+    // The pictures of the world are drawn in the film's visual style, with its look picture.
+    visualStyle: visualStyleOf,
+    visualReference: styleReference,
   });
 }

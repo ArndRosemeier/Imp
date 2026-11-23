@@ -3,6 +3,7 @@ import type { KeyValueStore } from '@imp/core';
 import { readWorld } from '@imp/world';
 import { characterPrefix, movieDevelopmentKey, readScenes, shotPrefix } from './commands.js';
 import { Character, Development, Shot } from './schema.js';
+import { visualStyleOf } from './style.js';
 
 /**
  * What the movie crew needs from each other. Each check looks for the work
@@ -160,3 +161,14 @@ export const firstCutForSound = checkpointNeed(
   ['movie.sound.generate'],
   sceneOf,
 );
+
+/** The look of the film in words, before any portrait or key frame is drawn. */
+export const lookNeed: Need = {
+  id: 'look',
+  name: 'The visual style',
+  description:
+    'The look of the film in words (movie.style.update: palette, light, camera, era), set by the Production Designer, ideally with a chosen look picture. Every portrait and key frame is drawn in it. A film written before there was a look keeps its tone instead.',
+  providedBy: 'production-designer',
+  before: ['movie.character.image.generate', 'movie.shot.frame.generate'],
+  check: async (store, projectId) => (await visualStyleOf(store, projectId)).trim() !== '',
+};

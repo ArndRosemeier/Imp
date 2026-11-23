@@ -8794,3 +8794,39 @@ dialog.approvals-dialog[open] {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* The look bible: the style in words beside the chosen look picture. */
+.look-bible h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.look-bible-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+@media (max-width: 900px) {
+  .look-bible-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.look-key {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+.look-key img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.look-empty {
+  padding: var(--space-4);
+  text-align: center;
+}
