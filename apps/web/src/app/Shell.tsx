@@ -1,5 +1,6 @@
 import { AudioView, OPEN_VIEW } from './audio.js';
 import { EditView } from './edit.js';
+import { PendingClipsProvider } from './clips-pending.js';
 import { ImpMark } from './ImpMark.js';
 import { aliasOfTheVisit } from './imp-names.js';
 import { ShotsView } from './shots.js';
@@ -512,39 +513,41 @@ export function Shell({ onForgetKey }: { onForgetKey: () => void }): ReactElemen
               </button>
             ))}
           </nav>
-          <main className="main" data-stage={isStage ? view : undefined}>
-            {view === 'crew' && <CrewView />}
-            {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
-            {view === 'projects' && (
-              <ProjectsView
-                creating={creating}
-                onCreatingChange={setCreating}
-                onOpen={(id) => {
-                  openProject(id);
-                  const opened = projects.find((candidate) => candidate.id === id);
-                  const firstStage = imp.modes.find((m) => m.id === (opened?.mode ?? 'movie'))
-                    ?.stages[0];
-                  setView(firstStage?.id ?? 'crew');
-                }}
-              />
-            )}
-            {isStage &&
-              state.data !== undefined &&
-              (project === null ? (
-                startMovie
-              ) : (
-                <>
-                  <FirstFilm
-                    stage={view}
-                    stageNames={Object.fromEntries(
-                      stages.map((stage) => [stage.id, tx(stage.name)]),
-                    )}
-                  />
-                  <StageTip key={view} stage={view} />
-                  <StageView stage={view} project={project} />
-                </>
-              ))}
-          </main>
+          <PendingClipsProvider project={project}>
+            <main className="main" data-stage={isStage ? view : undefined}>
+              {view === 'crew' && <CrewView />}
+              {view === 'settings' && <SettingsView onForgetKey={onForgetKey} />}
+              {view === 'projects' && (
+                <ProjectsView
+                  creating={creating}
+                  onCreatingChange={setCreating}
+                  onOpen={(id) => {
+                    openProject(id);
+                    const opened = projects.find((candidate) => candidate.id === id);
+                    const firstStage = imp.modes.find((m) => m.id === (opened?.mode ?? 'movie'))
+                      ?.stages[0];
+                    setView(firstStage?.id ?? 'crew');
+                  }}
+                />
+              )}
+              {isStage &&
+                state.data !== undefined &&
+                (project === null ? (
+                  startMovie
+                ) : (
+                  <>
+                    <FirstFilm
+                      stage={view}
+                      stageNames={Object.fromEntries(
+                        stages.map((stage) => [stage.id, tx(stage.name)]),
+                      )}
+                    />
+                    <StageTip key={view} stage={view} />
+                    <StageView stage={view} project={project} />
+                  </>
+                ))}
+            </main>
+          </PendingClipsProvider>
           {showLibrary && (
             <div className="library-column" id="library-panel">
               <LibraryPanel

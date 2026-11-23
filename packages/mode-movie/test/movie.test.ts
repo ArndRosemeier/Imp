@@ -858,6 +858,80 @@ describe('shots and clips', () => {
     });
   });
 
+  it('lists the clips being made across scenes, with the ids to name them by', async () => {
+    const { run, at, add, scene } = await withScene({ videoPendingChecks: 5 });
+    const later = await run('movie.scene.create', { heading: 'EXT. CLIFF - DAWN' });
+    const first = await add({ description: 'The lamp turns.' });
+    const started = await run('movie.shot.clip.generate', at(first.id));
+    expect(started).toMatchObject({ sceneId: scene.id, shotId: first.id });
+    const other = await run('movie.shot.create', {
+      sceneId: later.id,
+      description: 'Waves on rock.',
+    });
+    await run('movie.shot.clip.generate', { sceneId: later.id, shotId: other.id });
+    expect(await run('movie.shot.clip.pending', {})).toEqual({
+      clips: [
+        expect.objectContaining({ sceneId: scene.id, scenePosition: 1, shotId: first.id }),
+        expect.objectContaining({
+          sceneId: later.id,
+          scenePosition: 2,
+          sceneHeading: 'EXT. CLIFF - DAWN',
+          shotId: other.id,
+          shotPosition: 1,
+          model: 'vendor/clips',
+        }),
+      ],
+    });
+  });
+
+  it('gives up on a clip that is not done within the hour, or that the service lost', async () => {
+    const { run, runtime, provider, at, add } = await withScene({ videoPendingChecks: 99 });
+    const slow = await add({ description: 'The lamp turns.' });
+    await run('movie.shot.clip.generate', at(slow.id));
+    expect(
+      ((await run('movie.shot.clip.check', at(slow.id))) as unknown as WithClip).clip.status,
+    ).toBe('pending');
+    const start = runtime.now().getTime();
+    Object.assign(runtime, { now: () => new Date(start + 61 * 60 * 1000) });
+    const given = (await run('movie.shot.clip.check', at(slow.id))) as unknown as WithClip;
+    expect(given.clip).toMatchObject({
+      status: 'failed',
+      error: expect.stringMatching(/60 minutes/) as string,
+    });
+    expect(await run('movie.shot.clip.pending', {})).toEqual({ clips: [] });
+
+    Object.assign(runtime, { now: () => new Date(start) });
+    const lost = await add({ description: 'The door bangs.' });
+    await run('movie.shot.clip.generate', at(lost.id));
+    Object.assign(provider, {
+      checkVideo: () =>
+        Promise.reject(new ProviderError('bad_request', 'fake', 'No such job.', { status: 404 })),
+    });
+    const gone = (await run('movie.shot.clip.check', at(lost.id))) as unknown as WithClip;
+    expect(gone.clip).toMatchObject({
+      status: 'failed',
+      error: expect.stringMatching(/no longer knows/) as string,
+    });
+
+    // A passing failure within the hour is reported and the clip keeps waiting.
+    const flaky = await add({ description: 'Gulls.' });
+    await run('movie.shot.clip.generate', at(flaky.id));
+    Object.assign(provider, {
+      checkVideo: () => Promise.reject(new ProviderError('network', 'fake', 'Offline.')),
+    });
+    await expect(run('movie.shot.clip.check', at(flaky.id))).rejects.toThrow();
+    expect(await run('movie.shot.get', at(flaky.id))).toMatchObject({
+      clip: { status: 'pending' },
+    });
+    // After the hour the same failure gives the clip up.
+    Object.assign(runtime, { now: () => new Date(start + 61 * 60 * 1000) });
+    const stuck = (await run('movie.shot.clip.check', at(flaky.id))) as unknown as WithClip;
+    expect(stuck.clip).toMatchObject({
+      status: 'failed',
+      error: expect.stringMatching(/Offline/) as string,
+    });
+  });
+
   it('asks for sound by default, also for shots where nobody speaks', async () => {
     const { run, provider, at, add } = await withScene();
     const quiet = await add({ description: 'The lamp turns.' });

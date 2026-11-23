@@ -88,6 +88,8 @@ import {
 import { EmptyState } from './help/EmptyState.js';
 import { fixed, t, tn } from '../i18n/i18n.js';
 import { formatUsd } from './spend.js';
+import { ImpSpinner } from './ImpMark.js';
+import { RenderingBadge, usePendingClips } from './clips-pending.js';
 
 /** Turns stored media into object URLs for as long as the keys are shown. */
 function useBlobUrls(keys: readonly string[]): ReadonlyMap<string, string> {
@@ -640,6 +642,30 @@ function Timeline({
                 </div>
               );
             })}
+            {cut.items
+              .filter((item) => item.state === 'clip_pending' && item.durationSeconds === 0)
+              .map((item) => (
+                <button
+                  key={item.itemId}
+                  type="button"
+                  className={`rendering-pin${selection?.kind === 'item' && selection.id === item.itemId ? ' selected' : ''}`}
+                  style={{ left: item.startsAtSeconds * scale }}
+                  title={t(
+                    'Shot {index}: the clip is being made. It joins the cut here when it is ready.',
+                    {
+                      index: String(item.index),
+                    },
+                  )}
+                  aria-label={t('Shot {index}: clip being made', { index: String(item.index) })}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelect({ kind: 'item', id: item.itemId });
+                  }}
+                >
+                  <ImpSpinner size={12} />
+                  <span>{item.index}</span>
+                </button>
+              ))}
           </div>
           {removed.length > 0 && (
             <div className="lane lane-removed" aria-label={t('Taken out by the proposal')}>
@@ -1260,6 +1286,7 @@ function SceneEditor({
                         })
                       : ITEM_STATE_TEXT[item.state]}
                 </span>
+                {item.state === 'clip_pending' && <ImpSpinner size={14} />}
               </h3>
               {item.kind === 'title' ? (
                 <>
@@ -1963,6 +1990,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
   const sceneId = (scenes.find((candidate) => candidate.id === selectedId) ?? scenes[0])?.id;
 
   const [exporting, setExporting] = useState<string | null>(null);
+  const rendering = usePendingClips().clips.length;
   const [helpOpen, setHelpOpen] = useState(false);
   const coarse = useCoarsePointer();
   const openHelp = (): void => {
@@ -1984,6 +2012,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
             })}
           </span>
         )}
+        {rendering > 0 && <RenderingBadge count={rendering} />}
         <span className="edit-head-tools">
           {look !== undefined && (
             <Popover

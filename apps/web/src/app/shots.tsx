@@ -18,11 +18,12 @@ import {
   SparkleIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { useEffect, useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
+import { useId, useRef, useState, type ReactElement, type SyntheticEvent } from 'react';
 import { useLibraryDrop } from './library/drag.js';
 import { z } from 'zod';
 import { runCommand, useLive } from './context.js';
 import { WorkingOn } from './work.js';
+import { RenderingBadge, usePendingClips } from './clips-pending.js';
 import { ConfirmButton, EditableField } from './Field.js';
 import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
@@ -30,7 +31,8 @@ import { ModelBar } from './model-bar.js';
 import { formatUsd, Price } from './spend.js';
 import { useScriptLines } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
-import { fixed, t, tn, tx } from '../i18n/i18n.js';
+import { currentLanguage, fixed, t, tn, tx } from '../i18n/i18n.js';
+import { ImpSpinner } from './ImpMark.js';
 import { Marked } from '../i18n/Marked.js';
 
 const Scenes = z.object({
@@ -41,11 +43,9 @@ const Cast = z.object({
 });
 const Shots = z.object({ shots: z.array(Shot) });
 
-/** How often a clip that is being made is looked at again. */
-const CHECK_EVERY_MS = 10_000;
-
 function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
   const clip = shot.clip;
+  const problem = usePendingClips().problems.get(shot.id);
   const url = useBlobUrl(clip?.blobKey ?? undefined);
   if (clip === null) {
     return (
@@ -57,12 +57,25 @@ function ClipPlayer({ shot }: { shot: Shot }): ReactElement {
   }
   if (clip.status === 'pending') {
     return (
-      <div className="clip clip-empty" role="status" aria-busy="true">
+      <div className="clip clip-empty clip-rendering" role="status" aria-busy="true">
+        <ImpSpinner size={28} />
         <span>
           {t('Being made')}
           {clip.progress === null ? '' : `, ${String(Math.round(clip.progress))}%`}…
         </span>
-        <span className="muted">{t('This takes a minute or more. You can leave this view.')}</span>
+        <span className="muted">
+          {t('Started {time} with {model}. This takes a minute or more. You can leave this view.', {
+            time: new Intl.DateTimeFormat(currentLanguage(), { timeStyle: 'short' }).format(
+              new Date(clip.createdAt),
+            ),
+            model: clip.model,
+          })}
+        </span>
+        {problem !== undefined && (
+          <span className="muted">
+            {t('The last check failed: {problem}. Imp keeps trying.', { problem })}
+          </span>
+        )}
       </div>
     );
   }
@@ -463,6 +476,8 @@ export function SceneTabs({
   sceneId: string | undefined;
   onSelect: (sceneId: string) => void;
 }): ReactElement {
+  const { clips } = usePendingClips();
+  const rendering = (id: string): number => clips.filter((clip) => clip.sceneId === id).length;
   return (
     <div className="chips" role="tablist" aria-label={t('Scenes')}>
       {scenes.map((candidate) => (
@@ -479,6 +494,9 @@ export function SceneTabs({
           <span>
             {candidate.position} · {shortSceneTitle(candidate.heading)}
           </span>
+          {rendering(candidate.id) > 0 && (
+            <RenderingBadge count={rendering(candidate.id)} compact />
+          )}
           <WorkingOn kind="scene" id={candidate.id} compact />
         </button>
       ))}
@@ -644,6 +662,7 @@ function ShotCard({
               {t('Pickup')}
             </span>
           )}
+          {pending && <RenderingBadge progress={shot.clip?.progress ?? null} />}
           <WorkingOn kind="shot" id={shot.id} />
         </h3>
         <ConfirmButton
@@ -815,7 +834,11 @@ function ShotCard({
           }}
         >
           <FilmStripIcon aria-hidden="true" />{' '}
-          {shot.clip === null ? t('Generate clip') : t('Generate again')}
+          {shot.clip === null
+            ? t('Generate clip')
+            : shot.clip.status === 'failed'
+              ? t('Try again')
+              : t('Generate again')}
           <Price command="movie.shot.clip.generate" input={generateInput} />
         </button>
         {shot.clip !== null && !pending && (
@@ -1028,24 +1051,8 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
   const shots = listed.data?.shots.filter((shot) => shot.sceneId === sceneId) ?? [];
   const script = useScriptLines(project, sceneId);
 
-  // Clips that are being made are looked at again until they are done, also after a reload.
-  const waiting = shots
-    .filter((shot) => shot.clip?.status === 'pending')
-    .map((shot) => shot.id)
-    .join(',');
-  useEffect(() => {
-    if (waiting === '' || sceneId === undefined) return undefined;
-    const timer = setInterval(() => {
-      for (const shotId of waiting.split(',')) {
-        void act('movie.shot.clip.check', { sceneId, shotId });
-      }
-    }, CHECK_EVERY_MS);
-    return () => {
-      clearInterval(timer);
-    };
-    // `act` is new on every render and does the same each time.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waiting, sceneId]);
+  // Clips being made in other scenes, so they are found without opening every scene.
+  const elsewhere = usePendingClips().clips.filter((clip) => clip.sceneId !== sceneId);
 
   return (
     <>
@@ -1089,6 +1096,27 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
         retry={retry}
       />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
+      {elsewhere.length > 0 && (
+        <div className="row wrap rendering-elsewhere">
+          <span className="muted">{t('Rendering in other scenes:')}</span>
+          {elsewhere.map((clip) => (
+            <button
+              key={clip.shotId}
+              type="button"
+              className="chip"
+              onClick={() => {
+                setSelectedId(clip.sceneId);
+              }}
+            >
+              <ImpSpinner size={12} />
+              {t('Scene {scene} · shot {shot}', {
+                scene: String(clip.scenePosition),
+                shot: String(clip.shotPosition),
+              })}
+            </button>
+          ))}
+        </div>
+      )}
       {sceneId === undefined ? (
         outline.data !== undefined && (
           <EmptyState

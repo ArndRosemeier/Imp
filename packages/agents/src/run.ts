@@ -194,6 +194,7 @@ function systemPrompt(
     `You are ${member.name}, working as ${role.name} in Imp, a content creation toolbox.`,
     role.brief,
     'You act only by calling the tools you are given. Read the current state before changing it.',
+    'When you name something by its id (a scene, a shot, a character), copy the whole id from a tool result of this run. Never shorten, guess or make up an id; if you do not have it, look it up or name the thing by its position and title instead.',
     ...(hiddenGroups === null
       ? []
       : [

@@ -33,6 +33,7 @@ import {
   characterPrefix,
   movieDevelopmentKey,
   movieSceneKey,
+  readScenes,
   requireLocationState,
   shotPrefix,
 } from './commands.js';
@@ -42,6 +43,13 @@ import { Character, Clip, Development, DialogueTake, MODE_ID, Scene, Shot } from
 
 /** The setting that names the model clips are made with when a call does not say. */
 export const VIDEO_MODEL_SETTING = 'video.model';
+
+/**
+ * How long a clip may be in the making before it counts as failed. Video
+ * models take minutes; a job still unfinished after this is lost or stuck,
+ * and the shot should not wait for it for ever.
+ */
+export const CLIP_TIMEOUT_MS = 60 * 60 * 1000;
 
 /** Guiding images beyond the portraits stop at this many in all; video models take only a few. */
 export const MAX_CLIP_GUIDES = 4;
@@ -570,7 +578,7 @@ export function createShotCommands(
           'Start the clip exactly on the chosen key frame of the shot (movie.shot.frame.generate), where there is one and the model takes a start picture. This keeps places and faces the same from shot to shot.',
         ),
     }),
-    output: z.object({ clip: Clip }),
+    output: z.object({ sceneId: z.string(), shotId: z.string(), clip: Clip }),
     estimate: async ({ runtime }, input) => {
       const { shot } = await loadShot(runtime.store, 'movie.shot.clip.generate', input);
       const model = await chosenModel(runtime.store, VIDEO_MODEL_SETTING, input.model);
@@ -730,7 +738,8 @@ export function createShotCommands(
       const { takes, dropped } = retire(latest);
       await runtime.store.batch([{ type: 'put', key, value: { ...latest, clip, takes } }]);
       await deleteClipFiles(runtime, dropped);
-      return { clip };
+      // The ids come back with it, so whoever started it names the right shot when reporting.
+      return { sceneId: input.sceneId, shotId: input.shotId, clip };
     },
   });
 
@@ -751,6 +760,9 @@ export function createShotCommands(
       if (shot.clip.status !== 'pending') return { clip: shot.clip };
 
       let clip: Clip;
+      const pending = shot.clip;
+      const timedOut = (): boolean =>
+        runtime.now().getTime() - Date.parse(pending.createdAt) > CLIP_TIMEOUT_MS;
       try {
         const job = await provider.checkVideo(shot.clip.jobId);
         if (job.status === 'completed') {
@@ -765,6 +777,14 @@ export function createShotCommands(
             progress: null,
             costUsd: job.costUsd,
           };
+        } else if (job.status === 'pending' && timedOut()) {
+          clip = {
+            ...shot.clip,
+            status: 'failed',
+            progress: null,
+            error: `The model did not finish the clip within ${String(CLIP_TIMEOUT_MS / 60_000)} minutes. Generate it again.`,
+            costUsd: job.costUsd,
+          };
         } else {
           clip = {
             ...shot.clip,
@@ -776,6 +796,24 @@ export function createShotCommands(
         }
       } catch (error) {
         if (!(error instanceof ProviderError)) throw error;
+        // A job the provider no longer knows, or one that cannot be reached for too long, is given up.
+        const gone = error.status === 404;
+        if (gone || timedOut()) {
+          clip = {
+            ...shot.clip,
+            status: 'failed',
+            progress: null,
+            error: gone
+              ? 'The video service no longer knows this clip. Generate it again.'
+              : `The clip could not be checked for ${String(CLIP_TIMEOUT_MS / 60_000)} minutes (${error.message}). Generate it again.`,
+          };
+          const latest = (await loadShot(runtime.store, id, at)).shot;
+          if (latest.clip?.jobId !== clip.jobId || latest.clip.status !== 'pending') {
+            return { clip: latest.clip ?? clip };
+          }
+          await runtime.store.batch([{ type: 'put', key, value: { ...latest, clip } }]);
+          return { clip };
+        }
         throw new CommandError(
           'handler_failed',
           id,
@@ -793,6 +831,50 @@ export function createShotCommands(
       }
       await runtime.store.batch([{ type: 'put', key, value: { ...latest, clip } }]);
       return { clip };
+    },
+  });
+
+  const clipPending = defineCommand({
+    id: 'movie.shot.clip.pending',
+    title: 'List clips being made',
+    description:
+      'Returns every clip of a project that is still being made, across all scenes: the scene and shot (ids and positions), the model, when it was started and how far it is. Check each with movie.shot.clip.check. Use these ids when you name a shot; never shorten or guess one.',
+    effect: 'read',
+    input: z.object({ projectId: ProjectId }),
+    output: z.object({
+      clips: z.array(
+        z.object({
+          sceneId: z.string(),
+          scenePosition: z.number(),
+          sceneHeading: z.string(),
+          shotId: z.string(),
+          shotPosition: z.number(),
+          model: z.string(),
+          createdAt: z.string(),
+          progress: z.number().nullable(),
+        }),
+      ),
+    }),
+    handler: async ({ runtime }, { projectId }) => {
+      await requireProject(runtime.store, 'movie.shot.clip.pending', projectId, MODE_ID);
+      const scenes = await readScenes(runtime.store, projectId);
+      const clips = [];
+      for (const scene of scenes) {
+        for (const shot of await readShots(runtime.store, projectId, scene.id)) {
+          if (shot.clip?.status !== 'pending') continue;
+          clips.push({
+            sceneId: scene.id,
+            scenePosition: scene.position,
+            sceneHeading: scene.heading,
+            shotId: shot.id,
+            shotPosition: shot.position,
+            model: shot.clip.model,
+            createdAt: shot.clip.createdAt,
+            progress: shot.clip.progress,
+          });
+        }
+      }
+      return { clips };
     },
   });
 
@@ -1090,6 +1172,7 @@ export function createShotCommands(
     dialogueDelete,
     clipGenerate,
     clipCheck,
+    clipPending,
     clipDelete,
     clipFromFile,
     takeList,

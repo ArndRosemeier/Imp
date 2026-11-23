@@ -1430,8 +1430,6 @@ export const de: Readonly<Record<string, string>> = {
     'Niemand ist in der Crew. Stell jemanden in der Crew-Ansicht ein.',
   // app/shots.tsx
   'Being made': 'Wird erstellt',
-  'This takes a minute or more. You can leave this view.':
-    'Das dauert eine Minute oder länger. Du kannst diese Ansicht verlassen.',
   'No clip was made:': 'Es wurde kein Clip erstellt:',
   'the model gave no reason': 'das Modell nannte keinen Grund',
   'Clip of shot {position}': 'Clip von Einstellung {position}',
@@ -2355,4 +2353,18 @@ export const de: Readonly<Record<string, string>> = {
   'rough-cut-2': 'rohschnitt-2',
   silent: 'stumm',
   '{count} changed': '{count} geändert',
+  'List clips being made': 'Clips in Arbeit auflisten',
+  Rendering: 'Wird erstellt',
+  'Rendering in other scenes:': 'In anderen Szenen in Arbeit:',
+  'Scene {scene} · shot {shot}': 'Szene {scene} · Einstellung {shot}',
+  'Shot {index}: clip being made': 'Einstellung {index}: Clip wird erstellt',
+  'Shot {index}: the clip is being made. It joins the cut here when it is ready.':
+    'Einstellung {index}: Der Clip wird erstellt. Sobald er fertig ist, kommt er hier in den Schnitt.',
+  'Started {time} with {model}. This takes a minute or more. You can leave this view.':
+    'Um {time} mit {model} gestartet. Das dauert eine Minute oder länger. Du kannst diese Ansicht verlassen.',
+  'The last check failed: {problem}. Imp keeps trying.':
+    'Die letzte Abfrage ist fehlgeschlagen: {problem}. Imp versucht es weiter.',
+  'Try again': 'Noch einmal versuchen',
+  '{count} clip rendering': '{count} Clip in Arbeit',
+  '{count} clips rendering': '{count} Clips in Arbeit',
 };
