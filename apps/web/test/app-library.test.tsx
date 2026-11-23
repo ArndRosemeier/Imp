@@ -533,16 +533,40 @@ describe('App: library, crew and help', () => {
       'disabled',
       true,
     );
-    await user.click(within(form).getByLabelText('movie'));
-    // A critic reads and does not change anything.
-    await user.click(within(form).getByLabelText('change things'));
+    // It reads the film and changes nothing: a text-only model is enough.
+    await user.click(
+      within(within(form).getByRole('group', { name: 'May read' })).getByLabelText('movie'),
+    );
+    expect(within(form).getByText('A text-only model is enough')).toBeTruthy();
     await user.click(within(form).getByLabelText('ask to delete things'));
     await user.click(within(form).getByRole('button', { name: /Create the role/ }));
 
     await user.click(await screen.findByRole('button', { name: /Hire Dialogue Polisher/ }));
     await screen.findByLabelText('Talking to');
     expect(await imp.store.get('roles/dialogue-polisher')).toMatchObject({
-      scope: { prefixes: ['movie.'], effects: ['read', 'destructive'] },
+      scope: { prefixes: ['movie.'], writes: [], effects: ['read', 'destructive'] },
+      sees: [],
+      webSearch: false,
+    });
+
+    // Everything a role holds can be changed here too: what it changes, sees and needs.
+    await user.click(screen.getByRole('button', { name: /^Change$/ }));
+    const change = await screen.findByRole('form', { name: 'Change role' });
+    expect(within(change).getByLabelText('Name')).toHaveProperty('value', 'Dialogue Polisher');
+    await user.click(
+      within(within(change).getByRole('group', { name: /May change/ })).getByLabelText('movie'),
+    );
+    await user.click(within(change).getByLabelText('pictures'));
+    await user.click(within(change).getByLabelText('search the web'));
+    await user.click(await within(change).findByLabelText('Written scenes'));
+    await user.click(within(change).getByRole('button', { name: /Save the role/ }));
+    await vi.waitFor(async () => {
+      expect(await imp.store.get('roles/dialogue-polisher')).toMatchObject({
+        scope: { prefixes: ['movie.'], writes: ['movie.'] },
+        sees: ['image'],
+        webSearch: true,
+        needs: [{ id: 'scenes', providedBy: 'screenwriter' }],
+      });
     });
     // A role someone holds cannot be deleted, so the button is offered only after dismissal.
     expect(screen.queryByRole('button', { name: /Delete role/ })).toBeNull();

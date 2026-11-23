@@ -32,7 +32,29 @@ export {
   SavedCrew,
   SavedCrewMember,
 } from './saved-crews.js';
-export { RoleCatalog, StoredRole, coordinatorRole, guideRole, type Role } from './role.js';
+export {
+  RoleCatalog,
+  StoredNeed,
+  StoredRole,
+  coordinatorRole,
+  COORDINATOR_WRITES,
+  guideRole,
+  modelNeedsOf,
+  modelProblem,
+  roleCanUse,
+  SEEN_KINDS,
+  showsMedia,
+  type SeenKind,
+  type Need,
+  type Role,
+} from './role.js';
+export {
+  createNeedCommands,
+  NeedStatus,
+  needStatus,
+  readWaivedNeeds,
+  waivedNeedsKey,
+} from './needs.js';
 export { findCommands, isDirect } from './discovery.js';
 export {
   runAgent,
@@ -40,7 +62,9 @@ export {
   type AgentRunResult,
   type AgentRunStatus,
   type AgentStep,
+  type MissingReport,
   type PendingApproval,
+  REPORT_TOOL,
 } from './run.js';
 export {
   createWorkCommands,

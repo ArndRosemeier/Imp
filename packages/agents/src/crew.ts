@@ -1,11 +1,17 @@
 import { CommandError, defineCommand, type Command, type KeyValueStore, patchOf } from '@imp/core';
+import type { ModelInfo } from '@imp/providers';
 import { z } from 'zod';
 import { forgetConversations } from './conversations.js';
 import {
   ADDED_ROLE_PREFIX,
   CUSTOM_ROLE_PREFIX,
+  modelNeedsOf,
+  modelProblem,
   ROLE_ID,
+  SEEN_KINDS,
+  StoredNeed,
   StoredRole,
+  type Role,
   type RoleCatalog,
 } from './role.js';
 
@@ -34,6 +40,8 @@ const RoleSummary = z.object({
   custom: z.boolean(),
   /** Present for an extra built-in role that was added, which crew.role.remove puts away. */
   extra: z.literal(true).optional(),
+  /** What its model must take besides text; empty when a text-only model is enough. */
+  modelInput: z.array(z.string()),
 });
 
 const RoleFields = {
@@ -47,7 +55,22 @@ const RoleFields = {
     .array(z.string().min(1))
     .min(1)
     .describe(
-      'What the role may use, as command ids or prefixes of them, for example "movie.scene." or "project.list".',
+      'What the role may read and use, as command ids or prefixes of them, for example "movie." or "project.list". Give it what it needs to read for context.',
+    ),
+  writes: z
+    .array(z.string().min(1))
+    .describe(
+      'What the role may change, create, spend on or delete: only its own area, as command ids or prefixes, for example ["movie.scene.update"] for a dialogue polisher. Empty for a role that only reads. Work that belongs to another role stays with that role.',
+    ),
+  sees: z
+    .array(z.enum(SEEN_KINDS))
+    .describe(
+      'What the role must be shown besides text to do its work: "image" for judging pictures, "audio" for listening, "video" for watching clips. Empty for a role that works from text alone, such as writing, so that a model that takes only text is enough. Only models that take all of these can be hired for it.',
+    ),
+  needs: z
+    .array(StoredNeed)
+    .describe(
+      'What the role needs before it can work, such as a cast or written scenes, with the role that provides each. The coordinator checks these with crew.needs before it gives the role a task. Reuse the ids other roles use for the same thing (crew.needs lists them).',
     ),
   effects: z
     .array(z.enum(['read', 'write', 'spend', 'destructive']))
@@ -62,6 +85,19 @@ const RoleFields = {
     ),
 };
 
+/** A role reads at least what it may write; what it writes is held to `writes`. */
+function readsWhatItWrites(
+  commands: readonly string[],
+  writes: readonly string[],
+  effects: StoredRole['scope']['effects'],
+): StoredRole['scope'] {
+  const prefixes = [...commands];
+  for (const prefix of writes) {
+    if (!prefixes.some((read) => prefix.startsWith(read))) prefixes.push(prefix);
+  }
+  return { prefixes, writes: [...writes], effects };
+}
+
 const toSlug = (name: string): string =>
   name
     .toLowerCase()
@@ -71,6 +107,8 @@ const toSlug = (name: string): string =>
 export interface CrewCommandOptions {
   /** The ids of the commands that exist, so a role is not given ones that do not. */
   readonly commandIds?: () => readonly string[];
+  /** The live model catalog, so that a role gets only a model that can do its work. */
+  readonly models?: () => Promise<readonly ModelInfo[]>;
 }
 
 export async function readCrewMember(
@@ -103,6 +141,30 @@ export function createCrewCommands(
     }
   }
 
+  /**
+   * Refuses a model that cannot do the role's work: one without tool calling,
+   * or one that cannot take the input the role must see. A model the catalog
+   * does not know, or a catalog that cannot be reached, is let through.
+   */
+  async function checkModel(commandId: string, role: Role, modelId: string): Promise<void> {
+    let catalog: readonly ModelInfo[];
+    try {
+      catalog = (await options.models?.()) ?? [];
+    } catch {
+      return;
+    }
+    const model = catalog.find(({ id }) => id === modelId);
+    if (model === undefined) return;
+    const problem = modelProblem(role, model);
+    if (problem !== null) {
+      throw new CommandError('invalid_input', commandId, problem, {
+        details: [
+          `model: pick one from models.list with role "${role.id}", which lists only the models that fit`,
+        ],
+      });
+    }
+  }
+
   async function requireCustom(store: KeyValueStore, commandId: string, id: string) {
     const stored = await store.get(`${CUSTOM_ROLE_PREFIX}${id}`);
     if (stored === undefined || roles.get(id) !== undefined) {
@@ -131,12 +193,13 @@ export function createCrewCommands(
         .describe('Built-in roles not offered for hire yet; crew.role.add offers one.'),
     }),
     handler: async ({ runtime }) => ({
-      roles: (await roles.all(runtime.store)).map(({ id, name, summary, custom, optional }) => ({
-        id,
-        name,
-        summary,
-        custom,
-        ...(optional === true ? { extra: true as const } : {}),
+      roles: (await roles.all(runtime.store)).map((role) => ({
+        id: role.id,
+        name: role.name,
+        summary: role.summary,
+        custom: role.custom,
+        ...(role.optional === true ? { extra: true as const } : {}),
+        modelInput: [...modelNeedsOf(role).input],
       })),
       extras: (await roles.extras(runtime.store)).map(({ id, name, summary }) => ({
         id,
@@ -218,8 +281,27 @@ export function createCrewCommands(
     output: RoleSummary.extend({
       brief: z.string(),
       commands: z.array(z.string()),
+      writes: z
+        .array(z.string())
+        .describe('What it may change, create, spend on or delete: its own area.'),
       effects: z.array(z.string()),
       webSearch: z.boolean(),
+      sees: z
+        .array(z.string())
+        .nullable()
+        .describe('What it is shown besides text; null for whatever its model takes.'),
+      model: z
+        .object({ tools: z.literal(true), input: z.array(z.string()) })
+        .describe('What a model needs to be hired for it: tool calling, and these inputs.'),
+      needs: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          description: z.string(),
+          providedBy: z.string().nullable(),
+          before: z.array(z.string()).nullable(),
+        }),
+      ),
     }),
     handler: async ({ runtime }, { id }) => {
       // Extra roles can be read before they are added, to decide whether to add them.
@@ -236,10 +318,21 @@ export function createCrewCommands(
         name: role.name,
         summary: role.summary,
         custom: role.custom,
+        modelInput: [...modelNeedsOf(role).input],
         brief: role.brief,
         commands: [...(role.scope.prefixes ?? [''])],
+        writes: [...(role.scope.writes ?? role.scope.prefixes ?? [''])],
         effects: [...(role.scope.effects ?? ['read', 'write', 'spend', 'destructive'])],
         webSearch: role.webSearch ?? false,
+        sees: role.sees === undefined ? null : [...role.sees],
+        model: { tools: true as const, input: [...modelNeedsOf(role).input] },
+        needs: (role.needs ?? []).map((need) => ({
+          id: need.id,
+          name: need.name,
+          description: need.description,
+          providedBy: need.providedBy ?? null,
+          before: need.before === undefined ? null : [...need.before],
+        })),
       };
     },
   });
@@ -261,6 +354,8 @@ export function createCrewCommands(
       summary: RoleFields.summary.default(''),
       effects: RoleFields.effects.default(['read', 'write']),
       webSearch: RoleFields.webSearch.default(false),
+      needs: RoleFields.needs.default([]),
+      sees: RoleFields.sees.default([]),
     }),
     output: StoredRole,
     handler: async ({ runtime }, input) => {
@@ -276,13 +371,16 @@ export function createCrewCommands(
         throw new CommandError('invalid_input', 'crew.role.create', `Role "${id}" already exists.`);
       }
       checkCommands('crew.role.create', input.commands);
+      checkCommands('crew.role.create', input.writes);
       const role: StoredRole = {
         id,
         name: input.name,
         summary: input.summary,
         brief: input.brief,
-        scope: { prefixes: input.commands, effects: input.effects },
+        scope: readsWhatItWrites(input.commands, input.writes, input.effects),
         webSearch: input.webSearch,
+        needs: input.needs,
+        sees: input.sees,
       };
       await runtime.store.batch([{ type: 'put', key: `${CUSTOM_ROLE_PREFIX}${id}`, value: role }]);
       return role;
@@ -300,16 +398,21 @@ export function createCrewCommands(
     handler: async ({ runtime }, { id, ...changes }) => {
       const current = await requireCustom(runtime.store, 'crew.role.update', id);
       if (changes.commands !== undefined) checkCommands('crew.role.update', changes.commands);
+      if (changes.writes !== undefined) checkCommands('crew.role.update', changes.writes);
       const role: StoredRole = {
         id,
         name: changes.name ?? current.name,
         summary: changes.summary ?? current.summary,
         brief: changes.brief ?? current.brief,
-        scope: {
-          prefixes: changes.commands ?? current.scope.prefixes,
-          effects: changes.effects ?? current.scope.effects,
-        },
+        scope: readsWhatItWrites(
+          changes.commands ?? current.scope.prefixes,
+          // A role stored before roles were kept to an area wrote wherever it read.
+          changes.writes ?? current.scope.writes ?? current.scope.prefixes,
+          changes.effects ?? current.scope.effects,
+        ),
         webSearch: changes.webSearch ?? current.webSearch,
+        needs: changes.needs ?? current.needs,
+        sees: changes.sees ?? current.sees,
       };
       await runtime.store.batch([{ type: 'put', key: `${CUSTOM_ROLE_PREFIX}${id}`, value: role }]);
       return role;
@@ -370,6 +473,7 @@ export function createCrewCommands(
           ],
         });
       }
+      await checkModel('crew.hire', role, input.model);
       const member: CrewMember = {
         id: runtime.newId(),
         roleId: role.id,
@@ -408,6 +512,10 @@ export function createCrewCommands(
       const current = await readCrewMember(runtime.store, id);
       if (current === undefined) {
         throw new CommandError('invalid_input', 'crew.update', `No crew member "${id}".`);
+      }
+      if (changes.model !== undefined && changes.model !== current.model) {
+        const role = await roles.find(runtime.store, current.roleId);
+        if (role !== undefined) await checkModel('crew.update', role, changes.model);
       }
       const member: CrewMember = {
         ...current,

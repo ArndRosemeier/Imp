@@ -74,29 +74,45 @@ describe('App: films an agent makes', () => {
     const started = start([], undefined, renderer);
     const { provider, user } = started;
     const projectId = await movieWithATitle(started);
-    const input = { id: 'movie.edit.export', input: { projectId } };
+    // The Film Editor has every command of its own as a tool.
+    const input = { projectId };
     provider.script(
       {
         toolCalls: [
-          { id: 'x1', name: 'run_command', arguments: input, argumentsText: JSON.stringify(input) },
+          {
+            id: 'x1',
+            name: 'movie__edit__export',
+            arguments: input,
+            argumentsText: JSON.stringify(input),
+          },
         ],
       },
       { content: 'Your film **Storm-film.mp4** is ready.' },
     );
-    await user.type(screen.getByLabelText('Message to Coordinator'), 'Make a film of the shots.');
+    // Exporting is the Film Editor's work, not the coordinator's.
+    await user.click(screen.getByRole('button', { name: 'Crew' }));
+    await user.click(await screen.findByRole('button', { name: /Hire Film Editor/ }));
+    // The agents' model sees no pictures, which the Film Editor needs: only fitting ones are offered.
+    expect(await screen.findByText(/needs a model that takes pictures/)).toBeTruthy();
+    await user.click(screen.getByLabelText('Hire with a model that fits'));
+    const offered = await screen.findByRole('listbox', { name: 'Models found' });
+    expect(within(offered).queryByRole('option', { name: /vendor\/writer/ })).toBeNull();
+    await user.click(await within(offered).findByRole('option', { name: /vendor\/seer/ }));
+    await user.selectOptions(await screen.findByLabelText('Talking to'), 'Film Editor');
+    await user.type(screen.getByLabelText('Message to Film Editor'), 'Make a film of the shots.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
 
     // A card under the reply plays and saves it.
-    const panel = screen.getByRole('complementary', { name: /Conversation with Coordinator/ });
+    const panel = screen.getByRole('complementary', { name: /Conversation with Film Editor/ });
     const card = await within(panel).findByRole('article', { name: 'Storm-film.mp4' });
-    expect(within(card).getByText(/by Coordinator · 0:03 · 1280×720 24 fps/)).toBeTruthy();
+    expect(within(card).getByText(/by Film Editor · 0:03 · 1280×720 24 fps/)).toBeTruthy();
     await user.click(within(card).getByRole('button', { name: /Play/ }));
     await vi.waitFor(() => {
       expect(card.querySelector('video')?.getAttribute('src')).toMatch(/^blob:/);
     });
 
     // A notice says it is done; Watch opens the library on its films.
-    const notice = await screen.findByText('Coordinator finished a film');
+    const notice = await screen.findByText('Film Editor finished a film');
     const box = notice.closest<HTMLElement>('.film-notice');
     if (box === null) throw new Error('no notice');
     await user.click(within(box).getByRole('button', { name: /Watch/ }));

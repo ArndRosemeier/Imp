@@ -57,13 +57,18 @@ const STATUS_NOTE: Partial<Record<AgentRun['status'], string>> = {
   get cancelled(): string {
     return t('The last run was interrupted, for example because the tab was closed or reloaded.');
   },
+  get blocked(): string {
+    return t(
+      'Stopped because something this work needs is missing. Once it is there, Continue picks up.',
+    );
+  },
 };
 
 /** Runs that stopped part way, which Continue picks up where they left off. */
 /** The conversation shown, with the project it belongs to (null outside projects). */
 const ConversationWhere = ConversationSchema.extend({ projectId: z.string().nullable() });
 
-const CONTINUABLE: ReadonlySet<string> = new Set(['step-limit', 'cancelled']);
+const CONTINUABLE: ReadonlySet<string> = new Set(['step-limit', 'cancelled', 'blocked']);
 
 function outcomeOf(content: string): string {
   try {

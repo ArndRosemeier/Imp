@@ -404,6 +404,12 @@ describe('App: setup and agents', () => {
     const projectId = (project?.value as { id: string }).id;
     call.arguments.projectId = projectId;
     call.argumentsText = JSON.stringify(call.arguments);
+    // Scenes are written for a cast; this film has nobody in it.
+    await imp.registry.executeById(
+      'crew.needs.waive',
+      { need: 'cast', reason: 'No people in this film.' },
+      { actor: { kind: 'user', id: 'local' } },
+    );
 
     await user.click(screen.getByRole('button', { name: 'Crew' }));
     await user.click(await screen.findByRole('button', { name: /Hire Screenwriter/ }));

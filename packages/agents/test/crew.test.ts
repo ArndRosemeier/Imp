@@ -59,12 +59,14 @@ describe('crew commands', () => {
           name: 'Casting Director',
           summary: 'Writes and revises the script.',
           custom: false,
+          modelInput: [],
         },
         {
           id: 'screenwriter',
           name: 'Screenwriter',
           summary: 'Writes and revises the script.',
           custom: false,
+          modelInput: [],
         },
       ],
       extras: [{ id: 'critic', name: 'Critic', summary: 'Leaves notes.' }],
@@ -147,6 +149,7 @@ describe('custom roles', () => {
     summary: 'Tightens dialogue.',
     brief: 'You tighten dialogue without changing what is said.',
     commands: ['movie.scene.'],
+    writes: ['movie.scene.update'],
   };
 
   it('creates a role that can be listed, read and hired for', async () => {
@@ -156,8 +159,14 @@ describe('custom roles', () => {
       name: 'Dialogue Polisher',
       summary: 'Tightens dialogue.',
       brief: polisher.brief,
-      scope: { prefixes: ['movie.scene.'], effects: ['read', 'write'] },
+      scope: {
+        prefixes: ['movie.scene.'],
+        writes: ['movie.scene.update'],
+        effects: ['read', 'write'],
+      },
       webSearch: false,
+      needs: [],
+      sees: [],
     });
     const listed = (await run('crew.roles', {})) as { roles: { id: string; custom: boolean }[] };
     expect(listed.roles.map((role) => [role.id, role.custom])).toEqual([
@@ -203,7 +212,12 @@ describe('custom roles', () => {
     });
     expect(
       await run('crew.role.update', { id: 'polisher', name: 'P', commands: ['settings.get'] }),
-    ).toMatchObject({ name: 'P', brief: 'Shorter.', scope: { prefixes: ['settings.get'] } });
+    ).toMatchObject({
+      name: 'P',
+      brief: 'Shorter.',
+      // It still reads what it may change.
+      scope: { prefixes: ['settings.get', 'movie.scene.update'], writes: ['movie.scene.update'] },
+    });
 
     const hired = (await run('crew.hire', { roleId: 'polisher', model: 'm' })) as { id: string };
     await expect(run('crew.role.delete', { id: 'polisher' })).rejects.toThrow(/Dismiss P first/);
@@ -243,6 +257,7 @@ describe('custom roles', () => {
       name: 'Researcher',
       brief: 'You check facts.',
       commands: ['settings.'],
+      writes: [],
       webSearch: true,
     });
     expect(await run('crew.role.get', { id: 'researcher' })).toMatchObject({ webSearch: true });
@@ -313,7 +328,7 @@ describe('custom roles', () => {
     );
     const result = await registry.executeById(
       'crew.role.create',
-      { ...polisher, commands: ['anything.'] },
+      { ...polisher, commands: ['anything.'], writes: ['anything.else'] },
       { actor: user },
     );
     expect(result.status).toBe('ok');

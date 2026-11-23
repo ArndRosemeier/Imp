@@ -1,4 +1,4 @@
-import { defineCommand, type Command } from '@imp/core';
+import { CommandError, defineCommand, type Command } from '@imp/core';
 import {
   describeVideoModel,
   MODALITIES,
@@ -6,6 +6,7 @@ import {
   type ModelInfo,
 } from '@imp/providers';
 import { z } from 'zod';
+import { modelProblem, type RoleCatalog } from './role.js';
 
 const MAX_MODELS = 25;
 
@@ -24,7 +25,10 @@ function price(model: ModelInfo): number {
  * Looking up models is a command, so that choosing one, for an agent or for
  * image generation, is something the coordinator can do during setup.
  */
-export function createModelCommands(provider: GenerationProvider): readonly Command[] {
+export function createModelCommands(
+  provider: GenerationProvider,
+  roles?: RoleCatalog,
+): readonly Command[] {
   const list = defineCommand({
     id: 'models.list',
     title: 'List models',
@@ -38,6 +42,12 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
         .boolean()
         .default(false)
         .describe('Only models that can call tools, which an agent needs.'),
+      role: z
+        .string()
+        .optional()
+        .describe(
+          'A role id from crew.roles: only the models that fit it, which can call tools and take the input the role must see (pictures for a casting director). A role that works from text takes any of them.',
+        ),
       all: z
         .boolean()
         .default(false)
@@ -68,14 +78,22 @@ export function createModelCommands(provider: GenerationProvider): readonly Comm
       /** How many matched in all; the list is cut to keep it short. */
       total: z.number(),
     }),
-    handler: async (_context, input) => {
+    handler: async ({ runtime }, input) => {
       const search = input.search?.trim().toLowerCase() ?? '';
+      const role =
+        input.role === undefined || roles === undefined
+          ? undefined
+          : await roles.find(runtime.store, input.role);
+      if (input.role !== undefined && role === undefined) {
+        throw new CommandError('invalid_input', 'models.list', `Unknown role "${input.role}".`);
+      }
       const matches = (await provider.listModels())
         .filter(
           (model) =>
             model.outputModalities.includes(input.output) &&
             (input.output !== 'video' || input.all || describeVideoModel(model).fits) &&
             (!input.tools || model.supportsTools) &&
+            (role === undefined || modelProblem(role, model) === null) &&
             (search === '' ||
               model.id.toLowerCase().includes(search) ||
               model.name.toLowerCase().includes(search)),

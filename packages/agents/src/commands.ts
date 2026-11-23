@@ -1,10 +1,10 @@
 import {
   CommandError,
   defineCommand,
-  isInScope,
   listProjects,
   readLanguage,
   readProject,
+  type Actor,
   type AutoApproval,
   type WriteOperation,
   type Command,
@@ -22,7 +22,8 @@ import {
   currentConversationProject,
 } from './conversations.js';
 import { CrewMember, readCrewMember } from './crew.js';
-import type { RoleCatalog } from './role.js';
+import { roleCanUse, type Role, type RoleCatalog } from './role.js';
+import { describeNeed, needsNote, needStatus, roleNames, type NeedStatus } from './needs.js';
 import { runAgent } from './run.js';
 import {
   createWorkCommands,
@@ -68,6 +69,7 @@ const RunStatus = z.enum([
   'budget-exhausted',
   'cancelled',
   'failed',
+  'blocked',
 ]);
 
 const PendingApprovalSchema = z.object({
@@ -87,6 +89,11 @@ export const AgentRunSchema = z.object({
   costUsd: z.number(),
   usage: UsageSchema,
   pendingApprovals: z.array(PendingApprovalSchema),
+  /** What the agent stopped to report missing (status blocked): arrange it, then ask again. */
+  missing: z
+    .object({ what: z.string(), from: z.string().nullable(), detail: z.string() })
+    .nullable()
+    .default(null),
   error: z.string().nullable(),
 });
 export type AgentRun = z.infer<typeof AgentRunSchema>;
@@ -383,6 +390,44 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     return { member, role };
   }
 
+  /**
+   * What the role needs before it can work, in the open project. An agent
+   * that gives a task checks it first and arranges what is missing, so it is
+   * refused while a need is missing that it did not name in `without`; a
+   * person may go ahead, and the member is told what is missing.
+   */
+  async function refuseUnready(
+    actor: Actor,
+    store: KeyValueStore,
+    input: { task?: string | undefined; without: readonly string[] },
+    role: Role,
+    memberName: string,
+    projectId: string | null,
+  ): Promise<NeedStatus[]> {
+    const needs = await needStatus(store, role, projectId);
+    const blocking = needs.filter(
+      (need) => need.state === 'missing' && !input.without.includes(need.id),
+    );
+    if (actor.kind === 'agent' && input.task !== undefined && blocking.length > 0) {
+      const names = await roleNames(roles, store);
+      throw new CommandError(
+        'invalid_input',
+        'crew.ask',
+        `${memberName} cannot start yet. Missing: ${blocking
+          .map((need) => describeNeed(need, names))
+          .join('; ')}. Have that made first with crew.ask, then give this task.`,
+        {
+          details: [
+            ...blocking.map((need) => `${need.id}: ${need.description}`),
+            'without: name a need here when this task does not need it (the role still cannot run what it is needed for)',
+            'crew.needs.waive: when this project never needs it',
+          ],
+        },
+      );
+    }
+    return needs;
+  }
+
   /** What a run that stopped at its step limit is told when it is continued. */
   const CONTINUE_AFTER_LIMIT =
     'Continue the task from where you stopped. Your summary above says what is left.';
@@ -405,12 +450,33 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         .optional()
         .describe('Facts the agent should know for this run, such as the current project id.'),
       maxSteps: z.number().int().positive().max(50).default(20),
+      without: z
+        .array(z.string())
+        .default([])
+        .describe(
+          'Ids of needs (from crew.needs) that are missing and that this task does not need, such as "cast" when the Screenwriter is asked for the development only. An agent cannot give a task while a need of the role is missing unless it is named here. The role still cannot run the commands the need is for.',
+        ),
     }),
     output: AgentRunSchema,
     estimate: async ({ runtime }, input) => {
       const member = await readCrewMember(runtime.store, input.memberId);
       if (member === undefined) return null;
       return { kind: 'chat', model: member.model, maxUsd: member.budgetUsdPerRun };
+    },
+    // Refused before the person is asked to approve a task the member cannot start.
+    check: async ({ actor, runtime }, input) => {
+      const member = await readCrewMember(runtime.store, input.memberId);
+      const role =
+        member === undefined ? undefined : await roles.find(runtime.store, member.roleId);
+      if (member === undefined || role === undefined) return;
+      await refuseUnready(
+        actor,
+        runtime.store,
+        input,
+        role,
+        member.name,
+        await currentConversationProject(runtime.store),
+      );
     },
     handler: async ({ actor, runtime }, input) => {
       const { store } = runtime;
@@ -453,6 +519,21 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         );
       }
 
+      const names = await roleNames(roles, store);
+      const needs = await refuseUnready(actor, store, input, role, member.name, projectId);
+      const guard = async (commandId: string): Promise<string | null> => {
+        if (projectId === null) return null;
+        for (const need of role.needs ?? []) {
+          if (need.before?.some((prefix) => commandId.startsWith(prefix)) !== true) continue;
+          const [status] = await needStatus(store, { ...role, needs: [need] }, projectId);
+          if (status?.state === 'missing') {
+            return `${commandId} needs ${describeNeed(status, names)}, which is not there yet. Do not make it yourself or make it up: call report_missing with what is missing and stop.`;
+          }
+        }
+        return null;
+      };
+      const canReport = role.id !== 'coordinator' && role.id !== 'guide';
+
       // The project the agent works in, always: an agent that is given work by another agent
       // was once left to guess the project id, and wrote to none.
       const open = projectId === null ? undefined : await readProject(store, projectId);
@@ -460,10 +541,15 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         open === undefined
           ? undefined
           : `Open project: "${open.name}" (projectId "${open.id}", mode ${open.mode}).`;
-      const runContext =
+      const withFacts =
         facts === undefined || input.context?.includes(open?.id ?? '') === true
           ? input.context
           : [input.context, facts].filter((part) => part !== undefined).join('\n');
+      const note = needsNote(needs, names);
+      const runContext =
+        note === undefined
+          ? withFacts
+          : [withFacts, note].filter((part) => part !== undefined).join('\n');
 
       let conversation: Conversation = {
         ...before,
@@ -516,6 +602,8 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           role,
           blobs: runtime.blobs,
           language: await readLanguage(store),
+          guard,
+          canReport,
           onCommand: (id) => {
             if (OPENS_PROJECT.has(id)) opened = true;
           },
@@ -568,6 +656,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           costUsd: result.costUsd,
           usage: result.usage,
           pendingApprovals,
+          missing: result.missing,
           error: result.error,
         };
       } finally {
@@ -674,7 +763,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         outcome = 'The user declined this. Do not ask for it again unless they bring it up.';
       } else if (
         !registry.has(pending.commandId) ||
-        !isInScope(registry.get(pending.commandId), role.scope)
+        !roleCanUse(role, registry.get(pending.commandId))
       ) {
         // An approval lets a command in the role's scope run; it never widens the scope.
         throw new CommandError(

@@ -4,6 +4,7 @@ import {
   createAgentCommands,
   type WorkSubject,
   createCrewCommands,
+  createNeedCommands,
   alwaysAllowed,
   createModelCommands,
   createModelMixCommands,
@@ -219,10 +220,12 @@ export function createImp(options: ImpOptions): Imp {
       },
     }),
     ...modes.flatMap((mode) => mode.commands),
-    ...createModelCommands(provider),
+    ...createModelCommands(provider, roles),
     ...createCrewCommands(roles, {
       commandIds: () => registry.list().map((command) => command.id),
+      models: () => provider.listModels(),
     }),
+    ...createNeedCommands(roles),
     ...createSavedCrewCommands(roles),
     ...createModelMixCommands([
       { setting: 'coordinator.model', label: 'Agents' },

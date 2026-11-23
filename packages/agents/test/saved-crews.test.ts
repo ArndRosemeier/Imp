@@ -54,6 +54,7 @@ describe('saved crews', () => {
       name: 'Critic',
       brief: 'You judge cuts.',
       commands: ['settings.get'],
+      writes: [],
     });
     await run('crew.hire', { roleId: 'screenwriter', model: 'm/a', name: 'Ada', webSearch: true });
     await run('crew.hire', { roleId: 'critic', model: 'm/b', budgetUsdPerRun: 2 });
