@@ -198,7 +198,8 @@ export function CrewPanel({
     !working &&
     approvals.length === 0 &&
     CONTINUABLE.has(conversation?.lastStatus ?? '') &&
-    (lastRole === 'user' || lastRole === 'tool');
+    // A run at its step limit ends on its own summary of what is left.
+    (lastRole === 'user' || lastRole === 'tool' || conversation?.lastStatus === 'step-limit');
 
   useEffect(() => {
     if (!takesSuggestions) return;

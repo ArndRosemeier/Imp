@@ -257,6 +257,27 @@ describe('crew.ask', () => {
     expect(await conversation(coordinator.id)).toMatchObject({ lastStatus: 'completed' });
   });
 
+  it('continues a run that stopped at its step limit with its summary', async () => {
+    const { run, hire, runtime, conversation, provider } = setup([
+      { content: 'Finished the second half.' },
+    ]);
+    const coordinator = await hire('coordinator');
+    const stopped = {
+      ...(await conversation(coordinator.id)),
+      lastStatus: 'step-limit',
+      messages: [
+        { role: 'user', content: 'Write the script.' },
+        { role: 'assistant', content: 'Half is written; the rest is left.' },
+      ],
+    };
+    await runtime.store.batch([
+      { type: 'put', key: `conversations/${coordinator.id}`, value: json(stopped) },
+    ]);
+    const result = (await run('crew.ask', { memberId: coordinator.id })) as { finalText: string };
+    expect(result.finalText).toBe('Finished the second half.');
+    expect(provider.requests.at(-1)?.messages.at(-1)?.content).toMatch(/Continue the task/);
+  });
+
   it('is a spending command, so an agent cannot start another agent unasked', async () => {
     const { registry, hire } = setup([]);
     const coordinator = await hire('coordinator');

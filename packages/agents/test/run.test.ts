@@ -297,14 +297,61 @@ describe('runAgent', () => {
     expect(result.status).toBe('completed');
   });
 
-  it('stops at the step limit', async () => {
+  it('spends the last step on a summary, with tools off', async () => {
+    const { run, provider } = setup([
+      { toolCalls: [call('settings__list', {})] },
+      { toolCalls: [call('settings__list', {})] },
+      { toolCalls: [call('settings__list', {})] },
+      { toolCalls: [call('settings__list', {})] },
+      { content: 'I listed the settings twice. The theme is still to set.' },
+    ]);
+    const result = await run({ maxSteps: 5 });
+    expect(result).toMatchObject({
+      status: 'step-limit',
+      steps: 5,
+      finalText: 'I listed the settings twice. The theme is still to set.',
+    });
+    // Warned while there is time, then asked for the summary only.
+    expect(provider.requests[0]?.messages.at(-1)?.content).toBe('Set the theme to dark.');
+    expect(provider.requests[1]?.messages.at(-1)?.content).toMatch(/^3 steps left/);
+    expect(provider.requests[3]?.messages.at(-1)?.content).toMatch(/^1 step left/);
+    expect(provider.requests[4]?.messages.at(-1)?.content).toMatch(/last step of this run/);
+    expect(provider.requests[4]?.toolChoice).toBe('none');
+    expect(provider.requests[3]?.toolChoice).toBeUndefined();
+    // The notes are never kept in the conversation.
+    expect(result.messages.some((m) => String(m.content).includes('step'))).toBe(false);
+  });
+
+  it('drops tool calls made on the last step, and sums up from what ran when the agent says nothing', async () => {
     const { run } = setup([
-      { toolCalls: [call('settings__list', {})] },
-      { toolCalls: [call('settings__list', {})] },
+      { toolCalls: [call('settings__list', {}), call('media__generate', { prompt: 'x' })] },
       { toolCalls: [call('settings__list', {})] },
     ]);
     const result = await run({ maxSteps: 2 });
-    expect(result).toMatchObject({ status: 'step-limit', steps: 2, finalText: null });
+    expect(result.status).toBe('step-limit');
+    expect(result.finalText).toMatch(/every step of this run/);
+    expect(result.finalText).toMatch(/What I ran: settings\.list\./);
+    expect(result.finalText).toMatch(/Waiting for your approval: media\.generate\./);
+    const lastMessage = result.messages.at(-1);
+    expect(lastMessage).toEqual({ role: 'assistant', content: null });
+  });
+
+  it('writes the summary it makes in German when Imp is in German', async () => {
+    const { run } = setup([
+      { toolCalls: [call('settings__list', {})] },
+      { toolCalls: [call('settings__list', {}), call('settings__list', {})] },
+      { content: '' },
+    ]);
+    const result = await run({ maxSteps: 3, language: 'de' });
+    expect(result.finalText).toMatch(/Ausgeführt: settings\.list ×3\./);
+  });
+
+  it('keeps every step for work when a run has only one', async () => {
+    const { run, provider } = setup([{ toolCalls: [call('settings__list', {})] }]);
+    const result = await run({ maxSteps: 1 });
+    expect(result.status).toBe('step-limit');
+    expect(provider.requests[0]?.toolChoice).toBeUndefined();
+    expect(result.finalText).toMatch(/What I ran: settings\.list\./);
   });
 
   it('stops when the run budget is used up', async () => {
@@ -316,6 +363,7 @@ describe('runAgent', () => {
     ]);
     const result = await run();
     expect(result.status).toBe('budget-exhausted');
+    expect(result.finalText).toMatch(/budget for one run is used up/);
     expect(result.costUsd).toBeCloseTo(1.2);
     expect(provider.requests).toHaveLength(2);
   });

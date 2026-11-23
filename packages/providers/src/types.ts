@@ -133,6 +133,12 @@ export interface ChatRequest {
   readonly messages: readonly ChatMessage[];
   readonly tools?: readonly ToolDefinition[];
   /**
+   * "none" asks the model to answer in words without calling any of the
+   * tools, which stay listed so that earlier tool calls in the conversation
+   * still make sense. Models may ignore it.
+   */
+  readonly toolChoice?: 'auto' | 'none';
+  /**
    * Lets the model look things up on the web while it answers. The provider
    * runs the searches; they are part of the cost of the call.
    */
