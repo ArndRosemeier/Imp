@@ -145,10 +145,11 @@ Videomodelle vergessen zwischen zwei Clips, wie ein Raum aussah. Gibst du jeder 
 
 1. Wähle über die Reiter eine Szene.
 2. Füg Einstellungen hinzu: Bildausschnitt (Totale, Großaufnahme), was passiert, wer darin ist und wie lange sie **im Schnitt dauert**, mit einem Wort zum Warum. Wechsle die Längen: Ein Blick ist nach ein, zwei Sekunden vorbei, ein Moment, der wirken soll, braucht länger. Der Clip wird etwas länger erstellt, damit der Schnitt ihn im besten Moment schneiden kann.
-3. Erstelle wahlweise einen **Keyframe**, ein Standbild, mit dem der Clip beginnt. Er ist günstig und lässt dich den Look prüfen, bevor du für Video bezahlst.
-4. Gib einer Einstellung mit Sprechrolle ihre **Zeile** und den Vortrag. Der Clip spricht sie selbst, lippensynchron, zusammen mit den Geräuschen der Szene.
-5. Erstelle den **Clip**. Das dauert ein, zwei Minuten. Die Porträts der Figuren in der Einstellung und die Ortsbilder gehen mit. Clips haben immer Ton; Videomodelle ohne Ton werden nicht angeboten.
-6. Für einen Erzähler oder eine Stimme aus dem Off **nimm den Dialog** mit der Stimme dieser Figur auf; er läuft über den Clip.
+3. Erstelle wahlweise einen **Keyframe**, ein Standbild, mit dem der Clip beginnt. Er ist günstig und lässt dich den Look prüfen, bevor du für Video bezahlst. Ein **Schlussbild** legt fest, wo der Clip landet, bei Modellen, die eines annehmen.
+4. Leg fest, wie jede Einstellung **auf die vorige folgt**: neuer Blickwinkel oder Ort; *führt dieselbe Aufnahme fort*, dann beginnt der Clip mit dem letzten Bild der vorigen und die Handlung fließt weiter (er wird nach jenem Clip erstellt); oder ein *Schnitt in der Bewegung*, derselbe Moment aus neuem Blickwinkel, dessen Keyframe passend zum Ende der vorigen Einstellung gemalt wird. Schreib dazu, warum dort geschnitten wird; der Film Editor liest es.
+5. Gib einer Einstellung mit Sprechrolle ihre **Zeile** und den Vortrag. Der Clip spricht sie selbst, lippensynchron, zusammen mit den Geräuschen der Szene.
+6. Erstelle den **Clip**. Das dauert ein, zwei Minuten. Die Porträts der Figuren in der Einstellung und die Ortsbilder gehen mit. Clips haben immer Ton; Videomodelle ohne Ton werden nicht angeboten.
+7. Für einen Erzähler oder eine Stimme aus dem Off **nimm den Dialog** mit der Stimme dieser Figur auf; er läuft über den Clip.
 
 ## Takes
 

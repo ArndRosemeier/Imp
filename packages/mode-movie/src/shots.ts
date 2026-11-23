@@ -38,6 +38,8 @@ import {
   shotPrefix,
 } from './commands.js';
 import { asStartFrame, type FrameImageEncoder } from './frames.js';
+import type { FrameGrabber } from './edit-review.js';
+import { chosenEndFrame, continuesProblem, lastFrameOf, shotBefore } from './joins.js';
 import {
   CLIP_SLACK_SECONDS,
   clipSecondsWanted,
@@ -81,6 +83,8 @@ export const ShotFields = Shot.omit({
   dialogue: true,
   frames: true,
   frameId: true,
+  endFrames: true,
+  endFrameId: true,
   pickup: true,
 });
 
@@ -383,6 +387,7 @@ async function findModel(provider: GenerationProvider, id: string): Promise<Mode
 export function createShotCommands(
   provider: GenerationProvider,
   frameImage?: FrameImageEncoder,
+  frameGrabber?: FrameGrabber,
 ): readonly Command[] {
   const list = defineCommand({
     id: 'movie.shot.list',
@@ -468,9 +473,13 @@ export function createShotCommands(
         delivery: fields.delivery ?? '',
         lengthSeconds: fields.lengthSeconds ?? null,
         lengthReason: fields.lengthReason ?? '',
+        join: fields.join ?? 'cut',
+        cutReason: fields.cutReason ?? '',
         dialogue: null,
         frames: [],
         frameId: null,
+        endFrames: [],
+        endFrameId: null,
         clip: null,
         takes: [],
         pickup: null,
@@ -513,6 +522,8 @@ export function createShotCommands(
         lengthSeconds:
           changes.lengthSeconds === undefined ? shot.lengthSeconds : changes.lengthSeconds,
         lengthReason: changes.lengthReason ?? shot.lengthReason,
+        join: changes.join ?? shot.join,
+        cutReason: changes.cutReason ?? shot.cutReason,
       };
       await requireShotSetting(runtime.store, 'movie.shot.update', projectId, next);
       await runtime.store.batch([{ type: 'put', key, value: next }]);
@@ -550,7 +561,7 @@ export function createShotCommands(
     id: 'movie.shot.clip.generate',
     title: 'Generate clip',
     description:
-      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). Clips have sound of their own unless silence is asked for, and the model speaks the line itself, so it matches the lips. Only a line of a voice-only character (a narrator, a voice off screen) with recorded dialogue (movie.shot.dialogue.generate) is laid over the clip, which is made long enough for it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip, which is kept as a take (movie.shot.take.list) and can be put back. Costs money at the video model, more than anything else here.',
+      'Starts making the video clip of a shot from its description and performance, guided by the portraits of its characters where the model takes them (the clip says how many were used). Clips have sound of their own unless silence is asked for, and the model speaks the line itself, so it matches the lips. Only a line of a voice-only character (a narrator, a voice off screen) with recorded dialogue (movie.shot.dialogue.generate) is laid over the clip, which is made long enough for it. Lengths and sizes are fitted to what the model makes, and a model that cannot make a film is refused before anything is spent. Returns at once with the clip pending; it takes a minute or more, so check on it with movie.shot.clip.check. Replaces an earlier clip, which is kept as a take (movie.shot.take.list) and can be put back. How it begins follows the join of the shot: a shot that continues the one before starts on the last frame of that clip and waits for it; otherwise it starts on its chosen key frame. Where the shot has a chosen end frame and the model takes one, the clip lands on it. Costs money at the video model, more than anything else here.',
     effect: 'spend',
     input: z.object({
       ...At,
@@ -588,9 +599,23 @@ export function createShotCommands(
         .boolean()
         .default(true)
         .describe(
-          'Start the clip exactly on the chosen key frame of the shot (movie.shot.frame.generate), where there is one and the model takes a start picture. This keeps places and faces the same from shot to shot.',
+          'Start the clip exactly on the chosen key frame of the shot (movie.shot.frame.generate), where there is one and the model takes a start picture. This keeps places and faces the same from shot to shot. A shot that continues the one before always starts on the last frame of that clip.',
+        ),
+      endFrame: z
+        .boolean()
+        .default(true)
+        .describe(
+          'End the clip on the chosen end frame of the shot (movie.shot.frame.generate with end true), where there is one and the model takes an end picture.',
         ),
     }),
+    check: async ({ runtime }, input) => {
+      const { shot } = await loadShot(runtime.store, 'movie.shot.clip.generate', input);
+      const shots = await readShots(runtime.store, input.projectId, input.sceneId);
+      const problem = continuesProblem(shot, shotBefore(shots, shot));
+      if (problem !== null) {
+        throw new CommandError('invalid_input', 'movie.shot.clip.generate', problem);
+      }
+    },
     output: z.object({ sceneId: z.string(), shotId: z.string(), clip: Clip }),
     estimate: async ({ runtime }, input) => {
       const { shot } = await loadShot(runtime.store, 'movie.shot.clip.generate', input);
@@ -677,27 +702,91 @@ export function createShotCommands(
       };
       // The surest way first: start on the key frame. Then guiding images, then words alone.
       // A model that cannot take one refuses before anything is spent, and the next is tried.
+      const accepts = (kind: string): boolean =>
+        info?.video === undefined || info.video.frameImages.includes(kind);
+      const before = shotBefore(
+        await readShots(runtime.store, input.projectId, input.sceneId),
+        shot,
+      );
+      const problem = continuesProblem(shot, before);
+      if (problem !== null) throw new CommandError('invalid_input', id, problem);
+      // A continuing shot starts where the clip before it stops, so the action flows across the cut.
+      const carried =
+        shot.join === 'continues' && before !== undefined
+          ? await lastFrameOf(runtime, frameGrabber, before.clip)
+          : undefined;
+      if (shot.join === 'continues' && carried === undefined) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `Shot ${String(shot.position)} continues the shot before, but the last frame of that clip cannot be read here. Set its join to "action" or "cut" and give it a key frame.`,
+        );
+      }
+      if (carried !== undefined && !accepts('first_frame')) {
+        throw new CommandError(
+          'invalid_input',
+          id,
+          `${model} cannot start a clip on a picture, so this shot cannot carry on from the one before. Pick a model whose notes say "start picture", or set the join to "cut".`,
+        );
+      }
       const frame = shot.frames.find((candidate) => candidate.id === shot.frameId);
       const stored =
-        input.startFrame &&
-        frame !== undefined &&
-        (info?.video === undefined || info.video.frameImages.includes('first_frame'))
+        carried === undefined && input.startFrame && frame !== undefined && accepts('first_frame')
           ? await runtime.blobs.get(frame.blobKey)
           : undefined;
-      const startBlob = stored === undefined ? undefined : await asStartFrame(stored, frameImage);
-      const attempts: { extra: Partial<VideoRequest>; frameId: string | null; guides: string[] }[] =
-        [];
-      if (startBlob !== undefined && frame !== undefined) {
+      const startBlob =
+        carried ?? (stored === undefined ? undefined : await asStartFrame(stored, frameImage));
+      const end = input.endFrame && accepts('last_frame') ? chosenEndFrame(shot) : undefined;
+      const endStored = end === undefined ? undefined : await runtime.blobs.get(end.blobKey);
+      const endBlob =
+        endStored === undefined ? undefined : await asStartFrame(endStored, frameImage);
+      interface Attempt {
+        extra: Partial<VideoRequest>;
+        frameId: string | null;
+        endFrameId: string | null;
+        guides: string[];
+      }
+      const startGuides = carried !== undefined ? [] : (frame?.guides ?? []);
+      const startId = carried !== undefined ? null : (frame?.id ?? null);
+      const attempts: Attempt[] = [];
+      if (startBlob !== undefined && endBlob !== undefined && end !== undefined) {
         attempts.push({
-          extra: { firstFrame: startBlob },
-          frameId: frame.id,
-          guides: frame.guides,
+          extra: { firstFrame: startBlob, lastFrame: endBlob },
+          frameId: startId,
+          endFrameId: end.id,
+          guides: startGuides,
         });
       }
-      if (references.length > 0) attempts.push({ extra: { references }, frameId: null, guides });
-      attempts.push({ extra: {}, frameId: null, guides: [] });
+      if (startBlob === undefined && endBlob !== undefined && end !== undefined) {
+        attempts.push({
+          extra: { lastFrame: endBlob, ...(references.length > 0 ? { references } : {}) },
+          frameId: null,
+          endFrameId: end.id,
+          guides: references.length > 0 ? guides : [],
+        });
+      }
+      if (startBlob !== undefined) {
+        attempts.push({
+          extra: { firstFrame: startBlob },
+          frameId: startId,
+          endFrameId: null,
+          guides: startGuides,
+        });
+      }
+      // A clip that must carry on from the one before is never made from words instead.
+      if (carried === undefined) {
+        if (references.length > 0) {
+          attempts.push({ extra: { references }, frameId: null, endFrameId: null, guides });
+        }
+        attempts.push({ extra: {}, frameId: null, endFrameId: null, guides: [] });
+      }
       let job;
-      let used = attempts[attempts.length - 1] ?? { extra: {}, frameId: null, guides: [] };
+      let used: Attempt = attempts[attempts.length - 1] ?? {
+        extra: {},
+        frameId: null,
+        endFrameId: null,
+        guides: [],
+      };
       try {
         for (const [index, attempt] of attempts.entries()) {
           try {
@@ -737,6 +826,14 @@ export function createShotCommands(
         silent: !audio,
         voiceApart: dialogueApart,
         startFrameId: used.frameId,
+        endFrameId: used.endFrameId,
+        continuesFrom:
+          carried !== undefined &&
+          before?.clip?.blobKey !== null &&
+          before?.clip?.blobKey !== undefined &&
+          used.extra.firstFrame === carried
+            ? { shotId: before.id, clipKey: before.clip.blobKey }
+            : null,
         costUsd: job.costUsd,
         createdAt: runtime.now().toISOString(),
       };
@@ -953,6 +1050,8 @@ export function createShotCommands(
           silent: false,
           voiceApart: false,
           startFrameId: null,
+          endFrameId: null,
+          continuesFrom: null,
           costUsd: null,
           createdAt: runtime.now().toISOString(),
         },

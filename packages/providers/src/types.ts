@@ -282,6 +282,8 @@ export interface VideoRequest {
   readonly references?: readonly MediaInput[];
   /** An image the clip starts on exactly. */
   readonly firstFrame?: MediaInput;
+  /** An image the clip ends on, for models whose frame images include `last_frame`. */
+  readonly lastFrame?: MediaInput;
 }
 
 /**

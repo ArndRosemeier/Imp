@@ -161,6 +161,13 @@ export const Clip = z.object({
   voiceApart: z.boolean().default(false),
   /** The key frame the clip was made to start on, or null when it was made from words and guides. */
   startFrameId: z.string().nullable().default(null),
+  /** The end frame the clip was made to land on, or null when its end was left to the model. */
+  endFrameId: z.string().nullable().default(null),
+  /**
+   * The clip of the shot before that this one carries on from, when it started
+   * on that clip's last frame. A new clip there leaves this one out of step.
+   */
+  continuesFrom: z.object({ shotId: z.string(), clipKey: z.string() }).nullable().default(null),
   costUsd: z.number().nullable(),
   createdAt: z.iso.datetime(),
 });
@@ -222,6 +229,10 @@ export const Pickup = z.object({
   requestedAt: z.string(),
 });
 export type Pickup = z.infer<typeof Pickup>;
+
+/** How a shot comes after the one before it. */
+export const ShotJoin = z.enum(['cut', 'continues', 'action']);
+export type ShotJoin = z.infer<typeof ShotJoin>;
 
 export const Shot = z.object({
   id: z.string(),
@@ -295,10 +306,22 @@ export const Shot = z.object({
     .string()
     .default('')
     .describe('Why the shot holds that long, in a few words, for the editor.'),
+  join: ShotJoin.default('cut').describe(
+    'How the shot comes after the one before it in the scene. "cut": a new angle or place, its own key frame. "continues": the same camera carries on, so the clip starts on the last frame of the clip before and the action flows on; it waits for that clip. "action": a cut on action, the same instant from a new angle; its key frame is painted to match where the shot before ends (its end frame, or the last frame of its clip).',
+  ),
+  cutReason: z
+    .string()
+    .default('')
+    .describe(
+      'Why the cut to this shot happens, for the editor: on a movement, on a look, on a line, to show a reaction, to move time on.',
+    ),
   dialogue: DialogueTake.nullable().default(null),
   /** Painted first frames of the shot; the chosen one is what the clip starts on. */
   frames: z.array(KeyFrame).default([]),
   frameId: z.string().nullable().default(null),
+  /** Painted last frames; the chosen one is what the clip ends on, where the model takes one. */
+  endFrames: z.array(KeyFrame).default([]),
+  endFrameId: z.string().nullable().default(null),
   clip: Clip.nullable().default(null),
   /**
    * Earlier ready clips of the shot, newest first. Making a new clip keeps the

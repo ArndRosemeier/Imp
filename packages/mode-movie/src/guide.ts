@@ -149,10 +149,11 @@ export const shotsGuide: GuideTopic = {
 
 1. Pick a scene from the tabs.
 2. Add shots: framing (wide, close-up), what happens, who is in it, and how long it **holds in the cut**, with a word on why. Vary the lengths: a glance is over in a second or two, a moment that should land takes longer. The clip is made a little longer than that, so the edit can cut it at its best moment.
-3. Optionally make a **key frame**, a still picture the clip starts on. It is cheap and lets you check the look before paying for video.
-4. Give a speaking shot its **line** and delivery. The clip speaks it itself, so the lips match, along with the sounds of the scene.
-5. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it. Clips always have sound; video models that make none are not offered.
-6. For a narrator or a voice off screen, **record the dialogue** in that character's voice; it plays over the clip.
+3. Optionally make a **key frame**, a still picture the clip starts on. It is cheap and lets you check the look before paying for video. An **end frame** says where the clip lands, for models that take one.
+4. Say how each shot **comes after the one before**: a new angle or place; *carries on the same take*, where the clip starts on the last frame of the one before so the action flows on (it is made after that clip); or a *cut on action*, the same instant from a new angle, whose key frame is painted to match where the shot before ends. Add why the cut is there; the Film Editor reads it.
+5. Give a speaking shot its **line** and delivery. The clip speaks it itself, so the lips match, along with the sounds of the scene.
+6. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it. Clips always have sound; video models that make none are not offered.
+7. For a narrator or a voice off screen, **record the dialogue** in that character's voice; it plays over the clip.
 
 ## Takes
 

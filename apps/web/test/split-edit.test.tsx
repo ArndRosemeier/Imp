@@ -19,6 +19,9 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   pickupReason: null,
   plannedSeconds: null,
   lengthReason: '',
+  join: 'cut',
+  cutReason: '',
+  outOfStep: false,
   trimStartSeconds: 0,
   trimEndSeconds: 0,
   dialogueVolume: 1,
@@ -63,6 +66,8 @@ const clip = (blobKey: string, durationSeconds: number | null = 4) => ({
   silent: false,
   voiceApart: false,
   startFrameId: null,
+  endFrameId: null,
+  continuesFrom: null,
   costUsd: null,
   createdAt: '2026-11-21T10:00:00.000Z',
 });

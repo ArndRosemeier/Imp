@@ -916,6 +916,7 @@ describe('OpenRouter provider: images', () => {
       { status: 200, body: { id: 'gen-vid-1', status: 'completed', usage: { cost: 0.21 } } },
       { status: 200, bytes: clip, contentType: 'video/mp4' },
       { status: 200, body: { id: 'gen-vid-2', status: 'pending' } },
+      { status: 200, body: { id: 'gen-vid-3', status: 'pending' } },
     );
     const started = await provider.startVideo({
       model: 'v/clips',
@@ -947,6 +948,12 @@ describe('OpenRouter provider: images', () => {
       mediaType: 'video/mp4',
     });
     await provider.startVideo({ model: 'v/clips', prompt: 'Silent.', audio: false });
+    await provider.startVideo({
+      model: 'v/clips',
+      prompt: 'Lands.',
+      audio: true,
+      lastFrame: { bytes: new Uint8Array([1, 2, 3, 4]), mediaType: 'image/webp' },
+    });
 
     const part = { type: 'image_url', image_url: { url: 'data:image/webp;base64,AQIDBA==' } };
     expect(JSON.parse(calls[0]?.request.body ?? '')).toEqual({
@@ -964,11 +971,18 @@ describe('OpenRouter provider: images', () => {
       prompt: 'Silent.',
       generate_audio: false,
     });
+    expect(JSON.parse(calls[5]?.request.body ?? '')).toEqual({
+      model: 'v/clips',
+      prompt: 'Lands.',
+      generate_audio: true,
+      frame_images: [{ ...part, frame_type: 'last_frame' }],
+    });
     expect(calls.map((call) => [call.request.method, call.url.replace(/^.*\/v1/, '')])).toEqual([
       ['POST', '/videos'],
       ['GET', '/videos/gen-vid-1'],
       ['GET', '/videos/gen-vid-1'],
       ['GET', '/videos/gen-vid-1/content?index=0'],
+      ['POST', '/videos'],
       ['POST', '/videos'],
     ]);
   });
