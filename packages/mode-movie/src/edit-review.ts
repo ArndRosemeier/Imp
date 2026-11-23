@@ -149,6 +149,18 @@ export function edlText(
       notes.push(
         `clip ${item.trimStartSeconds.toFixed(2)}-${(item.sourceSeconds - item.trimEndSeconds).toFixed(2)} of ${item.sourceSeconds.toFixed(2)}`,
       );
+      if (item.plannedSeconds !== null) {
+        const over = item.durationSeconds - item.plannedSeconds;
+        notes.push(
+          `planned ${item.plannedSeconds.toFixed(1)}${item.lengthReason === '' ? '' : ` (${item.lengthReason})`}${
+            over > 0.5
+              ? `, runs ${over.toFixed(1)} over`
+              : over < -0.5
+                ? `, ${(-over).toFixed(1)} short`
+                : ''
+          }`,
+        );
+      }
       if (item.speed !== 1) notes.push(`speed ${String(item.speed)}x`);
       if (item.reverse) notes.push('reversed');
       if (item.holdSeconds > 0) notes.push(`holds last frame ${item.holdSeconds.toFixed(1)}`);

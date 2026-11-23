@@ -716,6 +716,7 @@ function ShotCard({
         )}
         onCommit={(performance) => change({ performance })}
       />
+      <ShotLength shot={shot} change={change} />
       <ShotPlace
         shot={shot}
         sceneLocationId={sceneLocationId}
@@ -897,6 +898,60 @@ export function clipOptionInput(options: ClipOptionValues): Record<string, unkno
   if (!options.portraits) input['portraits'] = false;
   if (!options.startFrame) input['startFrame'] = false;
   return input;
+}
+
+const LENGTH_CHOICES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 10, 12, 15, 20, 30] as const;
+
+/**
+ * How long the shot holds in the cut, and why. The clip is made a little
+ * longer, so the edit can trim it to its best moment.
+ */
+function ShotLength({
+  shot,
+  change,
+}: {
+  shot: Shot;
+  change: (patch: Record<string, unknown>) => Promise<unknown>;
+}): ReactElement {
+  const lengthId = useId();
+  const planned = shot.lengthSeconds;
+  const choices: readonly number[] =
+    planned === null || (LENGTH_CHOICES as readonly number[]).includes(planned)
+      ? LENGTH_CHOICES
+      : [...LENGTH_CHOICES, planned].sort((a, b) => a - b);
+  return (
+    <div className="row wrap shot-length">
+      <div className="field compact">
+        <label htmlFor={lengthId}>{t('Holds in the cut (s)')}</label>
+        <select
+          id={lengthId}
+          className="select"
+          title={t(
+            'How long the shot plays in the film. The clip is made a little longer, so the edit can cut it at its best moment.',
+          )}
+          value={planned === null ? '' : String(planned)}
+          onChange={(event) => {
+            void change({
+              lengthSeconds: event.target.value === '' ? null : Number(event.target.value),
+            });
+          }}
+        >
+          <option value="">{t('Not planned')}</option>
+          {choices.map((seconds) => (
+            <option key={seconds} value={String(seconds)}>
+              {String(seconds)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <EditableField
+        label={t('Why that long')}
+        value={shot.lengthReason}
+        placeholder={t('A quick glance; lets the silence land; the walk to the door')}
+        onCommit={(lengthReason) => change({ lengthReason })}
+      />
+    </div>
+  );
 }
 
 /** The choices an agent has when it makes a clip, folded away under the Generate button. */

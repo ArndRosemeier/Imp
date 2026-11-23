@@ -282,6 +282,19 @@ export const Shot = z.object({
     .describe(
       'How the line is said: emotion, intensity, pace, breath. For example "screaming over the wind, voice cracking".',
     ),
+  lengthSeconds: z
+    .number()
+    .min(0.5)
+    .max(30)
+    .nullable()
+    .default(null)
+    .describe(
+      'How long the shot holds in the finished cut, in seconds, from what happens in it: a glance 1.5, a reaction 2.5, a line plus a beat, a walk across a room 7. Vary it with the rhythm of the scene. Null when not planned: the clip then fits the line, or 4 seconds, and the edit does not trim by it. The clip is made a little longer, so the edit can trim it to its best moment.',
+    ),
+  lengthReason: z
+    .string()
+    .default('')
+    .describe('Why the shot holds that long, in a few words, for the editor.'),
   dialogue: DialogueTake.nullable().default(null),
   /** Painted first frames of the shot; the chosen one is what the clip starts on. */
   frames: z.array(KeyFrame).default([]),

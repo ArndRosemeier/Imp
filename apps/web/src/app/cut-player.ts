@@ -86,6 +86,8 @@ export const Item = z.object({
   /** A pickup waiting for its clip, standing in the cut as a slate. */
   placeholder: z.boolean().default(false),
   pickupReason: z.string().nullable().default(null),
+  plannedSeconds: z.number().nullable().default(null),
+  lengthReason: z.string().default(''),
   trimStartSeconds: z.number(),
   trimEndSeconds: z.number(),
   dialogueVolume: z.number(),

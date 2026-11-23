@@ -144,7 +144,7 @@ Videomodelle vergessen zwischen zwei Clips, wie ein Raum aussah. Gibst du jeder 
 ## Was du hier tust
 
 1. Wähle über die Reiter eine Szene.
-2. Füg Einstellungen hinzu: Bildausschnitt (Totale, Großaufnahme), was passiert, wer darin ist, wie lange.
+2. Füg Einstellungen hinzu: Bildausschnitt (Totale, Großaufnahme), was passiert, wer darin ist und wie lange sie **im Schnitt dauert**, mit einem Wort zum Warum. Wechsle die Längen: Ein Blick ist nach ein, zwei Sekunden vorbei, ein Moment, der wirken soll, braucht länger. Der Clip wird etwas länger erstellt, damit der Schnitt ihn im besten Moment schneiden kann.
 3. Erstelle wahlweise einen **Keyframe**, ein Standbild, mit dem der Clip beginnt. Er ist günstig und lässt dich den Look prüfen, bevor du für Video bezahlst.
 4. Gib einer Einstellung mit Sprechrolle ihre **Zeile** und den Vortrag. Der Clip spricht sie selbst, lippensynchron, zusammen mit den Geräuschen der Szene.
 5. Erstelle den **Clip**. Das dauert ein, zwei Minuten. Die Porträts der Figuren in der Einstellung und die Ortsbilder gehen mit. Clips haben immer Ton; Videomodelle ohne Ton werden nicht angeboten.
@@ -209,6 +209,7 @@ Der **Sounddesigner** liest jede Szene und erstellt, was sie braucht.`,
 ## Schneiden
 
 - Kürze ein Stück, indem du seine Ränder ziehst; teile es am Abspielkopf; zieh Stücke, um sie umzuordnen.
+- **Auf geplante Länge kürzen** (die nach innen zeigenden Pfeile) macht einen ersten Schnitt: Jede Einstellung wird auf ihre geplante Dauer gekürzt, ein wenig am Anfang und der Rest am Ende. Ist ein Stück gewählt, nur dieses. Danach schiebst du die Ränder auf den besten Moment.
 - Wähle ein Stück, um seinen Inspektor zu sehen: Takes, Tempo, Standbild, Zoom, Farbkorrektur und wie es hereinkommt (Schnitt, Überblendung, Abblende, Wischblende).
 - **Übergänge**: Wähle das zweite von zwei Stücken und leg unter *Kommt herein mit* fest, wie es kommt: harter Schnitt, Überblendung, Abblende auf Schwarz oder Weiß oder Wischblende. **Länge (s)** unter der Auswahl bestimmt, wie lange das dauert (0,1 bis 5 Sekunden). Eine Überblendung oder Wischblende liegt über dem vorigen Stück, die Szene wird also um so viel kürzer; eine Abblende behält ihre Länge.
 - **J- und L-Schnitte** lassen den Ton einer Einstellung früher beginnen oder unter der nächsten weiterlaufen.

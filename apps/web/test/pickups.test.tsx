@@ -21,6 +21,8 @@ const piece = (fields: Partial<Item> = {}): Item => ({
   state: 'ready',
   placeholder: false,
   pickupReason: null,
+  plannedSeconds: null,
+  lengthReason: '',
   trimStartSeconds: 0,
   trimEndSeconds: 0,
   dialogueVolume: 1,

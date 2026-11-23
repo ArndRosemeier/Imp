@@ -148,7 +148,7 @@ export const shotsGuide: GuideTopic = {
 ## What to do here
 
 1. Pick a scene from the tabs.
-2. Add shots: framing (wide, close-up), what happens, who is in it, how long.
+2. Add shots: framing (wide, close-up), what happens, who is in it, and how long it **holds in the cut**, with a word on why. Vary the lengths: a glance is over in a second or two, a moment that should land takes longer. The clip is made a little longer than that, so the edit can cut it at its best moment.
 3. Optionally make a **key frame**, a still picture the clip starts on. It is cheap and lets you check the look before paying for video.
 4. Give a speaking shot its **line** and delivery. The clip speaks it itself, so the lips match, along with the sounds of the scene.
 5. Make the **clip**. It takes a minute or two. The portraits of the characters in the shot and the location pictures go with it. Clips always have sound; video models that make none are not offered.
@@ -215,6 +215,7 @@ export const editGuide: GuideTopic = {
 ## Cutting
 
 - Trim a piece by dragging its edges; split it at the playhead; drag pieces to reorder them.
+- **Trim to planned length** (the arrows pointing inward) makes a first cut: every shot is cut down to how long it is planned to hold, with a sliver off the start and the rest off the end. With a piece selected, only that one. Then move the edges to the best moment.
 - Select a piece to see its inspector: takes, speed, freeze frame, punch-in, colour grade, and how it comes in (cut, dissolve, dip, wipe).
 - **Transitions**: select the second of two pieces and choose under *Comes in with* how it arrives: cut, dissolve, dip to black or white, or wipe. **Length (s)** below the choice sets how long it takes (0.1 to 5 seconds). A dissolve or wipe lies over the piece before, so the scene gets that much shorter; a dip keeps its length.
 - **J and L cuts** let the sound of one shot start early or run on under the next.

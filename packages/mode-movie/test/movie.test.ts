@@ -707,6 +707,8 @@ describe('shots and clips', () => {
       speakerId: null,
       line: '',
       delivery: '',
+      lengthSeconds: null,
+      lengthReason: '',
       dialogue: null,
       frames: [],
       frameId: null,
@@ -721,6 +723,7 @@ describe('shots and clips', () => {
           position: 1,
           description: 'The lamp turns.',
           line: '',
+          lengthSeconds: null,
           dialogue: false,
           clip: null,
         },
@@ -729,6 +732,7 @@ describe('shots and clips', () => {
           position: 2,
           description: 'Mara at the stairs.',
           line: 'Who is there?',
+          lengthSeconds: null,
           dialogue: false,
           clip: null,
         },
@@ -829,7 +833,7 @@ describe('shots and clips', () => {
     });
     expect(provider.videoRequests[0]).toMatchObject({
       model: 'vendor/clips',
-      durationSeconds: 4,
+      durationSeconds: 6,
       resolution: '720p',
       aspectRatio: '16:9',
       audio: true,
@@ -1042,9 +1046,9 @@ describe('shots and clips', () => {
       resolution: '1080p',
     })) as unknown as WithClip;
     // Mara is on screen: the clip speaks the line itself, so it matches her lips.
-    expect(started.clip).toMatchObject({ silent: false, voiceApart: false, durationSeconds: 4 });
+    expect(started.clip).toMatchObject({ silent: false, voiceApart: false, durationSeconds: 6 });
     expect(provider.videoRequests[0]).toMatchObject({
-      durationSeconds: 4,
+      durationSeconds: 6,
       resolution: '720p',
       audio: true,
       prompt: expect.stringContaining('"Tomas! Get away from the rail!"') as string,
