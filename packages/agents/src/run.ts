@@ -41,6 +41,7 @@ export type AgentRunStatus =
   | 'completed'
   /** The agent stopped because something it needs is waiting for the user's approval. */
   | 'awaiting-approval'
+  /** The agent used every step it had; it was asked to sum up what is done and what is left. */
   | 'step-limit'
   | 'budget-exhausted'
   | 'cancelled'
@@ -49,7 +50,11 @@ export type AgentRunStatus =
 
 export interface AgentRunResult {
   readonly status: AgentRunStatus;
-  /** The agent's last message to the user, if it wrote one. */
+  /**
+   * The agent's last message to the user. A run that stops at its step limit
+   * or budget still ends with a summary: the agent's own when it gave one,
+   * else one made from what it ran and what waits for approval.
+   */
   readonly finalText: string | null;
   readonly steps: number;
   readonly costUsd: number;
@@ -112,6 +117,8 @@ export type AgentStep =
     };
 
 const DEFAULT_MAX_STEPS = 20;
+/** From this many steps left, the agent is told how many it has, so it can finish in time. */
+const WARN_STEPS_LEFT = 3;
 /** Tool results longer than this are not carried into the next run. */
 const KEPT_RESULT_CHARS = 1200;
 const TRIMMED_RESULT = JSON.stringify({
@@ -147,12 +154,67 @@ function systemPrompt(
       : []),
     'If a tool reports that it needs approval, do not call it again; finish and say what is waiting.',
     'If a tool result says it is retryable, call it once more. If it fails again, stop and say what failed.',
-    'When the task is done, reply with a short summary of what you did.',
+    'Each reply that calls tools is one step, and a run has a limited number of them. Put calls that do not depend on each other into the same reply.',
+    'Do what the task asks and nothing beside it. Once it is saved, check it once at most, then stop calling tools and reply with a short summary: what you did, what waits for approval, and what is left, if anything. Do not read again what you have just read or saved.',
     ...(language === DEFAULT_LANGUAGE
       ? []
       : [
           `The person uses Imp in ${english}: its buttons, stages and guide are in ${english}. Write every reply to them in natural ${english}, whatever language the guide or the tools use, and name buttons and stages as the ${english} interface shows them. Tool inputs, command ids and setting keys stay as the tools define them. Write film content (scripts, dialogue, prompts) in the language the person asks for; when they do not say, follow the project's existing content.`,
         ]),
+  ].join('\n\n');
+}
+
+/**
+ * A note for the model about its remaining steps. It goes only into the
+ * request, never into the conversation, so the chat shows nothing the person
+ * did not write and a later run is not told about an old limit.
+ */
+function stepsNote(left: number): ChatMessage {
+  return left === 0
+    ? {
+        role: 'user',
+        content:
+          'This is the last step of this run: you cannot call tools now. Reply to the person with a short summary: what you did and saved, what waits for their approval, and what is still left to do. They can let you continue.',
+      }
+    : {
+        role: 'user',
+        content: `${String(left)} step${left === 1 ? '' : 's'} left in this run, then you must stop. Do what is left in as few steps as you can, and do not check again what is already saved. If the task is done, reply with your summary now.`,
+      };
+}
+
+/** A summary of a run that stopped without one of its own, from what it did. */
+function fallbackSummary(
+  language: Language,
+  status: 'step-limit' | 'budget-exhausted',
+  ran: ReadonlyMap<string, number>,
+  pending: readonly PendingApproval[],
+): string {
+  const de = language === 'de';
+  const list = (counts: ReadonlyMap<string, number>): string =>
+    [...counts].map(([id, count]) => (count > 1 ? `${id} ×${String(count)}` : id)).join(', ');
+  const waiting = new Map<string, number>();
+  for (const { commandId } of pending) waiting.set(commandId, (waiting.get(commandId) ?? 0) + 1);
+  const why =
+    status === 'step-limit'
+      ? de
+        ? 'Ich habe alle Schritte dieses Laufs verbraucht, ohne eine Zusammenfassung zu schreiben.'
+        : 'I used every step of this run without writing a summary.'
+      : de
+        ? 'Das Budget für einen Lauf ist aufgebraucht.'
+        : 'The budget for one run is used up.';
+  return [
+    why,
+    ran.size === 0
+      ? de
+        ? 'Ausgeführt habe ich nichts.'
+        : 'I ran nothing.'
+      : `${de ? 'Ausgeführt' : 'What I ran'}: ${list(ran)}.`,
+    ...(waiting.size === 0
+      ? []
+      : [`${de ? 'Wartet auf deine Freigabe' : 'Waiting for your approval'}: ${list(waiting)}.`]),
+    de
+      ? 'Du kannst mich dort weitermachen lassen, wo ich aufgehört habe.'
+      : 'Continue picks up where I stopped.',
   ].join('\n\n');
 }
 
@@ -216,13 +278,14 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     ...toToolDefinitions(inScope.filter((command) => isDirect(command, role.direct))),
     ...(hidden.length > 0 ? discoveryTools : []),
   ];
+  const language = options.language ?? DEFAULT_LANGUAGE;
   const system: ChatMessage = {
     role: 'system',
     content: systemPrompt(
       member,
       role,
       hidden.length > 0 ? describeGroups(hidden) : null,
-      options.language ?? DEFAULT_LANGUAGE,
+      language,
     ),
     cache: true,
   };
@@ -241,10 +304,16 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
   let costUsd = 0;
   let steps = 0;
   let finalText: string | null = null;
+  /** The commands that ran, with how often, for a summary when the agent leaves none. */
+  const ran = new Map<string, number>();
 
   const finish = (status: AgentRunStatus, error: string | null = null): AgentRunResult => ({
     status,
-    finalText,
+    finalText:
+      (finalText === null || finalText.trim() === '') &&
+      (status === 'step-limit' || status === 'budget-exhausted')
+        ? fallbackSummary(language, status, ran, pendingApprovals)
+        : finalText,
     steps,
     costUsd,
     usage,
@@ -300,6 +369,7 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
         });
       }
       options.onCommand?.(commandId);
+      ran.set(commandId, (ran.get(commandId) ?? 0) + 1);
       const content = JSON.stringify({ status: 'ok', output: result.output });
       const attachments = attachmentsOf(result.output);
       if (attachments.length === 0) return content;
@@ -354,13 +424,22 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
 
     steps += 1;
     await options.onStep?.({ kind: 'thinking', steps, costUsd });
+    const left = maxSteps - steps;
+    // The last step of a run with more than one is for the summary, so that a run that runs
+    // out of steps still says what it did and what is left instead of stopping mid-work.
+    const last = left === 0 && maxSteps > 1;
     let response;
     try {
       response = await provider.chat(
         {
           model: member.model,
-          messages: [system, ...withCacheMark(messages)],
+          messages: [
+            system,
+            ...withCacheMark(messages),
+            ...(last || left <= WARN_STEPS_LEFT ? [stepsNote(left)] : []),
+          ],
           tools,
+          ...(last ? { toolChoice: 'none' as const } : {}),
           ...(member.webSearch ? { webSearch: true } : {}),
           ...(media.size > 0 ? { media } : {}),
         },
@@ -376,6 +455,15 @@ export async function runAgent(options: AgentRunOptions): Promise<AgentRunResult
     usage.promptTokens += response.usage.promptTokens;
     usage.cachedPromptTokens += response.usage.cachedPromptTokens;
     usage.completionTokens += response.usage.completionTokens;
+
+    if (last) {
+      // Calls made in spite of the request are dropped unrun: an unanswered call would break
+      // the conversation for the next run.
+      messages.push({ role: 'assistant', content: response.content });
+      finalText = response.content;
+      await options.onProgress?.(messages);
+      return finish('step-limit');
+    }
     messages.push({
       role: 'assistant',
       content: response.content,

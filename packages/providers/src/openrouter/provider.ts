@@ -57,8 +57,9 @@ export interface OpenRouterOptions {
   readonly appName?: string;
   /**
    * How long a chat answer may take before it counts as lost, so that a
-   * connection that hangs ends in an error that can be retried. Five minutes
-   * by default: long answers from thinking models take a few.
+   * connection that hangs ends in an error that can be retried. Ten minutes
+   * by default: thinking models such as z-ai/glm-5.3 were seen to think for a
+   * minute and a half before a few reads, and longer before a whole script.
    */
   readonly chatTimeoutMs?: number;
   /**
@@ -111,7 +112,7 @@ function causeText(cause: unknown): string {
   return said === '' ? '' : ` (${said})`;
 }
 
-const DEFAULT_CHAT_TIMEOUT_MS = 5 * 60_000;
+const DEFAULT_CHAT_TIMEOUT_MS = 10 * 60_000;
 
 const KNOWN_MODALITIES: ReadonlySet<string> = new Set(MODALITIES);
 
@@ -668,6 +669,9 @@ export function createOpenRouterProvider(options: OpenRouterOptions): Generation
         messages: toWireMessages(request.messages, request.media),
         usage: { include: true },
         ...(tools.length > 0 ? { tools } : {}),
+        ...(tools.length > 0 && request.toolChoice !== undefined
+          ? { tool_choice: request.toolChoice }
+          : {}),
         ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
         ...(request.maxOutputTokens === undefined ? {} : { max_tokens: request.maxOutputTokens }),
       };

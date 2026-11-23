@@ -383,6 +383,10 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     return { member, role };
   }
 
+  /** What a run that stopped at its step limit is told when it is continued. */
+  const CONTINUE_AFTER_LIMIT =
+    'Continue the task from where you stopped. Your summary above says what is left.';
+
   const ask = defineCommand({
     id: 'crew.ask',
     title: 'Give an agent a task',
@@ -436,9 +440,12 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           `${member.name} is waiting for a decision on what it asked for.`,
         );
       }
-      // A run that was cut off ends on the task or on results the model has not seen yet.
+      // A run that was cut off ends on the task or on results the model has not seen yet. A run
+      // that used all its steps ends on its summary instead, and is told to go on.
       const last = before.messages.at(-1)?.role;
-      if (input.task === undefined && last !== 'user' && last !== 'tool') {
+      const afterLimit =
+        input.task === undefined && last === 'assistant' && before.lastStatus === 'step-limit';
+      if (input.task === undefined && !afterLimit && last !== 'user' && last !== 'tool') {
         throw new CommandError(
           'invalid_input',
           'crew.ask',
@@ -514,7 +521,11 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           },
           history: toChatMessages(before.messages),
           maxSteps: input.maxSteps,
-          ...(input.task === undefined ? {} : { task: input.task }),
+          ...(input.task !== undefined
+            ? { task: input.task }
+            : afterLimit
+              ? { task: CONTINUE_AFTER_LIMIT }
+              : {}),
           ...(runContext === undefined ? {} : { context: runContext }),
           onProgress: async (messages) => {
             conversation = { ...conversation, messages: toStored(messages) };

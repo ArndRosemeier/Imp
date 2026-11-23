@@ -170,6 +170,22 @@ describe('OpenRouter provider: credentials', () => {
 });
 
 describe('OpenRouter provider: chat', () => {
+  it('asks for an answer without tool calls only when there are tools', async () => {
+    const tool = {
+      type: 'function' as const,
+      function: { name: 'settings__get', description: 'Reads.', parameters: { type: 'object' } },
+    };
+    const { provider, calls } = setup(
+      completion({ content: 'done' }),
+      completion({ content: 'done' }),
+    );
+    const messages = [{ role: 'user' as const, content: 'Sum up.' }];
+    await provider.chat({ model: 'vendor/model-a', messages, tools: [tool], toolChoice: 'none' });
+    await provider.chat({ model: 'vendor/model-a', messages, toolChoice: 'none' });
+    expect(JSON.parse(calls[0]?.request.body ?? '')).toMatchObject({ tool_choice: 'none' });
+    expect(JSON.parse(calls[1]?.request.body ?? '')).not.toHaveProperty('tool_choice');
+  });
+
   it('sends the conversation and tools in wire format with the key', async () => {
     const { provider, calls } = setup(completion({ content: 'done' }));
     const signal = { aborted: false };
