@@ -997,6 +997,21 @@ function ShotJoinField({
         placeholder={t('On her look to the door; as he sits down; after the line')}
         onCommit={(cutReason) => change({ cutReason })}
       />
+      <label
+        className="choice"
+        title={t(
+          'A shot the film rests on, such as a turn, a reveal or the last image. It gets a second take, and the better one is kept. Keep it to a few shots: each costs a clip more.',
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={shot.keyShot}
+          onChange={(event) => {
+            void change({ keyShot: event.target.checked });
+          }}
+        />
+        {t('Key shot: two takes')}
+      </label>
     </div>
   );
 }

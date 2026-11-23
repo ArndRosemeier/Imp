@@ -475,6 +475,7 @@ export function createShotCommands(
         lengthReason: fields.lengthReason ?? '',
         join: fields.join ?? 'cut',
         cutReason: fields.cutReason ?? '',
+        keyShot: fields.keyShot ?? false,
         dialogue: null,
         frames: [],
         frameId: null,
@@ -524,6 +525,7 @@ export function createShotCommands(
         lengthReason: changes.lengthReason ?? shot.lengthReason,
         join: changes.join ?? shot.join,
         cutReason: changes.cutReason ?? shot.cutReason,
+        keyShot: changes.keyShot ?? shot.keyShot,
       };
       await requireShotSetting(runtime.store, 'movie.shot.update', projectId, next);
       await runtime.store.batch([{ type: 'put', key, value: next }]);

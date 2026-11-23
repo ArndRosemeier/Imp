@@ -25,8 +25,20 @@ describe('App: what agents can change, people can change', () => {
     ).toEqual({ durationSeconds: 6, aspectRatio: '9:16', audio: false, startFrame: false });
     expect(exportOptionInput(DEFAULT_EXPORT_OPTIONS)).toEqual({});
     expect(
-      exportOptionInput({ resolution: '1080p', fps: 25, label: ' rough-cut-2 ', subtitles: false }),
-    ).toEqual({ resolution: '1080p', fps: 25, label: 'rough-cut-2', subtitles: false });
+      exportOptionInput({
+        resolution: '1080p',
+        fps: 25,
+        label: ' rough-cut-2 ',
+        subtitles: false,
+        loudness: 'broadcast',
+      }),
+    ).toEqual({
+      resolution: '1080p',
+      fps: 25,
+      label: 'rough-cut-2',
+      subtitles: false,
+      loudness: 'broadcast',
+    });
   });
 
   it('makes a silent, upright clip when the person asks for one', async () => {

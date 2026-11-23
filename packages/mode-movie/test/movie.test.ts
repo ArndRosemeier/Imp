@@ -711,6 +711,7 @@ describe('shots and clips', () => {
       lengthReason: '',
       join: 'cut',
       cutReason: '',
+      keyShot: false,
       dialogue: null,
       frames: [],
       frameId: null,

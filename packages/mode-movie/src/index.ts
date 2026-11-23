@@ -228,6 +228,8 @@ export {
 } from './script.js';
 export { movieStageOf, movieWork } from './work.js';
 export {
+  fineCutCheckpoint,
+  fineCutForFinishing,
   firstCutCheckpoint,
   movieCheckpoints,
   storyboardCheckpoint,

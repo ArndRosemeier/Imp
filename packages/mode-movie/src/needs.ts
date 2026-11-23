@@ -114,10 +114,19 @@ export const firstCutCheckpoint: Checkpoint = {
   per: { name: 'scene', plural: 'scenes' },
 };
 
+export const fineCutCheckpoint: Checkpoint = {
+  id: 'fine-cut',
+  name: 'Fine cut',
+  description:
+    'The whole film after a rhythm pass over all its scenes: how long each runs, how the pace changes, how one scene hands over to the next. Finishing waits for it: the look of the whole film and the end credits.',
+  stage: 'edit',
+};
+
 export const movieCheckpoints: readonly Checkpoint[] = [
   treatmentCheckpoint,
   storyboardCheckpoint,
   firstCutCheckpoint,
+  fineCutCheckpoint,
 ];
 
 const sceneOf = inputField('sceneId');
@@ -161,6 +170,12 @@ export const firstCutForSound = checkpointNeed(
   ['movie.sound.generate'],
   sceneOf,
 );
+
+/** Finishing the film, its one look and its credits, waits for the fine cut. */
+export const fineCutForFinishing = checkpointNeed(fineCutCheckpoint, [
+  'movie.edit.look.set',
+  'movie.edit.credits.generate',
+]);
 
 /** The look of the film in words, before any portrait or key frame is drawn. */
 export const lookNeed: Need = {

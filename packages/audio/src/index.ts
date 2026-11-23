@@ -25,7 +25,7 @@ export {
   type VoicePreset,
 } from './effects.js';
 export { designBiquad, responseDb, type FilterSpec, type FilterType } from './dsp/biquad.js';
-export { measureLoudness, type LoudnessReport } from './dsp/loudness.js';
+export { LoudnessMeter, measureLoudness, type LoudnessReport } from './dsp/loudness.js';
 export { audioSourcesFor, createAudioCommands, type AudioCommandOptions } from './commands.js';
 export { audioRenderKey, type AudioLink, type LengthOf } from './doc-commands.js';
 export {

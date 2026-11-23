@@ -2495,4 +2495,14 @@ export const de: Readonly<Record<string, string>> = {
   '{count} done notes': '{count} erledigte Notizen',
   '{count} open note': '{count} offene Notiz',
   '{count} open notes': '{count} offene Notizen',
+  'A shot the film rests on, such as a turn, a reveal or the last image. It gets a second take, and the better one is kept. Keep it to a few shots: each costs a clip more.':
+    'Eine Einstellung, auf der der Film ruht, etwa eine Wende, eine Enthüllung oder das letzte Bild. Sie bekommt einen zweiten Take, und der bessere wird behalten. Nur wenige Einstellungen: Jede kostet einen Clip mehr.',
+  'As mixed': 'Wie gemischt',
+  'Fine cut': 'Feinschnitt',
+  'For broadcast (-23 LUFS)': 'Für Rundfunk (-23 LUFS)',
+  'For the web (-16 LUFS)': 'Fürs Web (-16 LUFS)',
+  'Key shot: two takes': 'Schlüsseleinstellung: zwei Takes',
+  'The look of the whole film and the end credits wait until you sign off the fine cut.':
+    'Der Look des ganzen Films und der Abspann warten, bis du den Feinschnitt freigibst.',
+  "The person's sign-off of the fine cut": 'Deine Freigabe des Feinschnitts',
 };

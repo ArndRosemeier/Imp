@@ -5,7 +5,7 @@ import { CommandRegistry, createProjectCommands } from '@imp/core';
 import { createTestRuntime } from '@imp/core/testing';
 import { createFakeProvider } from '@imp/providers/testing';
 import { describe, expect, it } from 'vitest';
-import { createMovieMode, critic } from '../src/index.js';
+import { createMovieMode, critic, filmEditor } from '../src/index.js';
 
 const user = { kind: 'user', id: 'arnd' } as const;
 const reader = { kind: 'agent', id: 'm1', role: 'critic' } as const;
@@ -63,5 +63,29 @@ describe('script notes', () => {
   it('are what the critic writes before there are clips', () => {
     expect(critic.scope.writes).toContain('movie.script.note.');
     expect(critic.needs?.map((need) => need.id)).toEqual(['scenes']);
+  });
+});
+
+describe('finishing a film', () => {
+  it('holds the look of the whole film and the credits for the fine cut', () => {
+    const fineCut = filmEditor.needs?.find((need) => need.id === 'checkpoint:fine-cut');
+    expect(fineCut?.byPerson).toBe(true);
+    expect(fineCut?.before).toEqual(['movie.edit.look.set', 'movie.edit.credits.generate']);
+  });
+
+  it('keeps a shot marked as a key shot', async () => {
+    const { run, projectId, sceneId } = await setup();
+    const shot = await run('movie.shot.create', { projectId, sceneId, description: 'Wide.' });
+    expect(shot.keyShot).toBe(false);
+    const changed = await run('movie.shot.update', {
+      projectId,
+      sceneId,
+      shotId: shot.id,
+      keyShot: true,
+    });
+    expect(changed.keyShot).toBe(true);
+    expect((await run('movie.shot.update', { projectId, sceneId, shotId: shot.id })).keyShot).toBe(
+      true,
+    );
   });
 });

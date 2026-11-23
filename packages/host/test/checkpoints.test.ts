@@ -66,7 +66,7 @@ describe('checkpoints', () => {
     return { imp, fake, store, run, projectId, tool, ask };
   }
 
-  it('lists the three checkpoints of a film, stopping at each by default', async () => {
+  it('lists the four checkpoints of a film, stopping at each by default', async () => {
     const { run, projectId } = await setUp();
     const listed = await run<Checkpoints>('project.checkpoint.list', { projectId });
     expect(listed.style).toBe('each');
@@ -74,6 +74,7 @@ describe('checkpoints', () => {
       ['treatment', true],
       ['storyboard', true],
       ['first-cut', true],
+      ['fine-cut', true],
     ]);
   });
 
@@ -152,7 +153,12 @@ describe('checkpoints', () => {
     const { run, projectId, tool, ask } = await setUp();
     await run('project.checkpoint.style', { projectId, style: 'main' });
     const listed = await run<Checkpoints>('project.checkpoint.list', { projectId });
-    expect(listed.checkpoints.map((checkpoint) => checkpoint.stops)).toEqual([false, true, false]);
+    expect(listed.checkpoints.map((checkpoint) => checkpoint.stops)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
     await ask('casting-director', [
       tool('a', 'movie.character.create', { projectId, name: 'Mara', appearance: 'Sixties.' }),
     ]);

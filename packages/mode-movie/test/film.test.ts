@@ -202,7 +202,11 @@ describe('exporting a film', () => {
       volume: 0.5,
     });
 
-    const film = (await run('movie.edit.export', { projectId }, editor)) as FilmExport;
+    const film = (await run(
+      'movie.edit.export',
+      { projectId, loudness: 'off' },
+      editor,
+    )) as FilmExport;
 
     expect(fake.seen.job?.plan).toMatchObject({
       durationSeconds: 9,
@@ -254,6 +258,24 @@ describe('exporting a film', () => {
     };
     expect(listed.canRender).toBe(true);
     expect(listed.exports.map((entry) => entry.id)).toEqual([film.id]);
+    expect(film.loudnessLufs).toBeNull();
+
+    // Finished for the web, the whole film is levelled at one gain: as loud as -16 LUFS asks,
+    // but never so loud that its loudest moment comes within 1 dB of clipping.
+    const online = (await run('movie.edit.export', { projectId })) as FilmExport;
+    const level = sample(fake.seen.left, 6.5) ?? 0;
+    expect(level).toBeGreaterThan(0.25);
+    expect(level).toBeLessThanOrEqual(10 ** (-1 / 20) + 1e-6);
+    expect(sample(fake.seen.left, 5.5)).toBe(0);
+    expect(online.loudnessLufs).not.toBeNull();
+    expect(online.loudnessLufs ?? 0).toBeLessThanOrEqual(-16);
+    const broadcast = (await run('movie.edit.export', {
+      projectId,
+      loudness: 'broadcast',
+    })) as FilmExport;
+    // This wind is peaky: the peak ceiling holds it under both targets.
+    expect(broadcast.loudnessLufs ?? 0).toBeLessThanOrEqual(-23);
+    expect(sample(fake.seen.left, 6.5)).toBeLessThanOrEqual(level);
   });
 
   it('plans dissolves, wipes and dips between the pictures', async () => {
@@ -326,7 +348,7 @@ describe('exporting a film', () => {
         },
       },
     ]);
-    await run('movie.edit.export', { projectId, sceneIds: [second] });
+    await run('movie.edit.export', { projectId, sceneIds: [second], loudness: 'off' });
     // A 0.5 level held under -12 dB (0.25) by the limiter.
     expect(sample(fake.seen.left, 0.8)).toBeLessThan(0.27);
     expect(sample(fake.seen.left, 0.8)).toBeGreaterThan(0.2);
