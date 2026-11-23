@@ -301,4 +301,44 @@ describe('spending without asking', () => {
       output: { step: 0.1, project: 2, projectSpentUsd: 0, projectLeftUsd: 2 },
     });
   });
+
+  it('refuses a step that cannot run instead of asking, whatever the budget', async () => {
+    // Arnd's live run (2026-11-23): no picture model was chosen, so portraits had no price and
+    // went to approval, where approving them would only have failed.
+    const { runtime, registry, asAgent, asUser } = allowanceSetup();
+    const draw = defineCommand({
+      id: 'media.draw',
+      title: 'Draw',
+      description: 'A stand-in for a generation that uses the chosen picture model.',
+      effect: 'spend',
+      input: z.object({ model: z.string().optional() }),
+      output: z.object({ ok: z.boolean() }),
+      estimate: async ({ runtime: { store } }, input) => {
+        const chosen = await store.get('settings/images.model');
+        return {
+          kind: 'image',
+          model: input.model ?? (typeof chosen === 'string' ? chosen : null),
+        };
+      },
+      handler: () => Promise.resolve({ ok: true }),
+    });
+    registry.register(draw);
+    await expect(asAgent('media.draw', {})).rejects.toThrow(
+      /No image model is chosen.*"images\.model"/,
+    );
+    // Also with no budget, where everything else is put to the person.
+    expect(await asUser('spend.allowance.set', { project: 0 })).toBe('ok');
+    await expect(asAgent('media.draw', {})).rejects.toMatchObject({ code: 'invalid_input' });
+    expect(await asAgent('media.draw', { model: 'vendor/painter' })).toBe('needs-approval');
+    // Once a model is chosen, it runs within the budget unasked.
+    expect(await asUser('spend.allowance.set', { project: 1 })).toBe('ok');
+    await runtime.store.batch([
+      { type: 'put', key: 'settings/images.model', value: 'vendor/painter' },
+    ]);
+    expect(await asAgent('media.draw', {})).toBe('ok');
+    // Input that does not fit is refused at once as well, not asked about.
+    await expect(asAgent('media.paint', { prompt: 7 })).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+  });
 });

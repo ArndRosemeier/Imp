@@ -1,4 +1,5 @@
 import {
+  CommandError,
   CostRequest,
   CURRENT_PROJECT_SETTING,
   defineCommand,
@@ -370,6 +371,17 @@ function cachedCatalog(provider: GenerationProvider): () => Promise<readonly Mod
   };
 }
 
+/** The setting that names the model for each kind of work. */
+const MODEL_SETTINGS: Readonly<Record<SpendKind, string>> = {
+  chat: 'coordinator.model',
+  image: 'images.model',
+  speech: 'speech.model',
+  sound: 'sounds.model',
+  music: 'music.model',
+  video: 'video.model',
+  transcription: 'transcription.model',
+};
+
 /** Optional: the most one step may cost without asking, in US dollars. 0 sets no such limit. */
 export const ALLOWANCE_STEP_SETTING = 'spend.allowance.step';
 /** The budget: what agents may spend on one project without asking, in US dollars. 0 always asks. */
@@ -411,11 +423,22 @@ export function createSpendAllowance(provider: GenerationProvider): AutoApproval
     if (context.actor.kind !== 'agent' || command.effect !== 'spend') return false;
     if (command.estimate === undefined) return false;
     const { store } = context.runtime;
-    const allowance = await readAllowance(store);
-    if (allowance.project <= 0) return false;
+    // Priced first, whatever the budget: a step that cannot run is refused now (the estimate
+    // throws, or no model is chosen), instead of being put to the person and failing after.
     const request = await command.estimate(context, rawInput);
     if (request === null) return false;
     const parsed = CostRequest.parse(request);
+    if (parsed.model === null && parsed.kind !== 'chat') {
+      const setting = MODEL_SETTINGS[parsed.kind];
+      throw new CommandError(
+        'invalid_input',
+        command.id,
+        `No ${parsed.kind} model is chosen, so this cannot run. Set the setting "${setting}" to a model id from models.list, or pass a model.`,
+        { details: [`settings.set: key "${setting}", value a model id from models.list`] },
+      );
+    }
+    const allowance = await readAllowance(store);
+    if (allowance.project <= 0) return false;
     const estimate = await priceRequest(parsed, { store, models });
     // An agent run without a history to go by is priced as a typical short run.
     const expected =
@@ -506,16 +529,7 @@ export function createSpendCommands(options: {
     }),
     output: z.object({ estimate: Estimate }),
     handler: async ({ runtime }, request) => {
-      const setting: Readonly<Record<SpendKind, string>> = {
-        chat: 'coordinator.model',
-        image: 'images.model',
-        speech: 'speech.model',
-        sound: 'sounds.model',
-        music: 'music.model',
-        video: 'video.model',
-        transcription: 'transcription.model',
-      };
-      const set = await runtime.store.get(`settings/${setting[request.kind]}`);
+      const set = await runtime.store.get(`settings/${MODEL_SETTINGS[request.kind]}`);
       const model = request.model ?? (typeof set === 'string' && set !== '' ? set : null);
       return {
         estimate: await priceRequest({ ...request, model }, { store: runtime.store, models }),
