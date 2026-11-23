@@ -85,6 +85,16 @@ export const Item = z.object({
   state: ItemState,
   /** A pickup waiting for its clip, standing in the cut as a slate. */
   placeholder: z.boolean().default(false),
+  /** A shot with no clip yet, standing in as its key frame: the animatic. */
+  still: z
+    .object({
+      blobKey: z.string(),
+      mediaType: z.string(),
+      line: z.string(),
+      speakerId: z.string().nullable(),
+    })
+    .nullable()
+    .default(null),
   pickupReason: z.string().nullable().default(null),
   plannedSeconds: z.number().nullable().default(null),
   lengthReason: z.string().default(''),
@@ -348,6 +358,7 @@ export function blobKeys(source: Source, cut: Cut): string[] {
     ...cut.lines.map((line) => line.take?.blobKey),
     ...cut.sounds.map((placement) => placement.playKey),
     ...cut.lines.map((line) => line.playKey),
+    ...cut.items.map((item) => item.still?.blobKey),
   ].filter((key): key is string => typeof key === 'string');
 }
 
@@ -363,6 +374,8 @@ export interface Look {
   screens?: readonly [ScreenLook, ScreenLook];
   /** White laid over the picture in a dip to white, 0 to 1. */
   white?: number;
+  /** The key frame on screen for a shot with no clip yet, with its line and how bright it shows. */
+  still?: { readonly url: string; readonly line: string; readonly level: number } | undefined;
 }
 
 /** How one of the two preview screens shows. */
@@ -590,6 +603,7 @@ export class CutPlayer {
     const screens: [ScreenLook, ScreenLook] = [HIDDEN, HIDDEN];
     let card: Item | undefined;
     let cardLevel = 0;
+    let still: Look['still'];
     let white = 0;
     for (const slot of [0, 1] as const) {
       const shown = showing.find((candidate) => candidate.slot === slot);
@@ -617,6 +631,17 @@ export class CutPlayer {
       );
       white = Math.max(white, shade.white * share);
       const wiping = isFront && share < 1 && item.transition === 'wipe';
+      if (item.still !== null) {
+        // A shot with no clip yet shows its key frame for its planned length: the animatic.
+        this.screens[slot]?.pause();
+        this.voices[slot]?.pause();
+        this.#itemIds[slot] = item.itemId;
+        const url = urls.get(item.still.blobKey);
+        if (url !== undefined && (isFront || still === undefined)) {
+          still = { url, line: item.still.line, level: (1 - shade.black) * share };
+        }
+        continue;
+      }
       if (item.kind === 'title' || item.placeholder) {
         this.screens[slot]?.pause();
         this.voices[slot]?.pause();
@@ -643,12 +668,18 @@ export class CutPlayer {
     }
     const top = screens.find((screen) => screen.front && screen.opacity > 0);
     this.notify.look({
-      brightness: card !== undefined ? cardLevel : (top ?? screens[0]).opacity,
+      brightness:
+        card !== undefined
+          ? cardLevel
+          : top === undefined && still !== undefined
+            ? still.level
+            : (top ?? screens[0]).opacity,
       title: card === undefined ? '' : cardText(card),
       card: card !== undefined && (front?.item === card || showing.length === 1),
       zoom: top?.zoom ?? screens[0].zoom,
       screens,
       white,
+      still,
     });
     const lane = [
       ...cut.sounds.map((placement) => ({ placement, key: placementKey(placement, source) })),

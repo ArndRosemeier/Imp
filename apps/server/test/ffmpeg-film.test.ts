@@ -220,6 +220,60 @@ describe('rendering a film with ffmpeg', () => {
   );
 
   it.skipIf(!installed)(
+    'shows stills, such as the key frames of an animatic, at the size of the picture',
+    async () => {
+      const png = join(folder, 'green.png');
+      execFileSync('ffmpeg', [
+        '-v',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'color=c=green:s=640x360',
+        '-frames:v',
+        '1',
+        '-y',
+        png,
+      ]);
+      const green = new Uint8Array(readFileSync(png));
+      const written: Buffer[] = [];
+      const rendered = await createFfmpegFilmRenderer({ installed: true, font }).render({
+        plan: {
+          durationSeconds: 2,
+          height: null,
+          fps: null,
+          pictures: [
+            {
+              kind: 'still',
+              startSeconds: 0,
+              durationSeconds: 2,
+              blobKey: 'green',
+              fadeInSeconds: 0,
+              fadeOutSeconds: 0,
+            },
+          ],
+        },
+        clip: (key) => Promise.resolve(key === 'green' ? green : undefined),
+        mix: (_start, frames) =>
+          Promise.resolve([new Float32Array(frames), new Float32Array(frames)] as const),
+        write: (data) => {
+          written.push(Buffer.from(data));
+          return Promise.resolve();
+        },
+        progress: () => undefined,
+        cancelled: () => false,
+      });
+      expect(rendered).toMatchObject({ width: 640, height: 360 });
+      const file = join(folder, 'still.mp4');
+      writeFileSync(file, Buffer.concat(written));
+      const [r, g, b] = colourAt(file, 1);
+      expect(g).toBeGreaterThan(90);
+      expect(r + b).toBeLessThan(60);
+    },
+    60_000,
+  );
+
+  it.skipIf(!installed)(
     'plays pieces backwards, wipes, punches in, grades, dips and shows title cards',
     async () => {
       // Red for its first second, blue for its second.

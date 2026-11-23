@@ -29,6 +29,7 @@ import { ShotPlace, useWorld } from './place.js';
 import { moviePrefix, Problem, useAct, useBlobUrl, useModelSetting, type Act } from './movie.js';
 import { ModelBar } from './model-bar.js';
 import { CheckpointBar } from './checkpoints.js';
+import { Storyboard } from './storyboard.js';
 import { formatUsd, Price } from './spend.js';
 import { useScriptLines } from './screenplay.js';
 import { EmptyState } from './help/EmptyState.js';
@@ -681,6 +682,7 @@ function ShotCard({
   return (
     <article
       ref={card}
+      data-shot-id={shot.id}
       className="card stack shot"
       aria-label={t('Shot {position}', { position: String(shot.position) })}
     >
@@ -1261,7 +1263,10 @@ export function ShotsView({ project }: { project: Project }): ReactElement {
       />
       <SceneTabs scenes={scenes} sceneId={sceneId} onSelect={setSelectedId} />
       {sceneId !== undefined && shots.length > 0 && (
-        <CheckpointBar project={project} checkpointId="storyboard" itemId={sceneId} />
+        <>
+          <Storyboard shots={shots} cast={outline.data?.cast ?? []} />
+          <CheckpointBar project={project} checkpointId="storyboard" itemId={sceneId} />
+        </>
       )}
       {elsewhere.length > 0 && (
         <div className="row wrap rendering-elsewhere">

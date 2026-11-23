@@ -217,6 +217,10 @@ export const editGuide: GuideTopic = {
 - Open a scene to see its **timeline**: pictures on one lane, sound on its own lanes, text on another.
 - Playback runs on from one scene into the next, so you can watch the film through.
 
+## The animatic
+
+Before a shot has its clip, its key frame stands in the cut as a still for as long as the shot is planned to hold, with its line under it. A scene planned in Shots therefore plays here as an **animatic**: watch it and change the order or the lengths while that costs nothing. Exporting it gives a film of stills. Each clip takes the place of its still as it is made.
+
 ## Cutting
 
 - Trim a piece by dragging its edges; split it at the playhead; drag pieces to reorder them.

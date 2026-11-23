@@ -78,6 +78,22 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
       input?.dispose();
     }
   }
+  // The stills, decoded once each: they set no size of their own unless there are no clips.
+  const stills = new Map<string, ImageBitmap>();
+  for (const key of new Set(pictures.flatMap((p) => (p.kind === 'still' ? [p.blobKey] : [])))) {
+    const bytes = await job.clip(key);
+    if (bytes === undefined) continue;
+    try {
+      stills.set(key, await createImageBitmap(new Blob([bytes as BlobPart])));
+    } catch {
+      // A picture the browser cannot read stays black, like a clip it cannot decode.
+    }
+  }
+  if (probed.length === 0) {
+    for (const still of stills.values()) {
+      probed.push({ width: still.width, height: still.height, fps: 24, seconds: 1 });
+    }
+  }
   const format = chooseFormat(probed, plan.height, plan.fps);
   const { width, height, fps } = format;
 
@@ -172,7 +188,7 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
     readonly input?: Input | undefined;
   }
   const open = async (picture: FilmPicture, first: number, end: number): Promise<Layer> => {
-    if (picture.kind === 'title') return { picture, end };
+    if (picture.kind === 'title' || picture.kind === 'still') return { picture, end };
     const bytes = unreadable.has(picture.blobKey) ? undefined : await job.clip(picture.blobKey);
     const input = bytes === undefined ? undefined : openClip(bytes);
     const track = await input?.getPrimaryVideoTrack();
@@ -228,6 +244,17 @@ async function render(job: FilmRenderJob): Promise<FilmRendered> {
         width,
         height,
       );
+    } else if (picture.kind === 'still') {
+      const still = stills.get(picture.blobKey);
+      if (still !== undefined) {
+        const at = placePicture(width, height, still.width, still.height, 1, 0.5, 0.5);
+        layer.drawImage(still, at.x, at.y, at.width, at.height);
+        if (picture.matrix !== undefined) {
+          const pixels = layer.getImageData(0, 0, width, height);
+          applyMatrix(pixels.data, picture.matrix);
+          layer.putImageData(pixels, 0, 0);
+        }
+      }
     } else {
       const next = on.frames === undefined ? undefined : await on.frames.next();
       const sample = next === undefined || next.done === true ? null : next.value;

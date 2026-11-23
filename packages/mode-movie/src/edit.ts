@@ -39,6 +39,7 @@ import {
   Shot,
   ShotJoin,
   dialogueOver,
+  type KeyFrame,
   Sound,
   SoundPlacement,
   TextItem,
@@ -156,6 +157,18 @@ export async function readCut(
   return stored === undefined ? SceneCut.parse({ sceneId }) : SceneCut.parse(stored);
 }
 
+/** How long a still stands in the animatic for a shot that has no planned length. */
+export const STILL_SECONDS = 3;
+
+/** The picture a shot without a clip shows in the animatic: its key frame, or its end frame. */
+export function stillOf(shot: Shot): KeyFrame | null {
+  return (
+    shot.frames.find((frame) => frame.id === shot.frameId) ??
+    shot.endFrames.find((frame) => frame.id === shot.endFrameId) ??
+    null
+  );
+}
+
 /** How long a shot is planned to hold, rounded for reading; null when nobody said. */
 export function plannedFor(shot: Shot): number | null {
   const planned = plannedShotSeconds(shot, shot.clip?.voiceApart ?? false);
@@ -179,6 +192,8 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
   };
   // First how long each piece is, then where it falls: a dissolve or wipe overlaps the one before.
   const pieces = [];
+  // The still a continuing shot without a frame of its own holds, in the animatic.
+  let lastStill: KeyFrame | null = null;
   for (const item of items) {
     const shot =
       item.kind === 'shot'
@@ -195,15 +210,34 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
     const ready = item.kind === 'shot' && shot?.clip?.status === 'ready';
     // A pickup without its clip stands in as a slate of its planned length.
     const slate = item.kind === 'shot' && !ready ? (shot?.pickup?.seconds ?? 0) : 0;
+    // A shot with a key frame and no clip yet stands in as that still for its planned
+    // length: the cut plays as an animatic before any clip is paid for.
+    const still: KeyFrame | null =
+      item.kind === 'shot' && !ready && shot?.pickup === null
+        ? (stillOf(shot) ?? (shot.join === 'continues' ? lastStill : null))
+        : null;
+    if (item.kind === 'shot' && shot !== undefined) {
+      lastStill = ready ? null : (still ?? lastStill);
+    }
+    const stillSeconds =
+      still === null || shot === undefined
+        ? 0
+        : (plannedShotSeconds(shot, false) ?? STILL_SECONDS) / item.speed + item.holdSeconds;
     const duration =
-      item.kind === 'title' ? item.titleSeconds : ready ? pieceSeconds(timing) : slate;
-    pieces.push({ item, shot, timing, ready, duration: round(duration) });
+      item.kind === 'title'
+        ? item.titleSeconds
+        : ready
+          ? pieceSeconds(timing)
+          : slate > 0
+            ? slate
+            : stillSeconds;
+    pieces.push({ item, shot, timing, ready, still, duration: round(duration) });
   }
   let at = 0;
   let end = 0;
   let before = 0;
   const laid = [];
-  for (const [index, { item, shot, timing, ready, duration }] of pieces.entries()) {
+  for (const [index, { item, shot, timing, ready, still, duration }] of pieces.entries()) {
     const state: ItemState = item.kind === 'title' ? 'ready' : stateOf(shot);
     const overlap =
       index === 0 ? 0 : overlapSeconds(item.transition, item.transitionSeconds, before, duration);
@@ -218,7 +252,16 @@ async function layOut(store: KeyValueStore, projectId: string, items: readonly C
       shotId: item.shotId,
       label: item.kind === 'title' ? item.text : (shot?.description ?? ''),
       state,
-      placeholder: item.kind === 'shot' && !ready && duration > 0,
+      placeholder: item.kind === 'shot' && !ready && duration > 0 && still === null,
+      still:
+        still === null || shot === undefined
+          ? null
+          : {
+              blobKey: still.blobKey,
+              mediaType: still.mediaType,
+              line: shot.line.trim(),
+              speakerId: shot.speakerId,
+            },
       pickupReason: shot?.pickup?.reason ?? null,
       plannedSeconds: item.kind === 'shot' && shot !== undefined ? plannedFor(shot) : null,
       lengthReason: item.kind === 'shot' ? (shot?.lengthReason ?? '') : '',
@@ -328,6 +371,19 @@ export const LaidItem = z.object({
   state: ItemState,
   /** A pickup waiting for its clip, standing in the cut as a slate of its planned length. */
   placeholder: z.boolean(),
+  /**
+   * A shot with no clip yet, standing in the cut as its key frame for its planned length,
+   * so that the scene plays as an animatic; with the line it has, to show as a caption.
+   */
+  still: z
+    .object({
+      blobKey: z.string(),
+      mediaType: z.string(),
+      line: z.string(),
+      speakerId: z.string().nullable(),
+    })
+    .nullable()
+    .default(null),
   /** Why the shot was asked for, when it is a pickup. */
   pickupReason: z.string().nullable(),
   /** How long the shot is planned to hold in the cut, never shorter than its line; null when nobody said. */
