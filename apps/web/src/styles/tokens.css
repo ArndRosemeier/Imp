@@ -31,6 +31,9 @@
   --track-1: #5fb8b0;
   --track-2: #d98a9a;
   --track-3: #a9bf7a;
+  /* The chat for all projects (the Imp coordinator) has a colour of its own; a project's is amber. */
+  --scope-all: #6fc2d0;
+  --scope-all-wash: rgb(111 194 208 / 0.1);
 
   --radius-s: 8px;
   --radius-m: 12px;
@@ -71,6 +74,8 @@
   --track-1: #1f6f69;
   --track-2: #9b3f55;
   --track-3: #56702a;
+  --scope-all: #1b6a78;
+  --scope-all-wash: rgb(27 106 120 / 0.08);
   --shadow-overlay: 0 24px 80px rgb(60 40 10 / 0.2);
 }
 

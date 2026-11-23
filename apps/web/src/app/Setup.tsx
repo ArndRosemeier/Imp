@@ -1,4 +1,4 @@
-import { CrewMember, priceVideo } from '@imp/agents';
+import { CrewMember, GLOBAL_COORDINATOR_ROLE, priceVideo } from '@imp/agents';
 import type { ModelInfo } from '@imp/providers';
 import {
   ArrowLeftIcon,
@@ -161,6 +161,11 @@ export function Setup({ onDone }: { onDone: () => void }): ReactElement {
         await runCommand(imp, 'crew.hire', { roleId: 'coordinator', model: coordinatorModel }),
       );
       await runCommand(imp, 'settings.set', { key: 'coordinator.member', value: hired.id });
+      // The Imp coordinator looks after what concerns all projects, on the same model.
+      await runCommand(imp, 'crew.hire', {
+        roleId: GLOBAL_COORDINATOR_ROLE,
+        model: coordinatorModel,
+      });
       if (apply !== undefined) {
         // All three are kept, so switching from drafts to the final film later is one tap.
         let appliedId: string | null = null;

@@ -45,12 +45,17 @@ Auf der Seite **Projekte** erstellt **Beispielfilm öffnen** eine Kopie von „D
     area: 'workspace',
     title: 'Die Crew: Arbeiten mit KI-Agenten',
     summary:
-      'Der Koordinator, die Rollen, die du einstellen kannst, und wie du ihnen Arbeit gibst.',
+      'Die beiden Koordinatoren, die Rollen, die du einstellen kannst, und wie du ihnen Arbeit gibst.',
     body: `Imps KI-Agenten heißen die **Crew**. Jeder wird für eine Rolle eingestellt und läuft auf einem Modell deiner Wahl.
 
-## Der Koordinator
+## Die Koordinatoren
 
-Der Koordinator ist der Agent in der Leiste rechts. Sprich mit ihm wie mit einem Produzenten: Sag, was du willst, und er plant, stellt ein und verteilt die Arbeit. Er kann Optionen ändern und Dinge für dich einrichten. Die Arbeit der Crew macht er nicht selbst, deshalb genügt ihm ein Modell, das nur Text liest und schreibt.
+Die Leiste rechts hat zwei Chats, oben umschaltbar, jeder in seiner eigenen Farbe.
+
+- **Dein Projekt** (bernsteinfarben, mit dem Namen des Projekts): der **Koordinator** des Projekts. Sprich mit ihm wie mit einem Produzenten: Sag, was du willst, und er plant, stellt ein und verteilt die Arbeit in diesem Projekt.
+- **Alle Projekte** (blau): der **Imp-Koordinator**. Er kümmert sich um alles, was jedes Projekt betrifft: Optionen und Modelle, Modellmixe, gespeicherte Crews und Rollen sowie das Anlegen, Kopieren, Öffnen oder Löschen von Projekten, Vorlagen und Sicherungen. Der Startbildschirm zeigt ihn. Bitte ihn um einen Film, und er legt das Projekt an und gibt die Arbeit an dessen Koordinator weiter.
+
+Bittest du den Koordinator eines Projekts um etwas, das alle Projekte betrifft, etwa die Sprache umzustellen, gibt er es an den Imp-Koordinator weiter. In seinem Chat steht dann **An den Imp-Koordinator weitergegeben**, und der Chat des Imp-Koordinators zeigt die Bitte mit **Weitergegeben aus** und dem Namen des Projekts. Keiner von beiden macht die Arbeit der Crew selbst, deshalb genügt beiden ein Modell, das nur Text liest und schreibt; sie laufen auf dem Modell der Agenten.
 
 ## Rollen
 
@@ -80,7 +85,7 @@ Was eine Rolle sehen muss, bestimmt, welche Modelle zu ihr passen. Drehbuchautor
 
 ## Gespräche gehören zu Projekten
 
-Jedes Projekt hat sein eigenes Gespräch mit dem Koordinator und mit jedem Crewmitglied. Öffnest du ein anderes Projekt, erscheinen dessen Gespräche, und die Agenten erinnern sich nur an das, was in diesem Projekt gesagt wurde. Die Crew selbst ist in jedem Projekt dieselbe, und der Koordinator kann sich weiterhin um projektübergreifende Dinge kümmern, etwa die Bibliothek, gespeicherte Crews und deine anderen Projekte. Auf dem Startbildschirm, ohne offenes Projekt, sprechen die Agenten in einem eigenen Gespräch.
+Jedes Projekt hat sein eigenes Gespräch mit dem Koordinator und mit jedem Crewmitglied. Öffnest du ein anderes Projekt, erscheinen dessen Gespräche, und die Agenten erinnern sich nur an das, was in diesem Projekt gesagt wurde. Die Crew selbst ist in jedem Projekt dieselbe. Der Imp-Koordinator führt einen Chat für alle Projekte, egal welches Projekt offen ist.
 
 **Chat leeren** oben in einem Chat vergisst es nach einer Rückfrage für das aktuelle Projekt; andere Projekte behalten ihres. Was der Agent erstellt hat, bleibt.
 
@@ -136,7 +141,7 @@ Agenten fragen, bevor sie etwas löschen und bevor sie über das Budget ohne Rü
 - Der Reiter **Crews** verwahrt gespeicherte Crews, die du in jedes Projekt laden kannst. Eine gespeicherte Crew behält jeden Agenten mit Modell, Budget und Websuche sowie Kopien der eigenen Rollen, die sie enthält; sie lässt sich also auch laden, nachdem eine Rolle gelöscht wurde. Lade sie, um die Crew zu ersetzen oder zu ergänzen.
 - Der Reiter **Mixe** verwahrt Modellmixe: mit welchem Modell die Agenten denken und welche Modelle Bilder, Stimmen, Soundeffekte, Musik, Clips und Transkripte erstellen. Wende einen an, um alle auf einmal festzulegen; der Modell-Chip in jeder Phase tut dasselbe.
 
-Crews und Mixe gehören zum ganzen Arbeitsbereich, nicht zu einem Projekt. Agenten nutzen dieselbe Bibliothek: Bitte den Koordinator „speicher diese Crew“ oder „speicher diese Modelle als Mix“, und er erledigt es.`,
+Crews und Mixe gehören zum ganzen Arbeitsbereich, nicht zu einem Projekt. Agenten nutzen dieselbe Bibliothek: Bitte einen Koordinator „speicher diese Crew“ oder „speicher diese Modelle als Mix“, und der Imp-Koordinator erledigt es.`,
   },
   {
     id: 'projects',
@@ -164,7 +169,7 @@ Mit der Projektauswahl oben auf dem Bildschirm wechselst du von überall das off
 
 ## Wo du sie findest
 
-Auf der Seite **Projekte** unter **Alles sichern / Alles laden** und unter **Optionen**. Der Koordinator kann beides auch: Bitte ihn, alles zu sichern, und Imp bietet dir die Datei zum Aufbewahren an.
+Auf der Seite **Projekte** unter **Alles sichern / Alles laden** und unter **Optionen**. Der Imp-Koordinator kann beides auch: Bitte ihn, alles zu sichern, und Imp bietet dir die Datei zum Aufbewahren an.
 
 ## Sichern
 

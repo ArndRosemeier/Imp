@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { forgetConversations } from './conversations.js';
 import {
   ADDED_ROLE_PREFIX,
+  GLOBAL_COORDINATOR_ROLE,
   CUSTOM_ROLE_PREFIX,
   modelNeedsOf,
   modelProblem,
@@ -474,6 +475,19 @@ export function createCrewCommands(
         });
       }
       await checkModel('crew.hire', role, input.model);
+      if (role.id === GLOBAL_COORDINATOR_ROLE) {
+        const existing = (await runtime.store.list(CREW_PREFIX)).find(
+          (entry) =>
+            (entry.value as { roleId?: unknown } | null)?.roleId === GLOBAL_COORDINATOR_ROLE,
+        );
+        if (existing !== undefined) {
+          throw new CommandError(
+            'invalid_input',
+            'crew.hire',
+            'There is already an Imp coordinator: one looks after all projects. Change it with crew.update.',
+          );
+        }
+      }
       const member: CrewMember = {
         id: runtime.newId(),
         roleId: role.id,
@@ -550,7 +564,15 @@ export function createCrewCommands(
     input: z.object({ id: z.string() }),
     output: z.object({ id: z.string(), dismissed: z.boolean() }),
     handler: async ({ runtime }, { id }) => {
-      const existed = (await readCrewMember(runtime.store, id)) !== undefined;
+      const current = await readCrewMember(runtime.store, id);
+      if (current?.roleId === GLOBAL_COORDINATOR_ROLE) {
+        throw new CommandError(
+          'invalid_input',
+          'crew.dismiss',
+          'The Imp coordinator looks after all projects and stays on the crew. Change its model or budget with crew.update.',
+        );
+      }
+      const existed = current !== undefined;
       await runtime.store.batch([
         { type: 'delete', key: `${CREW_PREFIX}${id}` },
         ...(await forgetConversations(runtime.store, [id])),

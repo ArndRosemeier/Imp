@@ -2,6 +2,7 @@ import { MemoryBlobStore, MemoryKeyValueStore, toToolName } from '@imp/core';
 import {
   coordinatorRole,
   findCommands,
+  globalCoordinatorRole,
   guideRole,
   isDirect,
   roleCanUse,
@@ -74,7 +75,7 @@ const ROLE_ASKS: readonly (readonly [Role, string, string])[] = [
 ];
 
 describe('finding commands by what people call them', () => {
-  for (const role of [coordinatorRole, guideRole]) {
+  for (const role of [globalCoordinatorRole, guideRole]) {
     const find = lookup(role);
     it.each(ASKS)(`${role.name}: "%s" finds %s`, (query, id) => {
       expect(find(query)).toContain(id);
@@ -90,6 +91,27 @@ describe('finding commands by what people call them', () => {
 
   it('never offers the coordinator the work of the crew', () => {
     const find = lookup(coordinatorRole);
+    expect(find('export the film')).not.toContain('movie.edit.export');
+    expect(find('write a scene')).not.toContain('movie.scene.create');
+  });
+
+  it("keeps what concerns all projects from a project's coordinator, which passes it on", () => {
+    const find = lookup(coordinatorRole);
+    for (const [query, id] of [
+      ['save the crew', 'crew.saved.save'],
+      ['switch the interface to German', 'settings.language.set'],
+      ['create a custom critic role', 'crew.role.create'],
+      ['save all backup', 'backup.save'],
+    ] as const) {
+      expect(find(query)).not.toContain(id);
+    }
+    // Its own project's things it still does.
+    expect(find('copy asset to another project')).toContain('library.copy');
+    expect(find('report a problem')).toContain('support.report.prepare');
+  });
+
+  it('never offers the Imp coordinator the work inside a project', () => {
+    const find = lookup(globalCoordinatorRole);
     expect(find('export the film')).not.toContain('movie.edit.export');
     expect(find('write a scene')).not.toContain('movie.scene.create');
   });

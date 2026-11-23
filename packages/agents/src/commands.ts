@@ -22,7 +22,13 @@ import {
   currentConversationProject,
 } from './conversations.js';
 import { CrewMember, readCrewMember } from './crew.js';
-import { roleCanUse, type Role, type RoleCatalog } from './role.js';
+import {
+  GLOBAL_COORDINATOR_ROLE,
+  passedOnLine,
+  roleCanUse,
+  type Role,
+  type RoleCatalog,
+} from './role.js';
 import { describeNeed, needsNote, needStatus, roleNames, type NeedStatus } from './needs.js';
 import { runAgent } from './run.js';
 import {
@@ -206,6 +212,31 @@ async function writeConversation(
       value: storedValue(conversation),
     },
   ]);
+}
+
+/**
+ * Where the conversation with a member is held: the Imp coordinator talks in
+ * one chat for all projects, whatever project is open; everyone else in the
+ * open project's.
+ */
+export async function conversationPlace(
+  store: KeyValueStore,
+  memberId: string,
+): Promise<string | null> {
+  const member = await readCrewMember(store, memberId);
+  if (member?.roleId === GLOBAL_COORDINATOR_ROLE) return null;
+  return currentConversationProject(store);
+}
+
+/** The first crew member in a role, for telling one coordinator about the other. */
+async function memberInRole(store: KeyValueStore, roleId: string): Promise<CrewMember | undefined> {
+  return (await store.list('crew/'))
+    .flatMap((entry) => {
+      const parsed = CrewMember.safeParse(entry.value);
+      return parsed.success ? [parsed.data] : [];
+    })
+    .filter((member) => member.roleId === roleId)
+    .sort((a, b) => a.hiredAt.localeCompare(b.hiredAt))[0];
 }
 
 function toChatMessages(messages: Conversation['messages']): ChatMessage[] {
@@ -475,7 +506,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         input,
         role,
         member.name,
-        await currentConversationProject(runtime.store),
+        await conversationPlace(runtime.store, member.id),
       );
     },
     handler: async ({ actor, runtime }, input) => {
@@ -484,8 +515,11 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         throw new CommandError('invalid_input', 'crew.ask', 'An agent cannot give itself a task.');
       }
       const { member, role } = await resolve('crew.ask', store, input.memberId);
-      // Fixed for the whole run: the person may open another project meanwhile.
-      const projectId = await currentConversationProject(store);
+      // Fixed for the whole run: the person may open another project meanwhile. The Imp
+      // coordinator works for all projects, in a chat of its own.
+      const global = role.id === GLOBAL_COORDINATOR_ROLE;
+      const openNow = await currentConversationProject(store);
+      const projectId = global ? null : openNow;
       const elsewhere = working.get(member.id);
       if (elsewhere !== undefined && elsewhere !== projectId) {
         const project = elsewhere === null ? undefined : await readProject(store, elsewhere);
@@ -536,15 +570,34 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
 
       // The project the agent works in, always: an agent that is given work by another agent
       // was once left to guess the project id, and wrote to none.
-      const open = projectId === null ? undefined : await readProject(store, projectId);
-      const facts =
+      const open = openNow === null ? undefined : await readProject(store, openNow);
+      const openFact =
         open === undefined
           ? undefined
           : `Open project: "${open.name}" (projectId "${open.id}", mode ${open.mode}).`;
-      const withFacts =
-        facts === undefined || input.context?.includes(open?.id ?? '') === true
-          ? input.context
-          : [input.context, facts].filter((part) => part !== undefined).join('\n');
+      // Each coordinator knows whom to pass things to: the project's coordinator passes what
+      // concerns all projects to the Imp coordinator, which hands project work back.
+      let partnerFact: string | undefined;
+      if (global) {
+        const partner = await memberInRole(store, 'coordinator');
+        if (partner !== undefined) {
+          partnerFact = `The project coordinator, who does the work inside a project, is crew member "${partner.id}" (${partner.name}).`;
+        }
+      } else if (role.id === 'coordinator') {
+        const partner = await memberInRole(store, GLOBAL_COORDINATOR_ROLE);
+        if (partner !== undefined) {
+          partnerFact = `The Imp coordinator, for what concerns all projects, is crew member "${partner.id}" (${partner.name}).`;
+        }
+      }
+      // A project's coordinator passing something on: the Imp coordinator's chat shows from where.
+      const passedFrom =
+        global && actor.kind === 'agent' && open !== undefined && input.task !== undefined
+          ? passedOnLine(open)
+          : undefined;
+      // The UI already says which project is open; the fact is for agents that give work.
+      const saysProject = open !== undefined && input.context?.includes(open.id) === true;
+      const parts = [passedFrom, input.context, saysProject ? undefined : openFact, partnerFact];
+      const withFacts = parts.filter((part) => part !== undefined).join('\n') || undefined;
       const note = needsNote(needs, names);
       const runContext =
         note === undefined
@@ -605,7 +658,8 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
           guard,
           canReport,
           onCommand: (id) => {
-            if (OPENS_PROJECT.has(id)) opened = true;
+            // The Imp coordinator's chat stays where it is when it opens a project.
+            if (OPENS_PROJECT.has(id) && !global) opened = true;
           },
           history: toChatMessages(before.messages),
           maxSteps: input.maxSteps,
@@ -678,7 +732,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.conversation.get',
     title: 'Read conversation',
     description:
-      'Returns the conversation with a crew member in the open project: the messages, what is waiting for approval and what it has cost. Every project has its own conversations; with no project open, agents talk in a workspace-wide one.',
+      'Returns the conversation with a crew member in the open project: the messages, what is waiting for approval and what it has cost. Every project has its own conversations; with no project open, agents talk in a workspace-wide one. The Imp coordinator (role global-coordinator) has one conversation for all projects, whatever project is open.',
     effect: 'read',
     input: z.object({ memberId: z.string() }),
     output: ConversationSchema.extend({
@@ -688,7 +742,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
         .describe('The project the conversation belongs to, or null for the workspace-wide one.'),
     }),
     handler: async ({ runtime }, { memberId }) => {
-      const projectId = await currentConversationProject(runtime.store);
+      const projectId = await conversationPlace(runtime.store, memberId);
       return { ...(await readConversation(runtime.store, memberId, projectId)), projectId };
     },
   });
@@ -697,13 +751,13 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.conversation.clear',
     title: 'Clear chat',
     description:
-      'Forgets the conversation with a crew member (the coordinator included) in the open project, so its next task there starts fresh. Conversations in other projects and what the agent made are kept. Not while the agent is working.',
+      'Forgets the conversation with a crew member (the coordinator included) in the open project (for the Imp coordinator, its one chat for all projects), so its next task there starts fresh. Conversations in other projects and what the agent made are kept. Not while the agent is working.',
     effect: 'destructive',
     input: z.object({ memberId: z.string() }),
     output: z.object({ memberId: z.string(), projectId: z.string().nullable() }),
     handler: async ({ runtime }, { memberId }) => {
       const { store } = runtime;
-      const projectId = await currentConversationProject(store);
+      const projectId = await conversationPlace(store, memberId);
       const conversation = await readConversation(store, memberId, projectId);
       if (conversation.running) {
         throw new CommandError(
@@ -746,7 +800,7 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
       }
       const { store } = runtime;
       const { member, role } = await resolve('crew.approve', store, input.memberId);
-      const projectId = await currentConversationProject(store);
+      const projectId = await conversationPlace(store, member.id);
       const conversation = await claimConversation(store, member.id, projectId);
       const pending = conversation.pendingApprovals.find(({ id }) => id === input.approvalId);
       if (pending === undefined) {
@@ -819,19 +873,20 @@ export function createAgentCommands(options: AgentCommandOptions): readonly Comm
     id: 'crew.approvals.list',
     title: 'List waiting approvals',
     description:
-      'Returns everything any crew member asked for in the open project that waits for the user to approve or decline, with who asked. The user decides with crew.approve.',
+      'Returns everything any crew member asked for in the open project (and the Imp coordinator in its chat for all projects) that waits for the user to approve or decline, with who asked. The user decides with crew.approve.',
     effect: 'read',
     input: z.object({}),
     output: z.object({ approvals: z.array(WaitingApprovalSchema) }),
     handler: async ({ runtime }) => {
       const { store } = runtime;
-      const projectId = await currentConversationProject(store);
+      const open = await currentConversationProject(store);
       const crew = (await store.list('crew/')).flatMap((entry) => {
         const parsed = CrewMember.safeParse(entry.value);
         return parsed.success ? [parsed.data] : [];
       });
       const approvals: WaitingApproval[] = [];
       for (const member of crew) {
+        const projectId = member.roleId === GLOBAL_COORDINATOR_ROLE ? null : open;
         const conversation = await readConversation(store, member.id, projectId);
         for (const pending of conversation.pendingApprovals) {
           const command = registry.has(pending.commandId)

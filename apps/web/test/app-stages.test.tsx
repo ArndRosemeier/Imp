@@ -354,11 +354,14 @@ describe('App: stages', () => {
     const b = await call('project.create', { name: 'Tide', mode: 'movie' });
 
     await call('project.open', { projectId: a['id'] });
+    // The start screen shows the chat for all projects; the project's is one tap away.
+    await user.click(await screen.findByRole('tab', { name: /Keeper/ }));
     await user.type(await screen.findByLabelText('Message to Coordinator'), 'About Keeper.');
     await user.click(screen.getByRole('button', { name: /Send/ }));
     expect(await screen.findByText('Keeper it is.')).toBeTruthy();
 
     await call('project.open', { projectId: b['id'] });
+    expect(await screen.findByRole('tab', { name: /Tide/ })).toBeTruthy();
     expect(await screen.findByText(/Tell Coordinator what you want/)).toBeTruthy();
     expect(screen.queryByText('About Keeper.')).toBeNull();
     await user.type(screen.getByLabelText('Message to Coordinator'), 'About Tide.');

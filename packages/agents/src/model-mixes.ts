@@ -7,6 +7,7 @@ import {
 } from '@imp/core';
 import { z } from 'zod';
 import { CrewMember } from './crew.js';
+import { GLOBAL_COORDINATOR_ROLE } from './role.js';
 
 /** Where model mixes are kept, by id. Like saved crews, they belong to the workspace. */
 export const MODEL_MIX_PREFIX = 'model-mixes/';
@@ -189,10 +190,12 @@ export function createModelMixCommands(slots: readonly ModelSlot[]): readonly Co
       const agents = mix.models['coordinator.model'];
       if (agents !== undefined) {
         const memberId = await runtime.store.get(`${SETTINGS_PREFIX}coordinator.member`);
-        const stored =
-          typeof memberId === 'string' ? await runtime.store.get(`crew/${memberId}`) : undefined;
-        if (stored !== undefined) {
-          const member = CrewMember.parse(stored);
+        // Both coordinators run on the agents' model: the project one and the Imp coordinator.
+        for (const entry of await runtime.store.list('crew/')) {
+          const parsed = CrewMember.safeParse(entry.value);
+          if (!parsed.success) continue;
+          const member = parsed.data;
+          if (member.id !== memberId && member.roleId !== GLOBAL_COORDINATOR_ROLE) continue;
           writes.push({
             type: 'put',
             key: `crew/${member.id}`,

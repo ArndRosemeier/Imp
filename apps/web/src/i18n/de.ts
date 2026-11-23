@@ -2226,8 +2226,6 @@ export const de: Readonly<Record<string, string>> = {
   'Spoken line': 'Gesprochene Zeile',
   'Spoken lines': 'Gesprochene Zeilen',
   'Take clip sound apart': 'Clipton zerlegen',
-  'Talks with you, plans the work, hires the crew and keeps things moving.':
-    'Spricht mit dir, plant die Arbeit, stellt die Crew ein und hält alles in Gang.',
   Texts: 'Texte',
   'The Last Light': 'Das letzte Licht',
   Trailer: 'Trailer',
@@ -2289,4 +2287,25 @@ export const de: Readonly<Record<string, string>> = {
   '{input} in, {output} out per million tokens': '{input} rein, {output} raus pro Million Tokens',
   '{shown} of {total} shown. Type to narrow the list.':
     '{shown} von {total} gezeigt. Tippe, um die Liste einzugrenzen.',
+  'All projects': 'Alle Projekte',
+  'Imp coordinator': 'Imp-Koordinator',
+  'Looks after everything that concerns all projects: settings, models, crews, projects.':
+    'Kümmert sich um alles, was alle Projekte betrifft: Optionen, Modelle, Crews, Projekte.',
+  'No project open': 'Kein Projekt offen',
+  'Open a project to talk about it': 'Öffne ein Projekt, um darüber zu sprechen',
+  'Open that chat': 'Diesen Chat öffnen',
+  'Outside projects': 'Außerhalb von Projekten',
+  'Passed on from {project}': 'Weitergegeben aus {project}',
+  'Passed to the Imp coordinator (all projects)':
+    'An den Imp-Koordinator weitergegeben (alle Projekte)',
+  'Passing this on to the Imp coordinator (all projects)':
+    'Wird an den Imp-Koordinator weitergegeben (alle Projekte)',
+  'Talks with you about a project, plans the work, hires the crew and keeps things moving.':
+    'Spricht mit dir über ein Projekt, plant die Arbeit, stellt die Crew ein und hält alles am Laufen.',
+  'The Imp coordinator looks after what concerns all projects: settings, models, saved crews, roles, and creating, copying or deleting projects. It hands the work inside a project to that project’s coordinator, and project coordinators pass such asks on to it.':
+    'Der Imp-Koordinator kümmert sich um alles, was alle Projekte betrifft: Optionen, Modelle, gespeicherte Crews, Rollen und das Anlegen, Kopieren oder Löschen von Projekten. Die Arbeit in einem Projekt gibt er an dessen Koordinator weiter, und die Koordinatoren der Projekte reichen solche Anliegen an ihn weiter.',
+  'The Imp coordinator: settings, models, crews and projects':
+    'Der Imp-Koordinator: Optionen, Modelle, Crews und Projekte',
+  'The crew of {project}': 'Die Crew von {project}',
+  'Which chat': 'Welcher Chat',
 };

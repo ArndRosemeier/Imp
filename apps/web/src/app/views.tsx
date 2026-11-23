@@ -1,4 +1,4 @@
-import { CrewMember } from '@imp/agents';
+import { CrewMember, GLOBAL_COORDINATOR_ROLE } from '@imp/agents';
 import { AlwaysAllowed } from './Approvals.js';
 import { ActivityEntry } from '@imp/core';
 import {
@@ -112,19 +112,20 @@ export function CrewView(): ReactElement {
                 />
                 {t('Web search')}
               </label>
-              {member.id !== coordinator.data?.value && (
-                <button
-                  className="button quiet"
-                  aria-label={t('Dismiss {name}', { name: tx(member.name) })}
-                  onClick={() => {
-                    runCommand(imp, 'crew.dismiss', { id: member.id }).catch((error: unknown) => {
-                      console.error(messageOf(error));
-                    });
-                  }}
-                >
-                  <TrashIcon aria-hidden="true" /> {t('Dismiss')}
-                </button>
-              )}
+              {member.id !== coordinator.data?.value &&
+                member.roleId !== GLOBAL_COORDINATOR_ROLE && (
+                  <button
+                    className="button quiet"
+                    aria-label={t('Dismiss {name}', { name: tx(member.name) })}
+                    onClick={() => {
+                      runCommand(imp, 'crew.dismiss', { id: member.id }).catch((error: unknown) => {
+                        console.error(messageOf(error));
+                      });
+                    }}
+                  >
+                    <TrashIcon aria-hidden="true" /> {t('Dismiss')}
+                  </button>
+                )}
             </div>
           </article>
         ))}

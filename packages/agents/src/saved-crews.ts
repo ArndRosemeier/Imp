@@ -2,13 +2,19 @@ import { CommandError, defineCommand, type Command, type KeyValueStore } from '@
 import { z } from 'zod';
 import { forgetConversations } from './conversations.js';
 import { CrewMember } from './crew.js';
-import { CUSTOM_ROLE_PREFIX, StoredRole, type RoleCatalog } from './role.js';
+import {
+  CUSTOM_ROLE_PREFIX,
+  GLOBAL_COORDINATOR_ROLE,
+  StoredRole,
+  type RoleCatalog,
+} from './role.js';
 
 const CREW_PREFIX = 'crew/';
 /** Where saved crews are kept, by id. They belong to the workspace, not to one project. */
 export const SAVED_CREW_PREFIX = 'saved-crews/';
-/** The coordinator is never swapped out by loading a crew: it may be the one loading it. */
+/** The coordinators are never swapped out by loading a crew: one of them may be loading it. */
 const COORDINATOR = 'coordinator';
+const STAYS: ReadonlySet<string> = new Set([COORDINATOR, GLOBAL_COORDINATOR_ROLE]);
 
 /** One agent of a saved crew: everything needed to hire it again. */
 export const SavedCrewMember = CrewMember.pick({
@@ -187,7 +193,7 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
     title: 'Load a saved crew',
     keywords: KEYWORDS,
     description:
-      'Hires the agents of a saved crew. With replace true (the default) the current agents are dismissed first, with their conversations; the coordinator always stays. With replace false they join the current crew. Custom roles the crew needs are brought back if they were deleted.',
+      'Hires the agents of a saved crew. With replace true (the default) the current agents are dismissed first, with their conversations; the coordinator and the Imp coordinator always stay. With replace false they join the current crew. Custom roles the crew needs are brought back if they were deleted.',
     effect: 'write',
     input: z.object({
       id: z.string().describe('A saved crew id from crew.saved.list.'),
@@ -201,16 +207,16 @@ export function createSavedCrewCommands(roles: RoleCatalog): readonly Command[] 
     handler: async ({ runtime }, { id, replace }) => {
       const saved = await requireSaved(runtime.store, 'crew.saved.load', id);
       const current = await readCrew(runtime.store);
-      const leaving = replace ? current.filter((member) => member.roleId !== COORDINATOR) : [];
+      const leaving = replace ? current.filter((member) => !STAYS.has(member.roleId)) : [];
       const staying = current.filter((member) => !leaving.includes(member));
-      const hasCoordinator = staying.some((member) => member.roleId === COORDINATOR);
+      const kept = new Set(staying.map((member) => member.roleId));
       const rolesRestored: StoredRole[] = [];
       for (const role of saved.roles) {
         if ((await roles.find(runtime.store, role.id)) === undefined) rolesRestored.push(role);
       }
       const hired: CrewMember[] = [];
       for (const member of saved.members) {
-        if (member.roleId === COORDINATOR && hasCoordinator) continue;
+        if (STAYS.has(member.roleId) && kept.has(member.roleId)) continue;
         const known =
           rolesRestored.some((role) => role.id === member.roleId) ||
           (await roles.find(runtime.store, member.roleId)) !== undefined;
