@@ -184,7 +184,8 @@ describe("a project's coordinator", () => {
     expect(result.finalText).toContain('Passed to the Imp coordinator');
 
     // The project coordinator was told who the Imp coordinator is.
-    expect(provider.requests[0]?.messages.at(-1)?.context).toContain(imp.id);
+    const first = provider.requests[0]?.messages.at(-1);
+    expect(first?.role === 'user' ? first.context : undefined).toContain(imp.id);
     // Its own attempt was refused with a pointer to the Imp coordinator.
     const refused = provider.requests[1]?.messages.at(-1);
     expect(refused?.role).toBe('tool');

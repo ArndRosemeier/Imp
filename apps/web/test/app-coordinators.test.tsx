@@ -61,7 +61,9 @@ describe('App: the Imp coordinator and the project coordinators', () => {
     expect(within(globalChat).getByText('Done: the interface is German now.')).toBeTruthy();
     // The Imp coordinator was told where the ask came from.
     const passed = provider.requests[1]?.messages.at(-1);
-    expect(passed?.context).toMatch(/^Passed on by the coordinator of the project "Keeper"/);
+    expect(passed?.role === 'user' ? passed.context : undefined).toMatch(
+      /^Passed on by the coordinator of the project "Keeper"/,
+    );
   });
 
   it('gets an Imp set up before it existed its Imp coordinator, which cannot be dismissed', async () => {
