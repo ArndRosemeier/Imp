@@ -77,7 +77,7 @@ export interface TypedCommand<I extends z.ZodType, O extends z.ZodType> extends 
 const ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z][a-zA-Z0-9]*)+$/;
 const MIN_DESCRIPTION_LENGTH = 20;
 
-function issueLines(error: z.ZodError): string[] {
+export function issueLines(error: z.ZodError): string[] {
   return error.issues.map((issue) => {
     const path = issue.path.map(String).join('.');
     return path === '' ? issue.message : `${path}: ${issue.message}`;

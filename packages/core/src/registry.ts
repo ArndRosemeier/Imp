@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { appendActivity, type ActivityEntry } from './activity.js';
 import type { Actor } from './actor.js';
-import type { Command, CommandContext, TypedCommand } from './command.js';
+import { issueLines, type Command, type CommandContext, type TypedCommand } from './command.js';
 import { CommandError } from './errors.js';
 import { defaultPolicy, type ExecutionPolicy } from './policy.js';
 import type { CoreRuntime } from './runtime.js';
@@ -107,12 +107,18 @@ export class CommandRegistry {
     return this.#run(id, rawInput, options, (context, raw) => command.run(context, raw));
   }
 
-  /** True when the step may run without asking. A failing check asks, as if there were none. */
+  /**
+   * True when the step may run without asking. A check that fails for its own
+   * reasons asks, as if there were none; one that finds the step cannot run as
+   * asked (invalid_input, such as no model chosen) refuses it, so that nobody
+   * is asked to approve what would only fail.
+   */
   async #allowed(command: Command, actor: Actor, rawInput: unknown): Promise<boolean> {
     if (this.#autoApprove === undefined) return false;
     try {
       return await this.#autoApprove({ actor, runtime: this.#runtime }, command, rawInput);
-    } catch {
+    } catch (error) {
+      if (error instanceof CommandError && error.code === 'invalid_input') throw error;
       return false;
     }
   }
@@ -147,22 +153,28 @@ export class CommandRegistry {
       await record('denied');
       throw new CommandError('denied', id, `${actor.kind} "${actor.id}" may not run "${id}".`);
     }
-    if (decision === 'needs-approval' && options.approved !== true && command.check !== undefined) {
-      // A call that cannot go ahead is refused now, not after someone approved it.
+    if (decision === 'needs-approval' && options.approved !== true) {
+      // A call that cannot go ahead is refused now, not after someone approved it: input
+      // that does not fit, a check that fails, or a price that cannot be worked out because
+      // the call could not run (see #allowed).
+      let allowed: boolean;
       try {
-        await command.check({ actor, runtime: this.#runtime }, rawInput);
+        const parsed = command.input.safeParse(rawInput);
+        if (!parsed.success) {
+          throw new CommandError('invalid_input', id, `Invalid input for "${id}".`, {
+            details: issueLines(parsed.error),
+          });
+        }
+        await command.check?.({ actor, runtime: this.#runtime }, rawInput);
+        allowed = await this.#allowed(command, actor, rawInput);
       } catch (error) {
         await record('failed', failureText(error));
         throw error;
       }
-    }
-    if (
-      decision === 'needs-approval' &&
-      options.approved !== true &&
-      !(await this.#allowed(command, actor, rawInput))
-    ) {
-      await record('needs-approval');
-      return { status: 'needs-approval', commandId: id, input: rawInput };
+      if (!allowed) {
+        await record('needs-approval');
+        return { status: 'needs-approval', commandId: id, input: rawInput };
+      }
     }
 
     try {

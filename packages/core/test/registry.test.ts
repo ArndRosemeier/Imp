@@ -235,14 +235,14 @@ describe('CommandRegistry', () => {
       expect(
         (await registry.executeById('test.picky', { ready: true }, { actor: agent })).status,
       ).toBe('needs-approval');
-      // Invalid input is left to the run, which says what is wrong.
-      expect(
-        (await registry.executeById('test.picky', { ready: 'no' }, { actor: agent })).status,
-      ).toBe('needs-approval');
+      // Input that does not fit is refused now too, with what is wrong, not after an approval.
+      await expect(
+        registry.executeById('test.picky', { ready: 'no' }, { actor: agent }),
+      ).rejects.toMatchObject({ code: 'invalid_input', details: [expect.stringMatching(/ready/)] });
       expect((await readActivity(runtime.store)).map((entry) => entry.outcome)).toEqual([
         'failed',
         'needs-approval',
-        'needs-approval',
+        'failed',
       ]);
     });
   });
@@ -289,6 +289,12 @@ describe('approval without asking', () => {
         { actor: agent },
       ),
     ).toMatchObject({ status: 'needs-approval' });
+    // A check that finds the step cannot run as asked refuses it instead of asking.
+    await expect(
+      withAutoApprove(() =>
+        Promise.reject(new CommandError('invalid_input', 'test.spend', 'No model is chosen.')),
+      ).executeById('test.spend', {}, { actor: agent }),
+    ).rejects.toThrow('No model is chosen.');
     const denying = new CommandRegistry({
       runtime: createTestRuntime(),
       policy: () => 'deny',
