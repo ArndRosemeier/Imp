@@ -146,3 +146,89 @@ export function measureLoudness(
     samplePeakDb: toDb(samplePeak),
   };
 }
+
+/**
+ * Integrated loudness measured as the sound streams past, a stretch at a
+ * time, for sounds too long to hold at once, such as the mix of a whole film.
+ * It keeps the filters' state between stretches and the power of every 100 ms,
+ * from which the gated 400 ms blocks are built at the end. Peaks are sample
+ * peaks: true peak over a feature film would take too long.
+ */
+export class LoudnessMeter {
+  readonly #sub: number;
+  readonly #state: Float64Array[] = [];
+  readonly #powers: number[] = [];
+  #sum = 0;
+  #count = 0;
+  #peak = 0;
+
+  constructor(sampleRate = 48_000) {
+    this.#sub = Math.round(sampleRate / 10);
+  }
+
+  /** Feeds the next stretch: one array per channel, all the same length. */
+  push(channels: readonly Float32Array[]): void {
+    const length = channels[0]?.length ?? 0;
+    channels.forEach((_, index) => {
+      this.#state[index] ??= new Float64Array(8);
+    });
+    for (let i = 0; i < length; i++) {
+      let square = 0;
+      for (const [index, channel] of channels.entries()) {
+        const x = channel[i] ?? 0;
+        this.#peak = Math.max(this.#peak, Math.abs(x));
+        const state = this.#state[index] ?? new Float64Array(8);
+        // Two biquads in a row, direct form I: x1 x2 y1 y2 for each.
+        const y =
+          SHELF.b0 * x +
+          SHELF.b1 * (state[0] ?? 0) +
+          SHELF.b2 * (state[1] ?? 0) -
+          SHELF.a1 * (state[2] ?? 0) -
+          SHELF.a2 * (state[3] ?? 0);
+        state[1] = state[0] ?? 0;
+        state[0] = x;
+        state[3] = state[2] ?? 0;
+        state[2] = y;
+        const z =
+          HIGHPASS.b0 * y +
+          HIGHPASS.b1 * (state[4] ?? 0) +
+          HIGHPASS.b2 * (state[5] ?? 0) -
+          HIGHPASS.a1 * (state[6] ?? 0) -
+          HIGHPASS.a2 * (state[7] ?? 0);
+        state[5] = state[4] ?? 0;
+        state[4] = y;
+        state[7] = state[6] ?? 0;
+        state[6] = z;
+        square += z * z;
+      }
+      this.#sum += square;
+      this.#count += 1;
+      if (this.#count === this.#sub) {
+        this.#powers.push(this.#sum / this.#sub);
+        this.#sum = 0;
+        this.#count = 0;
+      }
+    }
+  }
+
+  /** The integrated loudness so far, in LUFS, and the highest sample in dBFS. */
+  result(): { integratedLufs: number; samplePeakDb: number } {
+    const subs =
+      this.#powers.length === 0 && this.#count > 0 ? [this.#sum / this.#count] : this.#powers;
+    // 400 ms blocks, overlapping by 75 %: four 100 ms parts each, a part apart.
+    const blocks: number[] = [];
+    for (let start = 0; start + 4 <= subs.length; start++) {
+      blocks.push(
+        ((subs[start] ?? 0) +
+          (subs[start + 1] ?? 0) +
+          (subs[start + 2] ?? 0) +
+          (subs[start + 3] ?? 0)) /
+          4,
+      );
+    }
+    return {
+      integratedLufs: integrated(blocks.length > 0 ? blocks : subs.length > 0 ? [mean(subs)] : []),
+      samplePeakDb: toDb(this.#peak),
+    };
+  }
+}

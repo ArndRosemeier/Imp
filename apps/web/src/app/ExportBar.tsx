@@ -252,6 +252,8 @@ export interface ExportOptionValues {
   readonly label: string;
   /** Burn the subtitles into the picture. */
   readonly subtitles: boolean;
+  /** How loud the sound is levelled: for the web, for broadcast, or left as mixed. */
+  readonly loudness: 'online' | 'broadcast' | 'off';
 }
 
 export const DEFAULT_EXPORT_OPTIONS: ExportOptionValues = {
@@ -259,7 +261,16 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptionValues = {
   fps: null,
   label: '',
   subtitles: true,
+  loudness: 'online',
 };
+
+const LOUDNESS = ['online', 'broadcast', 'off'] as const;
+
+function loudnessLabel(loudness: (typeof LOUDNESS)[number]): string {
+  if (loudness === 'online') return t('For the web (-16 LUFS)');
+  if (loudness === 'broadcast') return t('For broadcast (-23 LUFS)');
+  return t('As mixed');
+}
 
 const RESOLUTIONS = ['source', '720p', '1080p', '2160p'] as const;
 const FRAME_RATES = [24, 25, 30, 50, 60] as const;
@@ -272,6 +283,7 @@ export function exportOptionInput(options: ExportOptionValues): Record<string, u
   const label = options.label.trim();
   if (label !== '') input['label'] = label.slice(0, 60);
   if (!options.subtitles) input['subtitles'] = false;
+  if (options.loudness !== 'online') input['loudness'] = options.loudness;
   return input;
 }
 
@@ -292,6 +304,7 @@ function ExportOptions({
   const sizeId = useId();
   const fpsId = useId();
   const nameId = useId();
+  const loudnessId = useId();
   const changed = Object.keys(exportOptionInput(value)).length;
   const set = (patch: Partial<ExportOptionValues>): void => {
     onChange({ ...value, ...patch });
@@ -353,6 +366,24 @@ function ExportOptions({
               set({ label: event.target.value });
             }}
           />
+        </div>
+        <div className="field compact">
+          <label htmlFor={loudnessId}>{t('Loudness')}</label>
+          <select
+            id={loudnessId}
+            className="input"
+            value={value.loudness}
+            onChange={(event) => {
+              const next = LOUDNESS.find((choice) => choice === event.target.value);
+              if (next !== undefined) set({ loudness: next });
+            }}
+          >
+            {LOUDNESS.map((choice) => (
+              <option key={choice} value={choice}>
+                {loudnessLabel(choice)}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <label className="choice">

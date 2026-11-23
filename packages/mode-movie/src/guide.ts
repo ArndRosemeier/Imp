@@ -30,7 +30,7 @@ Tell the coordinator the story in a sentence. It hires a **Screenwriter**, who w
 
 ## Checkpoints
 
-The crew stops for you at three points, so that nothing expensive is made before you have looked: the **treatment** (here), the **storyboard** of each scene (in Shots) and the **first cut** of each scene (in Edit). Press **Sign off** when it is right; casting, design and the scenes wait for the treatment, the clips of a scene for its storyboard. **How much the crew does on its own** sets where it stops: at each checkpoint, only at the storyboard, or nowhere. Spending always keeps to the budget.
+The crew stops for you at four points, so that nothing expensive is made before you have looked: the **treatment** (here), the **storyboard** of each scene (in Shots), the **first cut** of each scene and the **fine cut** of the whole film (both in Edit). Press **Sign off** when it is right; casting, design and the scenes wait for the treatment, the clips of a scene for its storyboard. **How much the crew does on its own** sets where it stops: at each checkpoint, only at the storyboard, or nowhere. Spending always keeps to the budget.
 
 ## Tips
 
@@ -168,6 +168,8 @@ export const shotsGuide: GuideTopic = {
 
 Making a clip again never throws the old one away. Earlier clips stay as **takes** under the clip; tap one to watch it and use it again.
 
+Tick **Key shot: two takes** on the few shots the film rests on, such as a turn, a reveal or the last image. The Clip Designer then makes each of them twice and keeps the better take. Each costs one clip more, so keep it to about one shot in five.
+
 ## Costs
 
 A 4 second clip costs roughly 15 to 40 cents depending on the model and resolution. The price is on the button before every clip, and the total is in the top bar.
@@ -247,9 +249,15 @@ Before a shot has its clip, its key frame stands in the cut as a still for as lo
 
 The **Film Editor** can cut too. Its changes arrive as a **proposal**, like tracked changes: play it, then keep or reject each change. Mark a stretch with In and Out (I and O) and your next message is about just that stretch. The **Critic**, an extra role you add on the Crew page under More roles, reads the script before the shots and watches the film after, leaving notes and markers.
 
+## Fine cut and finishing
+
+Once the first cuts are signed off, the Film Editor makes a **rhythm pass** over the whole film: how long each scene runs, how the pace changes from scene to scene, and how each hands over to the next. That is the **fine cut**, the last checkpoint. After you sign it off, the film is finished: one look over all of it, titles and end credits, subtitles where wanted, and the export.
+
 ## Export
 
 Export renders the scene or the whole film as an MP4 file, faster than real time: in the browser, or with ffmpeg on the local server, where Imp offers to download ffmpeg if it is missing.
+
+The export **levels the sound** of the whole film to a standard loudness, as a finishing step: **For the web** (-16 LUFS, what streaming sites and phones expect) by default, **For broadcast** (-23 LUFS), or **As mixed**, under Export options. It never turns the film up so far that its loudest moment would clip.
 
 ## Where films end up
 

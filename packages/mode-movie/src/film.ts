@@ -6,6 +6,7 @@ import {
   renderDoc,
   toFrames,
   UnsupportedAudioError,
+  LoudnessMeter,
   type AudioCodec,
   type AudioSources,
   type SoundPlacement,
@@ -249,6 +250,8 @@ export const FilmExport = z.object({
   notReady: z.array(NotReady).default([]),
   /** Sounds that could not be decoded and are silent in the film. */
   unheard: z.array(z.string()).default([]),
+  /** How loud the film's sound is, in LUFS, after levelling; null when not measured or silent. */
+  loudnessLufs: z.number().nullable().default(null),
   /** Scenes with changes agents proposed that were not kept yet, so the film leaves them out. */
   draftsLeftOut: z.array(z.string()).default([]),
   error: z.string().default(''),
@@ -475,6 +478,11 @@ class FilmMix {
   }
 }
 
+/** How much of the film's sound the loudness pass mixes at a time: ten seconds. */
+const LOUDNESS_STRETCH = 480_000;
+/** The loudest sample stays this far below full scale after levelling. */
+const PEAK_CEILING_DB = -1;
+
 const RESOLUTIONS = { source: null, '720p': 720, '1080p': 1080, '2160p': 2160 } as const;
 
 export interface FilmExportOptions {
@@ -559,6 +567,12 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         .optional()
         .describe(
           'A short name for the file, like "rough-cut-2". Defaults to "film" or the scene.',
+        ),
+      loudness: z
+        .enum(['online', 'broadcast', 'off'])
+        .default('online')
+        .describe(
+          'Level the sound of the whole film to a standard loudness, as a finishing step: "online" (the default) is -16 LUFS, as streaming sites and phones expect; "broadcast" is -23 LUFS (EBU R 128); "off" leaves the mix as it is. The level is never raised past where the loudest moment would clip.',
         ),
       subtitles: z
         .boolean()
@@ -666,6 +680,8 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         plan.scenes,
         audioSourcesFor(runtime.blobs, options.codec),
       );
+      let gain = 1;
+      let loudnessLufs: number | null = null;
       let lastReport = 0;
       const started = runtime.now().getTime();
       const elapsed = () => Math.round((runtime.now().getTime() - started) / 100) / 10;
@@ -674,6 +690,32 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
         await runtime.store.batch([{ type: 'put', key, value: record }]);
       };
       try {
+        // Finishing: the film's sound is measured as a whole, then played at one gain.
+        if (input.loudness !== 'off') {
+          const meter = new LoudnessMeter();
+          const total = toFrames(plan.durationSeconds);
+          for (let at = 0; at < total && !controller.cancelled; at += LOUDNESS_STRETCH) {
+            meter.push(await mix.mix(at, Math.min(LOUDNESS_STRETCH, total - at)));
+          }
+          const measured = meter.result();
+          if (Number.isFinite(measured.integratedLufs)) {
+            const target = input.loudness === 'online' ? -16 : -23;
+            const db = Math.min(
+              target - measured.integratedLufs,
+              PEAK_CEILING_DB - measured.samplePeakDb,
+            );
+            gain = 10 ** (db / 20);
+            loudnessLufs = Math.round((measured.integratedLufs + db) * 10) / 10;
+          }
+        }
+        const levelled = async (startFrame: number, frames: number) => {
+          const channels = await mix.mix(startFrame, frames);
+          if (gain === 1) return channels;
+          for (const channel of channels) {
+            for (let i = 0; i < channel.length; i++) channel[i] = (channel[i] ?? 0) * gain;
+          }
+          return channels;
+        };
         const rendered = await options.renderer.render({
           plan: {
             durationSeconds: plan.durationSeconds,
@@ -683,7 +725,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
             texts: [...plan.captions, ...texts],
           },
           clip: async (blobKey) => (await runtime.blobs.get(blobKey))?.bytes,
-          mix: (startFrame, frames) => mix.mix(startFrame, frames),
+          mix: levelled,
           write: (data, position) => writer.write(data, position),
           progress: (seconds) => {
             const now = runtime.now().getTime();
@@ -715,6 +757,7 @@ export function createFilmExportCommands(options: FilmExportOptions): readonly C
           parts: file.parts,
           renderSeconds: elapsed(),
           unheard: [...mix.unheard],
+          loudnessLufs,
           finishedAt: runtime.now().toISOString(),
         });
         return record;

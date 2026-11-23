@@ -3,7 +3,7 @@ import { designBiquad, filter, responseDb } from '../src/dsp/biquad.js';
 import { compress, gainReductionDb, limit } from '../src/dsp/dynamics.js';
 import { denoise, learnNoise } from '../src/dsp/denoise.js';
 import { Fft } from '../src/dsp/fft.js';
-import { measureLoudness, truePeak } from '../src/dsp/loudness.js';
+import { LoudnessMeter, measureLoudness, truePeak } from '../src/dsp/loudness.js';
 import { applyEffects, describeEffect, Effect, EffectError } from '../src/effects.js';
 
 const RATE = 48_000;
@@ -179,6 +179,21 @@ describe('loudness', HEAVY, () => {
     expect(measureLoudness([new Float32Array(RATE)]).integratedLufs).toBe(-Infinity);
     const blip = sine(1000, 0.5, 0.2);
     expect(Number.isFinite(measureLoudness([blip, blip]).integratedLufs)).toBe(true);
+  });
+
+  it('measures a long sound a stretch at a time as it would whole', () => {
+    const tone = sine(1000, 10 ** (-23 / 20), 10);
+    const withSilence = new Float32Array([...tone, ...new Float32Array(RATE * 5)]);
+    const meter = new LoudnessMeter();
+    // Stretches of odd lengths, so blocks and filters run across their edges.
+    for (let at = 0; at < withSilence.length; at += 7777) {
+      const part = withSilence.subarray(at, at + 7777);
+      meter.push([part, part]);
+    }
+    const whole = measureLoudness([withSilence, withSilence]);
+    expect(meter.result().integratedLufs).toBeCloseTo(whole.integratedLufs, 1);
+    expect(meter.result().samplePeakDb).toBeCloseTo(-23, 1);
+    expect(new LoudnessMeter().result().integratedLufs).toBe(-Infinity);
   });
 
   it('finds peaks between samples', () => {

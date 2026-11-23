@@ -30,7 +30,7 @@ Erzähl dem Koordinator die Geschichte in einem Satz. Er stellt einen **Drehbuch
 
 ## Kontrollpunkte
 
-Die Crew hält an drei Stellen für dich an, damit nichts Teures entsteht, bevor du es gesehen hast: beim **Treatment** (hier), beim **Storyboard** jeder Szene (in Einstellungen) und beim **Rohschnitt** jeder Szene (im Schnitt). Drück **Freigeben**, wenn es passt; Casting, Ausstattung und die Szenen warten auf das Treatment, die Clips einer Szene auf ihr Storyboard. **Wie viel die Crew selbst macht** legt fest, wo sie anhält: an jedem Kontrollpunkt, nur beim Storyboard oder nirgends. Ausgaben bleiben immer im Budget.
+Die Crew hält an vier Stellen für dich an, damit nichts Teures entsteht, bevor du es gesehen hast: beim **Treatment** (hier), beim **Storyboard** jeder Szene (in Einstellungen), beim **Rohschnitt** jeder Szene und beim **Feinschnitt** des ganzen Films (beide im Schnitt). Drück **Freigeben**, wenn es passt; Casting, Ausstattung und die Szenen warten auf das Treatment, die Clips einer Szene auf ihr Storyboard. **Wie viel die Crew selbst macht** legt fest, wo sie anhält: an jedem Kontrollpunkt, nur beim Storyboard oder nirgends. Ausgaben bleiben immer im Budget.
 
 ## Tipps
 
@@ -164,6 +164,8 @@ Videomodelle vergessen zwischen zwei Clips, wie ein Raum aussah. Gibst du jeder 
 
 Erstellst du einen Clip neu, wird der alte nie weggeworfen. Frühere Clips bleiben als **Takes** unter dem Clip; tippe einen an, um ihn anzusehen und wieder zu verwenden.
 
+Setz bei den wenigen Einstellungen, auf denen der Film ruht, etwa einer Wende, einer Enthüllung oder dem letzten Bild, das Häkchen **Schlüsseleinstellung: zwei Takes**. Der Clip-Designer macht jede davon zweimal und behält den besseren Take. Jede kostet einen Clip mehr, also etwa eine von fünf Einstellungen.
+
 ## Kosten
 
 Ein Clip von 4 Sekunden kostet je nach Modell und Auflösung etwa 15 bis 40 Cent. Der Preis steht vor jedem Clip auf der Schaltfläche, und die Summe steht in der oberen Leiste.
@@ -241,9 +243,15 @@ Solange eine Einstellung noch keinen Clip hat, steht ihr Keyframe im Schnitt als
 
 Der **Cutter** kann ebenfalls schneiden. Seine Änderungen kommen als **Vorschlag**, wie Änderungen im Überarbeitungsmodus: Spiel ihn ab und behalte oder verwirf dann jede Änderung. Markiere mit In und Out (I und O) einen Abschnitt, und deine nächste Nachricht bezieht sich nur auf diesen Abschnitt. Der **Kritiker**, eine Zusatzrolle, die du auf der Seite Crew unter Weitere Rollen hinzufügst, liest das Drehbuch vor den Einstellungen und sieht sich den Film danach an, mit Notizen und Markern.
 
+## Feinschnitt und Fertigstellung
+
+Sind die Rohschnitte freigegeben, macht der Cutter einen **Rhythmusdurchgang** über den ganzen Film: wie lang jede Szene läuft, wie sich das Tempo von Szene zu Szene ändert und wie jede an die nächste übergibt. Das ist der **Feinschnitt**, der letzte Kontrollpunkt. Nach deiner Freigabe wird der Film fertiggestellt: ein Look über alles, Titel und Abspann, Untertitel wo gewünscht, und der Export.
+
 ## Exportieren
 
 Der Export rendert die Szene oder den ganzen Film als MP4-Datei, schneller als in Echtzeit: im Browser oder mit ffmpeg auf dem lokalen Server, wo Imp anbietet, ffmpeg herunterzuladen, falls es fehlt.
+
+Der Export **gleicht die Lautheit** des ganzen Films an einen Standard an, als letzter Schliff: **Fürs Web** (-16 LUFS, was Streamingseiten und Handys erwarten) als Voreinstellung, **Für Rundfunk** (-23 LUFS) oder **Wie gemischt**, unter Export-Optionen. Er dreht den Film nie so weit auf, dass sein lautester Moment übersteuert.
 
 ## Wo fertige Filme landen
 

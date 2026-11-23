@@ -2046,6 +2046,7 @@ export function EditView({ project }: { project: Project }): ReactElement {
           {sceneId !== undefined && (
             <CheckpointBar project={project} checkpointId="first-cut" itemId={sceneId} compact />
           )}
+          <CheckpointBar project={project} checkpointId="fine-cut" compact quiet />
           {look !== undefined && (
             <Popover
               label={t('Look of the whole film')}

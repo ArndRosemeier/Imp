@@ -54,6 +54,7 @@ const NAMES: Readonly<Record<string, () => string>> = {
   treatment: () => t('Treatment'),
   storyboard: () => t('Storyboard'),
   'first-cut': () => t('First cut'),
+  'fine-cut': () => t('Fine cut'),
 };
 const nameOf = (id: string, fallback: string): string => NAMES[id]?.() ?? fallback;
 
@@ -66,6 +67,8 @@ const WAITING: Readonly<Record<string, () => string>> = {
     ),
   'first-cut': () =>
     t('Music and extra sound for this scene wait until you sign off its first cut.'),
+  'fine-cut': () =>
+    t('The look of the whole film and the end credits wait until you sign off the fine cut.'),
 };
 
 /**
@@ -78,11 +81,14 @@ export function CheckpointBar({
   checkpointId,
   itemId,
   compact = false,
+  quiet = false,
 }: {
   project: Project;
   checkpointId: string;
   itemId?: string | undefined;
   compact?: boolean;
+  /** Never the main button of its toolbar, for a checkpoint that comes after another there. */
+  quiet?: boolean;
 }): ReactElement | null {
   const live = useCheckpoints(project);
   const { run, error } = useRun(project);
@@ -120,7 +126,7 @@ export function CheckpointBar({
         ) : (
           <button
             type="button"
-            className={state === 'waiting' ? 'button primary' : 'button quiet'}
+            className={state === 'waiting' && !quiet ? 'button primary' : 'button quiet'}
             title={WAITING[checkpoint.id]?.() ?? checkpoint.description}
             onClick={sign}
           >

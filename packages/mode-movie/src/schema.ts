@@ -315,6 +315,12 @@ export const Shot = z.object({
     .describe(
       'Why the cut to this shot happens, for the editor: on a movement, on a look, on a line, to show a reaction, to move time on.',
     ),
+  keyShot: z
+    .boolean()
+    .default(false)
+    .describe(
+      'A shot the film rests on, such as a turn, a reveal or the last image: it gets a second take, and the better one is kept. Only a few shots of a film, about one in five at most.',
+    ),
   dialogue: DialogueTake.nullable().default(null),
   /** Painted first frames of the shot; the chosen one is what the clip starts on. */
   frames: z.array(KeyFrame).default([]),
