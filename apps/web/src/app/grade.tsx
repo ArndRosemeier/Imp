@@ -169,7 +169,22 @@ export function GradeSlider({
     <label className="field compact grade-slider">
       <span className="row spread">
         <span>{label}</span>
-        <span className="muted tabular">{signed(shown)}</span>
+        {value !== 0 && dragging === null ? (
+          <button
+            type="button"
+            className="grade-reset muted tabular"
+            aria-label={t('Set {name} back to unchanged', { name: label })}
+            title={t('Set {name} back to unchanged', { name: label })}
+            onClick={(event) => {
+              event.preventDefault();
+              onCommit(0);
+            }}
+          >
+            {signed(shown)} ×
+          </button>
+        ) : (
+          <span className="muted tabular">{signed(shown)}</span>
+        )}
       </span>
       <input
         type="range"

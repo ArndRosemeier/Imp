@@ -23,6 +23,10 @@ export const INTERNAL_SETTINGS: ReadonlySet<string> = new Set([
   'help.enabled',
   'help.dismissed',
   'ui.language',
+  // The theme button in the top bar.
+  'ui.theme',
+  // Its own switch, under What agents do without asking.
+  'edit.agent-drafts',
   // The budget without approval has its own fields, under What agents do without asking.
   'spend.allowance.project',
   'spend.allowance.step',
@@ -55,11 +59,8 @@ export const SETTING_LABELS: Readonly<Record<string, string>> = {
   get 'edit.agent-drafts'(): string {
     return t('Agents cut drafts on the Edit stage');
   },
-  get theme(): string {
+  get 'ui.theme'(): string {
     return t('Theme');
-  },
-  get 'budget.daily'(): string {
-    return t('Daily budget');
   },
   get 'spend.allowance.project'(): string {
     return t('Budget without approval, per project');

@@ -41,7 +41,9 @@ export const settingsGet = defineCommand({
 export const settingsSet = defineCommand({
   id: 'settings.set',
   title: 'Change setting',
-  description: 'Stores a value for one setting, replacing any earlier value.',
+  description:
+    'Stores a value for one setting, replacing any earlier value. Also: ui.theme ("dark" or "light") and edit.agent-drafts (false lets agents edit the cut directly).',
+  keywords: ['theme', 'dark mode', 'light mode', 'colours', 'preference', 'Settings'],
   effect: 'write',
   input: Setting,
   output: Setting,

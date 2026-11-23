@@ -305,7 +305,7 @@ describe('App: stages', () => {
     expect(await screen.findByRole('heading', { name: 'Squall (2)' })).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Actions for Squall (2)' }));
-    await user.click(screen.getByRole('button', { name: 'Delete: Squall (2)' }));
+    await user.click(screen.getByRole('button', { name: 'Delete project: Squall (2)' }));
     await user.click(await screen.findByRole('button', { name: /Delete for good/ }));
     await vi.waitFor(() => {
       expect(screen.queryByRole('heading', { name: 'Squall (2)' })).toBeNull();

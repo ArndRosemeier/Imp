@@ -980,12 +980,12 @@ export function TextTools({
     })) as { id?: string } | undefined;
     if (made?.id !== undefined) onAdded(made.id);
   };
-  const download = async (): Promise<void> => {
+  const download = async (format: 'srt' | 'vtt'): Promise<void> => {
     setNote('');
     await saveFileAs(
       {
-        suggestedName: t('{name}.srt', { name: fileSafe(project.name, 'film') }),
-        mediaType: 'application/x-subrip',
+        suggestedName: `${fileSafe(project.name, 'film')}.${format}`,
+        mediaType: format === 'srt' ? 'application/x-subrip' : 'text/vtt',
         description: t('Subtitles'),
       },
       async () => {
@@ -999,7 +999,7 @@ export function TextTools({
           .parse(
             await runCommand(imp, 'movie.edit.subtitles.export', {
               projectId: project.id,
-              format: 'srt',
+              format,
             }),
           );
         if (file.subtitles === 0)
@@ -1063,12 +1063,24 @@ export function TextTools({
         className="button quiet"
         title={t('Save the film’s subtitles as an .srt file, for players and video sites')}
         onClick={() => {
-          void download().catch((reason: unknown) => {
+          void download('srt').catch((reason: unknown) => {
             setNote(reason instanceof Error ? reason.message : String(reason));
           });
         }}
       >
         <DownloadSimpleIcon aria-hidden="true" /> {t('.srt')}
+      </button>
+      <button
+        type="button"
+        className="button quiet"
+        title={t('Save the film’s subtitles as a WebVTT file, for web players')}
+        onClick={() => {
+          void download('vtt').catch((reason: unknown) => {
+            setNote(reason instanceof Error ? reason.message : String(reason));
+          });
+        }}
+      >
+        <DownloadSimpleIcon aria-hidden="true" /> {t('.vtt')}
       </button>
       {note !== '' && <span className="muted small">{note}</span>}
     </span>

@@ -607,6 +607,8 @@ function ShotCard({
   const fromScript = scriptLines.find((line) => line.shotIds.includes(shot.id));
   const at = { sceneId: shot.sceneId, shotId: shot.id };
   const [starting, setStarting] = useState(false);
+  const [options, setOptions] = useState<ClipOptionValues>(DEFAULT_CLIP_OPTIONS);
+  const generateInput = { ...at, ...clipOptionInput(options) };
   const pending = shot.clip?.status === 'pending';
   const change = (fields: Record<string, unknown>): Promise<unknown> =>
     act('movie.shot.update', { ...at, ...fields });
@@ -807,14 +809,14 @@ function ShotCard({
           }
           onClick={() => {
             setStarting(true);
-            void act('movie.shot.clip.generate', at).finally(() => {
+            void act('movie.shot.clip.generate', generateInput).finally(() => {
               setStarting(false);
             });
           }}
         >
           <FilmStripIcon aria-hidden="true" />{' '}
           {shot.clip === null ? t('Generate clip') : t('Generate again')}
-          <Price command="movie.shot.clip.generate" input={at} />
+          <Price command="movie.shot.clip.generate" input={generateInput} />
         </button>
         {shot.clip !== null && !pending && (
           <ConfirmButton
@@ -832,7 +834,166 @@ function ShotCard({
           </ConfirmButton>
         )}
       </div>
+      <ClipOptions value={options} onChange={setOptions} />
     </article>
+  );
+}
+
+export interface ClipOptionValues {
+  /** Seconds wanted, or null for the length of the dialogue (or 4). */
+  readonly durationSeconds: number | null;
+  readonly resolution: string;
+  readonly aspectRatio: string;
+  /** Whether the clip has sound of its own. Sound is the default; silence is asked for. */
+  readonly audio: boolean;
+  readonly portraits: boolean;
+  readonly startFrame: boolean;
+}
+
+export const DEFAULT_CLIP_OPTIONS: ClipOptionValues = {
+  durationSeconds: null,
+  resolution: '720p',
+  aspectRatio: '16:9',
+  audio: true,
+  portraits: true,
+  startFrame: true,
+};
+
+const RESOLUTION_CHOICES = ['480p', '720p', '1080p'] as const;
+const ASPECT_CHOICES = ['16:9', '9:16', '1:1', '4:3', '21:9'] as const;
+
+/** Only what differs from the defaults goes to the command, so agents and people read the same call. */
+export function clipOptionInput(options: ClipOptionValues): Record<string, unknown> {
+  const input: Record<string, unknown> = {};
+  if (options.durationSeconds !== null) input['durationSeconds'] = options.durationSeconds;
+  if (options.resolution !== DEFAULT_CLIP_OPTIONS.resolution)
+    input['resolution'] = options.resolution;
+  if (options.aspectRatio !== DEFAULT_CLIP_OPTIONS.aspectRatio)
+    input['aspectRatio'] = options.aspectRatio;
+  if (!options.audio) input['audio'] = false;
+  if (!options.portraits) input['portraits'] = false;
+  if (!options.startFrame) input['startFrame'] = false;
+  return input;
+}
+
+/** The choices an agent has when it makes a clip, folded away under the Generate button. */
+function ClipOptions({
+  value,
+  onChange,
+}: {
+  value: ClipOptionValues;
+  onChange: (next: ClipOptionValues) => void;
+}): ReactElement {
+  const lengthId = useId();
+  const sizeId = useId();
+  const aspectId = useId();
+  const changed = Object.keys(clipOptionInput(value)).length;
+  const set = (patch: Partial<ClipOptionValues>): void => {
+    onChange({ ...value, ...patch });
+  };
+  return (
+    <details className="options-fold">
+      <summary>
+        {t('Clip options')}
+        {changed > 0 && (
+          <span className="muted"> · {tn(changed, '{count} changed', '{count} changed')}</span>
+        )}
+        {!value.audio && <span className="tag neutral">{t('silent')}</span>}
+      </summary>
+      <div className="row wrap">
+        <div className="field compact">
+          <label htmlFor={lengthId}>{t('Length (s)')}</label>
+          <select
+            id={lengthId}
+            className="input"
+            value={value.durationSeconds === null ? '' : String(value.durationSeconds)}
+            onChange={(event) => {
+              set({
+                durationSeconds: event.target.value === '' ? null : Number(event.target.value),
+              });
+            }}
+          >
+            <option value="">{t('Automatic')}</option>
+            {[2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30].map((seconds) => (
+              <option key={seconds} value={seconds}>
+                {String(seconds)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field compact">
+          <label htmlFor={sizeId}>{t('Size')}</label>
+          <select
+            id={sizeId}
+            className="input"
+            value={value.resolution}
+            onChange={(event) => {
+              set({ resolution: event.target.value });
+            }}
+          >
+            {RESOLUTION_CHOICES.map((choice) => (
+              <option key={choice} value={choice}>
+                {choice}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field compact">
+          <label htmlFor={aspectId}>{t('Aspect ratio')}</label>
+          <select
+            id={aspectId}
+            className="input"
+            value={value.aspectRatio}
+            onChange={(event) => {
+              set({ aspectRatio: event.target.value });
+            }}
+          >
+            {ASPECT_CHOICES.map((choice) => (
+              <option key={choice} value={choice}>
+                {choice}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="choices">
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={value.audio}
+            onChange={(event) => {
+              set({ audio: event.target.checked });
+            }}
+          />
+          {t('With its own sound')}
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={value.portraits}
+            onChange={(event) => {
+              set({ portraits: event.target.checked });
+            }}
+          />
+          {t('Send the portraits as guides')}
+        </label>
+        <label className="choice">
+          <input
+            type="checkbox"
+            checked={value.startFrame}
+            onChange={(event) => {
+              set({ startFrame: event.target.checked });
+            }}
+          />
+          {t('Start on the key frame')}
+        </label>
+      </div>
+      <p className="muted small">
+        {t(
+          'The model makes the nearest length and size it can. Leave the portraits out for models that refuse them.',
+        )}
+      </p>
+    </details>
   );
 }
 
