@@ -1,0 +1,37 @@
+{
+  "title": "The Leaf",
+  "look": "Photoreal cinematic macro photography, 35mm anamorphic lens, shallow depth of field, warm golden-hour light with soft haze, rich autumn palette of crimson, amber and teal shadows, gentle film grain, 16:9.",
+  "leaf": "a single maple leaf with five pointed lobes, deep crimson at its heart fading to glowing amber-gold at the lobe tips, fine dark-red veins, a short curved dark-red stem, and one small crescent-shaped bite missing from the edge of its right-hand lobe",
+  "rules": [
+    "The leaf is the only character. Its shape, colours, notch and stem never change.",
+    "One unbroken take: no cuts, the camera always travels with the leaf.",
+    "Every clip is pinned at both ends: it starts on the real last frame of the clip before and ends on an anchor still painted from the leaf reference.",
+    "Anchors sit at moments where the leaf hangs almost still, so a join never interrupts a movement."
+  ],
+  "anchors": {
+    "k0": {
+      "refs": ["leaf_ref"],
+      "prompt": "The leaf hangs from the tip of a thin maple twig at the right of frame, backlit by low golden sun so it glows, seen in close-up from slightly below. Behind it, softly blurred, the crown of an old maple on a hilltop and a hazy valley far below. A few other duller leaves out of focus. Still air."
+    },
+    "k1": {
+      "refs": ["leaf_ref", "k0"],
+      "prompt": "The same leaf alone in mid-air, drifting flat and tilted like a small kite, in close-up at the centre of frame, a metre above a golden meadow of tall grass with dandelion seeds floating around it. Far behind, small and soft, the old maple on its hilltop against the low sun."
+    },
+    "k2": {
+      "refs": ["leaf_ref"],
+      "prompt": "The leaf gliding flat a hand's width above a perfectly still mirror lake at sunset, in close-up at the centre of frame, its reflection beneath it. Beside it three orange-and-white koi swim calmly through the air above the water as if the air were water, trailing tiny bubbles. Pink and gold clouds reflected in the lake, distant dark pines. Dreamlike but photoreal."
+    },
+    "k3": {
+      "refs": ["leaf_ref"],
+      "prompt": "The leaf drifting weightless at the centre of frame in a deep indigo space that is at once underwater and outer space: countless stars and a pale nebula, soft shafts of light falling from far above, small rising bubbles, and a few glowing paper-lantern jellyfish in warm amber light. The leaf is lit warm from one side and keeps its crimson and gold colours."
+    },
+    "k4": {
+      "refs": ["leaf_ref", "k5"],
+      "prompt": "Close-up of a white porcelain teacup of dark tea on a wooden windowsill; the surface of the tea is a tiny night sky full of stars. The leaf is rising out of the cup, hovering just above the rim at the centre of frame in a soft curl of steam. Warm golden evening light through the window, the same cozy room softly blurred behind."
+    },
+    "k5": {
+      "refs": ["leaf_ref"],
+      "prompt": "The leaf lying flat on the open pages of an old book, at the centre of frame in close-up from above at an angle. The book rests on a cream wool blanket on a window seat; beside it a white porcelain teacup with a wisp of steam. Warm golden evening light through the window, an autumn maple softly blurred outside. Peaceful, cozy, still."
+    }
+  }
+}

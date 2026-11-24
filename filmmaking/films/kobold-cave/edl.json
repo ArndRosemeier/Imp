@@ -1,0 +1,99 @@
+{
+  "title": "THE KOBOLD CAVE",
+  "title_seconds": 3.6,
+  "fade_in": 0.6,
+  "cuts": [
+    { "shot": "s01", "in": 0.0, "out": 3.6, "gain_db": -24, "note": "establishing shot" },
+    {
+      "shot": "s02",
+      "in": 1.2,
+      "out": 5.7,
+      "lead": 1.2,
+      "note": "J-cut: the slap of the notice and the tavern noise are heard over the exterior before we cut inside"
+    },
+    { "shot": "s03", "in": 0.4, "out": 2.0, "note": "insert of the notice" },
+    {
+      "shot": "s04",
+      "in": 1.4,
+      "out": 4.0,
+      "lead": 0.7,
+      "note": "J-cut: Brann starts talking over the insert; over-the-shoulder"
+    },
+    {
+      "shot": "s05",
+      "in": 0.7,
+      "out": 3.9,
+      "tail": 0.9,
+      "note": "reverse over-the-shoulder; L-cut: Fenn's chuckle runs on over Brann's face"
+    },
+    {
+      "shot": "s06",
+      "in": 0.6,
+      "out": 3.5,
+      "note": "reaction shot, a beat of silence before the line"
+    },
+    { "shot": "s07", "in": 1.7, "out": 8.7, "note": "back to the master two-shot" },
+    { "shot": "s08", "in": 1.5, "out": 3.0, "note": "candle, first half of the graphic match" },
+    {
+      "shot": "s09",
+      "in": 0.0,
+      "out": 5.8,
+      "note": "torch in the same spot: match cut to the cave, pull back to establish"
+    },
+    { "shot": "s10", "in": 0.0, "out": 5.6, "note": "Brann walks off mid-sentence" },
+    {
+      "shot": "s11",
+      "in": 0.3,
+      "out": 3.6,
+      "gain_db": -22,
+      "note": "cut on action into the tunnel, tracking from behind"
+    },
+    { "shot": "s12", "in": 0.3, "out": 1.9, "note": "insert: boot on tripwire" },
+    { "shot": "s13", "in": 0.5, "out": 3.0, "note": "reaction two-shot" },
+    { "shot": "s14", "in": 0.5, "out": 3.2, "note": "darts" },
+    { "shot": "s15", "in": 0.6, "out": 3.9, "note": "cutaway to the kobolds" },
+    { "shot": "s16", "in": 0.4, "out": 3.4, "note": "fight, fast cutting" },
+    { "shot": "s17", "in": 0.2, "out": 3.6, "note": "fight, fast cutting" },
+    { "shot": "s18", "in": 0.4, "out": 3.6, "note": "aftermath wide" },
+    {
+      "shot": "s19",
+      "in": 0.3,
+      "out": 8.75,
+      "tail": 0.25,
+      "note": "payoff two-shot, smash cut to black on the last word"
+    }
+  ],
+  "music": [
+    {
+      "file": "audio/tavern.mp3",
+      "at": 0.0,
+      "until_cut": "s02",
+      "gain_db": -30,
+      "filter": "lowpass=f=500",
+      "note": "heard through the wall from outside"
+    },
+    {
+      "file": "audio/tavern.mp3",
+      "at_cut": "s02",
+      "src_from_timeline": true,
+      "until_cut": "s09",
+      "gain_db": -25,
+      "note": "minstrels in the room; stops dead on the match cut"
+    },
+    {
+      "file": "audio/cave.mp3",
+      "at_cut": "s11",
+      "until_cut": "s19",
+      "gain_db": -19,
+      "fade_out": 1.2,
+      "note": "suspense that turns into the fight theme"
+    },
+    {
+      "file": "audio/cave.mp3",
+      "src_in": 26.5,
+      "at_cut": "END",
+      "gain_db": -15,
+      "note": "closing sting over the title"
+    }
+  ]
+}
