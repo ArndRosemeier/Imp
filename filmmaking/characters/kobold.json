@@ -1,0 +1,7 @@
+{
+  "id": "kobold",
+  "look": "a kobold: a scrawny knee-high reptilian creature with a dog-like snout, rust-brown scales, big yellow lantern eyes, small horns, a thin tail, wearing scraps of sackcloth and carrying a crude bone-tipped spear",
+  "files": {
+    "ref": "kobold_ref.webp"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "fenn",
+  "name": "Fenn Alderwick",
+  "role": "druid",
+  "look": "a lean, wiry man of about thirty with a narrow freckled face, long copper-red hair tied back with two thin braids hanging in front of his right ear, a short neat copper beard, and bright green eyes. He wears a moss-green hooded wool cloak fastened at the throat with a bronze oak-leaf brooch over a cream linen tunic and a brown leather herb-pouch belt, and carries a tall gnarled dark wooden staff whose top is a knot of roots gripping a rough amber stone",
+  "voice": "a light, quick, bright tenor with a wry, precise, slightly amused delivery",
+  "personality": "Clever, talkative, cautious, fond of being right and fonder of Brann than he lets on. Notices everything, warns about it, gets ignored, and enjoys saying so afterwards.",
+  "speech": "Quick, complete, slightly fussy sentences. Dry teasing. Corrects details. Gets the last word.",
+  "voice_prompt": "a light, quick, bright tenor voice, wry and amused",
+  "files": {
+    "portrait": "fenn_portrait.webp (hero reference, use for every still)",
+    "sheet": "fenn_sheet.webp (full body, three views; add for full-body and back shots)",
+    "voice_sample": "voice.mp3 (14 s; shared by public link for models that take a voice recording, e.g. Seedance: refer to it as @Audio1 and name whose voice it is)",
+    "voice_raw": "fenn_voice_raw.mp3"
+  },
+  "voice_sample_made_with": "bytedance-seed/seed-audio-1-0, voice described in the text prompt",
+  "how_to_use": "Stills: pass portrait (and sheet) as reference images and repeat the `look` text. Video with dialogue: write the line as: <tag>, says in <voice_prompt>: \"...\". Keep `look`, `voice_prompt` and tag wording identical between films.",
+  "tag": "Fenn, the lean red-haired man in the green cloak",
+  "first_film": "kobold-cave (2026-11-24)",
+  "relationship": "Brann and Fenn are old friends and adventuring partners who bicker constantly.",
+  "voice_archetype": "wry light-tenor clever one (lean, young, quick)",
+  "casting_rule": "The look largely decides the voice a video model gives a character, so two characters of the same look type will sound alike. No two characters in one production may share a voice archetype; on a clash, change the look or age of one before any shot is rendered."
+}

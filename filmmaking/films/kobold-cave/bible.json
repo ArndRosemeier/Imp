@@ -1,0 +1,31 @@
+{
+  "title": "The Kobold Cave",
+  "look": "Photoreal live-action fantasy film still, grounded medieval world, shot on 35mm anamorphic lens, natural motivated light, earthy muted palette with warm firelight and cool shadows, shallow depth of field, fine film grain.",
+  "cast": {
+    "brann": {
+      "name": "Brann Holt",
+      "role": "fighter",
+      "look": "a broad-shouldered, heavyset man of about forty with a square weathered face, short-cropped black hair, a thick short black beard with a grey streak at the chin, a pale scar cutting through his left eyebrow, and dark brown eyes. He wears a worn brown leather brigandine studded with dull iron rivets over a faded rust-red padded gambeson, a single dented steel pauldron on his right shoulder only, thick leather bracers, a wide belt with a plain longsword in a scabbard at his left hip, and a round wooden shield with an iron boss and a chipped red rim slung on his back",
+      "voice": "a deep, gravelly, slow baritone with a dry, flat, grumbling delivery",
+      "personality": "Blunt, proud, impatient, loyal to the bone. Thinks in terms of pay, ale and getting it over with. Goes first, always, and never admits he is hurt.",
+      "speech": "Short plain sentences. Understatement. Complains about pay. Never uses a long word if a grunt will do."
+    },
+    "fenn": {
+      "name": "Fenn Alderwick",
+      "role": "druid",
+      "look": "a lean, wiry man of about thirty with a narrow freckled face, long copper-red hair tied back with two thin braids hanging in front of his right ear, a short neat copper beard, and bright green eyes. He wears a moss-green hooded wool cloak fastened at the throat with a bronze oak-leaf brooch over a cream linen tunic and a brown leather herb-pouch belt, and carries a tall gnarled dark wooden staff whose top is a knot of roots gripping a rough amber stone",
+      "voice": "a light, quick, bright tenor with a wry, precise, slightly amused delivery",
+      "personality": "Clever, talkative, cautious, fond of being right and fonder of Brann than he lets on. Notices everything, warns about it, gets ignored, and enjoys saying so afterwards.",
+      "speech": "Quick, complete, slightly fussy sentences. Dry teasing. Corrects details. Gets the last word."
+    }
+  },
+  "voice_prompt": {
+    "brann": "a very deep, gravelly, slow bass voice, dry and grumbling",
+    "fenn": "a light, quick, bright tenor voice, wry and amused"
+  },
+  "kobold": "a kobold: a scrawny knee-high reptilian creature with a dog-like snout, rust-brown scales, big yellow lantern eyes, small horns, a thin tail, wearing scraps of sackcloth and carrying a crude bone-tipped spear",
+  "voice_archetypes": {
+    "brann": "gruff deep-bass veteran (big, bearded, around forty)",
+    "fenn": "wry light-tenor clever one (lean, young, quick)"
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "model": "google/gemini-omni-1.2-flash",
+  "resolution": "720p",
+  "usd_per_second": 0.0695,
+  "image_model": "meta/muse-image",
+  "style": "Photoreal live-action fantasy film, 35mm anamorphic, natural motivated light, fine film grain. One continuous shot, no cut inside the shot, no subtitles, no on-screen text, no music.",
+  "tags": {
+    "brann": "Brann, the big black-bearded man in leather armour",
+    "fenn": "Fenn, the lean red-haired man in the green cloak"
+  },
+  "locations": {
+    "tavern": "frames/tavern_master_169.png",
+    "cave_mouth": "frames/loc_cave_mouth.webp",
+    "tunnel": "frames/loc_tunnel.webp"
+  },
+  "shots": [
+    {
+      "id": "s01",
+      "scene": "tavern",
+      "size": "establishing wide",
+      "duration": 4,
+      "key": null,
+      "action": "Slow steady push-in towards the tavern door at dusk. Chimney smoke drifts, the hanging sign sways slightly, the warm windows flicker with firelight and moving shadows of guests inside.",
+      "sound": "evening wind, muffled chatter and laughter from inside the tavern, a dog barking far away",
+      "seed": 11
+    },
+    {
+      "id": "s02",
+      "scene": "tavern",
+      "size": "two-shot master",
+      "duration": 6,
+      "key": null,
+      "action": "Static medium two-shot. The arm of an unseen innkeeper reaches in from the top of frame, slaps a ragged parchment notice down on the table between the two men and withdraws. Brann looks down at it, then up at Fenn with a scowl.",
+      "lines": [
+        ["brann", "Ten silver. For kobolds."],
+        ["fenn", "It is honest work, Brann."]
+      ],
+      "sound": "a slap of parchment on wood, tavern murmur, crackling hearth fire",
+      "seed": 12
+    },
+    {
+      "id": "s03",
+      "scene": "tavern",
+      "size": "insert",
+      "duration": 3,
+      "cast": [],
+      "loc_ref": true,
+      "key": "Extreme close-up from above of a ragged parchment notice lying on the same rough wooden tavern table, beside the lit candle and the tankard of dark ale: on the parchment a crude charcoal drawing of a small horned lizard creature standing next to a cave mouth, and below it ten small drawn circles for coins, no writing at all. A man's thick hand in a worn brown leather bracer with a rust-red padded sleeve rests beside it, index finger pointing at the creature. Warm candlelight, shallow depth of field.",
+      "action": "The thick finger taps the drawn creature twice, hard, then the hand flattens on the parchment. The candle flame flickers.",
+      "sound": "two dull finger taps on wood, tavern murmur, crackling fire",
+      "seed": 13
+    },
+    {
+      "id": "s04",
+      "scene": "tavern",
+      "size": "over-the-shoulder on Brann",
+      "duration": 5,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Over-the-shoulder shot in the same tavern as the location reference. In the foreground at the right edge of frame, dark and out of focus, the back of Fenn's head with copper-red hair tied back and his moss-green cloaked shoulder. In sharp focus beyond him sits Brann at the rough wooden table, medium close-up, his body and face turned towards the right of frame, looking at Fenn, scowling, a tankard in his fist. The stone hearth fire glows behind him. Warm firelight.",
+      "action": "Static over-the-shoulder shot. Brann leans forward a little over the table and speaks to Fenn, aggrieved, then takes a swig from the tankard.",
+      "lines": [["brann", "I fought a troll last spring. Now it is kobolds."]],
+      "sound": "tavern murmur, crackling fire",
+      "seed": 14
+    },
+    {
+      "id": "s05",
+      "scene": "tavern",
+      "size": "reverse over-the-shoulder on Fenn",
+      "duration": 5,
+      "cast": ["fenn", "brann"],
+      "loc_ref": true,
+      "key": "Reverse over-the-shoulder shot in the same tavern as the location reference. In the foreground at the left edge of frame, dark and out of focus, the back of Brann's head with short black hair and his dented steel pauldron. In sharp focus beyond him sits Fenn at the rough wooden table, medium close-up, his body and face turned towards the left of frame, looking at Brann, one eyebrow raised, a faint smile. Behind him the dark timber wall with hanging strings of onions and dried herbs and his gnarled staff leaning against it. Warm candlelight.",
+      "action": "Static over-the-shoulder shot. Fenn tilts his head, amused, and answers calmly in two short sentences with a little pause between them, then smiles wider.",
+      "lines": [
+        ["fenn", "You fought a large goat."],
+        ["fenn", "In the fog."]
+      ],
+      "sound": "tavern murmur, crackling fire",
+      "seed": 15
+    },
+    {
+      "id": "s06",
+      "scene": "tavern",
+      "size": "close-up reaction on Brann",
+      "duration": 4,
+      "cast": ["brann"],
+      "loc_ref": true,
+      "key": "Close-up of Brann in the same tavern as the location reference, head and shoulders, camera on the same side of the table as in the location reference: we see the right side of his face in three-quarter profile, his nose pointing towards the RIGHT edge of the frame, his eyes glaring at someone off-screen to the right, jaw set, brows lowered. His dented steel pauldron is on the shoulder nearest the camera. The stone hearth fire glows out of focus behind him at the left of frame. Warm firelight on his face.",
+      "action": "Static close-up. Brann glares in silence for two full seconds, his jaw working, his eyes narrowing. Then he mutters one short line and looks away.",
+      "lines": [["brann", "It had horns."]],
+      "sound": "tavern murmur, crackling fire",
+      "seed": 16
+    },
+    {
+      "id": "s07",
+      "scene": "tavern",
+      "size": "two-shot master",
+      "duration": 9,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Exactly the same medium two-shot as the location reference image: the same tavern table seen from the side, Brann sitting on the left facing right, Fenn sitting on the right facing left, the candle burning between them, the tankard and the bowl of stew on the table. Now a ragged parchment notice lies on the table between them and Brann has both hands flat on the table, about to push himself up. Fenn leans back with his arms folded, amused.",
+      "action": "Static medium two-shot. Brann pushes himself up from the bench to his full height and speaks both of his sentences down at Fenn, slowly and clearly. Then he slams his fist on the table. Only after that Fenn, still seated with folded arms, answers dryly without moving.",
+      "lines": [
+        ["brann", "Fine. But I go first."],
+        ["fenn", "You always go first. That is why I carry the bandages."]
+      ],
+      "sound": "bench scraping, a tankard slammed on wood, tavern murmur, fire",
+      "seed": 17
+    },
+    {
+      "id": "s08",
+      "scene": "tavern",
+      "size": "extreme close-up, graphic match out",
+      "duration": 3,
+      "cast": [],
+      "loc_ref": true,
+      "key": "Extreme close-up of a single candle flame on a thick yellow wax candle on the tavern table, the flame exactly in the centre of the frame and filling a fifth of the frame height, upright and steady. Behind it only dark warm blur with soft orange bokeh from the hearth fire. Shallow depth of field.",
+      "action": "Static extreme close-up. Something heavy is slammed on the table off-screen: the flame shudders and bends sideways, then slowly straightens and burns steady in the exact centre of the frame.",
+      "sound": "a heavy wooden thump, then quiet tavern murmur fading",
+      "seed": 18,
+      "last": "s08"
+    },
+    {
+      "id": "s09",
+      "scene": "cave_mouth",
+      "size": "extreme close-up pulling back to wide, graphic match in",
+      "duration": 6,
+      "cast": [],
+      "loc_ref": false,
+      "key": "Extreme close-up of the flame of a burning pitch torch, the flame exactly in the centre of the frame and filling a fifth of the frame height, upright. Behind it only soft cold grey-green blur of a misty pine forest in morning light. Shallow depth of field.",
+      "last": "s09_end",
+      "action": "The camera pulls smoothly back and rises from the torch flame, revealing that Brann holds the torch in his raised hand; it keeps pulling back until it shows both men from behind, standing side by side in front of the dark mouth of a cave in a mossy hillside on a cold misty morning, Brann on the left with the torch and his shield on his back, Fenn on the right with his staff. They stand and look into the dark.",
+      "sound": "torch flame crackling, cold wind in pines, crows calling, nobody speaks",
+      "seed": 19
+    },
+    {
+      "id": "s09_end",
+      "keyframe_only": true,
+      "scene": "cave_mouth",
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "sheets": true,
+      "key": "Wide shot of the same cave mouth as the location reference on a cold misty grey morning, seen from behind two men who stand side by side on the muddy path facing the dark opening, full body, backs to the camera. On the left Brann, his round wooden shield with the chipped red rim on his back, holding a burning torch up in his right hand. On the right Fenn, bare-headed with his hood down on his shoulders so his copper-red hair tied back is clearly visible, in his moss-green cloak, holding his tall gnarled staff with the amber stone. The cave mouth is dark between them."
+    },
+    {
+      "id": "s10",
+      "scene": "cave_mouth",
+      "size": "medium two-shot, cut on action out",
+      "duration": 6,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Medium two-shot from the side at the threshold of the same cave mouth as the location reference, cold misty grey morning. The dark cave opening is at the right edge of frame. Brann stands at the left of frame, facing right towards the cave, holding a burning torch in his right hand, impatient. Fenn crouches in the centre-right, facing right, touching the muddy ground at the threshold with his fingertips and frowning at it, his staff in his other hand.",
+      "action": "Static medium shot. Fenn, crouching, studies the ground and speaks without looking up. While he is still talking, Brann snorts and strides past him to the right, straight into the dark cave with the torch. Fenn looks up after him, lets his head drop, and says the name wearily.",
+      "lines": [
+        ["fenn", "Kobolds set traps. Let me look before"],
+        ["fenn", "Brann."]
+      ],
+      "sound": "cold wind, torch crackle, heavy boots squelching in mud",
+      "seed": 20
+    },
+    {
+      "id": "s11",
+      "scene": "tunnel",
+      "size": "tracking from behind",
+      "duration": 4,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "sheets": true,
+      "key": "Inside the same narrow mine tunnel as the location reference, seen from behind: two men walking away from the camera into the dark, full body. Brann walks ahead at left-centre, a burning torch raised in his right hand, his round wooden shield with the chipped red rim on his back. Fenn follows one step behind at the right, hood down, copper-red hair tied back, the amber stone at the top of his staff glowing softly gold. Warm torchlight on wet rock, deep darkness ahead.",
+      "action": "The camera follows steadily behind the two men as they walk deeper into the tunnel. Torchlight and long shadows swing across the wet walls; the hanging bone totems sway as Brann brushes past.",
+      "sound": "two sets of footsteps in gravel and puddles, dripping water, faint chittering far ahead, nobody speaks",
+      "seed": 21
+    },
+    {
+      "id": "s12",
+      "scene": "tunnel",
+      "size": "insert",
+      "duration": 3,
+      "cast": [],
+      "loc_ref": true,
+      "key": "Extreme close-up at ground level in the same mine tunnel: a heavy muddy brown leather boot stepping forward, its sole a hand's width above a thin taut cord stretched ankle-high across the wet tunnel floor between two small wooden pegs. Warm torchlight glints on the cord. Shallow depth of field, dark background.",
+      "action": "Static ground-level close-up. The boot comes down on the cord. The cord pulls tight and one peg jerks. The boot freezes in place.",
+      "sound": "a boot step, a taut cord twanging, then a loud sharp mechanical click, then silence",
+      "seed": 22
+    },
+    {
+      "id": "s13",
+      "scene": "tunnel",
+      "size": "tight two-shot reaction",
+      "duration": 4,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Tight frontal two-shot in the same dark mine tunnel, head and shoulders. Brann at the left, frozen, eyes wide, looking down, the burning torch held beside his face. Fenn at the right, just behind Brann's shoulder, eyes closed, face weary and resigned. Warm torchlight on their faces, black tunnel behind them.",
+      "action": "Static tight two-shot. Both men stand frozen. Brann slowly looks up, not moving anything but his eyes. Fenn opens his eyes and speaks flatly, without turning his head.",
+      "lines": [["fenn", "I said traps."]],
+      "sound": "silence, one drip of water, torch crackle",
+      "seed": 23
+    },
+    {
+      "id": "s14",
+      "scene": "tunnel",
+      "size": "medium action",
+      "duration": 4,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Medium shot from the side in the same mine tunnel. Brann crouches at the left behind his big round wooden shield with the chipped red rim, which he holds up in front of him with his left arm, facing right; the burning torch lies on the wet ground beside him. Fenn ducks low behind Brann's back, clutching his staff. At the right the rock wall has a row of small dark holes.",
+      "action": "A volley of small feathered darts shoots out of the holes in the wall from the right and thuds into the wooden shield, one after another. Brann braces behind the shield and it shakes with each hit; Fenn flinches lower. Then it stops.",
+      "sound": "a rapid series of whistling darts and wooden thuds, a grunt of effort, then silence",
+      "seed": 24
+    },
+    {
+      "id": "s15",
+      "scene": "tunnel",
+      "size": "cutaway to the kobolds",
+      "duration": 4,
+      "cast": [],
+      "loc_ref": true,
+      "extra_refs": ["library/kobold_ref.webp"],
+      "key": "Low angle deeper in the same dark mine tunnel: five small kobolds, exactly like the creature in the creature reference image, knee-high scrawny rust-brown reptilian creatures with dog-like snouts, big yellow lantern eyes, small horns, scraps of sackcloth and crude bone-tipped spears, peering out from behind rocks and timber props, looking towards the camera. Their yellow eyes shine in the dark; faint warm torch glow reaches them from the camera side.",
+      "action": "The kobolds chitter to each other, bob up and down and shake their little spears. Then all of them scramble out from behind the rocks and rush towards the camera in a squealing pack.",
+      "sound": "high chittering and yipping, small claws on rock, squealing war cries, nobody speaks words",
+      "seed": 25
+    },
+    {
+      "id": "s16",
+      "scene": "tunnel",
+      "size": "medium wide action",
+      "duration": 4,
+      "cast": ["brann"],
+      "loc_ref": true,
+      "extra_refs": ["library/kobold_ref.webp"],
+      "key": "Medium wide shot from the side in the same mine tunnel lit by a torch burning on the ground. At the left Brann charges towards the right, his round wooden shield held out in front of him with several small feathered darts stuck in it, his longsword in his right hand, mouth open in a roar. At the right four small kobolds like the creature reference, with bone-tipped spears, facing him with wide yellow eyes.",
+      "action": "Brann charges to the right and slams shield-first into the pack of kobolds. They are bowled over and tumble backwards, squealing, spears flying; none is hurt badly, they scramble up and run. Fast, physical, a little comic.",
+      "sound": "a roar, a heavy wooden crash, kobold squeals and yelps, clattering spears",
+      "seed": 26
+    },
+    {
+      "id": "s17",
+      "scene": "tunnel",
+      "size": "low-angle hero shot",
+      "duration": 4,
+      "cast": ["fenn"],
+      "loc_ref": true,
+      "extra_refs": ["library/kobold_ref.webp"],
+      "key": "Low-angle medium shot of Fenn in the same mine tunnel, standing at the left of frame facing right, his staff raised in both hands, the amber stone at its top blazing bright gold, his moss-green cloak billowing. At the right two small kobolds like the creature reference leap towards him with bone-tipped spears. Golden light from the staff on the wet rock walls.",
+      "action": "Fenn slams the foot of his staff down on the rock floor. Thick brown tree roots burst up out of the ground, coil around the two leaping kobolds and lift them, wriggling and squealing, into the air. Fenn lowers the staff with a small satisfied smile.",
+      "sound": "a deep thud, cracking rock, creaking and rushing roots, kobold squeals, a low magical hum",
+      "seed": 27
+    },
+    {
+      "id": "s18",
+      "scene": "tunnel",
+      "size": "wide",
+      "duration": 4,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "sheets": true,
+      "extra_refs": ["library/kobold_ref.webp"],
+      "key": "Wide shot down the same mine tunnel. In the foreground, seen from behind and half in silhouette, Brann at the left with shield and sword and Fenn at the right with his softly glowing staff. Beyond them a pack of small kobolds like the creature reference runs away down the tunnel into the dark; one small iron-bound wooden chest lies dropped on the tunnel floor in the middle distance, its lid sprung open, silver coins spilled around it and glinting.",
+      "action": "The kobolds flee down the tunnel away from the camera, yelping, dropping their spears, and vanish into the dark. The two men stand and watch them go. Brann lowers his sword.",
+      "sound": "fading kobold yelps and scrabbling claws, spears clattering, then quiet dripping",
+      "seed": 28
+    },
+    {
+      "id": "s19",
+      "scene": "tunnel",
+      "size": "two-shot, smash cut out",
+      "duration": 9,
+      "cast": ["brann", "fenn"],
+      "loc_ref": true,
+      "key": "Medium two-shot in the same mine tunnel, lit by a torch and the soft gold glow of a staff. At the left Brann kneels on one knee beside a small open iron-bound chest full of silver coins, turned three-quarters towards the camera, holding up a fistful of coins and grinning broadly. At the right Fenn stands leaning on his softly glowing staff, looking down at Brann's back with raised eyebrows. One small feathered dart sticks out of the back of Brann's trousers.",
+      "action": "Static medium two-shot. First Brann, grinning, lets silver coins run through his fingers into the chest and speaks his two smug words out loud. Then Fenn points with one finger at Brann's backside and answers mildly. Brann stops, twists to look over his own shoulder, turns slowly back with a stony face, and says his last line quietly.",
+      "lines": [
+        ["brann", "See? Easy."],
+        ["fenn", "You have a dart in your backside."],
+        ["brann", "Tell no one."]
+      ],
+      "sound": "clinking coins, dripping water, torch crackle",
+      "seed": 29
+    }
+  ]
+}

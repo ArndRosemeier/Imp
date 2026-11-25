@@ -1,0 +1,51 @@
+{
+  "model": "google/gemini-omni-1.2-flash",
+  "style": "The leaf keeps exactly the same shape and colours throughout. One continuous unbroken shot, no cuts, no fades. Photoreal cinematic macro, shallow depth of field, smooth natural motion; the camera travels with the leaf and keeps it close and centred.",
+  "shots": [
+    {
+      "id": "c1",
+      "duration": 8,
+      "from": "k0",
+      "to": "k1",
+      "seed": 7,
+      "action": "A crimson-and-gold maple leaf hangs from a twig, glowing in low golden sun. A breath of wind stirs it; the stem lets go and the leaf slips free. It tumbles and spins slowly downward and forward, away from the hilltop maple, and the camera falls and glides with it down the hillside towards a golden meadow of tall grass. Dandelion seeds lift into the air around it. By the end the leaf has levelled out and floats flat and calm just above the meadow, still drifting gently forward, the old maple small on its hill behind.",
+      "sound": "soft wind, rustling leaves, quiet birds"
+    },
+    {
+      "id": "c2",
+      "duration": 10,
+      "from": "prev",
+      "to": "k2",
+      "seed": 7,
+      "action": "The maple leaf is already drifting gently forward over the golden meadow among floating dandelion seeds. A warm gust lifts it and carries it on, low over the tall grass, which thins and gives way to the shore of a perfectly still mirror lake at sunset. The leaf sails out over the water, skimming a hand's width above its own reflection. The world turns quietly dreamlike: three orange-and-white koi rise out of the lake without a splash and swim calmly through the air beside the leaf as if the air were water, trailing tiny bubbles. By the end the leaf glides flat and serene above the mirror, the koi alongside, pink and gold clouds reflected below, dark pines far off.",
+      "sound": "wind over grass fading to stillness, faint water, soft airy bubbles"
+    },
+    {
+      "id": "c3",
+      "duration": 10,
+      "from": "prev",
+      "to": "k3",
+      "seed": 7,
+      "action": "The maple leaf glides just above the mirror lake with koi swimming through the air beside it. The leaf tilts, dips, and slips down through the surface of the lake as if through a soft curtain of light, without a splash; the camera follows it straight through. Below the surface there is no lakebed: the water opens into a deep indigo space that is at once underwater and outer space. The leaf sinks slowly and weightlessly among countless stars and a pale nebula, shafts of light falling from far above, small bubbles rising past it, glowing paper-lantern jellyfish pulsing in warm amber light. By the end it hangs almost still at the centre, turning very slowly, lit warm from one side.",
+      "sound": "a soft muffled plunge, then deep underwater hush with a faint shimmering hum"
+    },
+    {
+      "id": "c4",
+      "duration": 10,
+      "from": "prev",
+      "to": "k4",
+      "seed": 7,
+      "action": "The maple leaf drifts weightless in a deep indigo space of stars, bubbles and glowing lantern jellyfish. It begins to rise, slowly at first, then steadily, towards a round disc of warm golden light far above; the stars and bubbles stream gently downward past it and the jellyfish fall away below. The disc grows until it is the round rim of a white porcelain teacup seen from inside: the starry space is the dark tea in the cup. The leaf rises through the surface of the tea in a soft curl of steam, and the camera rises with it out into a cozy room: the teacup stands on a wooden windowsill in warm golden evening light, its tea still a tiny night sky full of stars. By the end the leaf hovers just above the rim of the cup in the steam.",
+      "sound": "rising shimmering hum, a soft liquid bloop, then a quiet warm room, faint ticking clock"
+    },
+    {
+      "id": "c5",
+      "duration": 8,
+      "from": "prev",
+      "to": "k5",
+      "seed": 7,
+      "action": "The maple leaf hovers in a curl of steam just above a white porcelain teacup of starry tea on a wooden windowsill in warm golden evening light. The steam lets it go: the leaf sways gently to the right and downward, rocking like a tiny boat, and the camera pans slowly right with it along the same windowsill, the teacup sliding towards the left edge of frame. Right beside the cup an old book lies open on a folded cream wool blanket. The leaf settles softly, face up and flat, onto the open pages, rocks once, and comes to rest, as bright crimson and gold as ever. The camera eases to a stop and holds on the resting leaf, the autumn maple blurred outside the window. Peaceful and still. A single slow pan in one room, with no cut and no change of scene.",
+      "sound": "quiet room, a soft papery touch as the leaf lands, distant birdsong"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "brann",
+  "name": "Brann Holt",
+  "role": "fighter",
+  "look": "a broad-shouldered, heavyset man of about forty with a square weathered face, short-cropped black hair, a thick short black beard with a grey streak at the chin, a pale scar cutting through his left eyebrow, and dark brown eyes. He wears a worn brown leather brigandine studded with dull iron rivets over a faded rust-red padded gambeson, a single dented steel pauldron on his right shoulder only, thick leather bracers, a wide belt with a plain longsword in a scabbard at his left hip, and a round wooden shield with an iron boss and a chipped red rim slung on his back",
+  "voice": "a deep, gravelly, slow baritone with a dry, flat, grumbling delivery",
+  "personality": "Blunt, proud, impatient, loyal to the bone. Thinks in terms of pay, ale and getting it over with. Goes first, always, and never admits he is hurt.",
+  "speech": "Short plain sentences. Understatement. Complains about pay. Never uses a long word if a grunt will do.",
+  "voice_prompt": "a very deep, gravelly, slow bass voice, dry and grumbling",
+  "files": {
+    "portrait": "brann_portrait.webp (hero reference, use for every still)",
+    "sheet": "brann_sheet.webp (full body, three views; add for full-body and back shots)",
+    "voice_sample": "voice.mp3 (14 s; shared by public link for models that take a voice recording, e.g. Seedance: refer to it as @Audio1 and name whose voice it is)",
+    "voice_raw": "brann_voice_raw.mp3"
+  },
+  "voice_sample_made_with": "bytedance-seed/seed-audio-1-0, voice described in the text prompt",
+  "how_to_use": "Stills: pass portrait (and sheet) as reference images and repeat the `look` text. Video with dialogue: write the line as: <tag>, says in <voice_prompt>: \"...\". Keep `look`, `voice_prompt` and tag wording identical between films.",
+  "tag": "Brann, the big black-bearded man in leather armour",
+  "first_film": "kobold-cave (2026-11-24)",
+  "relationship": "Brann and Fenn are old friends and adventuring partners who bicker constantly.",
+  "voice_archetype": "gruff deep-bass veteran (big, bearded, around forty)",
+  "casting_rule": "The look largely decides the voice a video model gives a character, so two characters of the same look type will sound alike. No two characters in one production may share a voice archetype; on a clash, change the look or age of one before any shot is rendered."
+}
