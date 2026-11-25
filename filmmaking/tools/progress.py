@@ -88,7 +88,7 @@ def build():
             st, "✓" if st == "done" else i, E(x["name"]), LABEL[st], '<span class="at">%s UTC</span>' % E(x["at"]) if x.get("at") else "", E(x.get("what", ""))))
         if x.get("note"): o.append('<p class="note">%s</p>' % E(x["note"]))
         if x.get("images"):
-            o.append('<div class="shots">' + "".join('<figure><img src="%s" alt="%s"><figcaption>%s</figcaption></figure>' % (thumb(im["file"], 1400 if "sheet" in im["file"] and "_sheet" in im["file"] else 480), E(im["caption"]), E(im["caption"])) for im in x["images"]) + "</div>")
+            o.append('<div class="shots">' + "".join('<figure><img src="%s" alt="%s"><figcaption>%s</figcaption></figure>' % (thumb(im["file"], 1400 if ("_sheet" in im["file"] or im["file"].startswith("tests/")) else 480), E(im["caption"]), E(im["caption"])) for im in x["images"]) + "</div>")
         o.append("</div></li>")
     o.append("</ol></section>")
     if d.get("learnings"):

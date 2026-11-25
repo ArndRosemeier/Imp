@@ -222,3 +222,113 @@ Template:
 - **Now:** Estimates are built from seconds of video plus a retake allowance.
 - **Source:** measured (ledger)
 - **Status:** in the playbook
+
+## The Last Letter at Dunmore Pier (long format, photoreal, 2026-11-25)
+
+### A model that listens and watches gives Claude a second opinion
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** A chat model with audio and video input (`watch.py`, `google/gemini-4-hydrogen`) was asked about recordings and clips: who speaks, which accent, who moves their lips to which line, what happens in order, what looks wrong. Over 91 clips it flagged 32; about 22 were real misses (swapped speakers, a gate that never opened, drawn graphics over the picture, a cap appearing on a head). It also erred: it called a walking man frozen.
+- **Why:** Until now Claude judged clips from still frames, transcripts and pitch only. Motion and sound were unverified.
+- **Now:** Every clip is reviewed by `watchreview.py` against its action and its picture-facts, with a KEEP or RETAKE line. A RETAKE is confirmed on frames before money is spent. The finished cut is watched in parts of about a minute. It stays a second opinion: Arnd's eyes and ears decide.
+- **Source:** measured, inspected
+- **Status:** in the playbook
+
+### The keyframe must show the start of the action
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** Shots whose keyframe already showed the end state (a hand already on the sleeve, an envelope already held up) could not perform the action. The model invented something else: turned the envelope, opened a book, brought in a coffin.
+- **Why:** The first frame is a hard constraint. An action that is already finished in it has nowhere to go.
+- **Now:** At the keyframe check, each still is compared with the first words of its action, not with its last.
+- **Source:** inspected
+- **Status:** in the playbook
+
+### Close-ups need the scene's wide shot as their reference
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** In the first cut, close-ups stood in a different place than the wide shot of the same scene: a second pier with railings behind the faces, a promenade instead of the shed wall. Painting the four pier close-ups and two awning close-ups again with the scene's wide keyframe as reference, and with the background named in words, put all of them in the right place at the first try.
+- **Why:** Every keyframe had been painted on its own from an empty location master. That holds the look of a place, not its geometry or what is behind each person.
+- **Now:** Per scene the wide master is painted first. Every closer shot takes it as a reference and says what is behind the figure and what is not there. A contact sheet per scene is checked before filming.
+- **Source:** inspected
+- **Status:** in the playbook
+
+### Costume details drift inside a scene
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** In the last scene Margaret's gloves are on, off and on again, her scarf changes its knot, and a moon appears in one shot. The watcher listed them; they were not fixed.
+- **Why:** The cast text names the costume once for the whole film. Nothing fixes its state per scene, and small things are not visible on a contact sheet.
+- **Now:** Proposed: a costume and prop state per scene in the shot list (gloves on, scarf knotted, letter in which hand), added to every keyframe prompt of that scene and checked by the watcher on the scene's stills.
+- **Source:** inspected (by the watching model, confirmed on stills)
+- **Status:** open
+
+### Name the hardware that is in the picture
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** The gate had a slide bolt. The prompt said "lifts the latch". The hand pushed at the bolt, it sprang back and the gate stayed shut. "Draws the bolt back and pushes the gate" worked.
+- **Why:** The video model animates what is in the frame, not what the script calls it.
+- **Now:** Actions on objects are written after the keyframe is approved, in the words of what the still shows.
+- **Source:** inspected
+- **Status:** in the playbook
+
+### Sound words come back as drawings
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** Two clips whose prompts named sounds (laughter and a brass band, waves and breath) showed cartoon graphics over the picture: "ha ha", musical notes, drawn puffs.
+- **Why:** Unknown. The video model seems to read some sound descriptions as things to show.
+- **Now:** The style text of every shot ends with "No graphics, symbols, captions, drawn effects or overlays of any kind appear in the picture." The retakes were clean.
+- **Source:** inspected
+- **Status:** in the playbook
+
+### Ask for less in one shot
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** "Reaches over the gate and lifts the mailbox lid" produced a second gate and a second mailbox. "Looks at the letter, lifts it a little towards the mailbox, stops" worked. One round of simpler prompts mended 9 of 12 failed shots.
+- **Why:** An action the geometry of the still does not allow makes the model rebuild the set.
+- **Now:** A failed shot is first rewritten smaller. If the same thing fails twice, the keyframe or the staging changes.
+- **Source:** inspected
+- **Status:** in the playbook
+
+### One recording per character pins a voice, and a direction per line makes it act
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** Seed Audio spoke all of a character's lines in one request as one voice (similarity 0.85 to 0.97 between lines). Two requests with the same description gave two voices (0.59). The voice has to be described in the prompt text; the `instructions` field gave a man for a woman. Writing each line as `Direction: "line"` raised the listener's acting score from 2 to 5 up to 7 to 8, and the directions were not spoken.
+- **Why:** The model picks a new voice per request and reads undirected lines flat.
+- **Now:** `voicecut.py` cuts the one recording into lines by word times. Useful wherever a recorded voice can be used: voice-over, animation, non-photoreal films.
+- **Source:** measured (speaker embeddings, `voiceid.py`), judged by the listening model
+- **Status:** in the playbook
+
+### Recorded voices cannot be put on living photoreal shots today
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** Three routes failed. Lip-sync on a still (HeyGen Avatar 6 turbo) keeps the voice, but the background is a frozen photograph, nobody leaves the frame, and a bearded or turned-away speaker loses his line to the clearer face. Wan 3.0 ignores an audio reference and invents its own voices. HeyGen refuses video of realistic people as a reference. Seedance refuses photoreal faces.
+- **Why:** Providers guard realistic faces and voices.
+- **Now:** Photoreal dialogue is filmed with the voice the video model makes, held by a detailed voice description per character. Measured on clean single-speaker clips the voices held (Margaret 0.83 to 0.88 over 11 shots, Thomas 0.87 to 0.90). The lip-sync detour cost about $10. Arnd has both versions of one scene to judge by ear.
+- **Source:** measured, inspected
+- **Status:** open: Arnd's verdict on the voices
+
+### Loudness levelling shifts sound against picture
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** The first long cut drifted: each of 91 cuts lost two frames of sound and the film ended five seconds out. `synccheck.py` (where a transcript hears a first word against where the edit puts it) showed it.
+- **Why:** ffmpeg's loudnorm shifts timestamps; cutting to length afterwards cut real sound.
+- **Now:** `longcut.py` renumbers the samples (`asetpts=N/SR/TB`) before padding, renders picture and sound of each cut separately and joins the sound as WAV. Sync is checked on every cut of a film; it measured 0.00 to 0.02 s.
+- **Source:** measured
+- **Status:** in the playbook
+
+### A long film is cut in two passes
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** A single ffmpeg graph for 91 cuts was replaced by one small file per cut, cached by content, and a join. A changed shot recuts in seconds.
+- **Why:** Long graphs are slow and fail as a whole.
+- **Now:** `longcut.py` for anything beyond about 20 cuts. It also grades by time layer, cross-fades marked cuts, lays voice-overs and music, and makes title cards.
+- **Source:** measured
+- **Status:** in the playbook
+
+### What a ten-minute film costs
+
+- **Date / film:** 2026-11-25, The Last Letter at Dunmore Pier
+- **What happened:** About $72 for 10.5 minutes in 91 shots: silent shots and dialogue about $40 at 6 cents a second, retakes about $9, the lip-sync detour and model tests about $15, stills $2, the watching and listening model about $3, music $0.24. About 860 seconds were filmed for 629 in the cut.
+- **Why:** Video is still the bill. Checking by a watching model is cheap next to a retake.
+- **Now:** Estimate 6 to 7 cents per second of the finished film times 1.4, plus scouting.
+- **Source:** measured (key usage; the ledger undercounts when jobs run in parallel)
+- **Status:** in the playbook

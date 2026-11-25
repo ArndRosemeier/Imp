@@ -1,0 +1,54 @@
+{
+  "albert": {
+    "a02": "Gently, to his old dog",
+    "a08": "A flat, polite greeting",
+    "a09": "A quiet question",
+    "a11": "Resigned",
+    "a14": "Politely, handing over a letter",
+    "a17": "Too quickly, afraid to stay",
+    "n26": "Almost to himself",
+    "n37": "Very softly, a decision made",
+    "n44": "Slowly, with great difficulty, ashamed, with a long pause between the two sentences",
+    "p02": "Barely above a whisper, broken, each short sentence costing him, with pauses between them",
+    "p05": "Quietly, taking the blame",
+    "p06": "A whisper"
+  },
+  "margaret": {
+    "a14": "Kindly, a little amused",
+    "a15": "Warmly, with a small smile",
+    "a17": "A simple neighbourly offer",
+    "n29": "Quietly, looking out at the rain, lonely",
+    "n30": "Slowly, tired, with pauses, a little embarrassed at the end",
+    "n31": "Lightly, far away in thought, as of something long past; a pause before the last sentence",
+    "n33": "A tired, polite goodbye",
+    "n42": "Mildly surprised",
+    "p01": "Very quietly, after crying",
+    "p03": "Softly, without anger, almost to the sea",
+    "p04": "With a small sad smile in the voice",
+    "p05": "Low, reproachful, hurt",
+    "p06": "Steady, through tears",
+    "p07": "Slowly, exhausted and sad rather than angry",
+    "p09": "Very quietly, forgiving, with a pause between the two sentences"
+  },
+  "teromed": {
+    "a08": "Gruffly, without looking up from his work",
+    "a09": "A flat statement of fact, grumbling",
+    "a10": "Slowly, looking out to sea, with a long pause between the two sentences, the second one heavy and final",
+    "a11": "Drily, with a short nod"
+  },
+  "maelis": {
+    "n25": "Briskly, busy with her hands, not unkind",
+    "n26": "Lightly and cheerfully, meaning to comfort",
+    "n27": "Warmly and sincerely, with real admiration, a little shy",
+    "n37": "A plain, friendly working remark"
+  },
+  "thomas": {
+    "t06": "Calling out over wind, loud and urgent",
+    "t08": "Low and urgent, close to his brother's face, each short sentence pressed home, the last one slow and emphatic",
+    "t09": "Quietly, shy and happy, with a small helpless laugh in the voice",
+    "t11": "Earnestly and fondly, with a grin on the second sentence"
+  },
+  "albert_y": {
+    "t11": "After a hard swallow, low and tight, barely audible"
+  }
+}

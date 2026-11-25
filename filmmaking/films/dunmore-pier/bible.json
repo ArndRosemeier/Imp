@@ -1,0 +1,130 @@
+{
+  "title": "The Last Letter at Dunmore Pier",
+  "looks": {
+    "now": "Photoreal live-action cinema still from a quiet British coastal drama set in 2006. Shot on 35mm film, 50mm lens, soft overcast daylight, cold desaturated palette of slate grey, sea green and navy blue, shallow depth of field, fine film grain. No text, no captions, no watermark.",
+    "then": "Photoreal live-action cinema still from a film shot in 1966 on old colour film stock: warm faded Kodachrome colours, amber highlights, soft halation around bright areas, lifted milky blacks, heavy film grain, slight vignette. Period 1966, a busy Scottish fishing harbour town, period clothes only. No text, no captions, no watermark."
+  },
+  "style_rule": "Two time layers. NOW (2006) is cold, grey-blue and still. THEN (1966) is warm faded colour film stock with grain. Three colours carry the story in both layers: navy blue is Albert, yellow is Thomas, green is Margaret (her coat, her gate, the wax seal on the letter).",
+  "keep": "Keep every face and hairstyle exactly as in the references, and the costume too unless this description names other clothes.",
+  "cast": {
+    "albert": {
+      "name": "Albert Reeve",
+      "age": 65,
+      "layer": "now",
+      "ref_noun": "the old postman",
+      "look": "a tall, thin, slightly stooped man of sixty-five with a long narrow clean-shaven face, hollow cheeks, deep-set pale blue eyes under straight grey eyebrows, a long straight nose, large ears and thin white hair. He wears a dark navy double-breasted wool postman's overcoat with two rows of brass buttons, a dark navy peaked postman's cap with a thin red band, a charcoal-grey wool scarf tucked into the collar, and a dark brown leather mail satchel on a wide strap across his chest, the bag hanging at his right hip",
+      "tag": "Albert, the thin old postman in the navy coat and peaked cap",
+      "voice_prompt": "a quiet, dry, soft-spoken old man's voice, light and husky, slow and hesitant, with a gentle Scottish accent",
+      "voice_archetype": "quiet dry husk (thin, old, clean-shaven, soft-spoken)",
+      "personality": "Careful, orderly, reliable to a fault. Forty years of silence about one letter. Says little, and less when it matters."
+    },
+    "albert_y": {
+      "name": "Albert Reeve at twenty-five",
+      "age": 25,
+      "layer": "then",
+      "ref_noun": "the young postman",
+      "look": "a tall, thin, neat young man of twenty-five with a long narrow clean-shaven face, deep-set pale blue eyes under straight dark eyebrows, a long straight nose, large ears and short dark brown hair with a tidy side parting. He wears a dark navy double-breasted wool postman's overcoat with two rows of bright brass buttons, a dark navy peaked postman's cap with a thin red band, and a dark brown leather mail satchel on a wide strap across his chest, the bag hanging at his right hip",
+      "tag": "Albert, the thin young postman in the navy coat",
+      "voice_prompt": "a quiet, tight, soft-spoken young man's voice, light and careful, with a gentle Scottish accent",
+      "voice_archetype": "quiet careful light tenor (thin, young, neat)"
+    },
+    "thomas": {
+      "name": "Thomas Reeve",
+      "age": 22,
+      "layer": "then",
+      "ref_noun": "the young fisherman",
+      "look": "a broad-shouldered, sturdy young fisherman of twenty-two with a wide open freckled face, a square jaw with reddish stubble, bright hazel eyes, a broken-looking snub nose and a thick mop of curly copper-red hair. He wears stiff bright yellow oilskin bib trousers with the braces over a thick dark navy cable-knit wool sweater, and black rubber sea boots",
+      "tag": "Thomas, the broad red-haired young fisherman in yellow oilskins",
+      "voice_prompt": "a loud, warm, bright young man's baritone, quick and eager, with a broad Scottish accent",
+      "voice_archetype": "loud warm bright baritone (broad, young, red-haired, outgoing)"
+    },
+    "margaret": {
+      "name": "Margaret Hale",
+      "age": 63,
+      "layer": "now",
+      "ref_noun": "the old woman",
+      "look": "a slight, fine-boned woman of sixty-three with a calm oval face, clear pale grey eyes, high cheekbones, soft lines at the eyes and mouth, and silver-white hair pinned up loosely at the back with a few strands escaping. She wears a long dark bottle-green wool coat with the collar turned up, a cream wool scarf at the throat and dark green wool gloves",
+      "tag": "Margaret, the silver-haired woman in the dark green coat",
+      "voice_prompt": "a calm, clear, measured older woman's voice, warm and low, a retired schoolteacher, with a soft northern English accent",
+      "voice_archetype": "calm measured schoolteacher alto (older woman, clear, patient)"
+    },
+    "margaret_y": {
+      "name": "Margaret Hale at twenty-three",
+      "age": 23,
+      "layer": "then",
+      "ref_noun": "the young woman",
+      "look": "a slight, fine-boned young woman of twenty-three with a calm oval face, clear pale grey eyes, high cheekbones and long loose wavy dark brown hair that the wind keeps blowing across her face. She wears a bottle-green 1960s wool coat with a cream wool scarf at the throat",
+      "tag": "Margaret, the dark-haired young woman in the green coat",
+      "voice_prompt": "a clear, bright, gentle young woman's voice with a soft northern English accent",
+      "voice_archetype": "clear bright young woman (does not speak in this film)"
+    },
+    "teromed": {
+      "name": "Teromed",
+      "age": 78,
+      "layer": "now",
+      "ref_noun": "the huge old fisherman",
+      "look": "a huge, heavy, barrel-chested old fisherman of seventy-eight with a broad red wind-burnt face, a bulbous nose, small watery pale eyes, and a big bushy white beard. He wears a stiff black oilskin coat shiny with grease, a thick oatmeal-coloured wool sweater, and a black knitted watch cap pulled down to his eyebrows",
+      "tag": "Teromed, the huge white-bearded old fisherman in the black oilskin coat",
+      "voice_prompt": "a very deep, booming, gravelly bass voice, slow and rumbling like stones rolling in a bucket, with a thick Scottish accent",
+      "voice_archetype": "booming gravel bass (huge, bearded, very old)"
+    },
+    "maelis": {
+      "name": "Maelis",
+      "age": 24,
+      "layer": "now",
+      "ref_noun": "the young woman",
+      "look": "a brisk young woman of twenty-four with a round friendly face, brown skin, dark eyes, and short curly black hair, wearing round tortoiseshell glasses, a mustard-yellow knitted jumper with the sleeves pushed up, a blue staff lanyard around her neck and dark jeans",
+      "tag": "Maelis, the young woman in the mustard-yellow jumper and glasses",
+      "voice_prompt": "a bright, brisk, friendly young woman's voice, quick and matter-of-fact, with a light Scottish accent",
+      "voice_archetype": "bright brisk young woman"
+    },
+    "albert_b": {
+      "name": "Albert Reeve without cap and satchel",
+      "age": 65,
+      "layer": "now",
+      "ref_noun": "the old postman",
+      "look": "a tall, thin, slightly stooped man of sixty-five with a long narrow clean-shaven face, hollow cheeks, deep-set pale blue eyes under straight grey eyebrows, a long straight nose, large ears and thin white hair blowing in the wind, bare-headed. He wears a dark navy double-breasted wool overcoat with two rows of brass buttons and a charcoal-grey wool scarf. He has NO cap, NO bag and NO strap across his chest",
+      "tag": "Albert, the thin bare-headed old man in the navy coat",
+      "voice_prompt": "a quiet, dry, soft-spoken old man's voice, light and husky, slow and hesitant, with a gentle Scottish accent",
+      "voice_archetype": "quiet dry husk (thin, old, clean-shaven, soft-spoken)",
+      "personality": "Careful, orderly, reliable to a fault. Forty years of silence about one letter. Says little, and less when it matters.",
+      "costume_of": "albert",
+      "portrait": "library/albert/albert_portrait.webp",
+      "always_sheet": true
+    },
+    "albert_k": {
+      "name": "Albert Reeve at twenty-five in mourning",
+      "age": 25,
+      "layer": "then",
+      "ref_noun": "the young postman",
+      "look": "a tall, thin, neat young man of twenty-five with a long narrow clean-shaven face, deep-set pale blue eyes under straight dark eyebrows, a long straight nose, large ears and short dark brown hair with a tidy side parting, bare-headed. He wears a plain black single-breasted wool overcoat over a black suit, white shirt and black tie. He has NO cap, NO bag, NO strap across his chest and NO brass buttons",
+      "tag": "Albert, the thin young man in black",
+      "voice_prompt": "a quiet, tight, soft-spoken young man's voice, light and careful, with a gentle Scottish accent",
+      "voice_archetype": "quiet careful light tenor (thin, young, neat)",
+      "costume_of": "albert_y",
+      "always_sheet": true
+    }
+  },
+  "props": {
+    "letter_new": {
+      "ref": "library/props/letter_new.webp",
+      "desc": "the letter in 1966: a small square envelope of thick cream paper, seen from the back, its flap sealed with one round drop of dark green sealing wax pressed flat with a thumbprint"
+    },
+    "letter_old": {
+      "ref": "library/props/letter_old.webp",
+      "desc": "the letter forty years later: the same small square envelope, now yellowed, brittle and foxed at the edges, seen from the back, its flap still sealed with the same unbroken round drop of dark green sealing wax with a thumbprint"
+    },
+    "tin_new": {
+      "ref": "library/props/tin_new.webp",
+      "desc": "the tin in 1966: a small flat rectangular hinged metal tin with glossy red enamel paint and a thin gold border, no lettering"
+    },
+    "tin_old": {
+      "ref": "library/props/tin_old.webp",
+      "desc": "the tin forty years later: the same small flat rectangular hinged metal tin, the red paint worn to a dull brick-red crust, rusted at the hinges and edges, no lettering"
+    },
+    "biscuit": {
+      "ref": "library/props/biscuit.webp",
+      "desc": "Biscuit: a small, very old wire-haired terrier with a grizzled tan and white coat, a grey muzzle and cloudy dark eyes"
+    }
+  }
+}

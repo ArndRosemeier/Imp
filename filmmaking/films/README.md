@@ -4,11 +4,12 @@ One record per film. The plan files beside each record (`bible.json`,
 `shots.json`, `edl.json`) are kept as worked examples of what the tools read.
 Media is not here: see the [README](../README.md) for where it lives.
 
-| Film            | Date       | Kind                           | Length | Shots | Cost  | Budget              |
-| --------------- | ---------- | ------------------------------ | ------ | ----- | ----- | ------------------- |
-| The Leaf        | 2026-11-24 | One take, no dialogue          | 49 s   | 5     | $3.93 | $20, shared         |
-| The Kobold Cave | 2026-11-24 | Cuts, two characters, dialogue | 73 s   | 19    | $8.60 | the rest of the $20 |
-| The Runaway Hat | in work    | Cut paper look, a chase        |        |       |       | $20 of its own      |
+| Film                            | Date       | Kind                                    | Length      | Shots | Cost      | Budget              |
+| ------------------------------- | ---------- | --------------------------------------- | ----------- | ----- | --------- | ------------------- |
+| The Leaf                        | 2026-11-24 | One take, no dialogue                   | 49 s        | 5     | $3.93     | $20, shared         |
+| The Kobold Cave                 | 2026-11-24 | Cuts, two characters, dialogue          | 73 s        | 19    | $8.60     | the rest of the $20 |
+| The Runaway Hat                 | 2026-11-24 | Cut paper look, a chase                 | 93 s        | 19    | $8.97     | $20 of its own      |
+| The Last Letter at Dunmore Pier | 2026-11-25 | Long format, photoreal, two time layers | 10 min 29 s | 91    | about $72 | $100 of its own     |
 
 ## The Leaf
 
@@ -53,3 +54,26 @@ In work on 2026-11-24. An old man's hat is blown away and has a surreal
 journey while he chases it. Arnd chose a cut paper look from four style tests
 and each world gets its own material. Its record and lessons will be added
 when it is finished.
+
+## The Last Letter at Dunmore Pier
+
+Folder `dunmore-pier`. Adapted from a short story by Arnd. An old postman
+hid for forty years the letter his brother wrote to Margaret before he
+drowned, and on his last round he brings it to her door.
+
+- **Purpose:** the first long film, and the first with a watching model in
+  the loop. Arnd: "better good than cheap", the goal is to sharpen the
+  playbook.
+- **Made of:** 91 shots in two time layers (2006 cold, 1966 warm), 17 places,
+  7 characters of which two appear at two ages, 30 dialogue shots, three
+  scores, one voice-over, two cross-fades on matching pictures.
+- **Cost:** about $72 of $100. See the lessons log for the split.
+- **Result:** every line is spoken, each voice holds when measured, sound is
+  in step. Weak: continuity inside scenes (gloves, scarf, a moon), stiff
+  crowds, some props that change size.
+- **Arnd's verdict:** not yet given.
+- **Final file:** `Director/movies/dunmore-pier/cut/dunmore-pier_v2.mp4` on
+  Drive.
+- **Here:** `bible.json`, `shots.json`,
+  `edl.json`, and the voice descriptions and line directions used for the
+  recorded voices.

@@ -79,6 +79,15 @@ Each film lives in a folder `movies/<film>/` with `bible.json`, `shots.json`,
   it.
 - Check screen direction and eyelines against the neighbouring shots.
 
+- **Start, not end.** The still shows the first moment of the shot's
+  action. A still that already shows the result leaves the clip nothing to
+  do.
+- **One place per scene.** Paint the scene's wide shot first. Every closer
+  shot takes it as a reference and names what is behind the figure. Check
+  one contact sheet per scene: same background, same costume, same props.
+- **The words follow the still.** Write actions on objects in the words of
+  what the approved still shows (a bolt is not a latch).
+
 ### On the clips (step 10)
 
 - **Words.** Transcribe each clip and compare with the script
@@ -91,8 +100,14 @@ Each film lives in a folder `movies/<film>/` with `bible.json`, `shots.json`,
 - **Picture-facts again.** Pull full-size frames from the start, middle and
   end of every shot that has a listed fact and check it. Things can appear or
   move during a clip that were not on the first frame.
-- **What was not checked.** Say so. Until Claude can watch a clip, motion is
-  unverified, and Arnd is told which shots carry the most risk.
+- **Watched.** Every clip goes to a watching model with its action and its
+  picture-facts (`watchreview.py`), which answers KEEP or RETAKE with a
+  reason. Confirm a RETAKE on frames before paying for it. Rewrite the shot
+  smaller first; change the keyframe if it fails twice.
+- **Who speaks.** For dialogue the watcher says which mouth moves to which
+  line. `speechtimes.py` gives the word times for trimming.
+- **What was not checked.** Say so. The watching model is a second opinion
+  and is sometimes wrong. Arnd is told which shots carry the most risk.
 
 ## Two kinds of film
 
@@ -163,3 +178,18 @@ in [characters/](characters/).
 - Files go to Drive with `drive_upload.py`, which has no size limit. The Drive
   connector stops at about 3 MB a file.
 - Sharing a file by public link needs Arnd's explicit yes each time.
+
+## A long film
+
+Learned on the first ten-minute film. See the lessons log for the detail.
+
+- Film act one first and review it before the rest. The first act showed
+  every kind of failure the film would have.
+- Film silent shots and dialogue shots in batches of six or seven. Review
+  each batch with the watching model, then retake in one round.
+- Cut with `longcut.py` and check sync with `synccheck.py`.
+- Watch the finished cut in parts of about a minute with one question:
+  what jars between shots? Inside-scene continuity only shows there.
+- Recorded voices (`voicecut.py`, one request per character, a direction
+  per line) are for voice-over and for looks that allow pinned voices.
+  Photoreal dialogue is spoken by the video model from a voice description.

@@ -1,0 +1,604 @@
+{
+  "title": "The Last Letter\nat Dunmore Pier",
+  "title_seconds": 4.5,
+  "end_title": "The Last Letter at Dunmore Pier",
+  "end_seconds": 6,
+  "size": "1280x720",
+  "fps": 30,
+  "grades": {
+    "then": "colorbalance=rs=0.035:bs=-0.045,eq=saturation=0.92"
+  },
+  "cuts": [
+    {
+      "shot": "a01",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25,
+      "fade_in": 1.5
+    },
+    {
+      "shot": "a02",
+      "in": 4.04,
+      "out": 6.94,
+      "gain_db": -19
+    },
+    {
+      "shot": "a03",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a04",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a05",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a06",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a07",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a08",
+      "in": 0.56,
+      "out": 9.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "a09",
+      "in": 2.98,
+      "out": 8.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "a10",
+      "in": 3.48,
+      "out": 12.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "a11",
+      "in": 0.1,
+      "out": 8.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "a12",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a13",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a14",
+      "in": 0.1,
+      "out": 8.78,
+      "gain_db": -19
+    },
+    {
+      "shot": "a15",
+      "in": 2.16,
+      "out": 7.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "a16",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a17",
+      "in": 0.1,
+      "out": 14.92,
+      "gain_db": -19
+    },
+    {
+      "shot": "a18",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "a19",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t01",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25,
+      "dissolve": 1.0
+    },
+    {
+      "shot": "t02",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "t03",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t04",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t05",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t06",
+      "in": 0.1,
+      "out": 6.94,
+      "gain_db": -19
+    },
+    {
+      "shot": "t07",
+      "in": 0.3,
+      "out": 3.6,
+      "gain_db": -25
+    },
+    {
+      "shot": "t08",
+      "in": 1.32,
+      "out": 10.0,
+      "gain_db": -19
+    },
+    {
+      "shot": "t09",
+      "in": 3.36,
+      "out": 9.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "t10",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t11",
+      "in": 2.64,
+      "out": 12.38,
+      "gain_db": -19
+    },
+    {
+      "shot": "t12",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t13",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t14",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t15",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t16",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t17",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t18",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t19",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t20",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "t21",
+      "in": 0.3,
+      "out": 4.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t22",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t23",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t24",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "t25",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t26",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t27",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t28",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t29",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "t30",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "t31",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n20",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25,
+      "dissolve": 1.0
+    },
+    {
+      "shot": "n21",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "n22",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "n23",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n24",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n25",
+      "in": 1.2,
+      "out": 6.86,
+      "gain_db": -19
+    },
+    {
+      "shot": "n26",
+      "in": 0.1,
+      "out": 11.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "n27",
+      "in": 0.1,
+      "out": 6.16,
+      "gain_db": -19
+    },
+    {
+      "shot": "n28",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n29",
+      "in": 1.34,
+      "out": 8.92,
+      "gain_db": -19
+    },
+    {
+      "shot": "n30",
+      "in": 0.4,
+      "out": 11.58,
+      "gain_db": -19
+    },
+    {
+      "shot": "n31",
+      "in": 1.0,
+      "out": 11.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "n32",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n33",
+      "in": 0.1,
+      "out": 6.38,
+      "gain_db": -19
+    },
+    {
+      "shot": "n34",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n35",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n36",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n37",
+      "in": 0.1,
+      "out": 10.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "n38",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n39",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "n40",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n41",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n42",
+      "in": 0.1,
+      "out": 6.12,
+      "gain_db": -19
+    },
+    {
+      "shot": "n43",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n44",
+      "in": 2.72,
+      "out": 10.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "n45",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n46",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n47",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n48",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n49",
+      "in": 0.3,
+      "out": 6.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "n50",
+      "in": 0.3,
+      "out": 7.93,
+      "gain_db": -25
+    },
+    {
+      "shot": "p01",
+      "in": 2.22,
+      "out": 5.94,
+      "gain_db": -19
+    },
+    {
+      "shot": "p02",
+      "in": 0.98,
+      "out": 12.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "p03",
+      "in": 1.58,
+      "out": 7.86,
+      "gain_db": -19
+    },
+    {
+      "shot": "p04",
+      "in": 0.1,
+      "out": 6.98,
+      "gain_db": -19
+    },
+    {
+      "shot": "p05",
+      "in": 0.12,
+      "out": 11.38,
+      "gain_db": -19
+    },
+    {
+      "shot": "p06",
+      "in": 0.62,
+      "out": 7.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "p07",
+      "in": 0.1,
+      "out": 9.7,
+      "gain_db": -19
+    },
+    {
+      "shot": "p08",
+      "in": 0.3,
+      "out": 5.94,
+      "gain_db": -25
+    },
+    {
+      "shot": "p09",
+      "in": 0.1,
+      "out": 8.93,
+      "gain_db": -19
+    },
+    {
+      "shot": "p10",
+      "in": 0.3,
+      "out": 11.93,
+      "gain_db": -25,
+      "fade_out": 2.5
+    }
+  ],
+  "over": [
+    {
+      "file": "audio/vo_thomas_hand.mp3",
+      "at_cut": "n39",
+      "offset": 2.2,
+      "gain_db": -20
+    }
+  ],
+  "music": [
+    {
+      "file": "audio/m_now.mp3",
+      "at": 0,
+      "until_cut": "a08",
+      "gain_db": -27,
+      "fade_in": 2,
+      "fade_out": 5
+    },
+    {
+      "file": "audio/m_then.mp3",
+      "at_cut": "t01",
+      "until_cut": "n20",
+      "gain_db": -24,
+      "fade_in": 2,
+      "fade_out": 6
+    },
+    {
+      "file": "audio/m_now.mp3",
+      "at_cut": "n34",
+      "until_cut": "n41",
+      "gain_db": -27,
+      "fade_in": 3,
+      "fade_out": 5
+    },
+    {
+      "file": "audio/m_end.mp3",
+      "at_cut": "p07",
+      "gain_db": -24,
+      "fade_in": 4,
+      "fade_out": 6
+    }
+  ]
+}
