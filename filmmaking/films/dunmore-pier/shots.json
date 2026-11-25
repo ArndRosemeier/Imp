@@ -1,0 +1,1408 @@
+{
+  "model": "alibaba/wan-3.0",
+  "resolution": "720p",
+  "usd_per_second": 0.1,
+  "image_model": "meta/muse-image",
+  "styles": {
+    "now": "Photoreal live-action British film drama, 35mm, natural overcast light, cold muted grey-blue palette, fine film grain, restrained naturalistic acting. One continuous shot, no cut inside the shot, no subtitles, no on-screen text, no music. No graphics, symbols, captions, drawn effects or overlays of any kind appear in the picture.",
+    "then": "Photoreal live-action film shot in 1966 on old colour film stock: warm faded colours, soft halation, heavy grain, restrained naturalistic acting. One continuous shot, no cut inside the shot, no subtitles, no on-screen text, no music. No graphics, symbols, captions, drawn effects or overlays of any kind appear in the picture."
+  },
+  "silent": "Nobody speaks; there is no voice and no narration.",
+  "locations": {
+    "kitchen_now": "loc/kitchen_now.webp",
+    "kitchen_then": "loc/kitchen_then.webp",
+    "street_now": "loc/street_now.webp",
+    "bay_now": "loc/bay_now.webp",
+    "pier_then": "loc/pier_then.webp",
+    "slip_now": "loc/slip_now.webp",
+    "gate_now": "loc/gate_now.webp",
+    "gate_then": "loc/gate_then.webp",
+    "door_now": "loc/door_now.webp",
+    "latch_now": "loc/latch_now.webp",
+    "latch_then": "loc/latch_then.webp",
+    "office_now": "loc/office_now.webp",
+    "awning_now": "loc/awning_now.webp",
+    "pierend_now": "loc/pierend_now.webp",
+    "churchyard_then": "loc/churchyard_then.webp",
+    "regatta_then": "loc/regatta_then.webp",
+    "storm_then": "loc/storm_then.webp"
+  },
+  "shots": [
+    {
+      "id": "a01",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up on the old black iron range stove: a steaming kettle and two slices of bread toasting on a wire rack over the hot plate. Cold grey dawn light from the small window behind. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button reaches in from the left for the toast.",
+      "action": "Static close-up. Steam rises from the kettle. The old hand lifts one slice of toast off the wire rack with bare fingers and takes it out of frame to the left.",
+      "sound": "a kettle starting to whistle softly, wind under a door, a clock ticking",
+      "claims": ["an old hand takes the toast"],
+      "loc_ref": true
+    },
+    {
+      "id": "a02",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Medium shot in the cottage kitchen at dawn. Albert stands on the left beside the black range stove in his navy uniform coat, bare-headed, WITHOUT his cap and WITHOUT the satchel, eating a slice of buttered toast standing up. On the floor at the right, on the folded grey blanket in front of the stove, lies the old terrier Biscuit, chin on his paws, looking up at him.",
+      "action": "Static medium shot. Albert, bare-headed the whole time, chews, looks down at the dog, bends a little and drops a crust of toast onto the blanket. The old dog stays lying down; his tail thumps once and he takes the crust lying down. Nothing appears or changes on Albert's head.",
+      "sound": "a clock ticking, the stove creaking, a dog's tail thumping on wood",
+      "lines": [["albert", "Easy, boy."]],
+      "claims": [
+        "Albert bare-headed, no satchel",
+        "dog stays lying on the blanket",
+        "he gives the dog a crust"
+      ],
+      "props": ["biscuit"],
+      "loc_ref": true,
+      "lead": 3.0
+    },
+    {
+      "id": "a03",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up of the row of wooden coat pegs beside the plank door: a heavy dark brown leather mail satchel with a wide strap and a brass buckle hangs from a peg, the leather dark and shiny with age. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button reaches for the strap.",
+      "action": "Static close-up. The old hand lifts the satchel off the peg, then the thumb presses hard on the stiff brass buckle until the strap tongue comes free and the flap opens.",
+      "sound": "leather creaking, a stiff brass buckle clicking open",
+      "claims": ["satchel hangs on a peg by the door", "old hand opens the buckle"],
+      "extra_refs": [
+        [
+          "library/albert/albert_sheet.webp",
+          "shows the leather satchel Albert carries; paint this satchel."
+        ]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "a04",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": [],
+      "key": "High-angle close-up over the scrubbed pine kitchen table: the open leather mail satchel lies on the table, its deep canvas inside dark and completely empty. Beside it on the table a meagre little stack of three thin white windowed envelopes. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button rests on the stack.",
+      "action": "Static high-angle close-up. The old hand picks up the three thin envelopes, holds them a moment as if weighing them, and drops them into the open satchel. They fall flat to the bottom of the big empty bag.",
+      "sound": "paper sliding, three envelopes dropping into an empty leather bag, a clock ticking",
+      "claims": ["only three envelopes", "the bag is otherwise empty"],
+      "extra_refs": [
+        ["library/albert/albert_sheet.webp", "shows the leather satchel; paint this satchel, open."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "a05",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Wide shot of the cottage kitchen at dawn from the back of the room. On the left Albert, now in his peaked cap, scarf and coat with the satchel at his hip, stands at the open plank door with one hand on the latch, grey daylight behind him, looking back over his shoulder into the room. In the right foreground the old terrier lies on his blanket by the stove, watching him.",
+      "action": "Static wide shot. Albert looks back at the dog for a long moment. The dog's ears twitch. Albert pulls his cap down, steps out and pulls the door shut behind him. The dog stays on the blanket, looking at the closed door.",
+      "sound": "wind and distant surf through an open door, gulls, the door closing with a wooden thud, then quiet and a clock",
+      "claims": ["Albert wears cap and satchel", "he leaves and closes the door", "dog stays"],
+      "props": ["biscuit"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "a06",
+      "layer": "now",
+      "scene": "street_now",
+      "duration": 6,
+      "cast": ["albert"],
+      "key": "Wide shot looking down the steep empty harbour street of boarded-up shops. Albert, small in the middle distance, walks down the middle of the wet street away from the camera towards the grey sea, satchel at his hip. Nobody else. Early grey morning.",
+      "action": "Static wide shot. Albert walks steadily away from the camera down the empty street, getting smaller. A loose strip of peeling paint flaps on a door frame, gulls wheel over the roofs, rain water runs in the gutter.",
+      "sound": "wind in a narrow street, slow boot steps on wet tarmac, a plastic crate rattling, gulls",
+      "claims": ["street is empty and boarded up", "Albert walks away from camera"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "a07",
+      "layer": "now",
+      "scene": "bay_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Very wide establishing shot of the bay exactly as in the location reference: the long derelict timber pier standing out into the grey water. In the left foreground, small, seen from behind, Albert walks along the coastal path above the shingle, satchel at his hip.",
+      "action": "Slow, slight push-in on the old pier. Albert, small, walks along the path from left to right. Grey waves swirl through the black pilings of the empty pier. Gulls drift on the wind.",
+      "sound": "wind over open water, slow waves on shingle, distant gulls, footsteps on gravel",
+      "claims": ["the pier is whole enough to walk on, but derelict and empty"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "a08",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 10,
+      "cast": ["albert", "teromed"],
+      "key": "Medium two-shot at the top of the stone slipway. On the right Teromed bends over the big rusted iron hand winch, working a greasy rag into its gear teeth with thick red fingers, facing left. On the left Albert has just stopped, facing right, the thin flat satchel at his hip. Grey sea and the old pier far behind them.",
+      "action": "Static medium two-shot. Albert on the left speaks first. Teromed on the right does not look up at once; he gives the winch handle a short jerk so the iron groans, then answers without turning his head.",
+      "sound": "wind, waves on shingle, a rusted iron winch groaning",
+      "lines": [
+        ["albert", "Morning, Teromed."],
+        ["teromed", "Reeve. You're late today."]
+      ],
+      "claims": ["Albert left, Teromed right at the winch"],
+      "loc_ref": true,
+      "lead": 1.5
+    },
+    {
+      "id": "a08r",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 6,
+      "cast": ["teromed"],
+      "key": "Over-the-shoulder medium close-up at the top of the stone slipway: Teromed, three-quarter face towards the camera, bent over the big rusted iron hand winch, working a greasy rag into the gear teeth, eyes on his work. His whole face is clearly visible, his mouth and lips clearly visible under the white moustache. In the left foreground, out of focus, the dark navy shoulder and peaked cap of a man seen from behind. Grey sea and the old pier far behind.",
+      "action": "Static over-the-shoulder shot. Teromed gives the winch handle a short jerk, and speaks gruffly without looking up from his work. After the words he glances up once, briefly.",
+      "sound": "wind, waves on shingle, a rusted iron winch groaning",
+      "lines": [["teromed", "Reeve. You're late today."]],
+      "loc_ref": true,
+      "lead": 1.6,
+      "takes": {
+        "0": "voice/teromed/a08_1.mp3"
+      },
+      "claims": ["Teromed speaks, looking at his work"],
+      "skip": true
+    },
+    {
+      "id": "a09r",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 5,
+      "cast": ["teromed"],
+      "key": "Over-the-shoulder medium close-up at the top of the stone slipway: Teromed, three-quarter face towards the camera, bent over the big rusted iron hand winch, holding a heavy spanner against a gear wheel, eyes on the gears. His whole face is clearly visible, his mouth and lips clearly visible under the white moustache. In the left foreground, out of focus, the dark navy shoulder and peaked cap of a man seen from behind. Grey sea and the old pier far behind.",
+      "action": "Static over-the-shoulder shot. Teromed taps the gear wheel twice with his spanner, and speaks flatly, eyes on the gears.",
+      "sound": "wind, waves on shingle, a rusted iron winch groaning",
+      "lines": [["teromed", "Salt's got into the gears."]],
+      "loc_ref": true,
+      "lead": 1.8,
+      "takes": {
+        "0": "voice/teromed/a09_0.mp3"
+      },
+      "claims": ["Teromed taps the gears and speaks"],
+      "skip": true
+    },
+    {
+      "id": "a09",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 9,
+      "cast": ["albert", "teromed"],
+      "key": "Medium two-shot at the rusted winch, slightly closer. Teromed on the right taps the worn gear wheel with a spanner, facing left. Albert on the left looks down at the gears, facing right.",
+      "action": "Static two-shot. Teromed taps the gear wheel twice with his spanner and speaks. Albert, looking at the gears, asks his question quietly.",
+      "sound": "a spanner tapping iron, wind, surf",
+      "lines": [
+        ["teromed", "Salt's got into the gears."],
+        ["albert", "Can it be mended?"]
+      ],
+      "claims": ["Teromed holds a spanner"],
+      "loc_ref": true,
+      "lead": 1.5
+    },
+    {
+      "id": "a10",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 11,
+      "cast": ["teromed"],
+      "key": "Close-up of Teromed, alone in frame, his broad red face and white beard turned towards the sea on the left, pale watery eyes on the bay, the black watch cap low on his brow. Soft blurred grey water behind him.",
+      "action": "Static close-up. Teromed slowly turns his pale eyes out to the bay and speaks slowly, with a long pause between the two sentences. After the last word he keeps looking at the sea.",
+      "sound": "wind, surf, a far gull",
+      "lines": [
+        [
+          "teromed",
+          "Everything can be mended once. After that, you're just holding the pieces together."
+        ]
+      ],
+      "loc_ref": true,
+      "lead": 2.0,
+      "tail": 2.5
+    },
+    {
+      "id": "a11r",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 5,
+      "cast": ["teromed"],
+      "key": "Over-the-shoulder medium close-up at the top of the stone slipway: Teromed, three-quarter face towards the camera, bent over the big rusted iron hand winch, straightened up a little, one hand on the winch handle, looking at the camera-side man's hip. His whole face is clearly visible, his mouth and lips clearly visible under the white moustache. In the left foreground, out of focus, the dark navy shoulder and peaked cap of a man seen from behind. Grey sea and the old pier far behind.",
+      "action": "Static over-the-shoulder shot. Teromed nods down towards the other man's flat bag and speaks drily.",
+      "sound": "wind, waves on shingle, a rusted iron winch groaning",
+      "lines": [["teromed", "Not much to carry today."]],
+      "loc_ref": true,
+      "lead": 1.2,
+      "takes": {
+        "0": "voice/teromed/a11_0.mp3"
+      },
+      "claims": ["Teromed nods at the bag and speaks"],
+      "skip": true
+    },
+    {
+      "id": "a11",
+      "layer": "now",
+      "scene": "slip_now",
+      "duration": 9,
+      "cast": ["albert", "teromed"],
+      "key": "Medium two-shot at the winch. Teromed on the right has straightened up and looks down at Albert's satchel, which hangs thin and flat against Albert's hip. Albert on the left, facing right, has one hand on the satchel strap.",
+      "action": "Static two-shot. Teromed nods at the flat satchel and speaks. Albert looks down at the bag, answers quietly, adjusts the strap on his shoulder and walks out of frame to the right. Teromed bends to the winch again.",
+      "sound": "wind, surf, a spanner striking iron as he leaves",
+      "lines": [
+        ["teromed", "Not much to carry today."],
+        ["albert", "No. Not much."]
+      ],
+      "claims": ["satchel is thin and flat"],
+      "loc_ref": true,
+      "lead": 1.2,
+      "tail": 3.0
+    },
+    {
+      "id": "a12",
+      "layer": "now",
+      "scene": "latch_now",
+      "duration": 5,
+      "cast": [],
+      "key": "Extreme close-up exactly as in the location reference: the rusted black iron latch on the worn green garden gate. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button comes in from the left, the thumb resting on the latch handle.",
+      "action": "Static extreme close-up. The old hand grips the knob of the rusted iron bolt and draws the bolt back out of its keeper with one firm, practised pull. Then the hand pushes the gate, and the whole gate swings away from the camera, inward, out of the picture.",
+      "sound": "a rusted iron latch lifting with a clink, a gate hinge creaking, wind",
+      "claims": ["old hand lifts the latch", "gate opens"],
+      "note": "First of four latch pictures in the same framing.",
+      "loc_ref": true
+    },
+    {
+      "id": "a13",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 7,
+      "cast": ["albert", "margaret"],
+      "key": "Wide shot from the lane exactly as in the location reference. In the left foreground, seen from behind, Albert stands in the lane at the garden gate, which he holds half open with one hand, satchel at his hip. INSIDE the garden, beyond the wall, in the middle of the frame, Margaret kneels on a square of sacking on the garden soil beside the faded rust-brown hydrangeas, a small garden hand-fork in her gloved hand, looking up towards him.",
+      "action": "Static wide shot. Margaret looks up at the sound of the latch, then gets up slowly, pressing a hand to the small of her back as she straightens, and takes one step towards the gate. Albert stays standing at the gate on the left with one hand resting on it, and waits; he lifts the other hand a little in greeting.",
+      "sound": "wind, far surf, a garden fork set down on stone",
+      "claims": ["Margaret kneels, then stands", "Albert at the gate on the left"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "a14",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 12,
+      "cast": ["albert", "margaret"],
+      "key": "Medium two-shot on the flagstone path in the cottage garden. Albert on the left, facing right, holds out one thin white windowed envelope. Margaret on the right, facing left, reaches for it with her gloved hand. Faded hydrangeas and the stone cottage behind them.",
+      "action": "Static two-shot. Margaret speaks first, kindly. Albert holds out the white envelope and answers. She takes it from his hand.",
+      "sound": "wind in dry hydrangea heads, far surf",
+      "lines": [
+        ["margaret", "Hello, Albert. I thought the wind might have kept you."],
+        ["albert", "Just this for you."]
+      ],
+      "claims": [
+        "the envelope is a plain white modern bill, NOT the old letter",
+        "Albert left, Margaret right"
+      ],
+      "loc_ref": true,
+      "gap": 1.5,
+      "tail": 2.0
+    },
+    {
+      "id": "a15",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 8,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, in the cottage garden, facing left, looking down at a white windowed envelope in her gloved hands with a small smile, strands of silver hair blowing across her cheek.",
+      "action": "Static close-up. Margaret holds the same plain white envelope the whole time. She looks down at it, then lifts her eyes with a small warm smile, and speaks.",
+      "sound": "wind, far surf",
+      "lines": [["margaret", "Forty-three years. Always on time."]],
+      "loc_ref": true,
+      "lead": 2.5
+    },
+    {
+      "id": "a16",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 5,
+      "cast": ["albert"],
+      "key": "Close-up of Albert, alone in frame, in the cottage garden, facing right, under his peaked cap. His pale blue eyes are on someone off-screen to the right; his mouth is a thin closed line.",
+      "action": "Static close-up. Albert does not speak. Something like pain passes over his face; he swallows, and his eyes drop to the ground.",
+      "sound": "wind, far surf",
+      "claims": ["Albert stays silent"],
+      "loc_ref": true
+    },
+    {
+      "id": "a17",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 15,
+      "cast": ["albert", "margaret"],
+      "key": "Medium two-shot on the flagstone path in the cottage garden. Margaret on the right, facing left, holds the white envelope against her coat and gestures with her other hand back towards the low green cottage door. Albert on the left, facing right, has taken half a step back, one hand on his satchel strap.",
+      "action": "Static two-shot. Margaret gestures towards her door and makes her offer. Albert answers a little too quickly, shakes his head, then nods politely and takes a step backwards towards the gate.",
+      "sound": "wind, far surf",
+      "lines": [
+        ["margaret", "Will you have a cup of tea? The kettle's just on."],
+        ["albert", "No. Thank you, Margaret. I've the far ridge to do."]
+      ],
+      "loc_ref": true,
+      "gap": 2.0,
+      "tail": 2.5
+    },
+    {
+      "id": "a18",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 6,
+      "cast": ["albert", "margaret"],
+      "key": "Wide shot from the lane exactly as in the location reference. Albert, seen from behind in the foreground left, walks away from the garden down the lane with his satchel. The garden gate is closed. In the garden behind the wall Margaret stands small beside the faded rust-brown hydrangeas with the white envelope in her hand, watching him go.",
+      "action": "Static wide shot. Albert walks away down the lane, out of the left of the frame. Margaret stays where she is, watching him go.",
+      "sound": "a gate closing with an iron clink, boot steps on gravel, wind",
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "a19",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 5,
+      "cast": ["margaret"],
+      "key": "Tight close-up of Margaret's face, centred in the frame, facing the camera and looking slightly left past it, grey sea light on her face, silver strands of hair blowing across her cheek. Soft blurred grey sea and cliff behind her.",
+      "action": "Static tight close-up. Margaret watches someone go; her small smile fades into something thoughtful and lonely. The wind moves her hair across her cheek.",
+      "sound": "wind, far surf",
+      "note": "Match cut out: young Margaret's face on the same pixels in t01.",
+      "loc_ref": false
+    },
+    {
+      "id": "t01",
+      "layer": "then",
+      "scene": "regatta_then",
+      "duration": 5,
+      "cast": ["margaret_y"],
+      "key": "Tight close-up of young Margaret's face, centred in the frame in exactly the same position and size as the woman in the last reference image, facing the camera and looking slightly left past it, laughing with her head a little back, long dark hair blowing across her cheek, in bright warm summer sun. She wears a pale blue summer dress with her green scarf loose around her shoulders, NOT a coat. Blurred strings of coloured bunting flags and sparkling water behind her.",
+      "action": "Static tight close-up. Young Margaret laughs out loud, eyes bright, pushing her blowing hair out of her face with one hand.",
+      "sound": "a young woman's bright laugh, a summer crowd, bunting flags snapping in the breeze, a brass band far off",
+      "extra_refs": [
+        [
+          "frames/a19.webp",
+          "shows the composition to match: put the young woman's head on exactly the same place in the frame, at the same size."
+        ]
+      ],
+      "note": "Match cut in from a19. She wears a light summer dress here, not the coat.",
+      "loc_ref": false
+    },
+    {
+      "id": "t02",
+      "layer": "then",
+      "scene": "regatta_then",
+      "duration": 8,
+      "cast": ["thomas", "margaret_y"],
+      "key": "Wide shot on the sunny regatta quay. Young Margaret, in a pale blue summer dress with her green scarf loose around her shoulders, sits on the wooden bench in the middle of the frame. Thomas, dripping wet from the sea in a soaked white shirt with rolled sleeves and dark trousers, barefoot, his copper curls wet, stands over her on the right, grinning, holding up a long wet garland of brown seaweed in both hands. Bunting flags, boats and a cheerful summer crowd behind them.",
+      "action": "Static wide shot. Thomas, laughing, drops the heavy wet garland of seaweed into Margaret's lap. She jumps back with a shriek, then bursts out laughing up at him. He throws his head back and laughs with her.",
+      "sound": "a summer crowd cheering, a wet slap of seaweed, a young woman's shriek turning into laughter, a young man's loud laugh, bunting snapping",
+      "claims": [
+        "Thomas is wet and laughing",
+        "seaweed lands in Margaret's lap",
+        "she laughs up at him"
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "t03",
+      "layer": "then",
+      "scene": "regatta_then",
+      "duration": 6,
+      "cast": ["albert_y"],
+      "key": "Medium shot of young Albert standing alone at the edge of the sunny regatta quay, apart from the blurred summer crowd behind him. He is in his full buttoned navy postman's coat in spite of the heat, his peaked cap tucked under his left arm, the leather satchel at his hip, facing right and watching something off-screen to the right with a still, shut face.",
+      "action": "Very slow push-in on young Albert. He stands quite still and watches. Behind him the blurred crowd moves and cheers. His jaw tightens; he looks down at the cap under his arm and back up.",
+      "sound": "the same summer crowd, further away, a woman's laugh carrying over it, bunting snapping",
+      "claims": ["Albert stands apart, in uniform, watching, not smiling"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t04",
+      "layer": "then",
+      "scene": "regatta_then",
+      "duration": 5,
+      "cast": ["thomas", "margaret_y"],
+      "key": "Close two-shot in warm summer sun, seen from a distance through a long lens with blurred shoulders of a crowd at the frame edges. Young Margaret on the left, sitting, in a pale blue summer dress with her green scarf loose around her shoulders (NOT a coat), looks up to the right at Thomas with bright eyes and flushed cheeks, hair blowing. Thomas on the right, wet copper curls, in a soaked white shirt with rolled sleeves under his yellow oilskin braces, in profile, grins down at her.",
+      "action": "Static long-lens shot. Margaret looks up at Thomas, her whole face warm and open, as if she had stepped into the sun. Thomas says something we cannot hear and she laughs again, her eyes always on him. Nobody looks at the camera.",
+      "sound": "summer crowd, soft laughter, bunting",
+      "claims": ["Margaret looks at Thomas, not at the camera"],
+      "loc_ref": true
+    },
+    {
+      "id": "t05",
+      "layer": "then",
+      "scene": "pier_then",
+      "duration": 6,
+      "cast": [],
+      "key": "Wide shot of the working pier on a cold grey November morning exactly as in the location reference: fish crates, barrels, the tarred salt shed, the black trawler with smoke rising from her funnel moored along the pier, a few small figures of fishermen in oilskins, gulls wheeling.",
+      "action": "Static wide shot. Smoke pours from the trawler's funnel, tiny figures carry crates along the pier, gulls wheel and the grey swell lifts the boat against the pilings.",
+      "sound": "a diesel engine thudding at idle, gulls screaming, men shouting far off, crates scraping on planks, cold wind",
+      "claims": [
+        "the pier is busy and whole",
+        "a trawler lies at the pier with smoke from the funnel"
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "t06",
+      "layer": "then",
+      "scene": "pier_then",
+      "duration": 7,
+      "cast": ["albert_y", "thomas"],
+      "key": "Medium shot on the busy timber pier on a cold grey November morning. Young Albert on the left, in cap and coat, is buckling his leather satchel closed. Thomas on the right, in yellow oilskin bib trousers over his navy sweater, has just caught him by the shoulder with one big hand; his usual grin is gone, his face is tight and nervous. Behind them crates, the trawler's black hull and smoking funnel.",
+      "action": "Handheld medium shot. Thomas grips Albert's shoulder and speaks urgently, then pulls him by the elbow out of frame to the left, towards the salt shed. Albert, surprised, lets himself be pulled.",
+      "sound": "a diesel engine thudding, a deck winch roaring, gulls, wind",
+      "lines": [["thomas", "Bert! Come out of the wind a second."]],
+      "claims": ["Thomas in yellow oilskins on the right", "Albert on the left with satchel"],
+      "loc_ref": true
+    },
+    {
+      "id": "t07",
+      "layer": "then",
+      "scene": null,
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up between two men standing close together in the still lee of a tarred wooden shed wall: a big freckled young hand with a navy cable-knit sweater cuff holds out a small square cream envelope, back side towards the camera, sealed with one round drop of dark green wax pressed flat with a thumbprint. Yellow oilskin and a navy postman's coat with brass buttons blurred at the edges of the frame. Behind the hand only the dark tarred planks of the shed wall. Nobody else in the picture, no faces.",
+      "action": "Static close-up. The freckled hand holds the cream envelope up between the two men, the green wax seal facing the camera the whole time. The hand trembles very slightly; the thumb moves once along the edge of the envelope. The envelope is not turned.",
+      "sound": "wind muffled behind a shed, the far thud of a diesel engine, breathing",
+      "claims": ["cream envelope with a green wax seal, unbroken"],
+      "props": ["letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t08",
+      "layer": "then",
+      "scene": null,
+      "duration": 12,
+      "cast": ["albert_y", "thomas"],
+      "key": "Over-the-shoulder shot in the lee of the tarred wooden salt shed. In the left foreground, blurred and seen from behind, young Albert's shoulder and peaked cap. Facing the camera on the right, in sharp focus, Thomas in his yellow oilskins and navy sweater, breath steaming in the cold, pressing the small cream envelope into Albert's hand at the bottom of the frame, his hazel eyes fixed on his brother.",
+      "action": "Static over-the-shoulder shot. Thomas presses the envelope into Albert's hand and speaks low and urgently, looking straight into his brother's face, closing Albert's fingers over the envelope on the last sentence.",
+      "sound": "wind muffled behind a shed, far engine thud, gulls far off",
+      "lines": [
+        [
+          "thomas",
+          "Give it to her, Bert. Today, on your round. Not in the box. Put it right into her hand."
+        ]
+      ],
+      "claims": ["Thomas gives the envelope to Albert"],
+      "props": ["letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t09",
+      "layer": "then",
+      "scene": null,
+      "duration": 10,
+      "cast": ["thomas"],
+      "key": "Close-up of Thomas, alone in frame, in the lee of the tarred wooden shed, facing left, a smudge of grease on his freckled cheek, breath steaming, a desperate boyish hope in his hazel eyes. The straps of his yellow oilskins over the navy sweater.",
+      "action": "Static close-up. Thomas speaks quietly, almost shy, looks down, then up again with a helpless half-smile.",
+      "sound": "muffled wind, far engine thud",
+      "lines": [["thomas", "I've asked her to wait for me. To have me, when I'm back."]],
+      "loc_ref": false
+    },
+    {
+      "id": "t10",
+      "layer": "then",
+      "scene": null,
+      "duration": 5,
+      "cast": ["albert_y"],
+      "key": "Close-up of young Albert, alone in frame, in the lee of the tarred wooden shed, facing right, under his peaked cap, looking down at a small cream envelope with a green wax seal that he holds in both hands at the bottom of the frame. His jaw is tight.",
+      "action": "Static close-up. Albert stares down at the envelope in his hands. His jaw works; he breathes in sharply through his nose as if a strap had been pulled tight across his chest. He does not speak.",
+      "sound": "muffled wind, a single herring gull crying overhead",
+      "claims": ["Albert holds the envelope", "he is silent"],
+      "props": ["letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t11",
+      "layer": "then",
+      "scene": null,
+      "duration": 14,
+      "cast": ["albert_y", "thomas"],
+      "key": "Medium two-shot in the lee of the tarred wooden salt shed. Young Albert on the left, facing right, holds the small cream envelope low in one hand, eyes down. Thomas on the right, facing left, in yellow oilskins, has a hand on Albert's sleeve and leans towards him.",
+      "action": "Static two-shot. Thomas, hand on Albert's sleeve, speaks warmly. Albert does not look up. After a pause Albert answers in a thin voice, still looking at the envelope.",
+      "sound": "muffled wind, far engine thud, a ship's whistle",
+      "lines": [
+        [
+          "thomas",
+          "You're the only one I'd trust with it. She says you're the safest man in the parish."
+        ],
+        ["albert_y", "I'll take it."]
+      ],
+      "claims": ["Albert left holding the envelope, Thomas right"],
+      "props": ["letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t12",
+      "layer": "then",
+      "scene": "pier_then",
+      "duration": 6,
+      "cast": ["albert_y", "thomas"],
+      "key": "Wide shot along the busy timber pier. In the left foreground, seen from behind, young Albert stands still with the small cream envelope in his hand. Thomas, in bright yellow oilskins, is running away from the camera down the pier towards the black trawler, whose funnel pours smoke, looking back over his shoulder with a wide grin and one arm raised.",
+      "action": "Static wide shot. Thomas runs down the pier towards the trawler, turns once, waves with a big grin and jumps aboard. Albert stands like a post with both arms hanging at his sides the whole time; he does not lift a hand.",
+      "sound": "boots pounding on planks, a ship's whistle, the engine picking up, gulls",
+      "claims": ["Thomas runs to the boat and waves", "Albert does not wave"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t13",
+      "layer": "then",
+      "scene": null,
+      "duration": 5,
+      "cast": [],
+      "key": "Close-up on the chest of a young man wearing a dark navy double-breasted postman's coat with two rows of bright brass buttons; the coat is unbuttoned at the top and held open a hand's width. His own right hand, coming up from the bottom of the frame on his own arm in the same navy sleeve, holds a small cream envelope with a green wax seal half way inside the open coat front, sliding it towards the inner breast pocket. No other person.",
+      "action": "Static close-up. The hand pushes the envelope slowly all the way inside the coat until it is out of sight, comes out empty, closes the coat front and presses flat on the wool over the place, and stays there.",
+      "sound": "wool rustling, wind, a far engine fading",
+      "claims": ["the envelope goes inside the coat, over the heart"],
+      "props": ["letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t14",
+      "layer": "then",
+      "scene": "pier_then",
+      "duration": 6,
+      "cast": ["albert_y"],
+      "key": "Very wide shot from the pier: the black trawler, small now, steams away across the grey bay towards the open sea, trailing a long smudge of black smoke across the sky like a pencil line. In the left foreground, small and seen from behind, young Albert stands alone on the pier watching it go.",
+      "action": "Static very wide shot. The trawler grows smaller towards the harbour mouth, its smoke trailing across the grey sky. Albert stands still; then he turns and walks out of frame.",
+      "sound": "a diesel engine fading over water, wind, gulls, slow waves against pilings",
+      "claims": ["the boat leaves", "Albert alone on the pier"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t15",
+      "layer": "then",
+      "scene": "gate_then",
+      "duration": 6,
+      "cast": ["albert_y"],
+      "key": "Wide shot from inside a cottage garden looking out, cold grey November day 1966. Across the lower foreground runs a dry stone wall with ONE single-leaf wooden garden gate in it, freshly painted glossy dark green with the same black iron bolt as in the reference picture, firmly CLOSED, seen from the garden side. Beyond the closed gate, outside in the narrow empty cliff lane, young Albert walks towards the camera, still fifteen steps away and small in the frame, looking at the ground, satchel at his hip. Behind him only brown bracken, grey sea and cliffs; no village, no boats, no cars. Dry leaves lie against the gate.",
+      "action": "Static wide shot. Albert walks up the lane towards the closed green gate, slower with every step, and stops just behind it without touching it, looking past the camera at the cottage. The gate stays closed. Dry leaves skitter along the lane.",
+      "sound": "slowing boot steps on gravel, wind, dry leaves scraping, far surf",
+      "claims": ["gate is closed between Albert and the garden", "Albert stops at the gate"],
+      "sheets": true,
+      "loc_ref": false,
+      "extra_refs": ["loc/latch_then.webp"]
+    },
+    {
+      "id": "t16",
+      "layer": "then",
+      "scene": null,
+      "duration": 5,
+      "cast": ["margaret_y"],
+      "key": "Seen from outside through a small cottage window with a rain-spotted pane: young Margaret sits at a table inside by a glowing paraffin lamp, in a moss-green cardigan, her long dark hair loose, head bent over a pile of school exercise books, a pen in her hand. Warm amber lamplight inside, cold blue-grey daylight on the window frame.",
+      "action": "Static shot through the window. Margaret marks an exercise book, turns a page and tucks a strand of hair behind her ear. She does not look up at the window.",
+      "sound": "wind, muffled through glass a clock and a pen scratching",
+      "claims": ["she does not see him"],
+      "loc_ref": false
+    },
+    {
+      "id": "t17",
+      "layer": "then",
+      "scene": "gate_then",
+      "duration": 6,
+      "cast": ["albert_y"],
+      "key": "Close-up of young Albert, alone in frame, standing outside at the garden wall on a cold grey day, facing right, the warm glow of a lit cottage window reflected faintly on his face. His right hand lies flat on the chest of his navy coat, over his heart.",
+      "action": "Static close-up. Albert looks towards the lit window, his hand pressed on his coat over the hidden letter. His face twists between longing and bitterness; he shuts his eyes for a second and opens them again. His mouth stays closed.",
+      "sound": "wind, dry leaves, far surf",
+      "claims": ["hand on his chest over the letter"],
+      "loc_ref": false
+    },
+    {
+      "id": "t18",
+      "layer": "then",
+      "scene": "latch_then",
+      "duration": 6,
+      "cast": [],
+      "key": "Extreme close-up exactly as in the location reference: the clean black iron latch on the freshly painted green garden gate, a warm lit window blurred behind. A young man's smooth hand with a dark navy wool coat cuff with one bright brass button hovers a finger's width above the latch handle, not touching it.",
+      "action": "Static extreme close-up. The young hand hovers just above the latch, trembling. The fingers almost touch the iron. Then the hand slowly closes into a fist and draws back out of frame. The latch has not moved.",
+      "sound": "wind, a dry leaf scraping, held breath",
+      "claims": ["the hand does NOT touch or lift the latch", "the gate stays closed"],
+      "note": "Second latch picture, same framing as a12.",
+      "loc_ref": true
+    },
+    {
+      "id": "t19",
+      "layer": "then",
+      "scene": "gate_then",
+      "duration": 6,
+      "cast": ["albert_y"],
+      "key": "Wide shot from the lane exactly as in the location reference, November 1966: the green gate is firmly CLOSED, the lamp glows in the window, the garden and the flagstone path behind the wall are empty. Young Albert is OUTSIDE the garden wall, in the lane in the right foreground, close to the camera, in profile, walking away from the gate towards the right edge of the frame, head down, satchel at his hip.",
+      "action": "Static wide shot. Albert walks on past the closed gate without stopping and out of the right side of the frame. The gate stays closed. The lamp glows in the window. Leaves blow across the empty lane.",
+      "sound": "boot steps on gravel going away, wind, leaves",
+      "claims": ["he walks past", "gate never opens"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t20",
+      "layer": "then",
+      "scene": "kitchen_then",
+      "duration": 8,
+      "cast": ["albert_y"],
+      "key": "Medium shot in the cottage kitchen in 1966, dim firelight from the range. Young Albert, still in his buttoned navy coat, cap off, kneels on the wooden floorboards in the right corner beside the black iron coal scuttle, which he has pushed aside. One short floorboard is lifted out and lies beside a dark gap in the floor. He holds the small glossy red tin in one hand and the cream envelope in the other.",
+      "action": "Static medium shot. Albert, kneeling, opens the red tin with his thumb, looks at the envelope in his other hand for a moment, and lays it inside the tin.",
+      "sound": "a coal fire ticking, a tin lid opening, wind in the chimney",
+      "claims": [
+        "he kneels by the coal scuttle",
+        "a floorboard is lifted",
+        "red tin and cream envelope"
+      ],
+      "props": ["tin_new", "letter_new"],
+      "loc_ref": true
+    },
+    {
+      "id": "t21",
+      "layer": "then",
+      "scene": null,
+      "duration": 5,
+      "cast": [],
+      "key": "Close-up from above on dark wooden floorboards in warm firelight: the small glossy red tin lies open, and inside it the small cream envelope with its green wax seal facing up. A young man's smooth hand with a dark navy wool coat cuff with one bright brass button holds the lid.",
+      "action": "Static close-up. The young hand closes the lid of the red tin over the envelope; it shuts with a small dry click. The hand rests on the closed tin.",
+      "sound": "a tin lid clicking shut, a coal fire ticking",
+      "claims": ["green-sealed envelope inside the tin", "lid closes"],
+      "props": ["tin_new", "letter_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t22",
+      "layer": "then",
+      "scene": "kitchen_then",
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up from above on the dark wooden floorboards in the corner of the kitchen in warm firelight: a dark gap where one short board is missing, the short loose board held above it by a young man's smooth hand with a dark navy wool coat cuff with one bright brass button. Deep in the gap, in the dust, the glossy red tin.",
+      "action": "Static close-up. The young hand lowers the short board over the gap, hiding the red tin, and presses it down. Then the heel of the hand taps the board twice until it sits flush. The hand stays flat on the board.",
+      "sound": "wood knocking on wood twice, a coal fire ticking",
+      "claims": ["the tin disappears under the board"],
+      "props": ["tin_new"],
+      "loc_ref": false
+    },
+    {
+      "id": "t23",
+      "layer": "then",
+      "scene": "storm_then",
+      "duration": 6,
+      "cast": [],
+      "key": "Wide shot of the harbour in the violent November gale at dusk exactly as in the location reference: enormous grey waves burst over the stone breakwater in towers of white spray, the moored fishing boats strain at their ropes, rain drives sideways.",
+      "action": "Static wide shot shaken by the wind. A huge wave bursts over the breakwater and collapses across the harbour; the moored boats heave and strain at their ropes; rain and spray fly sideways.",
+      "sound": "a full gale howling, huge waves booming on stone, ropes groaning, rain lashing",
+      "claims": ["storm at sea, no people needed"],
+      "loc_ref": true
+    },
+    {
+      "id": "t24",
+      "layer": "then",
+      "scene": "storm_then",
+      "duration": 8,
+      "cast": ["albert_y", "margaret_y"],
+      "key": "Medium wide shot in the gale at dusk, in the lee of the stone harbour master's office with its outside wooden staircase: a small huddled crowd of townspeople in dark 1960s coats, caps and headscarves stands in the driving rain looking out to sea. In the front on the right stands young Margaret in her green coat, bare-headed, her dark hair soaked, clutching her cream scarf at her throat. At the back on the left, apart from the others, stands young Albert in his postman's coat and cap. A man in shirtsleeves is coming down the wooden staircase.",
+      "action": "Static shot buffeted by wind. The man in wet shirtsleeves comes down the last steps of the staircase, stops in front of the crowd and slowly shakes his head. Nobody moves. Margaret keeps staring out at the sea. At the back Albert's hand goes to the chest of his coat.",
+      "sound": "a gale howling, waves booming, rain lashing, a wooden staircase creaking",
+      "claims": ["Margaret in green in the crowd", "Albert at the back", "a man shakes his head"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t25",
+      "layer": "then",
+      "scene": "storm_then",
+      "duration": 6,
+      "cast": ["margaret_y"],
+      "key": "Close-up of young Margaret, alone in frame, in the gale at dusk, facing left, rain running down her white face, her soaked dark hair plastered to her cheeks, grey eyes wide and fixed on the sea, one hand gripping the cream scarf at her throat.",
+      "action": "Static close-up shaken by the wind. Margaret stares out to sea without blinking while rain runs down her face. Her lips part; she does not cry out. Her hand tightens on the scarf.",
+      "sound": "a gale howling, waves booming, rain",
+      "loc_ref": false
+    },
+    {
+      "id": "t26",
+      "layer": "then",
+      "scene": null,
+      "duration": 6,
+      "cast": [],
+      "key": "Low wide shot of a shingle beach at grey dawn after a storm, calm now, mist over flat grey water: a torn bright yellow oilskin jacket lies washed up among brown kelp and driftwood on the wet stones at the waterline, one sleeve stirring in the shallow wash. Nobody in the picture.",
+      "action": "Static low shot. A small wave runs up the shingle, lifts the torn yellow sleeve, and draws back, pulling at it. The oilskin settles. Another small wave comes.",
+      "sound": "small quiet waves on shingle, a far gull, no wind",
+      "claims": ["a torn yellow oilskin on the shore", "no body, no person"],
+      "loc_ref": false
+    },
+    {
+      "id": "t27",
+      "layer": "then",
+      "scene": "churchyard_then",
+      "duration": 7,
+      "cast": ["albert_k", "margaret_y"],
+      "key": "Wide shot of a funeral in the windswept clifftop churchyard, grey sea beyond: a small group of mourners in black 1960s coats and hats stands around the open grave with a plain dark wooden coffin beside it. On the left side of the grave stands young Albert, bare-headed, in a black overcoat, with a small old woman in black leaning on his arm. On the right side of the grave, opposite him, stands young Margaret in her green coat with a black armband, beside an older man in a dark coat.",
+      "action": "Static wide shot. The wind pulls at black coats and bends the grass. The mourners stand with bowed heads. Margaret, on the right, stands very straight, looking at the coffin.",
+      "sound": "wind over a clifftop, a church bell tolling slowly, far surf",
+      "claims": [
+        "Albert left of the grave with his mother",
+        "Margaret right of the grave in green"
+      ],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "t28",
+      "layer": "then",
+      "scene": "churchyard_then",
+      "duration": 6,
+      "cast": ["margaret_y"],
+      "key": "Close-up of young Margaret, alone in frame, at the graveside, facing left, pale, dry-eyed, her dark hair pinned back under a small black hat, the collar of her green coat turned up. At the bottom of the frame her gloved hands hold a small black prayer book.",
+      "action": "Static close-up. Margaret stands without crying, her eyes fixed downward. Only her hands shake, so that the closed prayer book trembles in them. The book stays closed. Nothing enters the picture.",
+      "sound": "wind, a slow church bell, far surf",
+      "claims": ["she does not cry", "prayer book in her hands"],
+      "loc_ref": false
+    },
+    {
+      "id": "t29",
+      "layer": "then",
+      "scene": "churchyard_then",
+      "duration": 6,
+      "cast": ["albert_k"],
+      "key": "Close-up of young Albert, alone in frame, at the graveside, facing right, bare-headed, in a black overcoat, wind in his short dark hair. A small old woman's black-gloved hand grips his left arm at the edge of the frame. His eyes are raised, looking across at someone off-screen to the right.",
+      "action": "Static close-up. Albert looks across the grave at her. His right hand comes up and presses flat against the chest of his coat. Then he cannot bear it and looks down into the grave.",
+      "sound": "wind, a slow church bell",
+      "claims": ["hand goes to his chest"],
+      "loc_ref": false
+    },
+    {
+      "id": "t30",
+      "layer": "then",
+      "scene": "kitchen_then",
+      "duration": 8,
+      "cast": ["albert_k"],
+      "key": "Medium shot in the cottage kitchen in 1966 at night, lit only by the low fire in the range. Young Albert, in a black suit and black tie, sits on the wooden floorboards in the corner beside the coal scuttle and the dark gap of the lifted floorboard, his back against the wall. The open red tin lies in his lap and he holds the small cream envelope in both hands, its green wax seal unbroken.",
+      "action": "Static medium shot. Albert sits on the floor turning the sealed envelope over in his hands in the firelight. He half rises as if to go, stops, and sinks back against the wall. He lays the envelope back in the tin.",
+      "sound": "a low fire ticking, a mantel clock, wind in the chimney",
+      "claims": ["black suit (after the funeral)", "seal still unbroken", "he puts it back"],
+      "props": ["tin_new", "letter_new"],
+      "loc_ref": true
+    },
+    {
+      "id": "t31",
+      "layer": "then",
+      "scene": "kitchen_then",
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up from above on the dark wooden floorboards in the corner of the kitchen at night in dim firelight: a young man's smooth hand with a black suit sleeve and white shirt cuff, grey with coal dust, lies flat on one short floorboard that sits not quite flush with the others.",
+      "action": "Static close-up. The heel of the young hand taps the short board down twice until it is perfectly flush with the floor. Then the hand lies flat and still on the board for a long moment.",
+      "sound": "wood knocking on wood twice, then only a clock ticking",
+      "extra_refs": [
+        ["frames/t22.webp", "shows the floor and the board; keep the same floorboards and framing."]
+      ],
+      "note": "Match cut out: the old hand on the same board in n20.",
+      "loc_ref": false
+    },
+    {
+      "id": "n20",
+      "layer": "now",
+      "scene": null,
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up from above on the same dark wooden floorboards as in the reference image, in exactly the same framing, forty years later under the cold light of a single electric bulb: the boards are worn pale and dusty, and an old man's thin, veined hand with a grey wool cardigan cuff lies flat on the same short floorboard in exactly the same position as the hand in the reference image.",
+      "action": "Static close-up. The old hand lies flat on the board. Then the stiff fingers feel for the gap at the end of the board, hook under it and lift the short board up and away, showing the dark dusty space underneath.",
+      "sound": "a clock ticking, wind rattling a window, a board lifting with a dry creak",
+      "claims": ["old hand lifts the board"],
+      "extra_refs": [
+        [
+          "frames/t31.webp",
+          "shows the composition to match: same floorboards, same camera, the hand on exactly the same place."
+        ]
+      ],
+      "note": "Match cut in from t31.",
+      "loc_ref": false
+    },
+    {
+      "id": "n21",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 8,
+      "cast": ["albert"],
+      "key": "Medium shot in the cottage kitchen at night under a single bare electric bulb. Albert, bare-headed, in a grey wool cardigan over a white shirt, kneels on the wooden floorboards in the right corner beside the coal scuttle and the dark gap of the lifted floorboard. He holds the small rusted brick-red tin in both hands. Behind him the old terrier sleeps on the blanket by the stove. Rain on the black window. He carries NO bag and has NO strap across his chest.",
+      "action": "Static medium shot. Albert, kneeling, sits back on his heels with the rusted tin in his hands and blows the grey dust off its lid. He looks at it for a long moment.",
+      "sound": "rain and wind against a window, a clock ticking, a dog sighing in its sleep",
+      "claims": ["the tin is now rusted", "Albert without uniform coat or cap"],
+      "props": ["tin_old", "biscuit"],
+      "loc_ref": true
+    },
+    {
+      "id": "n22",
+      "layer": "now",
+      "scene": null,
+      "duration": 8,
+      "cast": [],
+      "key": "Close-up on the scrubbed pine kitchen table of an old cottage at night under the warm yellow light of a single bare bulb; behind the table only a dark whitewashed stone wall and a black rainy window, no modern kitchen: the rusted brick-red flat hinged metal tin stands open on the left. Beside it on the bare table lies the small yellowed, foxed cream envelope, seal side up, with its unbroken dark green wax seal. An old man's thin, veined hand with a dark navy wool cuff rests on the table next to the envelope, forefinger lifted a little.",
+      "action": "Static close-up, indoors, dry. The old hand moves slowly to the envelope. One fingertip touches the unbroken green wax seal very lightly and rests there. Nothing else moves; the envelope is not lifted.",
+      "sound": "old paper rustling, rain on a window, a clock ticking",
+      "claims": [
+        "the old envelope lies beside the open tin",
+        "a fingertip rests on the unbroken green seal"
+      ],
+      "props": ["tin_old", "letter_old"],
+      "loc_ref": false
+    },
+    {
+      "id": "n23",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Close-up of Albert, alone in frame, bare-headed, sitting at the kitchen table at night under a single bare bulb, in a grey wool cardigan, facing right and looking down at something on the table below the frame. Deep shadows in his hollow cheeks. Rain on the black window behind him. He carries NO bag and has NO strap across his chest.",
+      "action": "Static close-up. Albert looks down at the letter for a long time. A gust rattles the window; he glances up at it, then down again. He shuts his eyes.",
+      "sound": "a gust rattling a window, rain, a clock ticking",
+      "claims": ["Albert silent"],
+      "loc_ref": false
+    },
+    {
+      "id": "n24",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 7,
+      "cast": ["albert", "maelis"],
+      "key": "Wide shot of the post office sorting room exactly as in the location reference, grey morning light. On the left Albert, in cap and uniform coat, stands at the long oak sorting desk under the wall of empty pigeonholes, holding three letters. On the right Maelis kneels among the cardboard boxes by the counter, pulling a strip of brown packing tape across a box.",
+      "action": "Static wide shot. Maelis pulls a long strip of brown tape off the roll with a loud screech, seals a box and stacks it on another. Albert, at the desk, slides one letter carefully into a pigeonhole and squares its corner with his thumb.",
+      "sound": "packing tape tearing off a roll with a screech, a wall clock ticking loudly, cardboard thumping",
+      "claims": [
+        "pigeonholes empty",
+        "Maelis taping boxes on the right",
+        "Albert left at the desk"
+      ],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "n25",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 9,
+      "cast": ["maelis"],
+      "key": "Medium shot of Maelis, alone in frame, in the sorting room, standing behind a stack of taped cardboard boxes at the counter, facing left, a roll of brown packing tape in one hand and a black marker pen in the other. The small grey computer terminal on the counter behind her.",
+      "action": "Static medium shot. Maelis presses a strip of brown tape flat along the top of a cardboard box with her hand, without looking up, and speaks briskly while she works. Then she sets the tape roll down on the box.",
+      "sound": "a marker pen squeaking on cardboard, a wall clock ticking",
+      "lines": [
+        ["maelis", "The surveyor's coming Friday. They want the counters cleared by noon."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "n26",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 12,
+      "cast": ["albert", "maelis"],
+      "key": "Medium two-shot in the sorting room. Maelis on the right, facing left, points with her black marker pen at the small grey computer terminal on the counter beside her, its screen showing rows of green text. Albert on the left, facing right, stands at the sorting desk laying a letter into his open leather satchel on the bench.",
+      "action": "Static two-shot. Maelis nods at the computer screen and speaks lightly. Albert looks at the screen, then down at the letter in his hand, and answers quietly, almost to himself, as he lays the letter in his satchel.",
+      "sound": "an old computer humming, a wall clock ticking",
+      "lines": [
+        ["maelis", "It's all on the screen now. Faster. Less to carry."],
+        ["albert", "It doesn't have the weight."]
+      ],
+      "claims": ["computer terminal visible", "Albert puts a letter in the satchel"],
+      "loc_ref": true
+    },
+    {
+      "id": "n27",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 10,
+      "cast": ["albert", "maelis"],
+      "key": "Medium two-shot in the sorting room. Maelis on the right, facing left, has stopped packing and rests both hands on a cardboard box, looking at Albert with open respect. Albert on the left, facing right, has the satchel strap in his hand, about to lift it onto his shoulder.",
+      "action": "Static two-shot. Maelis speaks warmly. Albert goes still for a second with the strap in his hand. He does not answer; he lifts the satchel onto his shoulder, nods to her and turns away towards the door on the left.",
+      "sound": "a wall clock ticking loudly, boots on bare floorboards",
+      "lines": [
+        ["maelis", "My grandad says you never lost a letter. Not one, in all those years."]
+      ],
+      "claims": ["Albert does not answer"],
+      "loc_ref": true
+    },
+    {
+      "id": "n28",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 7,
+      "cast": ["albert", "margaret"],
+      "key": "Wide shot of the harbour front in heavy rain exactly as in the location reference. Under the rusted corrugated-iron awning of the closed fishmonger's, on the left, Albert shelters in cap and coat with his satchel. From the right Margaret hurries in out of the rain, shaking a small black umbrella, the shoulders of her green coat dark with wet. Albert wears his navy peaked cap, exactly as in the reference picture of this scene.",
+      "action": "Static wide shot. Rain pours off the edge of the awning. Margaret hurries in under it from the right, shaking her small black umbrella. Albert shifts closer to the boarded door to make room for her. They stand side by side looking out at the rain.",
+      "sound": "heavy rain drumming on corrugated iron, water pouring into a gutter, wind",
+      "claims": ["heavy rain", "both under the awning, Albert left, Margaret right"],
+      "sheets": true,
+      "loc_ref": true,
+      "extra_refs": ["frames/n29.webp"]
+    },
+    {
+      "id": "n29",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 10,
+      "cast": ["albert", "margaret"],
+      "key": "Medium two-shot under the rusted iron awning in heavy rain, both seen from the front, standing side by side looking out past the camera at the rain. Albert on the left, hands in his coat pockets. Margaret on the right, in her wet green coat, pulling her cream scarf tighter, her eyes on the grey harbour. Whitewashed shop windows behind them, rain streaming off the awning in front.",
+      "action": "Static two-shot. They watch the rain. Margaret speaks quietly without looking at him. Albert listens, eyes on the rain, and says nothing.",
+      "sound": "rain drumming on iron above, water running",
+      "lines": [
+        ["margaret", "I thought there'd be something left for me here. Some thread to pick up."]
+      ],
+      "claims": ["Margaret right, Albert left", "only Margaret speaks"],
+      "loc_ref": true
+    },
+    {
+      "id": "n30",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 13,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, under the awning, in profile facing left towards the rain, drops of water in her silver hair, the wet collar of her green coat turned up, her face tired and far away. The background is exactly the place of the reference picture of this scene: directly behind the figure the white boarded wall of the old harbour shed, above it the edge of the rusty corrugated iron awning dripping with rain; to the side, out of focus, the grey harbour water and the old black wooden boat. NO promenade, NO railing, NO canvas.",
+      "action": "Static close-up. Margaret speaks slowly, looking out at the harbour, with a small pause after the first sentence. At the end she gives a faint, embarrassed smile and looks down.",
+      "sound": "rain drumming on iron, a gutter dripping",
+      "lines": [
+        [
+          "margaret",
+          "The house is cold, Albert. Even with the fire lit. I spend half my time listening to the timbers creak."
+        ]
+      ],
+      "loc_ref": false,
+      "extra_refs": ["frames/n29.webp"]
+    },
+    {
+      "id": "n31",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 12,
+      "cast": ["albert", "margaret"],
+      "key": "Medium two-shot under the rusted iron awning as the rain eases, both seen from the front, side by side. Margaret on the right looks out past the camera at the sea, far away in thought. Albert on the left has turned his head to look at her profile.",
+      "action": "Static two-shot. The rain thins. Margaret, looking out at the sea, speaks slowly and lightly, as of something long past; she pauses, then adds the second sentence with a small shrug. Albert stares at her; his lips part but he does not speak.",
+      "sound": "thinning rain on iron, dripping water, a far gull",
+      "lines": [
+        [
+          "margaret",
+          "Do you know, I still wonder why your brother left without a word. I suppose he'd changed his mind."
+        ]
+      ],
+      "claims": ["only Margaret speaks", "Albert looks at her"],
+      "loc_ref": true
+    },
+    {
+      "id": "n32",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 6,
+      "cast": ["albert"],
+      "key": "Close-up of Albert, alone in frame, under the awning, facing right, under his peaked cap, his pale blue eyes wide and stricken, staring at someone just off-screen to the right. Water drips from the awning edge in front of him. The background is exactly the place of the reference picture of this scene: directly behind the figure the white boarded wall of the old harbour shed, above it the edge of the rusty corrugated iron awning dripping with rain; to the side, out of focus, the grey harbour water and the old black wooden boat. NO promenade, NO railing, NO canvas.",
+      "action": "Static close-up. Albert stares at her as if he had been struck. His mouth opens to speak and closes again. His hand comes up and grips the satchel strap on his chest until the knuckles whiten.",
+      "sound": "dripping water, the last thin rain",
+      "claims": ["Albert silent"],
+      "loc_ref": false,
+      "extra_refs": ["frames/n29.webp"]
+    },
+    {
+      "id": "n33",
+      "layer": "now",
+      "scene": "awning_now",
+      "duration": 9,
+      "cast": ["albert", "margaret"],
+      "key": "Wide shot of the harbour front after the rain, pale watery light on wet cobbles, exactly as in the location reference. Albert stands on the left under the rusted awning. Margaret, on the right, has stepped out from under it onto the wet cobbles with her small black umbrella held low, half turned back towards him. Albert wears his navy peaked cap, exactly as in the reference picture of this scene.",
+      "action": "Static wide shot. Margaret gives him a faint tired smile, says her goodbye, turns and walks away along the wet harbour front out of the right of the frame. Albert stays under the awning without moving, looking after her.",
+      "sound": "dripping water, slow steps on wet cobbles, a far gull",
+      "lines": [["margaret", "Well. The worst of it has passed. Goodbye, Albert."]],
+      "claims": ["she leaves to the right", "he stays"],
+      "sheets": true,
+      "loc_ref": true,
+      "extra_refs": ["frames/n29.webp"]
+    },
+    {
+      "id": "n34",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Wide shot from the lane exactly as in the location reference, at blue dusk: Albert, seen from behind in the foreground left, stands in front of the closed, weathered green garden gate with his satchel at his hip. The cottage is dark, but in its small window a single warm yellow lamp has just been lit.",
+      "action": "Static wide shot at dusk. Albert stands at the closed gate. The lamp glows in the window. His right hand comes up and presses on the breast of his coat, over the pocket. A gull cries overhead.",
+      "sound": "evening wind, far surf, one gull crying",
+      "claims": ["dusk", "gate closed", "lamp in the window, as in 1966"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "n35",
+      "layer": "now",
+      "scene": "latch_now",
+      "duration": 7,
+      "cast": [],
+      "key": "Extreme close-up exactly as in the location reference, at blue dusk with a warm lit window blurred behind: the rusted black iron latch on the worn green gate. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button rests on the latch handle.",
+      "action": "Static extreme close-up. The old hand grips the knob of the iron bolt and draws it half way back, holds it there, trembling, and then slides the bolt home again with a dull clink. The hand slides off the gate and out of frame. The gate has not opened.",
+      "sound": "an iron latch lifted a little and dropped back with a dull clink, evening wind",
+      "claims": ["latch lifted slightly and dropped", "gate stays closed"],
+      "note": "Third latch picture.",
+      "loc_ref": true
+    },
+    {
+      "id": "n36",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": [],
+      "key": "High-angle close-up over the scrubbed pine kitchen table in blue dawn light: the open leather mail satchel with three thin white envelopes standing in it. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button is sliding the small yellowed envelope with its dark green wax seal into the satchel behind the white envelopes.",
+      "action": "Static high-angle close-up. The old hand slides the yellowed, green-sealed envelope down into the satchel behind the white envelopes, where it looks small and out of place. The hand closes the flap and presses the brass buckle shut.",
+      "sound": "old paper sliding on leather, a brass buckle clicking shut like a lock",
+      "claims": ["the old letter goes into the satchel"],
+      "props": ["letter_old"],
+      "extra_refs": [
+        ["frames/a04.webp", "shows the same table and satchel from the same angle; match it."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "n37",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 11,
+      "cast": ["albert", "maelis"],
+      "key": "Medium two-shot at the post office counter, grey morning. Maelis on the right behind the counter, facing left, holds out a small bundle of three white envelopes held with a rubber band. Albert on the left, facing right, in cap and coat, his satchel on the counter in front of him, takes the bundle.",
+      "action": "Static two-shot. Maelis hands the small bundle across the counter and speaks. Albert takes it, puts it in the satchel, and answers softly, laying his hand flat on the satchel flap.",
+      "sound": "a wall clock ticking, cardboard boxes shifting",
+      "lines": [
+        ["maelis", "Just the three for the harbour end today."],
+        ["albert", "And one of my own."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "n38",
+      "layer": "now",
+      "scene": "gate_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Medium shot at the garden gate in thick grey sea fog. Albert, in cap and coat, stands outside the closed weathered green gate, seen from the side, facing right. In his right hand he holds the small yellowed envelope with the green wax seal. In front of him, just inside the wall, the red metal mailbox on its wooden post. The cottage is a grey shape in the fog.",
+      "action": "Static medium shot; the camera does not move and nothing new enters the picture. Albert looks down at the envelope in his hand for a long moment, then lifts his eyes to the small red mailbox on the wall and slowly raises the hand with the letter a little towards it. He stops there.",
+      "sound": "thick quiet, water dripping from eaves, muffled surf, a mailbox lid squeaking",
+      "claims": ["Albert holds the old letter at the gate", "he looks at the red mailbox"],
+      "props": ["letter_old"],
+      "loc_ref": true
+    },
+    {
+      "id": "n39",
+      "layer": "now",
+      "scene": null,
+      "duration": 8,
+      "cast": [],
+      "key": "Extreme close-up in grey fog: the slot of a red metal mailbox with peeling paint, its lid held open by an old man's thin fingers. The corner of a small yellowed envelope with a dark green wax seal is held at the mouth of the slot by an old man's thin, veined hand with a dark navy wool coat cuff with one brass button, half way in.",
+      "action": "Static extreme close-up. The yellowed envelope hangs at the mouth of the slot, half in. The old hand holds it there, trembling, for a long moment. Then the hand slowly draws the envelope back out. The lid falls shut with a sharp metal clack.",
+      "sound": "dripping water, held breath, then a sharp metal clack",
+      "claims": ["the letter does NOT go into the mailbox", "lid falls shut"],
+      "props": ["letter_old"],
+      "extra_refs": [
+        ["loc/gate_now.webp", "shows the red mailbox by the gate; paint this mailbox in close-up."]
+      ],
+      "note": "Thomas's line 'Put it right into her hand' from t08 is laid over this shot in the edit.",
+      "loc_ref": false
+    },
+    {
+      "id": "n40",
+      "layer": "now",
+      "scene": "latch_now",
+      "duration": 6,
+      "cast": [],
+      "key": "Extreme close-up exactly as in the location reference, in grey fog, beads of water on the iron: the rusted black iron latch on the worn green gate. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button grips the latch handle firmly.",
+      "action": "Static extreme close-up. The old hand grips the knob of the rusted iron bolt and draws the bolt all the way back out of its keeper with one firm pull. Then the hand pushes the gate and the whole gate swings wide open, away from the camera and out of frame, leaving the view through to the flagstone path and the cottage door in the fog.",
+      "sound": "an iron latch lifting with a clear clink, a gate swinging open on a long creak",
+      "claims": ["latch lifts fully", "the gate swings open"],
+      "note": "Fourth latch picture: the one he could not do for forty years.",
+      "loc_ref": true
+    },
+    {
+      "id": "n41",
+      "layer": "now",
+      "scene": "door_now",
+      "duration": 6,
+      "cast": ["albert"],
+      "key": "Wide shot in sea fog from the flagstone garden path, no gate in the picture, faded rust-brown hydrangeas at the sides: Albert, seen from behind, in cap and coat with his satchel, stands on the flagstone path in front of the low dark green cottage door, his left fist raised to knock. In his right hand at his side, the small yellowed envelope.",
+      "action": "Static wide shot. Albert stands before the door a moment, straightens his back, and knocks three times. He takes off his peaked cap and holds it against his chest, waiting.",
+      "sound": "three knocks on a wooden door, dripping water, muffled surf",
+      "claims": ["he knocks", "he takes his cap off"],
+      "props": ["letter_old"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "n42",
+      "layer": "now",
+      "scene": "door_now",
+      "duration": 8,
+      "cast": ["albert", "margaret"],
+      "key": "Medium two-shot at the open cottage door in sea fog. Margaret on the right stands in the open doorway in a moss-green knitted wool cardigan and her cream scarf (NOT her coat), bare hands, facing left, one hand on the door, surprised. Albert on the left, facing right, bare-headed, his peaked cap held against his chest in his left hand, his white hair damp with fog.",
+      "action": "Static two-shot. Margaret, in the doorway, looks at him in mild surprise and speaks. Albert does not answer; he lowers his eyes to something in his right hand below the frame.",
+      "sound": "a door opening, dripping water, a kettle far inside the house",
+      "lines": [["margaret", "Albert? There's nothing due today, surely."]],
+      "claims": ["Albert bare-headed, cap in hand", "Margaret in the doorway on the right"],
+      "loc_ref": true
+    },
+    {
+      "id": "n43",
+      "layer": "now",
+      "scene": null,
+      "duration": 7,
+      "cast": [],
+      "key": "Close-up between two people standing at a cottage doorway in fog: an old man's thin, veined hand with a dark navy wool coat cuff with one brass button on the left holds out the small yellowed envelope, back side up, its dark green wax seal unbroken, towards a woman's fine old hand with a moss-green cardigan cuff reaching from the right.",
+      "action": "Static close-up. The old man's hand holds the yellowed envelope out. The woman's hand hesitates in the air, then takes it. His hand stays open and empty for a moment, then falls away. Her thumb moves slowly over the green wax seal.",
+      "sound": "old paper passing from hand to hand, dripping water",
+      "claims": ["the letter goes from his hand into her hand", "seal unbroken"],
+      "props": ["letter_old"],
+      "loc_ref": false
+    },
+    {
+      "id": "n44",
+      "layer": "now",
+      "scene": "door_now",
+      "duration": 11,
+      "cast": ["albert"],
+      "key": "Close-up of Albert, alone in frame, bare-headed in the fog at the cottage door, facing right, damp white hair, his pale blue eyes raised to someone off-screen to the right, his face naked and afraid.",
+      "action": "Static close-up. Albert forces himself to look up at her and speaks slowly, with difficulty, pausing between the two sentences. After the last word he holds her gaze and does not look away.",
+      "sound": "dripping water, muffled surf",
+      "lines": [
+        ["albert", "It's forty years late. Thomas put it in my hand the morning they sailed."]
+      ],
+      "loc_ref": false
+    },
+    {
+      "id": "n45",
+      "layer": "now",
+      "scene": "door_now",
+      "duration": 7,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, in the cottage doorway, facing left, in her moss-green knitted wool cardigan and cream scarf (NOT her coat), bare hands without gloves, looking down at the small yellowed envelope with the green wax seal that she holds in both hands at the bottom of the frame. Warm dim light from the room behind her, grey fog light on her face.",
+      "action": "Static close-up. Margaret stares down at the envelope. Her breath catches. Very slowly she raises her eyes from the letter to the man off-screen on the left, and her face goes still and white. She does not speak.",
+      "sound": "dripping water, a kettle beginning to whistle far inside the house",
+      "claims": ["she holds the letter", "she is silent"],
+      "props": ["letter_old"],
+      "loc_ref": false
+    },
+    {
+      "id": "n46",
+      "layer": "now",
+      "scene": "door_now",
+      "duration": 7,
+      "cast": ["albert", "margaret"],
+      "key": "Wide shot in fog from the garden, no gate in the picture: Margaret stands small in the open cottage doorway on the right, in her moss-green knitted cardigan (NOT her coat), holding the yellowed envelope against her chest with both hands. Albert, on the left, has turned away and is walking down the flagstone path between faded rust-brown hydrangeas towards the left edge of the frame, putting his peaked cap back on, his satchel at his hip.",
+      "action": "Static wide shot. Albert walks away down the flagstone path and out of the left of the frame into the fog, without looking back. Margaret stays in the doorway holding the letter to her chest, watching him go.",
+      "sound": "slow boot steps on flagstones, dripping water, a kettle whistling inside",
+      "claims": ["he leaves", "she stays with the letter"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "n47",
+      "layer": "now",
+      "scene": "office_now",
+      "duration": 7,
+      "cast": [],
+      "key": "Close-up on the bare wooden post office counter in dim grey light, the room behind dark and empty: the leather mail satchel lies flat and empty on the counter, its strap coiled. An old man's thin, veined hand with a dark navy wool coat cuff with one brass button is setting down beside it a brass ring with three keys.",
+      "action": "Static close-up. The old hand lays the ring of keys down on the counter beside the empty satchel. The hand rests on the worn leather of the bag for a moment, then lifts away and leaves the frame.",
+      "sound": "keys set down on wood, leather creaking, then a door closing and a lock clicking far off",
+      "claims": ["satchel and keys left on the counter"],
+      "extra_refs": [
+        ["library/albert/albert_sheet.webp", "shows the leather satchel; paint this satchel."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "n48",
+      "layer": "now",
+      "scene": "kitchen_now",
+      "duration": 7,
+      "cast": ["albert"],
+      "key": "Medium shot in the cottage kitchen in fading grey afternoon light. Albert sits at the scrubbed pine table, bare-headed, in his grey wool cardigan over a white shirt, both hands lying flat and empty on the table top, staring at the door. No satchel, no strap across his chest, no cap, no letter. By the stove the old terrier lies on his blanket watching him.",
+      "action": "Static medium shot. Albert sits quite still with his big hands flat on the table, waiting. The light fades. The dog lifts his head and looks at him. Albert looks at his empty hands, then pushes back his chair and stands.",
+      "sound": "a clock ticking, wind rattling a latch, a fly at a window pane",
+      "claims": ["hands empty on the table", "no uniform, no bag"],
+      "props": ["biscuit"],
+      "loc_ref": true
+    },
+    {
+      "id": "n49",
+      "layer": "now",
+      "scene": "bay_now",
+      "duration": 7,
+      "cast": ["albert_b"],
+      "key": "Very wide shot of the bay at blue dusk exactly as in the location reference: the long derelict timber pier, the tide in now, dark water around the pilings, one small red buoy light far out. Albert, tiny, bare-headed, in a dark coat without his satchel, walks out along the pier towards its far end.",
+      "action": "Static very wide shot at dusk. The tiny figure of Albert walks steadily out along the old pier, step by step, towards the landing stage at its end, growing smaller. Waves keep rolling in and breaking on the shore. Far out on the dark water a red buoy light goes on and off, on and off.",
+      "sound": "the tide slapping against timber piles, evening wind, old planks groaning",
+      "claims": ["dusk", "he walks out on the pier", "he has no satchel and no cap"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "n50",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 8,
+      "cast": ["albert_b", "margaret"],
+      "key": "Wide shot at the far end of the old pier at dusk exactly as in the location reference. On the left, at the edge of the stone landing stage, Albert stands bare-headed in his dark navy coat without his satchel, seen from behind, looking out to sea. From the foreground right, seen from behind, Margaret in her dark green coat walks out along the planks towards him, a sheet of yellowed letter paper in her gloved hand.",
+      "action": "Static wide shot. Margaret walks slowly out along the planks towards Albert and stops a few paces behind him on the right. He hears her step and turns his head. The wind pulls at her coat and at the paper in her hand. Far out the red buoy light blinks.",
+      "sound": "slow steps on old planks, wind, the tide against stone, paper fluttering",
+      "claims": ["Albert left without satchel or cap", "Margaret right holding the opened letter"],
+      "sheets": true,
+      "loc_ref": true
+    },
+    {
+      "id": "p01",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 6,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, at the end of the pier at dusk, facing left, the collar of her green coat turned up, white strands of hair escaping in the wind, her eyes red-rimmed but her face very still. Blue dusk at the far end of the old pier, dark grey sea behind, wind. The background is exactly the place of the reference picture of this scene: behind the figure only open grey sea, dusk sky and, out of focus, the rusted iron frame of the old landing stage at the very end of the bare wooden pier. There is NO second pier, NO railing, NO town and NO shore anywhere in the picture.",
+      "action": "Static close-up. Margaret looks at him steadily, red-eyed and still, and asks her question quietly. Then she waits.",
+      "sound": "wind, the tide against stone",
+      "lines": [["margaret", "Why, Albert?"]],
+      "loc_ref": false,
+      "extra_refs": ["frames/p05.webp"]
+    },
+    {
+      "id": "p02",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 13,
+      "cast": ["albert_b"],
+      "key": "Close-up of Albert, alone in frame, at the end of the pier at dusk, bare-headed, facing right, wind in his thin white hair, the collar of his navy coat up, looking down. Blue dusk at the far end of the old pier, dark grey sea behind, wind. The background is exactly the place of the reference picture of this scene: behind the figure only open grey sea, dusk sky and, out of focus, the rusted iron frame of the old landing stage at the very end of the bare wooden pier. There is NO second pier, NO railing, NO town and NO shore anywhere in the picture.",
+      "action": "Static close-up. Albert looks down at the planks and speaks slowly, each short sentence costing him, and raises his eyes to her on the last one.",
+      "sound": "wind, the tide against stone",
+      "lines": [
+        [
+          "albert_b",
+          "I was afraid. He was the one people looked at. I knew if you read it, you'd go with him."
+        ]
+      ],
+      "loc_ref": false,
+      "extra_refs": ["frames/p05.webp"]
+    },
+    {
+      "id": "p03",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 8,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, at the end of the pier at dusk, in profile facing left, looking out past him at the dark sea, hair blowing, a tear track on her cheek. Blue dusk at the far end of the old pier, dark grey sea behind, wind. The background is exactly the place of the reference picture of this scene: behind the figure only open grey sea, dusk sky and, out of focus, the rusted iron frame of the old landing stage at the very end of the bare wooden pier. There is NO second pier, NO railing, NO town and NO shore anywhere in the picture.",
+      "action": "Static close-up. Margaret looks out at the dark water and speaks softly, without anger, almost to the sea.",
+      "sound": "wind, the tide against stone",
+      "lines": [["margaret", "I would have. I'd have gone anywhere he asked."]],
+      "loc_ref": false,
+      "extra_refs": ["frames/p05.webp"]
+    },
+    {
+      "id": "p04",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 9,
+      "cast": ["albert_b", "margaret"],
+      "key": "Medium two-shot at the end of the pier at dusk. Margaret on the right, facing left, looks down at the unfolded sheet of yellowed letter paper in her gloved hands. Albert on the left, bare-headed, facing right, watches her. Blue dusk at the far end of the old pier, dark grey sea behind, wind.",
+      "action": "Static two-shot. Margaret looks down at the letter in her hands; a small sad smile touches her mouth as she speaks, and fades. Albert watches her and says nothing.",
+      "sound": "wind, paper fluttering, the tide",
+      "lines": [["margaret", "He was twenty-two. He never could spell 'sincerely'."]],
+      "claims": ["she holds the opened letter", "only Margaret speaks"],
+      "loc_ref": true
+    },
+    {
+      "id": "p05",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 12,
+      "cast": ["albert_b", "margaret"],
+      "key": "Medium two-shot at the end of the pier at dusk. Margaret on the right has turned fully to face Albert, the letter held at her side, her coat flaring in the wind. Albert on the left, bare-headed, faces her, hands deep in his coat pockets. Blue dusk at the far end of the old pier, dark grey sea behind, wind.",
+      "action": "Static two-shot. Margaret speaks in a low voice, looking straight at him. Albert takes it without flinching and answers with two quiet words.",
+      "sound": "wind, the tide against stone",
+      "lines": [
+        ["margaret", "All those years you stood at my gate. You looked me in the eye."],
+        ["albert_b", "I did."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "p06",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 8,
+      "cast": ["albert_b", "margaret"],
+      "key": "Closer two-shot at the end of the pier at dusk, a pale rising moon behind thin cloud. Margaret on the right, facing left, tears on her cheeks catching the pale light, her face steady. Albert on the left, bare-headed, facing right. Blue dusk at the far end of the old pier, dark grey sea behind, wind.",
+      "action": "Static two-shot. Margaret speaks steadily in spite of the tears on her face. Albert nods once and answers.",
+      "sound": "wind, the tide against stone",
+      "lines": [
+        ["margaret", "It was a cruel thing, Albert."],
+        ["albert_b", "I know."]
+      ],
+      "loc_ref": true
+    },
+    {
+      "id": "p07",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 11,
+      "cast": ["margaret"],
+      "key": "Close-up of Margaret, alone in frame, at the end of the pier at dusk, facing left, tear tracks on her lined cheeks, hair blowing, her grey eyes on him, exhausted and sad rather than angry. Blue dusk at the far end of the old pier, dark grey sea behind, wind. The background is exactly the place of the reference picture of this scene: behind the figure only open grey sea, dusk sky and, out of focus, the rusted iron frame of the old landing stage at the very end of the bare wooden pier. There is NO second pier, NO railing, NO town and NO shore anywhere in the picture.",
+      "action": "Static close-up. Margaret speaks slowly, shaking her head very slightly on the second sentence. After the last words she breathes out, and the hardness leaves her face.",
+      "sound": "wind, the tide against stone",
+      "lines": [
+        ["margaret", "I can't tell you it's all right. It isn't. We can't have those years back."]
+      ],
+      "loc_ref": false,
+      "extra_refs": ["frames/p05.webp"]
+    },
+    {
+      "id": "p08",
+      "layer": "now",
+      "scene": null,
+      "duration": 6,
+      "cast": [],
+      "key": "Close-up at dusk: a woman's hand in a dark green wool glove comes to rest lightly on the sleeve of a dark navy wool coat with brass buttons at the cuff. Dark grey sea blurred behind. Blue evening light.",
+      "action": "Static close-up. The green-gloved hand reaches out, hesitates, and comes to rest lightly on the navy sleeve. It presses gently and stays there. The arm under it trembles.",
+      "sound": "wind, wool on wool, the tide",
+      "claims": ["her green glove on his navy sleeve"],
+      "loc_ref": false
+    },
+    {
+      "id": "p09",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 9,
+      "cast": ["albert_b", "margaret"],
+      "key": "Closer two-shot at the end of the pier at dusk. Margaret on the right, facing left, her green-gloved hand resting on Albert's sleeve, looks up into his face. Albert on the left, bare-headed, facing right, looks at her, a tear on his stubbled chin. Blue dusk at the far end of the old pier, dark grey sea behind, wind.",
+      "action": "Static two-shot. Only Margaret, the woman, speaks: her lips move, very quietly, with a pause between the two sentences, her hand resting on his sleeve. Albert, the old man, says nothing at all; his lips stay pressed together the whole time. As she finishes, his face breaks and he bows his head. They do not embrace.",
+      "sound": "wind dropping, the tide against stone",
+      "lines": [["margaret", "But you brought it. In the end, you brought it."]],
+      "claims": ["her hand on his sleeve", "only Margaret speaks"],
+      "loc_ref": true
+    },
+    {
+      "id": "p10",
+      "layer": "now",
+      "scene": "pierend_now",
+      "duration": 12,
+      "cast": ["albert_b", "margaret"],
+      "key": "Very wide shot from behind at the far end of the old pier in the last blue light of dusk: two small figures stand side by side at the edge of the stone landing stage, seen from behind, Albert bare-headed in navy on the left and Margaret in green on the right, close but not touching, looking out over the vast dark sea. Far out on the water the single red buoy light.",
+      "action": "Static very wide shot, held long. The two old people stand side by side without moving, looking out to sea. The dark tide surges against the stone. Far out the red buoy light blinks slowly, on and off, on and off, as the last light goes.",
+      "sound": "the tide surging slowly against stone, a soft wind, a far bell buoy",
+      "claims": ["two figures side by side, seen from behind", "red buoy light blinking"],
+      "sheets": true,
+      "loc_ref": true
+    }
+  ],
+  "png_frames": true,
+  "outdoor_scenes": [
+    "pierend_now",
+    "gate_now",
+    "awning_now",
+    "door_now",
+    "slip_now",
+    "regatta_then",
+    "pier_then",
+    "latch_now",
+    "latch_then",
+    "gate_then",
+    "storm_then",
+    "churchyard_then",
+    "bay_now",
+    "street_now"
+  ],
+  "outdoor": "The whole picture is alive, never a frozen photograph: the sea and its waves keep moving, grass, plants, hair and cloth stir in the wind.",
+  "dialogue": "native"
+}

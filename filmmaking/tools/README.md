@@ -1,6 +1,6 @@
 # Tools
 
-The scripts that made the films, copied as they were on 2026-11-24. They are
+The scripts that made the films, copied as they were on 2026-11-25. They are
 working scripts, not a library: short, written for one job, and run from
 inside a film's folder (or with `FILM_ROOT` set to it).
 
@@ -19,6 +19,16 @@ again when a film is finished.
 | `edit.py`         | Cuts the movie from `edl.json` and `cut.json`, including J-cuts, L-cuts, music beds and a title.                                                              |
 | `progress.py`     | Builds a film's progress page from `progress.json` and its ledger.                                                                                            |
 | `drive_upload.py` | Uploads files of any size to Google Drive, lists folders, and can share a file by link.                                                                       |
+| `watch.py`        | Asks a listening and watching model a question about a sound file or a clip.                                                                                  |
+| `watchreview.py`  | Sends each chosen clip with its action and picture-facts to the watching model and prints KEEP or RETAKE per shot.                                            |
+| `voiceid.py`      | Speaker embeddings: is this the same voice as that one? Needs `torch` and `resemblyzer`.                                                                      |
+| `voicecut.py`     | Cuts one recording of all of a character's lines into one file per line, by word times.                                                                       |
+| `dialogue.py`     | Lays a shot's recorded lines on a track with room for the action and has a still lip-synced to it.                                                            |
+| `lipsync.py`      | One lip-sync job through the ledger.                                                                                                                          |
+| `speechtimes.py`  | Word times and script match for every dialogue clip; the edit trims by them.                                                                                  |
+| `longcut.py`      | Cuts a long film in two passes: one file per cut, exact joins, cross-fades, grades per time layer, voice-overs, music, title cards.                           |
+| `synccheck.py`    | Checks in the finished film that first words fall where the edit puts them.                                                                                   |
+| `sheet.py`        | Contact sheet of any stills. `strip.py`: time-stamped frames of a clip.                                                                                       |
 | `sync.sh`         | Example of building the spend summary and copying a film folder to the shared files. Paths are specific to the first film.                                    |
 
 ## What they need

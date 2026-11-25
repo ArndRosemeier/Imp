@@ -16,7 +16,7 @@ import argparse, base64, json, os, sys, time, urllib.request, urllib.error
 ROOT = os.path.abspath(os.environ.get("FILM_ROOT") or os.getcwd())  # the movie folder: one per movie
 LEDGER = os.path.join(ROOT, "ledger.json")
 BASE = "https://openrouter.ai/api/v1"
-BUDGET_USD = 20.0
+BUDGET_USD = 20.0  # default; each ledger carries its own budget_usd
 KEY = os.environ.get("OPEN_ROUTER_KEY") or os.environ.get("OPENROUTER_API_KEY") or ""
 
 
@@ -51,7 +51,7 @@ def save(ledger):
 
 
 def spent(ledger):
-    return sum(e.get("cost_usd") or e.get("est_usd") or 0 for e in ledger["entries"])
+    return sum(e["cost_usd"] if e.get("cost_usd") is not None else (e.get("est_usd") or 0) for e in ledger["entries"])
 
 
 def guard(ledger, est):
@@ -162,7 +162,7 @@ def finish(name, max_wait=1500):
         if st == "completed": break
         if st not in ("pending", "in_progress"):
             record(ledger, job["key_before"], kind="video-failed", name=name, model=job["model"],
-                   cost_usd=(r.get("usage") or {}).get("cost"), error=str(r.get("error"))[:400])
+                   cost_usd=(r.get("usage") or {}).get("cost") or 0.0, error=str(r.get("error"))[:400])  # a failed job is not charged; never book the key delta of parallel jobs to it
             sys.exit(f"job {st}: {r.get('error')}")
         if time.time() - t0 > max_wait:
             sys.exit("still running; run: film.py poll " + name)

@@ -95,3 +95,40 @@ music. Arnd says Lyria does a decent job.
    their joins. Candidates not yet tried: models that continue from the
    previous clip as video input.
 3. A way for Claude to review motion and sound directly.
+
+## Added 2026-11-25 (The Last Letter at Dunmore Pier)
+
+From this film on Claude has a second opinion on motion and sound from a
+model that watches and listens (see the lessons log). It is still not the
+same as Arnd watching.
+
+| Job              | Model                                      | Price when tested        | Verdict                                                                                    |
+| ---------------- | ------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| Video + sound    | `alibaba/wan-3.0`                          | about $0.06 per s, 720p  | The workhorse for photoreal people. 2 to 30 s, first and last frame, speaks lines.         |
+| Video + sound    | `google/gemini-omni-1.2-flash`             | not charged              | Failed every job on 2026-11-24 evening and 2026-11-25.                                     |
+| Video + sound    | `bytedance/seedance-2.0-mini`, `2.5-flash` | not charged              | Refuse photoreal stills of people ("may contain real person").                             |
+| Video + sound    | `x-ai/grok-imagine-video-1.5-lite`         | $0.03 per s              | First frame only. Voices drift between shots (0.53).                                       |
+| Lip-sync         | `heygen/heygen-avatar-6-turbo`             | $0.05 per s, 1080p       | A still performs a supplied recording. Frozen background, one clear mouth per clip.        |
+| Speech           | `bytedance-seed/seed-audio-1-0`            | about 2 cents per minute | One request per character pins the voice. Describe the voice in the prompt text.           |
+| Listen and watch | `google/gemini-4-hydrogen`                 | 1 to 3 cents per clip    | Names speakers, lips, actions, frozen or morphing things. Sometimes wrong, sometimes mute. |
+| Word times       | `elevenlabs/scribe-v2`                     | about a cent per clip    | Word timestamps good enough to cut lines and to check sync.                                |
+
+### Wan 3.0
+
+- Needs PNG or JPEG frames (`shots.json` `png_frames`). About two to four
+  minutes per clip. Six or seven jobs at once worked.
+- Speaks scripted lines with the right mouth in two-shots (one clip of 30
+  gave the line to the wrong person). All 30 dialogue clips had every word.
+- Froze a sea twice; "the sea and its waves keep moving, grass, hair and
+  cloth stir" in outdoor prompts helped.
+- Ignores an audio reference. Its content filter refused one keyframe twice
+  ("Green net check rejected media"); a repainted still passed.
+- One batch of four jobs failed with HTTP 520 and ran on the second try.
+
+### References by link
+
+Audio and video references must be HTTPS links; data URLs are refused. With
+Arnd's permission a file can be shared from Drive for the length of a job
+(`drive_upload.py share`, then `unshare`). On 2026-11-25 this did not unlock
+anything for photoreal people: Wan ignored the recording and HeyGen asked for
+identity verification.
